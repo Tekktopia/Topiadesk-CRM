@@ -7,7 +7,7 @@ TopiaDesk CRM is a single-tenant, enterprise-grade CRM built for Scib Nigeria
 lifecycle visibility, pipeline management, coordination — not the system of
 record for policy administration, claims adjudication, or financial
 transactions. Those remain in Scib's Core Broking System and ERP, which
-TopiaDesk integrates with (see `apps/api/src/modules/integrations/`).
+TopiaDesk integrates with (see `backend/api/src/modules/integrations/`).
 
 It's built to be materially more capable than Freshdesk/Zendesk for this use
 case in four specific ways, each addressing a documented gap in those
@@ -22,10 +22,11 @@ per-resolution billing.
 ## Monorepo layout
 
 ```
-apps/
+backend/
   api/      NestJS — the only writer of business data, all Prisma access goes through it or worker
-  web/      Next.js 15 (App Router) — the UI
   worker/   BullMQ background jobs (renewal alerts, audit checkpoints, premium aging refresh)
+frontend/
+  web/      Next.js 15 (App Router) — the UI
 packages/
   db/       Prisma schema (single source of truth) + hand-written RLS/audit SQL + RLS-aware client
   config/   zod-validated environment schema, shared by api/worker
@@ -38,10 +39,10 @@ docs/       this file, the Phase 2/3 roadmap, the operational runbook
 ## Request path
 
 ```
-Browser → Traefik (TLS) → apps/web (Next.js, session cookie)
+Browser → Traefik (TLS) → frontend/web (Next.js, session cookie)
                               │  Authorization: Bearer <Keycloak access token>
                               ▼
-                          apps/api (NestJS)
+                          backend/api (NestJS)
    RlsContextMiddleware ──► verifies JWT via Keycloak JWKS
                          ──► resolves local User + roles (users/roles tables, no RLS)
                          ──► binds an RlsContext into AsyncLocalStorage

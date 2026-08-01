@@ -4,7 +4,7 @@ import { brand, gold, slate } from './tokens';
 
 /**
  * Shared Tailwind preset for the TopiaDesk design system. Consuming apps
- * (apps/web) import this into their own `tailwind.config.ts` via
+ * (frontend/web) import this into their own `tailwind.config.ts` via
  * `presets: [uiPreset]` so the token set lives in exactly one place.
  *
  * Two color layers are exposed:

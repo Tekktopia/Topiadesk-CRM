@@ -299,7 +299,7 @@ services:
   migrate:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: backend/api/Dockerfile
       target: build
     restart: "no"
     logging: *default-logging
@@ -320,7 +320,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: backend/api/Dockerfile
       target: runtime
     restart: unless-stopped
     logging: *default-logging
@@ -354,7 +354,7 @@ services:
   worker:
     build:
       context: .
-      dockerfile: apps/worker/Dockerfile
+      dockerfile: backend/worker/Dockerfile
     restart: unless-stopped
     logging: *default-logging
     environment:
@@ -372,7 +372,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: apps/web/Dockerfile
+      dockerfile: frontend/web/Dockerfile
     restart: unless-stopped
     logging: *default-logging
     environment:

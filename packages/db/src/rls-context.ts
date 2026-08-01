@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 /**
- * Framework-agnostic RLS context, shared by apps/api and apps/worker.
+ * Framework-agnostic RLS context, shared by backend/api and backend/worker.
  * Every code path that touches the Prisma client MUST run inside
  * `runWithRlsContext` — the extension in client.ts falls back to running
  * queries with NO session-scoped Postgres role predicates applied if no

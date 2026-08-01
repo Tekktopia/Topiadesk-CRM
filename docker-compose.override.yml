@@ -39,7 +39,7 @@ services:
       - "9090:9090"
 
   grafana:
-    # Host 3001, not 3000 — apps/web already claims WEB_PORT=3000.
+    # Host 3001, not 3000 — frontend/web already claims WEB_PORT=3000.
     ports:
       - "3001:3000"
 

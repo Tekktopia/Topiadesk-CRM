@@ -123,7 +123,13 @@ jobs:
     needs: [lint-typecheck-unit]
     strategy:
       matrix:
-        service: [api, worker, web]
+        include:
+          - service: api
+            dockerfile: backend/api/Dockerfile
+          - service: worker
+            dockerfile: backend/worker/Dockerfile
+          - service: web
+            dockerfile: frontend/web/Dockerfile
     steps:
       - uses: actions/checkout@v4
 
@@ -131,7 +137,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: apps/${{ matrix.service }}/Dockerfile
+          file: ${{ matrix.dockerfile }}
           push: false
           tags: topiadesk-${{ matrix.service }}:ci
           load: true

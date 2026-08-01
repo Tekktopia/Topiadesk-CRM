@@ -4,7 +4,7 @@
  * Ships raw TS/TSX source (no build step, `main`/`types` point straight at
  * `src/index.ts`) — consuming Next.js apps must add this package to
  * `transpilePackages` in `next.config.mjs` so SWC compiles the JSX. See
- * apps/web/next.config.mjs.
+ * frontend/web/next.config.mjs.
  */
 
 // -- Design tokens ----------------------------------------------------------

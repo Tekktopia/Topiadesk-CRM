@@ -23,7 +23,7 @@ module. This document is the concrete contract for what comes next.
   Settled/Repudiated) with SLA-driven turnaround per stage, escalation on
   overdue stages — built on the same `AutomationRule` engine and
   `Notification.dedupeKey` idempotency pattern already proven for renewal
-  alerts in Phase 1's `apps/worker/src/jobs/renewal-alerts/`.
+  alerts in Phase 1's `backend/worker/src/jobs/renewal-alerts/`.
 - **Dependency**: insurer portal integration for real-time claim status
   (extends the `IntegrationConnector`/`SyncJob`/`IntegrationLog` framework
   already built — a second connector implementation alongside the Phase 1

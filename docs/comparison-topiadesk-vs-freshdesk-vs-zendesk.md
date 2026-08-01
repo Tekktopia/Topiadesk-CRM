@@ -83,7 +83,7 @@ cost per request, gated by `AI_ORG_MONTHLY_SPEND_CAP_USD` and
 metered-and-hope model. *(Implementation status: the endpoint contract is
 live and Swagger-documented; the Anthropic SDK wrapper and the actual cap
 enforcement are Batch 1 scope — see the module's header comment in
-`apps/api/src/modules/ai-gateway/ai-gateway.controller.ts`. Flagged here as
+`backend/api/src/modules/ai-gateway/ai-gateway.controller.ts`. Flagged here as
 an architectural commitment already reflected in the schema, not yet a
 shipped feature.)*
 

@@ -1,6 +1,6 @@
 /**
  * Hand-mirrored from packages/db/prisma/schema.prisma. Deliberately NOT
- * importing from @prisma/client here — apps/web should never need the
+ * importing from @prisma/client here — frontend/web should never need the
  * Prisma engine binary. Keep in sync manually; Batch 1/2 agents extending
  * the schema should update both places in the same change.
  */

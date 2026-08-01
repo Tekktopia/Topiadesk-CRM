@@ -11,7 +11,7 @@ The four demo users' `id` fields (`11111111-...`, `22222222-...`,
 `KC.admin` / `KC.manager` / `KC.broker` / `KC.compliance` in
 `packages/db/prisma/seed.ts`. TopiaDesk's own `User` table links to Keycloak
 via `keycloakSubjectId`, which is populated from the JWT's `sub` claim at
-login time (see `apps/api/src/common/auth/rls-context.middleware.ts`) — for
+login time (see `backend/api/src/common/auth/rls-context.middleware.ts`) — for
 the seeded local Postgres users to resolve to a real Keycloak identity, the
 Keycloak-side user ID must equal the Postgres-side `keycloakSubjectId`. If
 you add more seed users later, keep both files in sync.

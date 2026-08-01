@@ -8,9 +8,9 @@ what's intentionally not built yet.
 
 ## Stack
 
-- **Backend**: NestJS (`apps/api`), Prisma + Postgres 16/pgvector with
-  row-level security (`packages/db`), BullMQ background jobs (`apps/worker`)
-- **Frontend**: Next.js 15 App Router (`apps/web`), shadcn/ui design system
+- **Backend**: NestJS (`backend/api`), Prisma + Postgres 16/pgvector with
+  row-level security (`packages/db`), BullMQ background jobs (`backend/worker`)
+- **Frontend**: Next.js 15 App Router (`frontend/web`), shadcn/ui design system
   (`packages/ui`)
 - **Auth**: self-hosted Keycloak (OIDC/SSO/MFA)
 - **Infra**: Docker Compose — Postgres, PgBouncer, Redis, MinIO, Keycloak,
