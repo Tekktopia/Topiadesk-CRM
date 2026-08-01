@@ -1,0 +1,4 @@
+# TopiaDesk CRM is an internal enterprise application, not a public site —
+# nothing here should ever be indexed.
+User-agent: *
+Disallow: /

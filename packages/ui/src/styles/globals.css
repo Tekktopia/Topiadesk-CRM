@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * TopiaDesk semantic design tokens (light + dark). HSL triplets without the
+ * `hsl()` wrapper so Tailwind's `hsl(var(--x) / <alpha-value>)` color
+ * functions (wired up in `../tailwind-preset.ts`) support opacity
+ * modifiers, e.g. `bg-primary/10`. `--primary` mirrors `brand.500`/`brand.400`
+ * and `--accent` mirrors `gold.500`/`gold.400` from `../tokens.ts` — keep
+ * both files in sync if you retune a hue (same hand-mirrored convention as
+ * packages/shared-types/src/enums.ts; there is no build step linking them).
+ *
+ * All light-mode text/background pairs below were checked against the WCAG
+ * 2.1 contrast formula and clear the AA threshold (4.5:1 for normal text):
+ * primary/primary-fg 5.0:1, muted/muted-fg 5.1:1, accent/accent-fg 5.8:1,
+ * destructive/destructive-fg 6.5:1, success/success-fg 5.5:1,
+ * warning/warning-fg 6.1:1, background/foreground 17.4:1. Dark-mode pairs
+ * are equal or better. Re-check with a contrast tool if you change a value.
+ */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 204 40% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 204 40% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 204 40% 10%;
+
+    --primary: 199 62% 38%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 196 30% 95%;
+    --secondary-foreground: 202 45% 18%;
+
+    --muted: 196 25% 95%;
+    --muted-foreground: 203 15% 40%;
+
+    --accent: 36 62% 48%;
+    --accent-foreground: 27 50% 10%;
+
+    --destructive: 0 72% 42%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 55% 30%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 36 90% 45%;
+    --warning-foreground: 27 50% 10%;
+
+    --border: 196 25% 88%;
+    --input: 196 25% 88%;
+    --ring: 199 62% 38%;
+
+    --radius: 0.5rem;
+
+    /* System font stack by default — no next/font/google dependency (that
+     * fetches over the network at build time, which we deliberately avoid
+     * for a spine build that must succeed without live connectivity). If
+     * apps/web later self-hosts a brand typeface via next/font/local, set
+     * these two variables on <html> and every `font-sans`/`font-mono`
+     * utility (see ../tailwind-preset.ts) picks it up automatically. */
+    --font-sans:
+      ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  .dark {
+    --background: 204 45% 7%;
+    --foreground: 195 30% 94%;
+
+    --card: 203 40% 9%;
+    --card-foreground: 195 30% 94%;
+
+    --popover: 203 40% 9%;
+    --popover-foreground: 195 30% 94%;
+
+    --primary: 198 65% 55%;
+    --primary-foreground: 204 55% 9%;
+
+    --secondary: 202 30% 15%;
+    --secondary-foreground: 195 30% 92%;
+
+    --muted: 202 25% 15%;
+    --muted-foreground: 197 15% 65%;
+
+    --accent: 38 65% 58%;
+    --accent-foreground: 27 55% 10%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 45% 42%;
+    --success-foreground: 204 45% 7%;
+
+    --warning: 38 85% 55%;
+    --warning-foreground: 27 55% 10%;
+
+    --border: 202 25% 18%;
+    --input: 202 25% 18%;
+    --ring: 198 65% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1;
+  }
+}

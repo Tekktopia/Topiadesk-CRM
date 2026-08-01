@@ -1,0 +1,33 @@
+# Applies to every `docker build` in this repo (build context = repo root,
+# needed so multi-stage builds can see every pnpm workspace package).
+node_modules
+**/node_modules
+**/dist
+**/build
+**/.next
+**/.turbo
+**/*.tsbuildinfo
+**/coverage
+**/playwright-report
+**/test-results
+
+.git
+.github
+
+# Secrets — never end up in a build context/image layer, even though a
+# top-level .dockerignore also protects nested Dockerfiles.
+.env
+.env.*
+!.env.example
+
+infra/postgres/data
+infra/minio/data
+infra/traefik/certs/*
+!infra/traefik/certs/.gitkeep
+
+*.log
+.DS_Store
+.vscode
+.idea
+
+Business Requirement Document - CRM.docx

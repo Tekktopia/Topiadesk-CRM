@@ -1,0 +1,579 @@
+# =============================================================================
+# TopiaDesk CRM — Docker Compose base file.
+#
+# BASE FILE vs. OVERRIDE — the choice, explained once here:
+#   This file is written to be a complete, self-sufficient, "prod-like"
+#   stack on its own (no dev-only shortcuts, no debug ports opened beyond
+#   what Traefik fronts). `docker-compose.override.yml` sits next to it and
+#   is picked up AUTOMATICALLY by `docker compose up` with no `-f` flags
+#   (Compose's own convention) — it layers on local-dev-only convenience:
+#   direct host-port access to the data-layer services (so you can point a
+#   GUI client at Postgres/Redis/MinIO without going through Traefik) and
+#   the Traefik dashboard. A profiles-based approach was considered instead,
+#   but profiles are opt-IN (services with a profile are excluded by
+#   default), which is the wrong default here — every service below should
+#   run by default; only the *extra host-port exposure* is dev-only. The
+#   override file expresses that correctly: `docker compose up` = full
+#   prod-like stack + dev conveniences, `docker compose -f docker-compose.yml
+#   up` = the same stack with nothing extra exposed.
+#
+# Every credential below is a `${VAR}` pulled from `.env` (copy from
+# `.env.example`) — nothing is hardcoded. Every `depends_on` uses an
+# explicit `condition:`, not a bare service name, so startup ordering is
+# actually enforced rather than hoped for.
+# =============================================================================
+name: topiadesk
+
+x-common-app-env: &common-app-env
+  NODE_ENV: ${NODE_ENV}
+  LOG_LEVEL: ${LOG_LEVEL}
+  APP_URL: ${APP_URL}
+  API_URL: ${API_URL}
+  API_PORT: ${API_PORT}
+  WORKER_METRICS_PORT: ${WORKER_METRICS_PORT}
+  DATABASE_URL: ${DATABASE_URL}
+  DIRECT_URL: ${DIRECT_URL}
+  REDIS_URL: ${REDIS_URL}
+  MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+  MINIO_PORT: ${MINIO_PORT}
+  MINIO_USE_SSL: ${MINIO_USE_SSL}
+  MINIO_DOCUMENTS_BUCKET: ${MINIO_DOCUMENTS_BUCKET}
+  MINIO_AUDIT_WORM_BUCKET: ${MINIO_AUDIT_WORM_BUCKET}
+  MINIO_BACKUPS_BUCKET: ${MINIO_BACKUPS_BUCKET}
+  MINIO_APP_ACCESS_KEY: ${MINIO_APP_ACCESS_KEY}
+  MINIO_APP_SECRET_KEY: ${MINIO_APP_SECRET_KEY}
+  KEYCLOAK_URL: ${KEYCLOAK_URL}
+  KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+  KEYCLOAK_CLIENT_ID_API: ${KEYCLOAK_CLIENT_ID_API}
+  KEYCLOAK_CLIENT_SECRET_API: ${KEYCLOAK_CLIENT_SECRET_API}
+  KEYCLOAK_ISSUER_URL: ${KEYCLOAK_ISSUER_URL}
+  KEYCLOAK_JWKS_URI: ${KEYCLOAK_JWKS_URI}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+  AI_GATEWAY_MODEL: ${AI_GATEWAY_MODEL}
+  AI_ORG_MONTHLY_SPEND_CAP_USD: ${AI_ORG_MONTHLY_SPEND_CAP_USD}
+  AI_PER_USER_DAILY_REQUEST_CAP: ${AI_PER_USER_DAILY_REQUEST_CAP}
+  SMTP_HOST: ${SMTP_HOST}
+  SMTP_PORT: ${SMTP_PORT}
+  SMTP_SECURE: ${SMTP_SECURE}
+  SMTP_FROM: ${SMTP_FROM}
+  BACKUP_CRON_SCHEDULE: ${BACKUP_CRON_SCHEDULE}
+  BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS}
+  IP_WHITELIST_ENFORCED: ${IP_WHITELIST_ENFORCED}
+  MFA_REQUIRED_FOR_ROLES: ${MFA_REQUIRED_FOR_ROLES}
+  WEB_SESSION_SECRET: ${WEB_SESSION_SECRET}
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ---------------------------------------------------------------------------
+  # Data layer
+  # ---------------------------------------------------------------------------
+  postgres:
+    build:
+      context: .
+      dockerfile: infra/postgres/Dockerfile
+    image: topiadesk/postgres:local
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      # Official postgres image's own contract (superuser bootstrap).
+      POSTGRES_USER: ${POSTGRES_SUPERUSER}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      # Consumed by infra/postgres/init/01-roles-and-extensions.sh.
+      POSTGRES_MIGRATOR_USER: ${POSTGRES_MIGRATOR_USER}
+      POSTGRES_MIGRATOR_PASSWORD: ${POSTGRES_MIGRATOR_PASSWORD}
+      POSTGRES_RUNTIME_USER: ${POSTGRES_RUNTIME_USER}
+      POSTGRES_RUNTIME_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD}
+      KEYCLOAK_DB: ${KEYCLOAK_DB}
+      KEYCLOAK_DB_USER: ${KEYCLOAK_DB_USER}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      # Consumed by archive-wal.sh (archive_command) and backup.sh — both
+      # baked into this same image.
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_PORT: ${MINIO_PORT}
+      MINIO_USE_SSL: ${MINIO_USE_SSL}
+      MINIO_APP_ACCESS_KEY: ${MINIO_APP_ACCESS_KEY}
+      MINIO_APP_SECRET_KEY: ${MINIO_APP_SECRET_KEY}
+      MINIO_BACKUPS_BUCKET: ${MINIO_BACKUPS_BUCKET}
+    volumes:
+      - ./infra/postgres/data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./infra/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      # Env-driven so WAL_ARCHIVE_TIMEOUT_SECONDS in .env is the single
+      # source of truth without editing the mounted .conf file.
+      - -c
+      - archive_timeout=${WAL_ARCHIVE_TIMEOUT_SECONDS}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - topiadesk_data
+
+  pgbouncer:
+    # edoburu/pgbouncer: small (~15MB), actively maintained, and its
+    # entrypoint's env-var contract was verified directly against its
+    # source (github.com/edoburu/docker-pgbouncer/blob/master/entrypoint.sh)
+    # before picking it — in particular LISTEN_PORT (needed since this
+    # image defaults to listening on 5432, not PGBOUNCER_PORT) and the
+    # plain DB_HOST/DB_USER/DB_PASSWORD/DB_NAME vars, which avoid the
+    # query-string-gets-parsed-as-dbname footgun of feeding it the pooled
+    # DATABASE_URL (which carries `?pgbouncer=true&schema=public` — fine
+    # for Prisma, not fine as an actual Postgres database name). bitnami/
+    # pgbouncer was considered and rejected: as of this build it has zero
+    # published tags on Docker Hub (`bitnami/pgbouncer` — only untagged/no
+    # results), i.e. effectively unavailable.
+    image: edoburu/pgbouncer:v1.25.2-p0
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      DB_HOST: ${POSTGRES_HOST}
+      DB_PORT: ${POSTGRES_PORT}
+      DB_NAME: ${POSTGRES_DB}
+      # app_runtime only — app_migrator (Prisma Migrate) always connects
+      # directly via DIRECT_URL, bypassing PgBouncer, per the build spec.
+      DB_USER: ${POSTGRES_RUNTIME_USER}
+      DB_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD}
+      LISTEN_PORT: ${PGBOUNCER_PORT}
+      POOL_MODE: ${PGBOUNCER_POOL_MODE}
+      MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONN}
+      DEFAULT_POOL_SIZE: ${PGBOUNCER_DEFAULT_POOL_SIZE}
+      # scram-sha-256 (not md5, not trust) — matches Postgres 16's default
+      # password_encryption (infra/postgres/postgresql.conf).
+      AUTH_TYPE: scram-sha-256
+      ADMIN_USERS: ${POSTGRES_RUNTIME_USER}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-p", "${PGBOUNCER_PORT}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - topiadesk_data
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD} ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - topiadesk_data
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["server", "/data", "--address", ":${MINIO_PORT}", "--console-address", ":${MINIO_CONSOLE_PORT}"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ./infra/minio/data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:${MINIO_PORT}/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - topiadesk_data
+
+  # One-off: creates the 3 buckets (audit-worm with object-lock/WORM
+  # retention) and the scoped MINIO_APP_ACCESS_KEY/SECRET_KEY credential
+  # that api/worker actually use — never the MinIO root user. Re-runnable;
+  # every step in create-buckets.sh is idempotent.
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    restart: "no"
+    logging: *default-logging
+    entrypoint: ["/bin/sh", "/init/create-buckets.sh"]
+    environment:
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_PORT: ${MINIO_PORT}
+      MINIO_USE_SSL: ${MINIO_USE_SSL}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_DOCUMENTS_BUCKET: ${MINIO_DOCUMENTS_BUCKET}
+      MINIO_AUDIT_WORM_BUCKET: ${MINIO_AUDIT_WORM_BUCKET}
+      MINIO_BACKUPS_BUCKET: ${MINIO_BACKUPS_BUCKET}
+      MINIO_APP_ACCESS_KEY: ${MINIO_APP_ACCESS_KEY}
+      MINIO_APP_SECRET_KEY: ${MINIO_APP_SECRET_KEY}
+    volumes:
+      - ./infra/minio/init/create-buckets.sh:/init/create-buckets.sh:ro
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - topiadesk_data
+
+  # ---------------------------------------------------------------------------
+  # Identity
+  # ---------------------------------------------------------------------------
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["start", "--import-realm"]
+    environment:
+      # Keycloak 26 renamed the admin-bootstrap vars from
+      # KEYCLOAK_ADMIN/KEYCLOAK_ADMIN_PASSWORD to
+      # KC_BOOTSTRAP_ADMIN_USERNAME/KC_BOOTSTRAP_ADMIN_PASSWORD — mapped
+      # here so .env.example can keep using the TopiaDesk-wide
+      # KEYCLOAK_ADMIN* names rather than Keycloak's version-specific ones.
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB: postgres
+      # Direct to Postgres, NOT through PgBouncer — Keycloak manages its
+      # own connection pool (Agroal) and, like Prisma Migrate, expects a
+      # plain session-level connection.
+      KC_DB_URL: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${KEYCLOAK_DB}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KC_HOSTNAME: ${KEYCLOAK_URL}
+      # TLS is terminated at Traefik (edge termination) — Keycloak itself
+      # speaks plain HTTP on the internal Docker network.
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      # Resolved inside infra/keycloak/realm-export.json via Keycloak's own
+      # `${env.VAR}` substitution for the topiadesk-api client secret —
+      # never written into that file as a literal.
+      KEYCLOAK_CLIENT_SECRET_API: ${KEYCLOAK_CLIENT_SECRET_API}
+    volumes:
+      - ./infra/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # The quay.io image ships neither curl nor wget, and hand-rolling an
+      # HTTP GET through bash's /dev/tcp for `/health/ready` is fragile to
+      # get right inside a YAML-escaped CMD-SHELL string. This settles for
+      # a plain "is the management/health listener (port 9000) up" TCP
+      # check — weaker than a true readiness probe, but robust, and
+      # sufficient here since nothing else in this stack gates startup on
+      # Keycloak's health (Traefik/web only soft-depend on it below).
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9000' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 40s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.keycloak.rule=Host(`${KEYCLOAK_HOSTNAME}`)
+      - traefik.http.routers.keycloak.entrypoints=websecure
+      - traefik.http.routers.keycloak.tls=true
+      - traefik.http.routers.keycloak.middlewares=secure-headers@file
+      - traefik.http.services.keycloak.loadbalancer.server.port=8080
+    networks:
+      - topiadesk_data
+      - topiadesk_public
+
+  # ---------------------------------------------------------------------------
+  # Migration/seed — blocks api/worker until Prisma Migrate + RLS/trigger
+  # SQL + seed data have all applied successfully.
+  # ---------------------------------------------------------------------------
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: build
+    restart: "no"
+    logging: *default-logging
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
+    command: ["sh", "-c", "pnpm --filter @topiadesk/db migrate:deploy && pnpm --filter @topiadesk/db seed"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - topiadesk_data
+
+  # ---------------------------------------------------------------------------
+  # Application
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: runtime
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      <<: *common-app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    # Dockerfile already declares a HEALTHCHECK hitting /ready (DB
+    # connectivity) — the readiness endpoint, not /health (liveness-only,
+    # deliberately no DB check — see health.controller.ts), because this
+    # healthcheck is what other tooling (and a future load balancer) should
+    # gate traffic on.
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.api.rule=Host(`api.${APP_BASE_DOMAIN}`)
+      - traefik.http.routers.api.entrypoints=websecure
+      - traefik.http.routers.api.tls=true
+      - traefik.http.routers.api.middlewares=secure-headers@file
+      - traefik.http.services.api.loadbalancer.server.port=${API_PORT}
+    networks:
+      - topiadesk_data
+      - topiadesk_public
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      <<: *common-app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - topiadesk_data
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${WEB_PORT}
+      APP_URL: ${APP_URL}
+      API_URL: ${API_URL}
+      API_INTERNAL_URL: ${API_INTERNAL_URL}
+      KEYCLOAK_URL: ${KEYCLOAK_URL}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_CLIENT_ID_WEB: ${KEYCLOAK_CLIENT_ID_WEB}
+      KEYCLOAK_ISSUER_URL: ${KEYCLOAK_ISSUER_URL}
+      WEB_SESSION_SECRET: ${WEB_SESSION_SECRET}
+      WEB_COOKIE_DOMAIN: ${WEB_COOKIE_DOMAIN}
+    depends_on:
+      api:
+        condition: service_started
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.web.rule=Host(`app.${APP_BASE_DOMAIN}`)
+      - traefik.http.routers.web.entrypoints=websecure
+      - traefik.http.routers.web.tls=true
+      - traefik.http.routers.web.middlewares=secure-headers@file
+      - traefik.http.services.web.loadbalancer.server.port=${WEB_PORT}
+    networks:
+      - topiadesk_data
+      - topiadesk_public
+
+  # ---------------------------------------------------------------------------
+  # Edge
+  # ---------------------------------------------------------------------------
+  traefik:
+    image: traefik:v3.7
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./infra/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./infra/traefik/dynamic:/etc/traefik/dynamic:ro
+      - ./infra/traefik/certs:/etc/traefik/certs:ro
+      - traefik_acme:/letsencrypt
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    depends_on:
+      - api
+      - web
+      - keycloak
+    networks:
+      - topiadesk_public
+
+  # ---------------------------------------------------------------------------
+  # Observability
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v3.13.2
+    restart: unless-stopped
+    logging: *default-logging
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION}
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - topiadesk_data
+
+  grafana:
+    image: grafana/grafana:12.4.6
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - topiadesk_data
+
+  loki:
+    image: grafana/loki:3.6.11
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["-config.file=/etc/loki/loki-config.yml", "-config.expand-env=true"]
+    environment:
+      LOKI_RETENTION_HOURS: ${LOKI_RETENTION_HOURS}
+    volumes:
+      - ./infra/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    # No healthcheck: block, deliberately — verified empirically that the
+    # grafana/loki image has no shell (`/bin/sh` doesn't exist) and no
+    # coreutils (wget/curl/ls/which all fail "executable file not found"),
+    # i.e. truly nothing execable except /usr/bin/loki itself. Any
+    # CMD/CMD-SHELL healthcheck is structurally impossible here, not just
+    # unconfigured — don't reintroduce one without first confirming a newer
+    # image tag actually ships a shell.
+    networks:
+      - topiadesk_data
+
+  promtail:
+    image: grafana/promtail:3.6.11
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["-config.file=/etc/promtail/promtail-config.yml"]
+    volumes:
+      - ./infra/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      loki:
+        # Not service_healthy — loki has no working healthcheck (see its
+        # service definition's comment). Promtail retries pushes on its own
+        # if loki isn't accepting connections yet, so service_started is
+        # sufficient here, not a silent gap.
+        condition: service_started
+    networks:
+      - topiadesk_data
+
+  # ---------------------------------------------------------------------------
+  # Dev-only mail capture (SMTP_HOST/SMTP_PORT already point here — swap
+  # for a real SMTP/SES endpoint in a real deployment's .env, no code
+  # change needed).
+  # ---------------------------------------------------------------------------
+  maildev:
+    image: maildev/maildev:2.2.1
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["--smtp", "${MAILDEV_SMTP_PORT}", "--web", "${MAILDEV_WEB_PORT}"]
+    networks:
+      - topiadesk_data
+
+  # ---------------------------------------------------------------------------
+  # Backup (Phase-1 DR mechanism #2 — see infra/backup/backup.sh's header
+  # and docs/runbook.md's "Backup & disaster recovery" for how this pairs
+  # with continuous WAL archiving on the postgres service).
+  # ---------------------------------------------------------------------------
+  backup:
+    build:
+      context: .
+      dockerfile: infra/postgres/Dockerfile
+    image: topiadesk/postgres:local
+    restart: unless-stopped
+    logging: *default-logging
+    entrypoint: ["/usr/local/bin/backup-entrypoint.sh"]
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_MIGRATOR_USER: ${POSTGRES_MIGRATOR_USER}
+      POSTGRES_MIGRATOR_PASSWORD: ${POSTGRES_MIGRATOR_PASSWORD}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_PORT: ${MINIO_PORT}
+      MINIO_USE_SSL: ${MINIO_USE_SSL}
+      MINIO_APP_ACCESS_KEY: ${MINIO_APP_ACCESS_KEY}
+      MINIO_APP_SECRET_KEY: ${MINIO_APP_SECRET_KEY}
+      MINIO_BACKUPS_BUCKET: ${MINIO_BACKUPS_BUCKET}
+      BACKUP_CRON_SCHEDULE: ${BACKUP_CRON_SCHEDULE}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    networks:
+      - topiadesk_data
+
+networks:
+  # Traefik + anything it routes to.
+  topiadesk_public:
+    name: topiadesk_public
+  # Postgres/PgBouncer/Redis/MinIO and everything that talks to them.
+  topiadesk_data:
+    name: topiadesk_data
+
+volumes:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  traefik_acme:

@@ -1,0 +1,28 @@
+# =============================================================================
+# TopiaDesk CRM — Traefik dynamic configuration (file provider).
+#
+# Per-service routers/middlewares live as Docker labels next to each service
+# in docker-compose.yml (the more common, co-located pattern for a Compose
+# stack). This file carries the handful of cross-cutting settings that
+# aren't naturally "owned" by any one service: the shared TLS policy and a
+# reusable security-headers middleware every router opts into.
+# =============================================================================
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: false
+
+http:
+  middlewares:
+    secure-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow"

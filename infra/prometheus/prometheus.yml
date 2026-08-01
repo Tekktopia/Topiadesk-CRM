@@ -1,0 +1,40 @@
+# =============================================================================
+# TopiaDesk CRM — Prometheus scrape configuration.
+#
+# NOTE — honesty flag, not a placeholder pretending to work: `api` and
+# `worker` targets below point at the ports those services already listen
+# on (API_PORT / WORKER_METRICS_PORT), but neither app currently exposes a
+# `/metrics` endpoint — that instrumentation (prom-client / a Nest metrics
+# module) is a later phase, not part of this infra build. Until then these
+# two jobs will show as `DOWN` / scrape-failed in Prometheus's own
+# "Targets" page, which is the correct, visible signal that instrumentation
+# is still pending — not a silently-fabricated green target.
+#
+# This file is a static Prometheus config and cannot read docker-compose
+# env var substitutions itself; target ports below are the *default*
+# values from .env.example (API_PORT=4000, WORKER_METRICS_PORT=9100). If
+# those are changed from their defaults, update the targets here to match.
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:4000"]
+        labels:
+          service: api
+
+  - job_name: worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["worker:9100"]
+        labels:
+          service: worker

@@ -1,0 +1,23 @@
+# =============================================================================
+# TopiaDesk CRM — Grafana dashboard provisioning provider.
+#
+# Wires this directory as a dashboard source; no dashboard JSON files are
+# checked in yet (none were requested/built as part of this infra pass, and
+# fabricating one against metrics that don't exist yet — see
+# infra/prometheus/prometheus.yml — would be actively misleading). Drop
+# dashboard JSON exports into this same directory and Grafana will pick
+# them up automatically on next restart; no provisioning changes needed.
+# =============================================================================
+apiVersion: 1
+
+providers:
+  - name: TopiaDesk
+    orgId: 1
+    folder: "TopiaDesk CRM"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

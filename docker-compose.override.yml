@@ -1,0 +1,70 @@
+# =============================================================================
+# TopiaDesk CRM — local-dev convenience overrides.
+#
+# Auto-merged by `docker compose up` (Compose's own default — no `-f` flags
+# needed) on top of docker-compose.yml. Everything here is additive host
+# port exposure (for pointing a native GUI client — psql/TablePlus,
+# RedisInsight, the MinIO console, Grafana/Prometheus's own UIs — straight
+# at a service without going through Traefik) plus enabling the Traefik
+# dashboard. Nothing here changes application behavior or credentials.
+#
+# For a stricter run that matches what a real deployment looks like
+# (nothing exposed except Traefik's 80/443), run:
+#   docker compose -f docker-compose.yml up -d
+# =============================================================================
+services:
+  postgres:
+    ports:
+      - "${POSTGRES_PORT}:5432"
+
+  pgbouncer:
+    ports:
+      - "${PGBOUNCER_PORT}:${PGBOUNCER_PORT}"
+
+  redis:
+    ports:
+      - "${REDIS_PORT}:6379"
+
+  minio:
+    ports:
+      - "${MINIO_PORT}:${MINIO_PORT}"
+      - "${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_PORT}"
+
+  keycloak:
+    ports:
+      - "8080:8080"
+
+  prometheus:
+    ports:
+      - "9090:9090"
+
+  grafana:
+    # Host 3001, not 3000 — apps/web already claims WEB_PORT=3000.
+    ports:
+      - "3001:3000"
+
+  loki:
+    ports:
+      - "3100:3100"
+
+  maildev:
+    ports:
+      - "${MAILDEV_WEB_PORT}:${MAILDEV_WEB_PORT}"
+      - "${MAILDEV_SMTP_PORT}:${MAILDEV_SMTP_PORT}"
+
+  traefik:
+    # Traefik supports setting any static-config key via TRAEFIK_<KEY> env
+    # vars (merged with infra/traefik/traefik.yml, not a replacement for
+    # it) — used here so the dashboard is only ever reachable when
+    # TRAEFIK_DASHBOARD_ENABLED=true in .env, never implied by this file's
+    # mere presence.
+    environment:
+      TRAEFIK_API_DASHBOARD: "${TRAEFIK_DASHBOARD_ENABLED}"
+      TRAEFIK_API_INSECURE: "${TRAEFIK_DASHBOARD_ENABLED}"
+    ports:
+      # Maps to the dedicated internal "traefik" entrypoint (port 8082 in
+      # infra/traefik/traefik.yml) that api.insecure's auto-created
+      # dashboard router binds to. Visit http://localhost:8081/dashboard/
+      # (8081, not 8080 — keycloak's direct-access override above already
+      # claims host port 8080; both can't bind it).
+      - "8081:8082"

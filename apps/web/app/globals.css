@@ -1,0 +1,8 @@
+/**
+ * apps/web owns no design tokens of its own — the full token set
+ * (Tailwind base/components/utilities directives + light/dark CSS custom
+ * properties) lives in @topiadesk/ui so every consumer gets it from one
+ * place. See packages/ui/src/styles/globals.css and
+ * packages/ui/src/tokens.ts.
+ */
+@import '@topiadesk/ui/styles/globals.css';

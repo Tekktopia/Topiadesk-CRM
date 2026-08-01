@@ -1,0 +1,1096 @@
+// TopiaDesk CRM — Phase 1 domain schema.
+// Single source of truth for the relational model. Row-level-security
+// policies, the audit hash-chain trigger, and cross-column check
+// constraints are NOT expressible in Prisma's schema DSL — they live as
+// hand-written, idempotent SQL under prisma/rls/ and prisma/triggers/,
+// applied by src/apply-sql.ts after every `prisma migrate deploy`.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [pgcrypto, vector]
+}
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+enum AccountType {
+  INDIVIDUAL
+  CORPORATE
+}
+
+enum AccountStatus {
+  PROSPECT
+  CLIENT
+  FORMER_CLIENT
+}
+
+enum RiskRating {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum CarrierType {
+  INSURER
+  REINSURER
+  BOTH
+}
+
+enum PermissionScope {
+  OWN
+  DEPARTMENT
+  BRANCH
+  ALL
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum TeamMemberRole {
+  MEMBER
+  LEAD
+}
+
+enum AccountRelationshipType {
+  REFERRAL_SOURCE
+  COMPETITOR
+  JOINT_VENTURE
+  PARENT_SUBSIDIARY
+  OTHER
+}
+
+enum LeadSource {
+  WEB
+  EMAIL
+  REFERRAL
+  PARTNER
+  SOCIAL
+  PHONE
+  EVENT
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  DISQUALIFIED
+  CONVERTED
+}
+
+enum MarketSubmissionStatus {
+  SUBMITTED
+  DECLINED
+  QUOTED
+  BOUND
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  MEETING
+  NOTE
+  WHATSAPP
+  PORTAL_MESSAGE
+  SMS
+}
+
+enum ActivityDirection {
+  INBOUND
+  OUTBOUND
+  INTERNAL
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum PolicyStatus {
+  QUOTED
+  BOUND
+  ISSUED
+  ENDORSED
+  CANCELLED
+  LAPSED
+  RENEWED
+}
+
+enum PolicyVersionType {
+  ISSUANCE
+  ENDORSEMENT
+  RENEWAL
+  CANCELLATION
+  REINSTATEMENT
+}
+
+enum PremiumStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+}
+
+enum RenewalStatus {
+  ON_TRACK
+  AT_RISK
+  IN_PROGRESS
+  RENEWED
+  LAPSED
+  DECLINED_TO_RENEW
+}
+
+enum DocumentEntityType {
+  ACCOUNT
+  CONTACT
+  POLICY
+  OPPORTUNITY
+  LEAD
+  TASK
+}
+
+enum RetentionAction {
+  ARCHIVE
+  FLAG_FOR_REVIEW
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGIN_FAILED
+  PERMISSION_CHANGE
+  EXPORT
+  VIEW_SENSITIVE
+}
+
+enum ConnectorType {
+  CORE_BROKING_SYSTEM
+  ERP
+  MOCK_STUB
+}
+
+enum SyncDirection {
+  INBOUND
+  OUTBOUND
+  BIDIRECTIONAL
+}
+
+enum SyncJobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  PARTIAL
+}
+
+enum IntegrationLogLevel {
+  INFO
+  WARN
+  ERROR
+}
+
+enum IntegrationLogCategory {
+  SYNC
+  RECONCILIATION
+  ERROR_HANDLING
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  READ
+}
+
+enum AutomationTriggerType {
+  SCHEDULE
+  ENTITY_EVENT
+}
+
+enum ApprovalEntityType {
+  POLICY_ENDORSEMENT
+  POLICY_CANCELLATION
+  OPPORTUNITY_DISCOUNT
+  USER_ROLE_CHANGE
+  DOCUMENT_RETENTION_OVERRIDE
+  OTHER
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AiFeature {
+  SUMMARIZATION
+  REPLY_DRAFT
+  INSIGHT
+}
+
+enum DashboardVisibility {
+  PRIVATE
+  DEPARTMENT
+  ORG
+}
+
+// =============================================================================
+// Org / RBAC
+// =============================================================================
+
+model Department {
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String
+  code               String       @unique
+  parentDepartmentId String?      @map("parent_department_id") @db.Uuid
+  parentDepartment   Department?  @relation("DepartmentHierarchy", fields: [parentDepartmentId], references: [id])
+  subDepartments     Department[] @relation("DepartmentHierarchy")
+  users              User[]
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("departments")
+}
+
+model Branch {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  code      String   @unique
+  address   String?
+  city      String?
+  state     String?
+  country   String?  @default("NG")
+  users     User[]
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("branches")
+}
+
+model Team {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  description String?
+  members     TeamMember[]
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("teams")
+}
+
+/// Additive visibility grant on top of department/branch RLS scoping —
+/// not a third nested RLS level. See prisma/rls/003_policies.sql.
+model TeamMember {
+  id        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teamId    String         @map("team_id") @db.Uuid
+  team      Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String         @map("user_id") @db.Uuid
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      TeamMemberRole @default(MEMBER)
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+model User {
+  id                String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  keycloakSubjectId String      @unique @map("keycloak_subject_id")
+  email             String      @unique
+  fullName          String      @map("full_name")
+  phone             String?
+  departmentId      String?     @map("department_id") @db.Uuid
+  department        Department? @relation(fields: [departmentId], references: [id])
+  branchId          String?     @map("branch_id") @db.Uuid
+  branch            Branch?     @relation(fields: [branchId], references: [id])
+  status            UserStatus  @default(ACTIVE)
+  lastSyncedAt      DateTime?   @map("last_synced_at") @db.Timestamptz(6)
+  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  roles           UserRole[]
+  teamMemberships TeamMember[]
+
+  ownedAccounts            Account[]         @relation("AccountOwner")
+  ownedOpportunities       Opportunity[]     @relation("OpportunityOwner")
+  assignedLeads            Lead[]            @relation("LeadAssignee")
+  assignedTasks            Task[]            @relation("TaskAssignee")
+  createdActivities        Activity[]        @relation("ActivityCreatedBy")
+  brokeredPolicies         Policy[]          @relation("PolicyBrokerOfRecord")
+  createdPolicyVersions    PolicyVersion[]   @relation("PolicyVersionCreatedBy")
+  assignedRenewals         RenewalSchedule[] @relation("RenewalAssignee")
+  uploadedDocuments        Document[]        @relation("DocumentUploadedBy")
+  uploadedDocumentVersions DocumentVersion[] @relation("DocumentVersionUploadedBy")
+  linkedDocuments          DocumentLink[]    @relation("DocumentLinkedBy")
+  auditEntries             AuditLog[]        @relation("AuditActorUser")
+  requestedApprovals       Approval[]        @relation("ApprovalRequestedBy")
+  decidedApprovals         Approval[]        @relation("ApprovalApprovedBy")
+  notifications            Notification[]    @relation("NotificationRecipient")
+  createdAutomationRules   AutomationRule[]  @relation("AutomationRuleCreatedBy")
+  aiUsage                  AiUsageLedger[]   @relation("AiUsageUser")
+  ownedDashboards          SavedDashboard[]  @relation("DashboardOwner")
+  updatedOrgSettings       OrgSetting[]      @relation("OrgSettingUpdatedBy")
+
+  @@map("users")
+}
+
+model Role {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String           @unique
+  description  String?
+  isSystemRole Boolean          @default(false) @map("is_system_role")
+  permissions  RolePermission[]
+  users        UserRole[]
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("roles")
+}
+
+/// scope drives the RLS predicate chosen for resources granted by this
+/// permission: OWN (ownerId = current user), DEPARTMENT, BRANCH, or ALL.
+model Permission {
+  id       String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  resource String
+  action   String
+  scope    PermissionScope
+  roles    RolePermission[]
+
+  @@unique([resource, action, scope])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String     @map("permission_id") @db.Uuid
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId String @map("role_id") @db.Uuid
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model OrgSetting {
+  key         String   @id
+  value       Json
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  updatedBy   User?    @relation("OrgSettingUpdatedBy", fields: [updatedById], references: [id])
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("org_settings")
+}
+
+model IpWhitelistEntry {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cidrRange       String   @map("cidr_range")
+  description     String?
+  appliesToRoleId String?  @map("applies_to_role_id") @db.Uuid
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("ip_whitelist_entries")
+}
+
+model Industry {
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String     @unique
+  parentIndustryId String?    @map("parent_industry_id") @db.Uuid
+  parentIndustry   Industry?  @relation("IndustryHierarchy", fields: [parentIndustryId], references: [id])
+  subIndustries    Industry[] @relation("IndustryHierarchy")
+  accounts         Account[]
+
+  @@map("industries")
+}
+
+// =============================================================================
+// CRM core
+// =============================================================================
+
+model Account {
+  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String
+  accountType       AccountType   @map("account_type")
+  status            AccountStatus @default(PROSPECT)
+  industryId        String?       @map("industry_id") @db.Uuid
+  industry          Industry?     @relation(fields: [industryId], references: [id])
+  annualRevenueBand String?       @map("annual_revenue_band")
+  riskRating        RiskRating?   @map("risk_rating")
+  addressLine1      String?       @map("address_line1")
+  addressLine2      String?       @map("address_line2")
+  city              String?
+  state             String?
+  country           String?       @default("NG")
+  postalCode        String?       @map("postal_code")
+  parentAccountId   String?       @map("parent_account_id") @db.Uuid
+  parentAccount     Account?      @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
+  subAccounts       Account[]     @relation("AccountHierarchy")
+  ownerId           String        @map("owner_id") @db.Uuid
+  owner             User          @relation("AccountOwner", fields: [ownerId], references: [id])
+  source            String?
+  notes             String?
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  contacts         Contact[]
+  relationshipsAsA AccountRelationship[] @relation("RelationshipAccountA")
+  relationshipsAsB AccountRelationship[] @relation("RelationshipAccountB")
+  leads            Lead[]                @relation("LeadConvertedAccount")
+  opportunities    Opportunity[]
+  policies         Policy[]
+  activities       Activity[]
+  tasks            Task[]
+
+  @@index([status])
+  @@map("accounts")
+}
+
+model AccountRelationship {
+  id               String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountAId       String                  @map("account_a_id") @db.Uuid
+  accountA         Account                 @relation("RelationshipAccountA", fields: [accountAId], references: [id], onDelete: Cascade)
+  accountBId       String                  @map("account_b_id") @db.Uuid
+  accountB         Account                 @relation("RelationshipAccountB", fields: [accountBId], references: [id], onDelete: Cascade)
+  relationshipType AccountRelationshipType @map("relationship_type")
+  notes            String?
+  createdAt        DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([accountAId, accountBId, relationshipType])
+  @@map("account_relationships")
+}
+
+/// Exactly one of accountId/carrierId must be set — enforced via a raw SQL
+/// CHECK constraint (prisma/rls/004_check_constraints.sql); Prisma's DSL
+/// cannot express cross-column checks.
+model Contact {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId String?  @map("account_id") @db.Uuid
+  account   Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  carrierId String?  @map("carrier_id") @db.Uuid
+  carrier   Carrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  email     String?
+  phone     String?
+  title     String?
+  isPrimary Boolean  @default(false) @map("is_primary")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("contacts")
+}
+
+model Carrier {
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String
+  carrierType     CarrierType @map("carrier_type")
+  amBestRating    String?     @map("am_best_rating")
+  linesOfBusiness String[]    @map("lines_of_business")
+  panelStatus     String?     @map("panel_status")
+  treatyType      String?     @map("treaty_type")
+  commissionTerms String?     @map("commission_terms")
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  contacts          Contact[]
+  policies          Policy[]
+  marketSubmissions OpportunityMarketSubmission[]
+
+  @@map("carriers")
+}
+
+model Pipeline {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  lineOfBusiness String?         @map("line_of_business")
+  isActive       Boolean         @default(true) @map("is_active")
+  stages         PipelineStage[]
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("pipelines")
+}
+
+model PipelineStage {
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pipelineId         String        @map("pipeline_id") @db.Uuid
+  pipeline           Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  name               String
+  order              Int
+  defaultProbability Int           @map("default_probability")
+  isWon              Boolean       @default(false) @map("is_won")
+  isLost             Boolean       @default(false) @map("is_lost")
+  opportunities      Opportunity[]
+
+  @@unique([pipelineId, order])
+  @@map("pipeline_stages")
+}
+
+model Lead {
+  id                     String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  source                 LeadSource
+  sourceCampaign         String?      @map("source_campaign")
+  firstName              String       @map("first_name")
+  lastName               String       @map("last_name")
+  email                  String?
+  phone                  String?
+  companyName            String?      @map("company_name")
+  score                  Int          @default(0)
+  status                 LeadStatus   @default(NEW)
+  assignedToId           String?      @map("assigned_to_id") @db.Uuid
+  assignedTo             User?        @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  convertedAccountId     String?      @map("converted_account_id") @db.Uuid
+  convertedAccount       Account?     @relation("LeadConvertedAccount", fields: [convertedAccountId], references: [id])
+  convertedOpportunityId String?      @unique @map("converted_opportunity_id") @db.Uuid
+  convertedOpportunity   Opportunity? @relation("LeadConvertedOpportunity", fields: [convertedOpportunityId], references: [id])
+  qualificationNotes     String?      @map("qualification_notes")
+  createdAt              DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  activities Activity[]
+  tasks      Task[]
+
+  @@index([status])
+  @@map("leads")
+}
+
+model Opportunity {
+  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId         String        @map("account_id") @db.Uuid
+  account           Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  name              String
+  pipelineStageId   String        @map("pipeline_stage_id") @db.Uuid
+  pipelineStage     PipelineStage @relation(fields: [pipelineStageId], references: [id])
+  amount            Decimal       @db.Decimal(15, 2)
+  probability       Int
+  expectedCloseDate DateTime      @map("expected_close_date") @db.Date
+  actualCloseDate   DateTime?     @map("actual_close_date") @db.Date
+  wonReason         String?       @map("won_reason")
+  lostReason        String?       @map("lost_reason")
+  ownerId           String        @map("owner_id") @db.Uuid
+  owner             User          @relation("OpportunityOwner", fields: [ownerId], references: [id])
+  lineOfBusiness    String?       @map("line_of_business")
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sourceLead        Lead?                         @relation("LeadConvertedOpportunity")
+  marketSubmissions OpportunityMarketSubmission[]
+  activities        Activity[]
+  tasks             Task[]
+
+  @@map("opportunities")
+}
+
+/// An opportunity shopped to multiple carriers simultaneously — brokerage-
+/// specific: a plain Opportunity->Carrier FK would lose this.
+model OpportunityMarketSubmission {
+  id            String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  opportunityId String                 @map("opportunity_id") @db.Uuid
+  opportunity   Opportunity            @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  carrierId     String                 @map("carrier_id") @db.Uuid
+  carrier       Carrier                @relation(fields: [carrierId], references: [id])
+  quotedPremium Decimal?               @map("quoted_premium") @db.Decimal(15, 2)
+  status        MarketSubmissionStatus @default(SUBMITTED)
+  submittedAt   DateTime               @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  respondedAt   DateTime?              @map("responded_at") @db.Timestamptz(6)
+  notes         String?
+
+  @@unique([opportunityId, carrierId])
+  @@map("opportunity_market_submissions")
+}
+
+/// Consolidates the BRD's "Activity" and "Interaction" concepts.
+model Activity {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId       String?           @map("account_id") @db.Uuid
+  account         Account?          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  contactId       String?           @map("contact_id") @db.Uuid
+  leadId          String?           @map("lead_id") @db.Uuid
+  lead            Lead?             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  opportunityId   String?           @map("opportunity_id") @db.Uuid
+  opportunity     Opportunity?      @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  policyId        String?           @map("policy_id") @db.Uuid
+  policy          Policy?           @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  type            ActivityType
+  direction       ActivityDirection
+  subject         String
+  body            String?
+  occurredAt      DateTime          @map("occurred_at") @db.Timestamptz(6)
+  createdById     String            @map("created_by_id") @db.Uuid
+  createdBy       User              @relation("ActivityCreatedBy", fields: [createdById], references: [id])
+  durationMinutes Int?              @map("duration_minutes")
+  outcome         String?
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([accountId, occurredAt])
+  @@map("activities")
+}
+
+model Task {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title         String
+  description   String?
+  dueDate       DateTime?    @map("due_date") @db.Timestamptz(6)
+  priority      TaskPriority @default(MEDIUM)
+  status        TaskStatus   @default(OPEN)
+  assigneeId    String       @map("assignee_id") @db.Uuid
+  assignee      User         @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  accountId     String?      @map("account_id") @db.Uuid
+  account       Account?     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  policyId      String?      @map("policy_id") @db.Uuid
+  policy        Policy?      @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  opportunityId String?      @map("opportunity_id") @db.Uuid
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  leadId        String?      @map("lead_id") @db.Uuid
+  lead          Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  completedAt   DateTime?    @map("completed_at") @db.Timestamptz(6)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([assigneeId, status])
+  @@map("tasks")
+}
+
+// =============================================================================
+// Policy lifecycle
+// =============================================================================
+
+model Policy {
+  id                   String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  policyNumber         String         @unique @map("policy_number")
+  accountId            String         @map("account_id") @db.Uuid
+  account              Account        @relation(fields: [accountId], references: [id])
+  carrierId            String         @map("carrier_id") @db.Uuid
+  carrier              Carrier        @relation(fields: [carrierId], references: [id])
+  lineOfBusiness       String         @map("line_of_business")
+  sumInsured           Decimal?       @map("sum_insured") @db.Decimal(18, 2)
+  currency             String         @default("NGN")
+  inceptionDate        DateTime       @map("inception_date") @db.Date
+  expiryDate           DateTime       @map("expiry_date") @db.Date
+  status               PolicyStatus   @default(QUOTED)
+  brokerOfRecordId     String?        @map("broker_of_record_id") @db.Uuid
+  brokerOfRecord       User?          @relation("PolicyBrokerOfRecord", fields: [brokerOfRecordId], references: [id])
+  currentVersionId     String?        @unique @map("current_version_id") @db.Uuid
+  currentVersion       PolicyVersion? @relation("PolicyCurrentVersion", fields: [currentVersionId], references: [id])
+  externalSourceSystem String?        @map("external_source_system")
+  externalSourceId     String?        @map("external_source_id")
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  versions        PolicyVersion[]  @relation("PolicyVersions")
+  premiums        Premium[]
+  renewalSchedule RenewalSchedule?
+  activities      Activity[]
+  tasks           Task[]
+
+  @@index([expiryDate])
+  @@map("policies")
+}
+
+model PolicyVersion {
+  id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  policyId            String            @map("policy_id") @db.Uuid
+  policy              Policy            @relation("PolicyVersions", fields: [policyId], references: [id], onDelete: Cascade)
+  versionNumber       Int               @map("version_number")
+  versionType         PolicyVersionType @map("version_type")
+  effectiveDate       DateTime          @map("effective_date") @db.Date
+  changeDescription   String?           @map("change_description")
+  premiumImpact       Decimal?          @map("premium_impact") @db.Decimal(15, 2)
+  sumInsuredAtVersion Decimal?          @map("sum_insured_at_version") @db.Decimal(18, 2)
+  documentId          String?           @map("document_id") @db.Uuid
+  document            Document?         @relation(fields: [documentId], references: [id])
+  createdById         String            @map("created_by_id") @db.Uuid
+  createdBy           User              @relation("PolicyVersionCreatedBy", fields: [createdById], references: [id])
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  premiums         Premium[]
+  currentForPolicy Policy?   @relation("PolicyCurrentVersion")
+
+  @@unique([policyId, versionNumber])
+  @@map("policy_versions")
+}
+
+/// Aging is computed via a nightly-refreshed materialized view
+/// (premium_aging_summary — see prisma/rls/005_reporting_views.sql), not a
+/// read-time generated column: Postgres generated columns can't reference
+/// CURRENT_DATE (not immutable).
+model Premium {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  policyId         String         @map("policy_id") @db.Uuid
+  policy           Policy         @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  policyVersionId  String?        @map("policy_version_id") @db.Uuid
+  policyVersion    PolicyVersion? @relation(fields: [policyVersionId], references: [id])
+  grossPremium     Decimal        @map("gross_premium") @db.Decimal(15, 2)
+  netPremium       Decimal        @map("net_premium") @db.Decimal(15, 2)
+  commissionRate   Decimal?       @map("commission_rate") @db.Decimal(5, 2)
+  commissionAmount Decimal?       @map("commission_amount") @db.Decimal(15, 2)
+  installmentPlan  String?        @map("installment_plan")
+  dueDate          DateTime       @map("due_date") @db.Date
+  paidAmount       Decimal        @default(0) @map("paid_amount") @db.Decimal(15, 2)
+  paidDate         DateTime?      @map("paid_date") @db.Date
+  status           PremiumStatus  @default(PENDING)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, dueDate])
+  @@map("premiums")
+}
+
+/// nextAlertDueAt is the scan column the worker's renewal job polls every
+/// ~15 minutes — kept Postgres-durable rather than pre-scheduled far out in
+/// Redis so a Redis restart can never silently drop a renewal reminder.
+model RenewalSchedule {
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  policyId           String        @unique @map("policy_id") @db.Uuid
+  policy             Policy        @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  renewalDueDate     DateTime      @map("renewal_due_date") @db.Date
+  alertThresholds    Int[]         @default([90, 60, 30, 7]) @map("alert_thresholds")
+  status             RenewalStatus @default(ON_TRACK)
+  assignedToId       String?       @map("assigned_to_id") @db.Uuid
+  assignedTo         User?         @relation("RenewalAssignee", fields: [assignedToId], references: [id])
+  lastAlertSentAt    DateTime?     @map("last_alert_sent_at") @db.Timestamptz(6)
+  nextAlertDueAt     DateTime      @map("next_alert_due_at") @db.Timestamptz(6)
+  renewalMeetingDate DateTime?     @map("renewal_meeting_date") @db.Timestamptz(6)
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([nextAlertDueAt])
+  @@map("renewal_schedules")
+}
+
+// =============================================================================
+// Documents
+// =============================================================================
+
+model Document {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fileName          String            @map("file_name")
+  mimeType          String            @map("mime_type")
+  sizeBytes         BigInt            @map("size_bytes")
+  categoryId        String?           @map("category_id") @db.Uuid
+  category          DocumentCategory? @relation(fields: [categoryId], references: [id])
+  currentVersionId  String?           @unique @map("current_version_id") @db.Uuid
+  currentVersion    DocumentVersion?  @relation("DocumentCurrentVersion", fields: [currentVersionId], references: [id])
+  uploadedById      String            @map("uploaded_by_id") @db.Uuid
+  uploadedBy        User              @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
+  retentionPolicyId String?           @map("retention_policy_id") @db.Uuid
+  retentionPolicy   RetentionPolicy?  @relation(fields: [retentionPolicyId], references: [id])
+  isArchived        Boolean           @default(false) @map("is_archived")
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  versions       DocumentVersion[] @relation("DocumentVersions")
+  links          DocumentLink[]
+  policyVersions PolicyVersion[]
+
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId     String   @map("document_id") @db.Uuid
+  document       Document @relation("DocumentVersions", fields: [documentId], references: [id], onDelete: Cascade)
+  versionNumber  Int      @map("version_number")
+  storageKey     String   @map("storage_key")
+  storageBucket  String   @map("storage_bucket")
+  sizeBytes      BigInt   @map("size_bytes")
+  checksumSha256 String   @map("checksum_sha256")
+  uploadedById   String   @map("uploaded_by_id") @db.Uuid
+  uploadedBy     User     @relation("DocumentVersionUploadedBy", fields: [uploadedById], references: [id])
+  changeNote     String?  @map("change_note")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  currentForDocument Document? @relation("DocumentCurrentVersion")
+
+  @@unique([documentId, versionNumber])
+  @@map("document_versions")
+}
+
+/// The one legitimately polymorphic table — entityType/entityId, integrity
+/// enforced at the service layer against a small fixed entityType->repository
+/// map (not a DB FK, since Postgres can't FK across multiple target tables).
+model DocumentLink {
+  id         String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId String             @map("document_id") @db.Uuid
+  document   Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  entityType DocumentEntityType @map("entity_type")
+  entityId   String             @map("entity_id") @db.Uuid
+  linkedById String             @map("linked_by_id") @db.Uuid
+  linkedBy   User               @relation("DocumentLinkedBy", fields: [linkedById], references: [id])
+  linkedAt   DateTime           @default(now()) @map("linked_at") @db.Timestamptz(6)
+
+  @@unique([documentId, entityType, entityId])
+  @@index([entityType, entityId])
+  @@map("document_links")
+}
+
+model DocumentCategory {
+  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name String @unique
+  code String @unique
+
+  documents Document[]
+
+  @@map("document_categories")
+}
+
+model RetentionPolicy {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  categoryId     String?         @map("category_id") @db.Uuid
+  retentionYears Int             @map("retention_years")
+  actionOnExpiry RetentionAction @map("action_on_expiry")
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  documents Document[]
+
+  @@map("retention_policies")
+}
+
+// =============================================================================
+// Audit (hash-chained, insert-only — see prisma/triggers/)
+// =============================================================================
+
+model AuditLog {
+  id             BigInt      @id @default(autoincrement())
+  entityType     String      @map("entity_type")
+  entityId       String      @map("entity_id") @db.Uuid
+  action         AuditAction
+  actorUserId    String?     @map("actor_user_id") @db.Uuid
+  actorUser      User?       @relation("AuditActorUser", fields: [actorUserId], references: [id])
+  actorSystemJob String?     @map("actor_system_job")
+  actorIp        String?     @map("actor_ip")
+  changedFields  Json?       @map("changed_fields")
+  chainLane      Int         @map("chain_lane")
+  prevHash       String?     @map("prev_hash") @db.Char(64)
+  currentHash    String      @map("current_hash") @db.Char(64)
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([entityType, entityId])
+  @@index([chainLane, id])
+  @@map("audit_log")
+}
+
+model AuditCheckpoint {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  checkpointAt DateTime @map("checkpoint_at") @db.Timestamptz(6)
+  laneHashes   Json     @map("lane_hashes")
+  anchorHash   String   @map("anchor_hash") @db.Char(64)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("audit_checkpoints")
+}
+
+// =============================================================================
+// Governance (maker-checker — satisfies the Phase-1 segregation-of-duties NFR
+// without a full workflow/BPM engine)
+// =============================================================================
+
+model Approval {
+  id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType    ApprovalEntityType @map("entity_type")
+  entityId      String             @map("entity_id") @db.Uuid
+  requestedById String             @map("requested_by_id") @db.Uuid
+  requestedBy   User               @relation("ApprovalRequestedBy", fields: [requestedById], references: [id])
+  approvedById  String?            @map("approved_by_id") @db.Uuid
+  approvedBy    User?              @relation("ApprovalApprovedBy", fields: [approvedById], references: [id])
+  status        ApprovalStatus     @default(PENDING)
+  reason        String?
+  decidedAt     DateTime?          @map("decided_at") @db.Timestamptz(6)
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([entityType, entityId])
+  @@map("approvals")
+}
+
+// =============================================================================
+// Integration framework (proven with one working mock/stub connector — see
+// apps/api/src/modules/integrations)
+// =============================================================================
+
+model IntegrationConnector {
+  id                     String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                   String        @unique
+  connectorType          ConnectorType @map("connector_type")
+  config                 Json
+  isEnabled              Boolean       @default(true) @map("is_enabled")
+  syncDirection          SyncDirection @map("sync_direction")
+  pollingIntervalMinutes Int?          @map("polling_interval_minutes")
+  webhookPath            String?       @unique @map("webhook_path")
+  lastSuccessfulSyncAt   DateTime?     @map("last_successful_sync_at") @db.Timestamptz(6)
+  createdAt              DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  syncJobs SyncJob[]
+  logs     IntegrationLog[]
+
+  @@map("integration_connectors")
+}
+
+model SyncJob {
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  connectorId      String               @map("connector_id") @db.Uuid
+  connector        IntegrationConnector @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  jobType          String               @map("job_type")
+  status           SyncJobStatus        @default(PENDING)
+  startedAt        DateTime?            @map("started_at") @db.Timestamptz(6)
+  completedAt      DateTime?            @map("completed_at") @db.Timestamptz(6)
+  recordsProcessed Int                  @default(0) @map("records_processed")
+  recordsSucceeded Int                  @default(0) @map("records_succeeded")
+  recordsFailed    Int                  @default(0) @map("records_failed")
+  triggeredBy      String?              @map("triggered_by")
+  correlationId    String               @map("correlation_id")
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  logs IntegrationLog[]
+
+  @@map("sync_jobs")
+}
+
+model IntegrationLog {
+  id                 String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  syncJobId          String?                @map("sync_job_id") @db.Uuid
+  syncJob            SyncJob?               @relation(fields: [syncJobId], references: [id], onDelete: SetNull)
+  connectorId        String                 @map("connector_id") @db.Uuid
+  connector          IntegrationConnector   @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  level              IntegrationLogLevel
+  category           IntegrationLogCategory
+  externalRecordId   String?                @map("external_record_id")
+  internalEntityType String?                @map("internal_entity_type")
+  internalEntityId   String?                @map("internal_entity_id") @db.Uuid
+  message            String
+  payloadSnapshot    Json?                  @map("payload_snapshot")
+  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("integration_logs")
+}
+
+// =============================================================================
+// Notifications & automation (foundation tier — see production-hardening
+// notes on renewal-alert idempotency)
+// =============================================================================
+
+model Notification {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipientUserId   String              @map("recipient_user_id") @db.Uuid
+  recipient         User                @relation("NotificationRecipient", fields: [recipientUserId], references: [id])
+  type              String
+  title             String
+  body              String
+  relatedEntityType String?             @map("related_entity_type")
+  relatedEntityId   String?             @map("related_entity_id") @db.Uuid
+  channel           NotificationChannel
+  status            NotificationStatus  @default(PENDING)
+  dedupeKey         String              @unique @map("dedupe_key")
+  sentAt            DateTime?           @map("sent_at") @db.Timestamptz(6)
+  readAt            DateTime?           @map("read_at") @db.Timestamptz(6)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([recipientUserId, status])
+  @@map("notifications")
+}
+
+model AutomationRule {
+  id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  triggerType AutomationTriggerType @map("trigger_type")
+  conditions  Json
+  actions     Json
+  isActive    Boolean               @default(true) @map("is_active")
+  createdById String                @map("created_by_id") @db.Uuid
+  createdBy   User                  @relation("AutomationRuleCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("automation_rules")
+}
+
+// =============================================================================
+// AI gateway
+// =============================================================================
+
+model AiUsageLedger {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String?   @map("user_id") @db.Uuid
+  user             User?     @relation("AiUsageUser", fields: [userId], references: [id])
+  feature          AiFeature
+  tokensIn         Int       @map("tokens_in")
+  tokensOut        Int       @map("tokens_out")
+  estimatedCostUsd Decimal   @map("estimated_cost_usd") @db.Decimal(10, 4)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt])
+  @@map("ai_usage_ledger")
+}
+
+/// Chunked embeddings for future semantic search over notes/documents.
+/// `embedding` uses pgvector via Prisma's Unsupported type — vector
+/// similarity queries are raw SQL (Prisma has no typed query API for it).
+model SemanticEmbedding {
+  id         String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType String                      @map("entity_type")
+  entityId   String                      @map("entity_id") @db.Uuid
+  chunkIndex Int                         @default(0) @map("chunk_index")
+  content    String
+  embedding  Unsupported("vector(1536)")
+  model      String
+  createdAt  DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([entityType, entityId, model, chunkIndex])
+  @@map("semantic_embeddings")
+}
+
+// =============================================================================
+// Dashboards
+// =============================================================================
+
+/// widgets reference fixed, server-defined report keys with typed filters —
+/// never raw SQL/query strings from the frontend (arbitrary-query injection
+/// risk otherwise).
+model SavedDashboard {
+  id           String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  ownerId      String?             @map("owner_id") @db.Uuid
+  owner        User?               @relation("DashboardOwner", fields: [ownerId], references: [id])
+  visibility   DashboardVisibility @default(PRIVATE)
+  layoutConfig Json                @map("layout_config")
+  widgets      Json
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("saved_dashboards")
+}

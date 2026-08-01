@@ -1,0 +1,103 @@
+import * as client from 'openid-client';
+import { getWebEnv } from '../env';
+
+/**
+ * OIDC library choice: `openid-client` (panva/openid-client), the
+ * de-facto standard, actively-maintained, certified OpenID Connect client
+ * for Node.js — rather than hand-rolling PKCE/token-exchange crypto, and
+ * rather than Auth.js/NextAuth. Reasoning:
+ *
+ *  - Our Keycloak web client (KEYCLOAK_CLIENT_ID_WEB) is registered as a
+ *    PUBLIC client (no KEYCLOAK_CLIENT_SECRET_WEB exists in .env.example,
+ *    by design — see Batch-2 handoff notes) secured by PKCE alone. That's
+ *    a deliberate, narrow configuration we want full visibility into
+ *    (exactly which params hit the token endpoint, `client.None()` client
+ *    authentication) rather than relying on a higher-level auth framework's
+ *    assumptions about confidential vs. public clients — this is a
+ *    compliance-sensitive insurance product, and an explicit, auditable
+ *    flow is worth the extra code versus a framework's implicit one.
+ *  - openid-client v6 is runtime-agnostic (Web Crypto/fetch-based, no
+ *    Node-only APIs in the request path), so the same code works in both
+ *    Node.js route handlers and (if ever needed) an Edge runtime.
+ *  - It gives us `buildAuthorizationUrl`/`authorizationCodeGrant`/
+ *    `refreshTokenGrant`/`buildEndSessionUrl` as small, composable
+ *    functions we call explicitly from our own route handlers — token
+ *    exchange, refresh, and cookie writes all stay in code we own and can
+ *    audit line-by-line, versus a framework's `jwt`/`session` callback
+ *    indirection.
+ *
+ * Discovery is cached process-wide (Keycloak's issuer metadata doesn't
+ * change at runtime) and only ever invoked lazily, from request-time code
+ * — never at module scope — so `next build` never needs live Keycloak
+ * connectivity.
+ */
+let configPromise: Promise<client.Configuration> | undefined;
+
+function discoverConfig(): Promise<client.Configuration> {
+  const env = getWebEnv();
+  return client.discovery(new URL(env.KEYCLOAK_ISSUER_URL), env.KEYCLOAK_CLIENT_ID_WEB, undefined, client.None()).catch(
+    (err: unknown) => {
+      // Reset so a transient discovery failure (e.g. Keycloak not up yet
+      // in dev) doesn't permanently poison the cache for the process.
+      configPromise = undefined;
+      throw err;
+    },
+  );
+}
+
+export function getOidcConfig(): Promise<client.Configuration> {
+  if (!configPromise) {
+    configPromise = discoverConfig();
+  }
+  // TS can't prove `configPromise` stays non-undefined across the closure
+  // in discoverConfig's `.catch` (which reassigns it on rejection) — this
+  // function itself only ever reads it synchronously right after the
+  // assignment above, so the cast is safe.
+  return configPromise as Promise<client.Configuration>;
+}
+
+export const OIDC_SCOPE = 'openid profile email';
+
+export async function buildAuthorizationRequest(redirectUri: string) {
+  const config = await getOidcConfig();
+  const codeVerifier = client.randomPKCECodeVerifier();
+  const codeChallenge = await client.calculatePKCECodeChallenge(codeVerifier);
+  const state = client.randomState();
+  const nonce = client.randomNonce();
+
+  const authorizationUrl = client.buildAuthorizationUrl(config, {
+    redirect_uri: redirectUri,
+    scope: OIDC_SCOPE,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+    state,
+    nonce,
+  });
+
+  return { authorizationUrl, codeVerifier, state, nonce };
+}
+
+export async function exchangeCodeForTokens(
+  currentUrl: URL,
+  checks: { codeVerifier: string; state: string; nonce: string },
+) {
+  const config = await getOidcConfig();
+  return client.authorizationCodeGrant(config, currentUrl, {
+    pkceCodeVerifier: checks.codeVerifier,
+    expectedState: checks.state,
+    expectedNonce: checks.nonce,
+  });
+}
+
+export async function refreshTokens(refreshToken: string) {
+  const config = await getOidcConfig();
+  return client.refreshTokenGrant(config, refreshToken);
+}
+
+export async function buildLogoutUrl(idToken: string, postLogoutRedirectUri: string): Promise<URL> {
+  const config = await getOidcConfig();
+  return client.buildEndSessionUrl(config, {
+    id_token_hint: idToken,
+    post_logout_redirect_uri: postLogoutRedirectUri,
+  });
+}
