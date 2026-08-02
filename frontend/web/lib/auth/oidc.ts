@@ -33,9 +33,47 @@ import { getWebEnv } from '../env';
  */
 let configPromise: Promise<client.Configuration> | undefined;
 
+/**
+ * Discovery, token exchange, and refresh all happen server-side (this code
+ * runs in Route Handlers), so they need to reach Keycloak by container
+ * name inside Docker Compose — auth.topiadesk.localhost (KEYCLOAK_ISSUER_URL)
+ * only resolves via host-machine/browser DNS, never Docker's embedded DNS.
+ * Discovery's issuer validation, and the authorization/end-session URLs
+ * handed back to the browser, must still be the public issuer though (that's
+ * literally what Keycloak stamps into the `iss` claim and what the user's
+ * browser can actually reach) — so instead of pointing discovery itself at
+ * the internal URL (which would fail issuer validation, since Keycloak's
+ * discovery document always reports the public KC_HOSTNAME), we keep the
+ * public URL as the logical issuer and rewrite only the outgoing request's
+ * origin via a custom fetch. See openid-client's `customFetch` docs for this
+ * exact pattern. In a real deployment where public DNS resolves everywhere,
+ * KEYCLOAK_INTERNAL_URL is simply left unset and this is a no-op passthrough.
+ */
+function internalKeycloakFetch(publicIssuer: URL, internalUrl: string): client.CustomFetch {
+  const internal = new URL(internalUrl);
+  return (url, options) => {
+    const target = new URL(url);
+    if (target.host === publicIssuer.host) {
+      target.protocol = internal.protocol;
+      target.host = internal.host;
+    }
+    // openid-client's CustomFetchOptions is structurally fetch-compatible at
+    // runtime but not identical to lib.dom's RequestInit (e.g. `body`'s
+    // FetchBody type vs BodyInit) — same friction openid-client's own docs
+    // show working around with a type-ignore when bridging to fetch-like
+    // callers.
+    // @ts-expect-error - CustomFetchOptions vs RequestInit, see comment above
+    return fetch(target, options);
+  };
+}
+
 function discoverConfig(): Promise<client.Configuration> {
   const env = getWebEnv();
-  return client.discovery(new URL(env.KEYCLOAK_ISSUER_URL), env.KEYCLOAK_CLIENT_ID_WEB, undefined, client.None()).catch(
+  const issuer = new URL(env.KEYCLOAK_ISSUER_URL);
+  const options = env.KEYCLOAK_INTERNAL_URL
+    ? { [client.customFetch]: internalKeycloakFetch(issuer, env.KEYCLOAK_INTERNAL_URL) }
+    : undefined;
+  return client.discovery(issuer, env.KEYCLOAK_CLIENT_ID_WEB, undefined, client.None(), options).catch(
     (err: unknown) => {
       // Reset so a transient discovery failure (e.g. Keycloak not up yet
       // in dev) doesn't permanently poison the cache for the process.

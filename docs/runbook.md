@@ -109,6 +109,42 @@ outage.
 routing (a not-ready pod stops receiving new requests but isn't killed).
 Extend this (not `/health`) when adding Redis/MinIO checks.
 
+## Troubleshooting
+
+**Login (or anything hitting Keycloak) 500s with `getaddrinfo ENOTFOUND
+auth.<domain>` in `web`/`api` logs.** `*.topiadesk.localhost` only resolves
+via host-machine/browser DNS (Chromium special-cases `.localhost`; macOS/some
+resolvers do too) — Docker Compose's embedded DNS has no idea what it is, so
+a container trying to reach it directly fails. `api`/`web` both need to talk
+to Keycloak by service name (`http://keycloak:8080`) instead, while still
+treating the public URL as the logical issuer (it's what's baked into every
+token's `iss` claim, and what the user's browser must be redirected to).
+`KEYCLOAK_INTERNAL_URL` in `.env` is that internal address — `jwt-verifier.ts`
+swaps just the origin of the JWKS fetch, and `lib/auth/oidc.ts` does the same
+for OIDC discovery/token-exchange via `openid-client`'s `customFetch` (kept
+separate from the URL used for issuer validation, which stays public). Unset
+in a real deployment where public DNS resolves everywhere — both fall back to
+the public URL directly. Follow this exact pattern for any future
+integration that's reachable at a `*.topiadesk.localhost` hostname.
+
+**A service is unexpectedly missing DB/Redis connectivity after
+`docker compose up -d <specific-service>`** (e.g. `/ready` fails with `Can't
+reach database server at pgbouncer:6432`, but `pgbouncer` itself is healthy).
+Observed repeatedly (both `api` and `web`, on separate occasions): a
+container recreation attaches only one of its two declared networks
+(`topiadesk_public` but not `topiadesk_data`), even though `docker compose
+config` correctly resolves both — a Compose/Docker Desktop reconciliation
+glitch, not a config error. Naming individual services (`docker compose up -d
+api`) seems to make it more likely, but it has also happened on a full
+`docker compose up -d` with no service named — that's a mitigation, not a
+guarantee. Fix: `docker network connect topiadesk_data <container>`
+(immediate, no restart needed). After any rebuild/restart of `api` or `web`,
+check `docker inspect <container> --format
+'{{json .NetworkSettings.Networks}}'` against the service's `networks:` list
+in `docker-compose.yml` — don't just trust the container's "healthy" status,
+since `/health`/`/ready` can pass while a sibling-service dependency (Redis,
+pgbouncer) is silently unreachable if it isn't checked by that healthcheck.
+
 ## Known Phase 1 limitations (accepted, not oversights)
 
 - **Keycloak is single-instance.** Full HA (Infinispan/JGroups clustering)

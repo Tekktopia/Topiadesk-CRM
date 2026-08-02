@@ -7,13 +7,15 @@
     "build": "next build",
     "start": "dotenv -e ../../.env -- next start -p \"${WEB_PORT:-3000}\"",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.6.0",
     "@tanstack/react-query": "^5.101.4",
     "@topiadesk/shared-types": "workspace:*",
     "@topiadesk/ui": "workspace:*",
+    "ioredis": "^5.4.1",
     "jose": "^6.2.6",
     "lucide-react": "^1.28.0",
     "next": "^15.5.22",
@@ -27,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.6",
+    "@playwright/test": "^1.62.1",
     "@tanstack/react-query-devtools": "^5.101.4",
     "@types/node": "^22.10.2",
     "@types/react": "^19.2.18",

@@ -48,6 +48,7 @@ x-common-app-env: &common-app-env
   KEYCLOAK_CLIENT_SECRET_API: ${KEYCLOAK_CLIENT_SECRET_API}
   KEYCLOAK_ISSUER_URL: ${KEYCLOAK_ISSUER_URL}
   KEYCLOAK_JWKS_URI: ${KEYCLOAK_JWKS_URI}
+  KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL}
   KEYCLOAK_WEBHOOK_SECRET: ${KEYCLOAK_WEBHOOK_SECRET}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
   AI_GATEWAY_MODEL: ${AI_GATEWAY_MODEL}
@@ -386,11 +387,17 @@ services:
       KEYCLOAK_REALM: ${KEYCLOAK_REALM}
       KEYCLOAK_CLIENT_ID_WEB: ${KEYCLOAK_CLIENT_ID_WEB}
       KEYCLOAK_ISSUER_URL: ${KEYCLOAK_ISSUER_URL}
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL}
+      REDIS_URL: ${REDIS_URL}
       WEB_SESSION_SECRET: ${WEB_SESSION_SECRET}
       WEB_COOKIE_DOMAIN: ${WEB_COOKIE_DOMAIN}
     depends_on:
       api:
         condition: service_started
+      # Server-side session store (lib/auth/redis-session-store.ts) — without
+      # Redis reachable, no one can log in at all.
+      redis:
+        condition: service_healthy
     labels:
       - traefik.enable=true
       - traefik.http.routers.web.rule=Host(`app.${APP_BASE_DOMAIN}`)

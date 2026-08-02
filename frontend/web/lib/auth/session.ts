@@ -1,4 +1,5 @@
 import 'server-only';
+import { randomUUID } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { getWebEnv } from '../env';
 import {
@@ -10,7 +11,8 @@ import {
 } from './constants';
 import { decryptPayload, encryptPayload } from './crypto';
 import { refreshTokens } from './oidc';
-import type { OAuthTransactionPayload, SessionPayload } from './types';
+import { deleteStoredSession, getStoredSession, setStoredSession } from './redis-session-store';
+import type { OAuthTransactionPayload, SessionCookiePayload, SessionPayload } from './types';
 
 export { SESSION_COOKIE_NAME, OAUTH_TXN_COOKIE_NAME };
 
@@ -22,9 +24,13 @@ export { SESSION_COOKIE_NAME, OAUTH_TXN_COOKIE_NAME };
  * touch localStorage/sessionStorage, per the compliance requirement that
  * XSS can't exfiltrate them:
  *
- *  - `td_session`: the real session — access/refresh/ID tokens plus their
- *    expiry, set after a successful callback, read on every request that
- *    needs to call the API.
+ *  - `td_session`: not the real session — an opaque `{sessionId}` envelope
+ *    (SessionCookiePayload). The real access/refresh/ID tokens
+ *    (SessionPayload) live server-side in Redis (./redis-session-store.ts),
+ *    looked up by sessionId on every read. Three full Keycloak JWTs
+ *    together routinely exceed the ~4096-byte limit browsers enforce on a
+ *    single cookie, which — before this — silently broke login in every
+ *    real browser (see types.ts's doc comment on SessionPayload).
  *  - `td_oauth_txn`: short-lived (5 min), holds the PKCE code_verifier +
  *    state + nonce for the single in-flight /login -> /callback round trip.
  *    Encrypted too, mainly to make the `returnTo` path tamper-evident
@@ -40,7 +46,9 @@ export { SESSION_COOKIE_NAME, OAUTH_TXN_COOKIE_NAME };
  *
  * Cookie names and timing constants live in `./constants.ts` (shared with
  * `middleware.ts`, which can't import this module — see that file's
- * top-of-file comment for why).
+ * top-of-file comment for why). middleware.ts only ever decrypts the small
+ * cookie envelope to confirm a non-tampered session pointer exists; it has
+ * no Redis/TCP access on the Edge runtime and doesn't need one.
  */
 
 function baseCookieOptions(maxAgeSeconds: number) {
@@ -56,24 +64,39 @@ function baseCookieOptions(maxAgeSeconds: number) {
   };
 }
 
-export async function readSession(): Promise<SessionPayload | null> {
+async function readSessionId(): Promise<string | null> {
   const store = await cookies();
   const raw = store.get(SESSION_COOKIE_NAME)?.value;
   if (!raw) return null;
   const env = getWebEnv();
-  return decryptPayload<SessionPayload>(raw, env.WEB_SESSION_SECRET);
+  const envelope = await decryptPayload<SessionCookiePayload>(raw, env.WEB_SESSION_SECRET);
+  return envelope?.sessionId ?? null;
+}
+
+export async function readSession(): Promise<SessionPayload | null> {
+  const sessionId = await readSessionId();
+  if (!sessionId) return null;
+  return getStoredSession(sessionId);
 }
 
 /** Route Handler / Server Action only (cookie mutation is not allowed
- * during a Server Component render). */
-export async function writeSession(payload: SessionPayload): Promise<void> {
+ * during a Server Component render). Pass `existingSessionId` on a token
+ * refresh to overwrite the same Redis entry/cookie envelope rather than
+ * minting a new one for what's still logically the same session. */
+export async function writeSession(payload: SessionPayload, existingSessionId?: string): Promise<void> {
+  const sessionId = existingSessionId ?? randomUUID();
+  await setStoredSession(sessionId, payload, SESSION_MAX_AGE_SECONDS);
+
   const env = getWebEnv();
-  const token = await encryptPayload(payload, env.WEB_SESSION_SECRET, SESSION_MAX_AGE_SECONDS);
+  const envelope: SessionCookiePayload = { sessionId };
+  const token = await encryptPayload(envelope, env.WEB_SESSION_SECRET, SESSION_MAX_AGE_SECONDS);
   const store = await cookies();
   store.set(SESSION_COOKIE_NAME, token, baseCookieOptions(SESSION_MAX_AGE_SECONDS));
 }
 
 export async function clearSession(): Promise<void> {
+  const sessionId = await readSessionId();
+  if (sessionId) await deleteStoredSession(sessionId);
   const store = await cookies();
   store.delete(SESSION_COOKIE_NAME);
 }
@@ -109,7 +132,9 @@ export async function clearOAuthTransaction(): Promise<void> {
  * Route Handler / Server Action only (writes cookies on refresh).
  */
 export async function getValidAccessToken(): Promise<string | null> {
-  const session = await readSession();
+  const sessionId = await readSessionId();
+  if (!sessionId) return null;
+  const session = await getStoredSession(sessionId);
   if (!session) return null;
 
   const now = Math.floor(Date.now() / 1000);
@@ -136,7 +161,7 @@ export async function getValidAccessToken(): Promise<string | null> {
       refreshTokenExpiresAt: session.refreshTokenExpiresAt,
       subject: session.subject,
     };
-    await writeSession(nextSession);
+    await writeSession(nextSession, sessionId);
     return nextSession.accessToken;
   } catch {
     await clearSession();

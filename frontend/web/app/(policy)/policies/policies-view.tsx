@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ShieldCheck } from 'lucide-react';
 import {
   Badge,
@@ -23,6 +23,7 @@ import {
 } from '@topiadesk/ui';
 import { formatDate, formatNaira, policyStatusVariant } from '@/app/(policy)/lib/format';
 import { POLICY_STATUSES, type LookupOption, type PolicyDto } from '@/app/(policy)/lib/types';
+import { CreatePolicyDialog } from './create-policy-dialog';
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: 'same-origin' });
@@ -33,6 +34,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 const ALL = 'ALL';
 
 export function PoliciesView() {
+  const queryClient = useQueryClient();
   const [status, setStatus] = React.useState<string>(ALL);
   const [accountId, setAccountId] = React.useState<string>(ALL);
 
@@ -64,9 +66,12 @@ export function PoliciesView() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Policies</h1>
-        <p className="text-sm text-muted-foreground">Every bound, issued, and lapsed policy across the book.</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Policies</h1>
+          <p className="text-sm text-muted-foreground">Every bound, issued, and lapsed policy across the book.</p>
+        </div>
+        <CreatePolicyDialog onCreated={() => queryClient.invalidateQueries({ queryKey: ['policies'] })} />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

@@ -2,7 +2,7 @@ import type { NextRequest} from 'next/server';
 import { NextResponse } from 'next/server';
 import { OAUTH_TXN_COOKIE_NAME, SESSION_COOKIE_NAME } from '@/lib/auth/constants';
 import { decryptPayload } from '@/lib/auth/crypto';
-import type { SessionPayload } from '@/lib/auth/types';
+import type { SessionCookiePayload } from '@/lib/auth/types';
 import { getWebEnv } from '@/lib/env';
 
 /**
@@ -29,8 +29,12 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   if (sessionCookie) {
     const env = getWebEnv();
-    const session = await decryptPayload<SessionPayload>(sessionCookie, env.WEB_SESSION_SECRET);
-    if (session) {
+    // Only the small `{sessionId}` envelope — the real tokens live in Redis
+    // and are deliberately unreachable from the Edge runtime. A valid,
+    // unexpired envelope is sufficient for this gate; the actual API call
+    // downstream is what resolves (and can invalidate) the stored session.
+    const envelope = await decryptPayload<SessionCookiePayload>(sessionCookie, env.WEB_SESSION_SECRET);
+    if (envelope?.sessionId) {
       return NextResponse.next();
     }
   }

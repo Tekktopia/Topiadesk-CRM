@@ -15,11 +15,17 @@ export interface AuthenticatedUser {
   branchId: string | null;
 }
 
-/** Shape persisted (encrypted) in the `td_session` cookie. Only what's
- * needed to call the API and to know when to refresh — never the raw ID
- * token claims beyond what we explicitly pick.
- * Extends `JWTPayload` (jose's index-signature interface) because these are
- * literally used as EncryptJWT/jwtDecrypt payloads — see ./crypto.ts. */
+/** The real session contents — access/refresh/ID tokens plus their expiry.
+ * Stored server-side in Redis (see ./redis-session-store.ts), keyed by the
+ * opaque session ID that's the *only* thing that ever lives in the
+ * `td_session` cookie (see SessionCookiePayload below). Three full Keycloak
+ * JWTs together routinely exceed 4KB — browsers cap an individual cookie's
+ * name=value pair at ~4096 bytes (RFC 6265's SHOULD, enforced as a hard
+ * limit by Chrome and others), so a cookie holding this shape directly is
+ * silently rejected/truncated by the browser. That surfaced as a genuine,
+ * always-broken bug: every login looped forever (ERR_TOO_MANY_REDIRECTS) in
+ * a real browser, only ever masked because prior testing used curl, whose
+ * cookie handling doesn't enforce the same per-cookie size limit. */
 export interface SessionPayload extends JWTPayload {
   accessToken: string;
   refreshToken: string;
@@ -30,6 +36,17 @@ export interface SessionPayload extends JWTPayload {
   refreshTokenExpiresAt: number;
   /** Keycloak subject (`sub`) — cheap identity check without a network call. */
   subject: string;
+}
+
+/** The actual shape persisted (encrypted) in the `td_session` cookie — just
+ * enough to look up the real SessionPayload in Redis, and small enough to
+ * never approach any browser's per-cookie size limit regardless of how
+ * large Keycloak's JWTs get as more roles/scopes are added. Middleware
+ * (Edge runtime, no Redis/TCP access) only ever decrypts this envelope to
+ * confirm a non-tampered, unexpired session pointer exists — it never needs
+ * the real tokens, so this is all it ever sees. */
+export interface SessionCookiePayload extends JWTPayload {
+  sessionId: string;
 }
 
 /** Transient state for the in-flight OAuth transaction, stored in a

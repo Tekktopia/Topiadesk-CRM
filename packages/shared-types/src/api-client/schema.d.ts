@@ -1268,6 +1268,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AuditLogController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2260,6 +2276,30 @@ export interface components {
             pipelineValue: string;
             renewalsDueNext90Days: number;
             activeClients: number;
+        };
+        AuditLogActorDto: {
+            id: string;
+            fullName: string;
+            email: string;
+        };
+        AuditLogResponseDto: {
+            /** @description BigInt chain sequence id, serialized as string */
+            id: string;
+            entityType: string;
+            entityId: string;
+            /** @enum {string} */
+            action: "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGIN_FAILED" | "PERMISSION_CHANGE" | "EXPORT" | "VIEW_SENSITIVE";
+            actorUserId: Record<string, never> | null;
+            actorUser: components["schemas"]["AuditLogActorDto"] | null;
+            actorSystemJob: Record<string, never> | null;
+            actorIp: Record<string, never> | null;
+            /** @description Trigger-captured column diff — shape varies by entityType */
+            changedFields: Record<string, never> | null;
+            chainLane: number;
+            prevHash: Record<string, never> | null;
+            currentHash: string;
+            /** Format: date-time */
+            createdAt: string;
         };
     };
     responses: never;
@@ -5411,6 +5451,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OperationalKpiResponseDto"];
+                };
+            };
+        };
+    };
+    AuditLogController_list: {
+        parameters: {
+            query?: {
+                entityType?: string;
+                entityId?: string;
+                actorUserId?: string;
+                action?: "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGIN_FAILED" | "PERMISSION_CHANGE" | "EXPORT" | "VIEW_SENSITIVE";
+                /** @description ISO 8601 — matches createdAt >= from */
+                from?: string;
+                /** @description ISO 8601 — matches createdAt <= to */
+                to?: string;
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogResponseDto"][];
                 };
             };
         };

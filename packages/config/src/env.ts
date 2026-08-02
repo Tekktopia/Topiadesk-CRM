@@ -53,6 +53,15 @@ const envSchema = z.object({
   KEYCLOAK_CLIENT_SECRET_API: z.string().min(1),
   KEYCLOAK_ISSUER_URL: z.string().url(),
   KEYCLOAK_JWKS_URI: z.string().url(),
+  // Server-to-server JWKS fetch (jwks-rsa, inside JwtVerifier) must use this
+  // instead of KEYCLOAK_JWKS_URI's host when running inside Docker Compose —
+  // *.topiadesk.localhost only resolves via host-machine/browser DNS, not
+  // Docker's embedded DNS (same reasoning as frontend/web's API_INTERNAL_URL).
+  // KEYCLOAK_ISSUER_URL stays the public URL regardless, since it's also used
+  // as the expected `iss` claim value, which Keycloak always stamps as the
+  // public hostname (KC_HOSTNAME). Falls back to KEYCLOAK_JWKS_URI's own host
+  // when unset, e.g. a real deployment where public DNS resolves everywhere.
+  KEYCLOAK_INTERNAL_URL: z.string().url().optional(),
   KEYCLOAK_WEBHOOK_SECRET: z.string().min(1),
 
   ANTHROPIC_API_KEY: z.string().min(1).optional(),

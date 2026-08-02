@@ -149,3 +149,17 @@ export type IntegrationLogDto = Omit<
 // -- Notifications --------------------------------------------------------
 type RawNotificationDto = Json200<'/notifications', 'get'>[number];
 export type NotificationDto = Omit<RawNotificationDto, 'readAt'> & { readAt: NullableString };
+
+// -- Audit log --------------------------------------------------------------
+type RawAuditLogDto = Json200<'/audit-log', 'get'>[number];
+export type AuditLogDto = Omit<
+  RawAuditLogDto,
+  'actorUserId' | 'actorSystemJob' | 'actorIp' | 'prevHash' | 'changedFields'
+> & {
+  actorUserId: NullableString;
+  actorSystemJob: NullableString;
+  actorIp: NullableString;
+  prevHash: NullableString;
+  changedFields: unknown;
+};
+export type AuditLogActorDto = NonNullable<AuditLogDto['actorUser']>;

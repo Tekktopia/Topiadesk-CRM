@@ -76,16 +76,15 @@ a named pain point in reviews, with stacked add-ons (Copilot, WFM) pushing
 effective cost up to ~87% above base seat price. **Freshdesk**: AI Copilot
 sessions are metered per-100-session blocks or a flat per-agent add-on.
 
-**TopiaDesk**: the `ai-gateway` module is designed around an `AiUsageLedger`
-table (`packages/db/prisma/schema.prisma`) recording tokens and estimated
-cost per request, gated by `AI_ORG_MONTHLY_SPEND_CAP_USD` and
-`AI_PER_USER_DAILY_REQUEST_CAP` (`.env.example`) — a hard ceiling, not a
-metered-and-hope model. *(Implementation status: the endpoint contract is
-live and Swagger-documented; the Anthropic SDK wrapper and the actual cap
-enforcement are Batch 1 scope — see the module's header comment in
-`backend/api/src/modules/ai-gateway/ai-gateway.controller.ts`. Flagged here as
-an architectural commitment already reflected in the schema, not yet a
-shipped feature.)*
+**TopiaDesk**: the `ai-gateway` module wraps the real Anthropic SDK
+(`backend/api/src/modules/ai-gateway/anthropic-client.ts`) behind an
+`AiUsageLedger` table (`packages/db/prisma/schema.prisma`) recording tokens
+and estimated cost per request, checked **before** every metered call —
+never after — against `AI_ORG_MONTHLY_SPEND_CAP_USD` (summed org-wide under
+elevated `SYSTEM_JOB_CONTEXT`, so the cap sees true total spend, not just
+one user's RLS-scoped slice) and `AI_PER_USER_DAILY_REQUEST_CAP`
+(`ai-gateway.service.ts`) — a hard ceiling enforced in code, not a
+metered-and-hope model or an aspirational schema field.
 
 ## Honest scope comparison
 

@@ -20,3 +20,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const query = qs.toString();
   return proxyJson(`/policies${query ? `?${query}` : ''}`);
 }
+
+/**
+ * POST /api/policies -> POST /policies (PolicyController.create,
+ * CreatePolicyDto) — creates a policy in the default QUOTED status; reaching
+ * ISSUED/BOUND/etc. happens later via PolicyVersion creation, not here.
+ */
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const body = await request.text();
+  return proxyJson('/policies', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  });
+}

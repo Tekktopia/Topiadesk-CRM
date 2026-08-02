@@ -2,6 +2,9 @@
 node_modules/
 .pnpm-store/
 
+# Local Claude Code session state (not project content)
+.claude/
+
 # Build outputs
 dist/
 build/
@@ -30,6 +33,9 @@ pnpm-debug.log*
 coverage/
 playwright-report/
 test-results/
+# Playwright auth storage state + persisted TOTP seeds (real session tokens
+# and MFA secrets for the local/CI Keycloak instance — never commit these)
+frontend/web/e2e/.auth/
 
 # Editor / OS
 .DS_Store

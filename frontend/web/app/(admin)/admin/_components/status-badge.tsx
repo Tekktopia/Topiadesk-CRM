@@ -37,3 +37,19 @@ export function LogLevelBadge({ level }: { level: string }) {
   const variant = LOG_LEVEL_VARIANT[level] ?? 'outline';
   return <Badge variant={variant}>{level}</Badge>;
 }
+
+const AUDIT_ACTION_VARIANT: Record<string, 'success' | 'warning' | 'destructive' | 'secondary' | 'outline'> = {
+  CREATE: 'success',
+  UPDATE: 'warning',
+  DELETE: 'destructive',
+  LOGIN: 'secondary',
+  LOGIN_FAILED: 'destructive',
+  PERMISSION_CHANGE: 'warning',
+  EXPORT: 'outline',
+  VIEW_SENSITIVE: 'outline',
+};
+
+export function AuditActionBadge({ action }: { action: string }) {
+  const variant = AUDIT_ACTION_VARIANT[action] ?? 'outline';
+  return <Badge variant={variant}>{action}</Badge>;
+}

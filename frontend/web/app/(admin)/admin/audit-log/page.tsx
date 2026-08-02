@@ -1,88 +1,232 @@
-import { CheckCircle2, Link2, Lock, ScrollText, ShieldCheck } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@topiadesk/ui';
-import { PageHeader } from '../_components/page-header';
+'use client';
 
-/**
- * Honest "not yet available" state — there is currently no backend read
- * endpoint for `audit_log`. Confirmed by reading every controller in
- * backend/api/src/modules/identity/ and backend/api/src/common/audit/: the
- * only code touching `audit_log` is AuditService.recordEvent() (write-only,
- * called internally from mutation paths like role/permission grant changes
- * — see roles.controller.ts, users.controller.ts, org-settings.controller.ts)
- * and the DB-level triggers described in docs/architecture.md's "Audit
- * trail" section. No @Controller anywhere exposes a GET for it. Rather than
- * fabricate data or call a nonexistent route, this page documents what IS
- * real (the capture + hash chain) and what's missing (the read API), so an
- * admin isn't misled into thinking there's nothing being recorded.
- */
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight, ScrollText } from 'lucide-react';
+import {
+  Button,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@topiadesk/ui';
+import { PageHeader } from '../_components/page-header';
+import { EmptyState, ErrorState } from '../_components/query-states';
+import { AuditActionBadge } from '../_components/status-badge';
+import { apiFetch } from '../_lib/api';
+import { useUsers } from '../_lib/queries';
+import type { AuditLogDto } from '../_lib/types';
+import { AuditLogDetailDialog } from './audit-log-detail-dialog';
+
+const UNSET = '__any';
+const TAKE = 50;
+
+// Hand-mirrored from packages/db/prisma/schema.prisma's AuditAction enum —
+// same convention as e.g. admin/users/page.tsx's local STATUS_OPTIONS.
+const AUDIT_ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGIN_FAILED', 'PERMISSION_CHANGE', 'EXPORT', 'VIEW_SENSITIVE'] as const;
+
+function useDebounced<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(id);
+  }, [value, delayMs]);
+  return debounced;
+}
+
 export default function AuditLogPage() {
+  const [entityType, setEntityType] = useState('');
+  const [entityId, setEntityId] = useState('');
+  const [actorUserId, setActorUserId] = useState<string>(UNSET);
+  const [action, setAction] = useState<string>(UNSET);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [skip, setSkip] = useState(0);
+  const [selected, setSelected] = useState<AuditLogDto | null>(null);
+
+  const debouncedEntityType = useDebounced(entityType, 300);
+  const debouncedEntityId = useDebounced(entityId, 300);
+
+  const usersQuery = useUsers();
+
+  // Any filter change invalidates the current page offset.
+  useEffect(() => {
+    setSkip(0);
+  }, [debouncedEntityType, debouncedEntityId, actorUserId, action, from, to]);
+
+  const qs = useMemo(() => {
+    const params = new URLSearchParams({ take: String(TAKE), skip: String(skip) });
+    if (debouncedEntityType) params.set('entityType', debouncedEntityType);
+    if (debouncedEntityId) params.set('entityId', debouncedEntityId);
+    if (actorUserId !== UNSET) params.set('actorUserId', actorUserId);
+    if (action !== UNSET) params.set('action', action);
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    return params.toString();
+  }, [debouncedEntityType, debouncedEntityId, actorUserId, action, from, to, skip]);
+
+  const auditLogQuery = useQuery({
+    queryKey: ['admin', 'audit-log', qs],
+    queryFn: () => apiFetch<AuditLogDto[]>(`/api/admin/audit-log?${qs}`),
+  });
+
+  const rows = auditLogQuery.data ?? [];
+  const hasNextPage = rows.length === TAKE;
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Audit Log"
-        description="Every compliance-relevant mutation is captured and hash-chained today. Viewing it here isn't possible yet — the read API doesn't exist."
+        description="Every compliance-relevant mutation, hash-chained and structurally append-only. Visible here only to ADMIN and COMPLIANCE_OFFICER — the API enforces this independently of what this page shows."
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ScrollText className="h-5 w-5 text-muted-foreground" aria-hidden />
-            No audit log read endpoint yet
-          </CardTitle>
-          <CardDescription>
-            <code className="font-mono text-xs">backend/api/src/modules/identity/</code> and{' '}
-            <code className="font-mono text-xs">backend/api/src/common/audit/audit.service.ts</code> only ever{' '}
-            <em>write</em> to <code className="font-mono text-xs">audit_log</code> — there is no{' '}
-            <code className="font-mono text-xs">GET</code> route anywhere in backend/api exposing it for reads yet.
-            This page intentionally shows no data rather than a fake table, since backend/api is out of scope for
-            this build. Exposing a paginated, filterable read endpoint (by entity, actor, date range) is a real
-            follow-up item for whoever owns that module next.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2 space-y-0">
-            <CheckCircle2 className="h-4 w-4 text-success" aria-hidden />
-            <CardTitle className="text-sm">What is real today</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>
-              A DB-level <code className="font-mono text-xs">AFTER INSERT/UPDATE/DELETE</code> trigger writes every
-              change on compliance-relevant tables to <code className="font-mono text-xs">audit_log</code>{' '}
-              automatically — not something application code can forget to instrument.
-            </p>
-            <p>
-              Role/permission grant changes (which have no natural row id to hook a trigger to) are recorded
-              explicitly as <code className="font-mono text-xs">PERMISSION_CHANGE</code> events by{' '}
-              <code className="font-mono text-xs">AuditService.recordEvent()</code> — see the Roles page&apos;s grant
-              and revoke actions in this Admin UI.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2 space-y-0">
-            <Lock className="h-4 w-4 text-muted-foreground" aria-hidden />
-            <CardTitle className="text-sm">Tamper-evident by construction</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p className="flex items-start gap-2">
-              <Link2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-              Every row is hash-chained (<code className="font-mono text-xs">sha256(prev_hash + payload)</code>,
-              computed in Postgres — not app code) across 8 concurrency lanes, with periodic checkpoints anchoring
-              all lanes.
-            </p>
-            <p className="flex items-start gap-2">
-              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-              The table is structurally append-only: no UPDATE/DELETE RLS policy exists, and those privileges are
-              revoked from the runtime role outright — verified in the Phase 0 log by attempting exactly that
-              tamper and getting <code className="font-mono text-xs">permission denied</code>.
-            </p>
-          </CardContent>
-        </Card>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="min-w-[160px] flex-1 space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="audit-entity-type">
+            Entity type
+          </label>
+          <Input
+            id="audit-entity-type"
+            placeholder="e.g. policies, accounts…"
+            value={entityType}
+            onChange={(e) => setEntityType(e.target.value)}
+          />
+        </div>
+        <div className="min-w-[220px] flex-1 space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="audit-entity-id">
+            Entity ID
+          </label>
+          <Input
+            id="audit-entity-id"
+            placeholder="UUID"
+            value={entityId}
+            onChange={(e) => setEntityId(e.target.value)}
+          />
+        </div>
+        <div className="w-full space-y-1.5 sm:w-48">
+          <label className="text-xs font-medium text-muted-foreground">Actor</label>
+          <Select value={actorUserId} onValueChange={setActorUserId}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={UNSET}>Any actor</SelectItem>
+              {(usersQuery.data ?? []).map((u) => (
+                <SelectItem key={u.id} value={u.id}>
+                  {u.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="w-full space-y-1.5 sm:w-44">
+          <label className="text-xs font-medium text-muted-foreground">Action</label>
+          <Select value={action} onValueChange={setAction}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={UNSET}>Any action</SelectItem>
+              {AUDIT_ACTIONS.map((a) => (
+                <SelectItem key={a} value={a}>
+                  {a}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="audit-from">
+            From
+          </label>
+          <Input id="audit-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="audit-to">
+            To
+          </label>
+          <Input id="audit-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
+        </div>
       </div>
+
+      {auditLogQuery.isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : auditLogQuery.isError ? (
+        <ErrorState error={auditLogQuery.error} />
+      ) : rows.length === 0 ? (
+        <EmptyState
+          title="No audit entries match these filters"
+          icon={<ScrollText className="h-8 w-8" aria-hidden />}
+          description={skip === 0 ? 'Try clearing a filter.' : undefined}
+        />
+      ) : (
+        <>
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Timestamp</TableHead>
+                  <TableHead>Actor</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Entity</TableHead>
+                  <TableHead className="w-24" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((entry) => (
+                  <TableRow key={entry.id} className="cursor-pointer" onClick={() => setSelected(entry)}>
+                    <TableCell className="text-sm text-muted-foreground">{new Date(entry.createdAt).toLocaleString()}</TableCell>
+                    <TableCell className="text-sm text-foreground">
+                      {entry.actorUser?.fullName ?? entry.actorSystemJob ?? '—'}
+                    </TableCell>
+                    <TableCell>
+                      <AuditActionBadge action={entry.action} />
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      <span className="text-foreground">{entry.entityType}</span>{' '}
+                      <span className="font-mono text-xs">{entry.entityId}</span>
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" size="sm" onClick={() => setSelected(entry)}>
+                        View details
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              Showing {skip + 1}–{skip + rows.length}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={skip === 0} onClick={() => setSkip(Math.max(0, skip - TAKE))}>
+                <ChevronLeft className="h-4 w-4" /> Previous
+              </Button>
+              <Button variant="outline" size="sm" disabled={!hasNextPage} onClick={() => setSkip(skip + TAKE)}>
+                Next <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
+
+      <AuditLogDetailDialog entry={selected} open={!!selected} onOpenChange={(open) => !open && setSelected(null)} />
     </div>
   );
 }

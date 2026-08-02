@@ -15,6 +15,7 @@ import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AiGatewayModule } from './modules/ai-gateway/ai-gateway.module';
 import { DashboardsModule } from './modules/dashboards/dashboards.module';
+import { AuditModule } from './modules/audit/audit.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { DashboardsModule } from './modules/dashboards/dashboards.module';
     NotificationsModule,
     AiGatewayModule,
     DashboardsModule,
+    AuditModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

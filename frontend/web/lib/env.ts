@@ -35,6 +35,19 @@ const webEnvSchema = z.object({
   KEYCLOAK_REALM: z.string().min(1),
   KEYCLOAK_CLIENT_ID_WEB: z.string().min(1),
   KEYCLOAK_ISSUER_URL: z.string().url(),
+  // Same reasoning as API_INTERNAL_URL above, applied to Keycloak: discovery
+  // and token-exchange calls happen server-side (Route Handlers), so they
+  // must reach Keycloak by container/service name inside Docker Compose.
+  // KEYCLOAK_ISSUER_URL remains the logical/public issuer used for OIDC
+  // discovery's issuer validation and for the browser-facing authorization/
+  // end-session redirect URLs — only the actual server-to-server HTTP
+  // requests get rewritten to this host. See lib/auth/oidc.ts.
+  KEYCLOAK_INTERNAL_URL: z.string().url().optional(),
+
+  // Server-side session store — the `td_session` cookie only carries an
+  // opaque session ID; the real Keycloak tokens are too large for a cookie
+  // (see lib/auth/types.ts) and live in Redis instead.
+  REDIS_URL: z.string().min(1),
 
   WEB_SESSION_SECRET: z.string().min(16),
   // Optional: browsers reject a cookie `domain` attribute that isn't a
