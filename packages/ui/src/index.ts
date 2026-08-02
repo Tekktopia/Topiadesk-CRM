@@ -34,3 +34,4 @@ export * from './primitives/tooltip';
 
 // -- Composite components -----------------------------------------------------
 export * from './composite/stat-tile';
+export * from './composite/activity-timeline';

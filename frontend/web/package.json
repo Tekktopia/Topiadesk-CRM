@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.6.0",
     "@tanstack/react-query": "^5.101.4",
     "@topiadesk/shared-types": "workspace:*",
     "@topiadesk/ui": "workspace:*",
@@ -20,6 +21,7 @@
     "openid-client": "^6.8.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-hook-form": "^7.84.0",
     "server-only": "^0.0.1",
     "zod": "^3.24.1"
   },

@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { dashboardNav } from './(dashboard)/nav';
-// Batch 2: once app/(crm)/nav.ts, app/(policy)/nav.ts, app/(admin)/nav.ts
-// exist, import each here and add it to the `nav` array below — that's the
-// only change this shared file needs per route group. See
-// lib/nav-types.ts and app/(dashboard)/nav.ts for the full pattern.
+// Pre-registered so no Batch 2 agent needs to edit this shared file — same
+// "spine" pattern as backend/api/src/app.module.ts in Phase 0. Each agent
+// only edits the body of its own already-imported nav.ts.
+import { crmNav } from './(crm)/nav';
+import { policyNav } from './(policy)/nav';
+import { adminNav } from './(admin)/nav';
 import { AppHeader } from './app-header';
 import { Providers } from './providers';
 import './globals.css';
@@ -18,7 +20,7 @@ export const metadata: Metadata = {
   description: 'TopiaDesk CRM — the engagement layer for Scib Nigeria insurance brokerage operations.',
 };
 
-const nav = [...dashboardNav];
+const nav = [...dashboardNav, ...crmNav, ...policyNav, ...adminNav];
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
