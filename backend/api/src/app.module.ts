@@ -58,6 +58,11 @@ export class AppModule implements NestModule {
         { path: 'api/docs', method: RequestMethod.ALL },
         { path: 'api/docs-json', method: RequestMethod.GET },
         { path: 'api/docs/(.*)', method: RequestMethod.ALL },
+        // Keycloak calls this directly (no TopiaDesk-issued JWT) — it's
+        // independently secured by KeycloakWebhookGuard's shared-secret
+        // check, not RLS context. See keycloak-webhook.controller.ts's
+        // header comment for why this exclusion belongs here.
+        { path: 'identity/webhooks/keycloak', method: RequestMethod.POST },
       )
       .forRoutes('*');
   }

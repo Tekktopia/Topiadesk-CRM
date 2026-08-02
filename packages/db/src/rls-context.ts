@@ -35,9 +35,28 @@ export function getRlsContext(): RlsContext | undefined {
   return rlsStorage.getStore();
 }
 
-/** Principal used by BullMQ jobs and other background code — see prisma/rls policy branches for SYSTEM_JOB. */
+/**
+ * Principal used by BullMQ jobs and other background code — see
+ * prisma/rls policy branches for SYSTEM_JOB (app_max_scope() hardcodes
+ * 'ALL' for this role regardless of userId, so RLS scoping is entirely
+ * role-driven here — userId is NOT used for any scope decision).
+ *
+ * userId is deliberately '' (empty), not a placeholder UUID like
+ * '00000000-...': the audit-chain trigger (prisma/triggers/
+ * 001_audit_chain_function.sql) falls back to
+ * `NEW.actor_user_id := app_current_user_id()` whenever a row-change
+ * trigger doesn't set it explicitly, and `audit_log.actor_user_id` has an
+ * FK to `users(id)`. A placeholder UUID that isn't a real user row makes
+ * every write to an audit-tracked table (e.g. renewal_schedules) under this
+ * context fail with a foreign-key violation — caught empirically running
+ * the renewal-alert scan against seeded data. `app_current_user_id()` is
+ * `NULLIF(current_setting('app.current_user_id', true), '')::uuid`, so an
+ * empty string resolves to SQL NULL, which the FK (nullable) accepts —
+ * same "empty string -> unset" convention departmentId/branchId already
+ * use below via the `?? ''` fallback in client.ts's set_config call.
+ */
 export const SYSTEM_JOB_CONTEXT: RlsContext = {
-  userId: '00000000-0000-0000-0000-000000000000',
+  userId: '',
   role: 'SYSTEM_JOB',
   departmentId: null,
   branchId: null,

@@ -90,7 +90,20 @@ function createRlsClient(): PrismaClient {
   return new Proxy(client, {
     get(target, prop, receiver) {
       if (typeof prop !== 'string' || PASSTHROUGH_KEYS.has(prop)) {
-        return Reflect.get(target, prop, receiver);
+        const passthroughValue = Reflect.get(target, prop, receiver);
+        // Bind to `target` (the real PrismaClient), not left as a bare
+        // reference: `getPrismaClient().$transaction(cb)` is a property
+        // access + call in one expression, so per JS method-call semantics
+        // `this` inside the retrieved function would otherwise be the
+        // PROXY, not the real client — empirically confirmed to break
+        // Prisma's interactive-transaction internals (a bare `$transaction`
+        // call through this proxy fails engine-side with "missing field
+        // `max_wait`", because default transaction options get looked up
+        // via `this` and silently resolve to undefined against the proxy).
+        // `$queryRaw`/`$executeRaw` called directly (no wrapping
+        // `$transaction`) don't hit this, which is why health.controller.ts's
+        // bare `$queryRaw` already worked — this fixes the case that didn't.
+        return typeof passthroughValue === 'function' ? passthroughValue.bind(target) : passthroughValue;
       }
       const value = Reflect.get(target, prop, receiver);
       // Model delegates are plain objects (findMany/create/... methods);

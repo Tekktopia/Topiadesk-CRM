@@ -39,11 +39,22 @@ CREATE INDEX IF NOT EXISTS premium_aging_summary_policy_id_idx
 
 -- REFRESH MATERIALIZED VIEW CONCURRENTLY requires the unique index above and
 -- avoids locking the view against concurrent reads during refresh.
+--
+-- SECURITY DEFINER (+ fixed search_path, same defensive reasoning as
+-- app_max_scope() in 002_policies.sql): REFRESH MATERIALIZED VIEW requires
+-- being the owner of the matview, full stop — there is no partial GRANT for
+-- it. The matview is owned by app_migrator (the schema owner, since
+-- apply-sql.ts runs as app_migrator); app_runtime (what api/worker actually
+-- connect as, per packages/db/src/rls-context.ts's SYSTEM_JOB principal)
+-- is deliberately NOT the owner and NOT BYPASSRLS. Without SECURITY
+-- DEFINER this function is uncallable by app_runtime at all — confirmed
+-- empirically: `must be owner of materialized view premium_aging_summary`
+-- (error 42501) when backend/worker's premium-aging-refresh job called it.
 CREATE OR REPLACE FUNCTION refresh_premium_aging_summary() RETURNS void AS $$
 BEGIN
   REFRESH MATERIALIZED VIEW CONCURRENTLY premium_aging_summary;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE VIEW premium_aging_summary_scoped AS
 SELECT pas.*

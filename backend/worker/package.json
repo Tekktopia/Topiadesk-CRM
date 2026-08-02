@@ -6,17 +6,23 @@
     "dev": "dotenv -e ../../.env -- tsx watch src/main.ts",
     "build": "tsc",
     "start": "tsx src/main.ts",
-    "typecheck": "tsc --noEmit"
+    "lint": "eslint \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@topiadesk/config": "workspace:*",
     "@topiadesk/db": "workspace:*",
+    "bullmq": "^6.0.5",
     "ioredis": "^5.4.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
     "dotenv-cli": "^8.0.0",
+    "pg": "^8.13.1",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
   }
 }

@@ -35,7 +35,11 @@ async function main() {
   ]);
 
   console.log('[seed] roles & permissions');
-  const resources = ['account', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document', 'approval', 'ai_usage', 'audit_log', 'integration'] as const;
+  // 'identity' covers Batch 1 Agent A's whole domain (users/roles/
+  // permissions/departments/branches/teams/org-settings/ip-whitelist) as ONE
+  // resource, matching how 'document' already covers Document/
+  // DocumentVersion/DocumentLink — not one resource per table.
+  const resources = ['account', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document', 'approval', 'ai_usage', 'audit_log', 'integration', 'identity'] as const;
   const actions = ['read', 'write'] as const;
   const scopes = ['OWN', 'DEPARTMENT', 'BRANCH', 'ALL'] as const;
 
@@ -72,17 +76,35 @@ async function main() {
     'MANAGER',
     'Department head — sees and manages all records owned within their department',
     true,
-    ['account', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document'].flatMap((r) => actions.map((a) => [r, a, 'DEPARTMENT'] as [string, string, (typeof scopes)[number]])),
+    [
+      ...['account', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document'].flatMap((r) => actions.map((a) => [r, a, 'DEPARTMENT'] as [string, string, (typeof scopes)[number]])),
+      // AI copilot (summarize/reply-draft) is a front-line productivity tool,
+      // not an admin-only feature — see backend/api/src/modules/ai-gateway/.
+      ['ai_usage', 'write', 'DEPARTMENT'],
+    ],
   );
   const accountHandlerRole = await grantRole(
     'ACCOUNT_HANDLER',
     'Front-line broker — manages their own book of business',
     true,
-    ['account', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document'].flatMap((r) => actions.map((a) => [r, a, 'OWN'] as [string, string, (typeof scopes)[number]])),
+    [
+      ...['account', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document'].flatMap((r) => actions.map((a) => [r, a, 'OWN'] as [string, string, (typeof scopes)[number]])),
+      ['ai_usage', 'write', 'OWN'],
+    ],
   );
   const complianceRole = await grantRole('COMPLIANCE_OFFICER', 'Audit, approvals, and regulatory oversight', true, [
     ['account', 'read', 'ALL'], ['policy', 'read', 'ALL'], ['approval', 'read', 'ALL'], ['approval', 'write', 'ALL'],
+    // policy:write (ALL) is required to actually apply a decided approval's
+    // effect (status/currentVersionId/sumInsured) to the Policy row, not
+    // just decide the Approval itself — RLS on `policies` would otherwise
+    // block this role from completing the maker-checker flow it exists to
+    // run. See backend/api/src/modules/policy/policy-version.controller.ts's
+    // /decision endpoint.
+    ['policy', 'write', 'ALL'],
     ['audit_log', 'read', 'ALL'], ['ai_usage', 'read', 'ALL'], ['document', 'read', 'ALL'],
+    // Read-only user/role directory visibility for oversight — not write,
+    // consistent with this role's other grants being read-heavy.
+    ['identity', 'read', 'ALL'],
   ]);
 
   console.log('[seed] demo users');

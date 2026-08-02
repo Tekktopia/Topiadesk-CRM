@@ -1,0 +1,204 @@
+import { BadRequestException, Body, Controller, ForbiddenException, Get, NotFoundException, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { getPrismaClient, type ApprovalStatus, type PolicyVersion } from '@topiadesk/db';
+import { decimalToString } from './decimal.util';
+import { PermissionGuard } from '../../common/auth/permission.guard';
+import { RequirePermission } from '../../common/auth/require-permission.decorator';
+import { CurrentUser } from '../../common/auth/current-user.decorator';
+import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
+import { CreatePolicyVersionDto } from './dto/create-policy-version.dto';
+import { DecideApprovalDto } from './dto/decide-approval.dto';
+import { PolicyVersionResponseDto } from './dto/policy-version-response.dto';
+import {
+  assertValidPolicyTransition,
+  isApprovalGated,
+  VERSION_TYPE_APPROVAL_ENTITY_TYPE,
+  VERSION_TYPE_STATUS_EFFECT,
+} from './policy-lifecycle';
+
+function toVersionDto(
+  version: PolicyVersion,
+  approvalStatus: ApprovalStatus | null,
+  applied: boolean,
+): PolicyVersionResponseDto {
+  return {
+    ...version,
+    premiumImpact: decimalToString(version.premiumImpact),
+    sumInsuredAtVersion: decimalToString(version.sumInsuredAtVersion),
+    approvalStatus,
+    applied,
+  };
+}
+
+/**
+ * PolicyVersion = the mechanism for recording issuance/endorsement/renewal/
+ * cancellation/reinstatement. Per the BRD's compliance requirement
+ * (segregation of duties), ENDORSEMENT and CANCELLATION versions do NOT
+ * apply immediately: creating one always writes the PolicyVersion row (a
+ * durable record of what was proposed, even if later rejected) plus a
+ * PENDING Approval; the version's effect on the Policy itself
+ * (currentVersionId/status/sumInsured) is applied only once that Approval
+ * is decided via POST .../decision. ISSUANCE/RENEWAL/REINSTATEMENT apply
+ * immediately — see policy-lifecycle.ts for the full rule and rationale.
+ */
+@ApiTags('policy')
+@ApiBearerAuth()
+@UseGuards(PermissionGuard)
+@Controller('policies/:policyId/versions')
+export class PolicyVersionController {
+  @Get()
+  @RequirePermission('policy', 'read')
+  @ApiOkResponse({ type: [PolicyVersionResponseDto] })
+  async list(@Param('policyId', ParseUUIDPipe) policyId: string): Promise<PolicyVersionResponseDto[]> {
+    await this.assertPolicyVisible(policyId);
+    const versions = await getPrismaClient().policyVersion.findMany({
+      where: { policyId },
+      orderBy: { versionNumber: 'asc' },
+    });
+    return Promise.all(versions.map((v) => this.withApprovalStatus(v)));
+  }
+
+  @Get(':versionId')
+  @RequirePermission('policy', 'read')
+  @ApiOkResponse({ type: PolicyVersionResponseDto })
+  async findOne(
+    @Param('policyId', ParseUUIDPipe) policyId: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+  ): Promise<PolicyVersionResponseDto> {
+    const version = await getPrismaClient().policyVersion.findFirst({ where: { id: versionId, policyId } });
+    if (!version) throw new NotFoundException('Policy version not found');
+    return this.withApprovalStatus(version);
+  }
+
+  @Post()
+  @RequirePermission('policy', 'write')
+  @ApiOkResponse({ type: PolicyVersionResponseDto })
+  async create(
+    @Param('policyId', ParseUUIDPipe) policyId: string,
+    @Body() dto: CreatePolicyVersionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<PolicyVersionResponseDto> {
+    const prisma = getPrismaClient();
+    const policy = await prisma.policy.findUnique({ where: { id: policyId } });
+    if (!policy) throw new NotFoundException('Policy not found');
+
+    const targetStatus = VERSION_TYPE_STATUS_EFFECT[dto.versionType];
+    // Fail fast at request time even for gated types — re-validated again
+    // at decision time in decideApproval() since policy state can drift
+    // between now and whenever an approver acts on it.
+    assertValidPolicyTransition(policy.status, targetStatus);
+
+    const maxVersion = await prisma.policyVersion.aggregate({ where: { policyId }, _max: { versionNumber: true } });
+    const versionNumber = (maxVersion._max.versionNumber ?? 0) + 1;
+
+    const version = await prisma.policyVersion.create({
+      data: {
+        policyId,
+        versionNumber,
+        versionType: dto.versionType,
+        effectiveDate: new Date(dto.effectiveDate),
+        changeDescription: dto.changeDescription,
+        premiumImpact: dto.premiumImpact,
+        sumInsuredAtVersion: dto.sumInsuredAtVersion,
+        documentId: dto.documentId,
+        createdById: user.id,
+      },
+    });
+
+    if (isApprovalGated(dto.versionType)) {
+      await prisma.approval.create({
+        data: {
+          entityType: VERSION_TYPE_APPROVAL_ENTITY_TYPE[dto.versionType]!,
+          entityId: version.id,
+          requestedById: user.id,
+          status: 'PENDING',
+        },
+      });
+      return toVersionDto(version, 'PENDING', false);
+    }
+
+    await prisma.policy.update({
+      where: { id: policyId },
+      data: {
+        currentVersionId: version.id,
+        status: targetStatus,
+        sumInsured: dto.sumInsuredAtVersion ?? undefined,
+      },
+    });
+    return toVersionDto(version, null, true);
+  }
+
+  @Post(':versionId/decision')
+  @RequirePermission('approval', 'write')
+  @ApiOkResponse({ type: PolicyVersionResponseDto })
+  async decideApproval(
+    @Param('policyId', ParseUUIDPipe) policyId: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Body() dto: DecideApprovalDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<PolicyVersionResponseDto> {
+    const prisma = getPrismaClient();
+    const version = await prisma.policyVersion.findFirst({ where: { id: versionId, policyId } });
+    if (!version) throw new NotFoundException('Policy version not found');
+    if (!isApprovalGated(version.versionType)) {
+      throw new BadRequestException(`${version.versionType} versions are applied immediately and have no approval to decide`);
+    }
+
+    const entityType = VERSION_TYPE_APPROVAL_ENTITY_TYPE[version.versionType]!;
+    const approval = await prisma.approval.findFirst({
+      where: { entityType, entityId: versionId, status: 'PENDING' },
+    });
+    if (!approval) throw new NotFoundException('No pending approval for this version');
+
+    // Segregation of duties (BRD NFR) — the DB CHECK constraint
+    // (approvals_requester_ne_approver, prisma/rls/003_check_constraints.sql)
+    // would also reject this, but a clear 403 here beats a raw constraint
+    // violation surfacing as a 500.
+    if (approval.requestedById === user.id) {
+      throw new ForbiddenException('Cannot decide your own approval request');
+    }
+
+    const policy = await prisma.policy.findUniqueOrThrow({ where: { id: policyId } });
+    const targetStatus = VERSION_TYPE_STATUS_EFFECT[version.versionType];
+
+    if (dto.decision === 'APPROVED') {
+      // Re-validate: policy state may have moved since the version was
+      // requested (e.g. someone else cancelled it in the meantime).
+      assertValidPolicyTransition(policy.status, targetStatus);
+
+      await prisma.approval.update({
+        where: { id: approval.id },
+        data: { status: 'APPROVED', approvedById: user.id, decidedAt: new Date(), reason: dto.reason },
+      });
+      await prisma.policy.update({
+        where: { id: policyId },
+        data: {
+          currentVersionId: version.id,
+          status: targetStatus,
+          sumInsured: version.sumInsuredAtVersion ?? undefined,
+        },
+      });
+      return toVersionDto(version, 'APPROVED', true);
+    }
+
+    await prisma.approval.update({
+      where: { id: approval.id },
+      data: { status: 'REJECTED', approvedById: user.id, decidedAt: new Date(), reason: dto.reason },
+    });
+    return toVersionDto(version, 'REJECTED', false);
+  }
+
+  private async assertPolicyVisible(policyId: string): Promise<void> {
+    const policy = await getPrismaClient().policy.findUnique({ where: { id: policyId }, select: { id: true } });
+    if (!policy) throw new NotFoundException('Policy not found');
+  }
+
+  private async withApprovalStatus(version: PolicyVersion): Promise<PolicyVersionResponseDto> {
+    if (!isApprovalGated(version.versionType)) return toVersionDto(version, null, true);
+    const approval = await getPrismaClient().approval.findFirst({
+      where: { entityType: VERSION_TYPE_APPROVAL_ENTITY_TYPE[version.versionType]!, entityId: version.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    return toVersionDto(version, approval?.status ?? null, approval?.status === 'APPROVED');
+  }
+}

@@ -30,6 +30,14 @@ services:
       - "${MINIO_PORT}:${MINIO_PORT}"
       - "${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_PORT}"
 
+  # Direct host access to the API (bypassing Traefik/TLS) — mainly so local
+  # tooling like packages/shared-types/scripts/generate-api-client.mjs can
+  # fetch /api/docs-json without the self-signed-cert + Host-header dance
+  # Traefik's route requires.
+  api:
+    ports:
+      - "${API_PORT}:${API_PORT}"
+
   keycloak:
     ports:
       - "8080:8080"

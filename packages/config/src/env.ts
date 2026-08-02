@@ -6,6 +6,23 @@ import { z } from 'zod';
  * `process.env` directly — an invalid/missing var fails fast at boot, not
  * mid-request in production.
  */
+
+/**
+ * `z.coerce.boolean()` does NOT parse the string "false" as `false` — it
+ * runs the input through the `Boolean()` constructor, and `Boolean('false')`
+ * is `true` (any non-empty string is truthy in JS). Every boolean env var
+ * below used to use `z.coerce.boolean()`, which meant `MINIO_USE_SSL=false`
+ * in .env was silently parsed as `true` — caught live: the documents
+ * module's MinIO S3 client tried a TLS handshake against MinIO's plain-HTTP
+ * port and failed with an opaque `EPROTO ... packet length too long` error.
+ * This parses '1'/'true' (case-insensitive) as true, anything else as false.
+ */
+const zBooleanFromEnvString = (defaultValue: boolean) =>
+  z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined ? defaultValue : ['1', 'true'].includes(v.trim().toLowerCase())));
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
@@ -23,7 +40,7 @@ const envSchema = z.object({
 
   MINIO_ENDPOINT: z.string().min(1),
   MINIO_PORT: z.coerce.number().int().positive().default(9000),
-  MINIO_USE_SSL: z.coerce.boolean().default(false),
+  MINIO_USE_SSL: zBooleanFromEnvString(false),
   MINIO_DOCUMENTS_BUCKET: z.string().min(1),
   MINIO_AUDIT_WORM_BUCKET: z.string().min(1),
   MINIO_BACKUPS_BUCKET: z.string().min(1),
@@ -36,6 +53,7 @@ const envSchema = z.object({
   KEYCLOAK_CLIENT_SECRET_API: z.string().min(1),
   KEYCLOAK_ISSUER_URL: z.string().url(),
   KEYCLOAK_JWKS_URI: z.string().url(),
+  KEYCLOAK_WEBHOOK_SECRET: z.string().min(1),
 
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   AI_GATEWAY_MODEL: z.string().default('claude-sonnet-5'),
@@ -44,13 +62,13 @@ const envSchema = z.object({
 
   SMTP_HOST: z.string().min(1),
   SMTP_PORT: z.coerce.number().int().positive(),
-  SMTP_SECURE: z.coerce.boolean().default(false),
+  SMTP_SECURE: zBooleanFromEnvString(false),
   SMTP_FROM: z.string().min(1),
 
   BACKUP_CRON_SCHEDULE: z.string().default('0 */6 * * *'),
   BACKUP_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
 
-  IP_WHITELIST_ENFORCED: z.coerce.boolean().default(false),
+  IP_WHITELIST_ENFORCED: zBooleanFromEnvString(false),
   MFA_REQUIRED_FOR_ROLES: z
     .string()
     .default('ADMIN,COMPLIANCE')
