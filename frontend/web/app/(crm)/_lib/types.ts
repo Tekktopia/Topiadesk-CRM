@@ -38,6 +38,8 @@ export interface Account {
   parentAccountId: string | null;
   city: string | null;
   country: string | null;
+  /** Phase 2 — jsonb, keyed by active CustomFieldDefinition.key for entityType=ACCOUNT. */
+  customFields: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -67,8 +69,18 @@ export interface AccountDetail extends Account {
 }
 
 export type AccountQuery = NonNullable<Paths['/crm/accounts']['get']['parameters']['query']>;
-export type CreateAccountInput = Paths['/crm/accounts']['post']['requestBody']['content']['application/json'];
-export type UpdateAccountInput = Paths['/crm/accounts/{id}']['patch']['requestBody']['content']['application/json'];
+// `& { customFields?: ... }` because ApiPaths (packages/shared-types/src/api-client/schema.d.ts)
+// hasn't been regenerated against the Phase 2 OpenAPI schema yet — customFields
+// is a real, accepted field on CreateAccountDto/UpdateAccountDto
+// (backend/api/src/modules/crm/dto/account.dto.ts) that the generated schema
+// doesn't know about. Same "keep in sync manually" convention as this file's
+// header comment already documents for response shapes.
+export type CreateAccountInput = Paths['/crm/accounts']['post']['requestBody']['content']['application/json'] & {
+  customFields?: Record<string, unknown>;
+};
+export type UpdateAccountInput = Paths['/crm/accounts/{id}']['patch']['requestBody']['content']['application/json'] & {
+  customFields?: Record<string, unknown>;
+};
 
 // -- Contacts -------------------------------------------------------------
 
@@ -82,12 +94,19 @@ export interface Contact {
   phone: string | null;
   title: string | null;
   isPrimary: boolean;
+  /** Phase 2 — jsonb, keyed by active CustomFieldDefinition.key for entityType=CONTACT. */
+  customFields: Record<string, unknown>;
   createdAt: string;
 }
 
 export type ContactQuery = NonNullable<Paths['/crm/contacts']['get']['parameters']['query']>;
-export type CreateContactInput = Paths['/crm/contacts']['post']['requestBody']['content']['application/json'];
-export type UpdateContactInput = Paths['/crm/contacts/{id}']['patch']['requestBody']['content']['application/json'];
+// See CreateAccountInput's comment — ApiPaths hasn't been regenerated for Phase 2's customFields.
+export type CreateContactInput = Paths['/crm/contacts']['post']['requestBody']['content']['application/json'] & {
+  customFields?: Record<string, unknown>;
+};
+export type UpdateContactInput = Paths['/crm/contacts/{id}']['patch']['requestBody']['content']['application/json'] & {
+  customFields?: Record<string, unknown>;
+};
 
 // -- Carriers ---------------------------------------------------------------
 
@@ -123,6 +142,8 @@ export interface Lead {
   convertedAccountId: string | null;
   convertedOpportunityId: string | null;
   qualificationNotes: string | null;
+  /** Phase 2 — jsonb, keyed by active CustomFieldDefinition.key for entityType=LEAD. */
+  customFields: Record<string, unknown>;
   createdAt: string;
 }
 
@@ -133,8 +154,13 @@ export interface ConvertLeadResponse {
 }
 
 export type LeadQuery = NonNullable<Paths['/crm/leads']['get']['parameters']['query']>;
-export type CreateLeadInput = Paths['/crm/leads']['post']['requestBody']['content']['application/json'];
-export type UpdateLeadInput = Paths['/crm/leads/{id}']['patch']['requestBody']['content']['application/json'];
+// See CreateAccountInput's comment — ApiPaths hasn't been regenerated for Phase 2's customFields.
+export type CreateLeadInput = Paths['/crm/leads']['post']['requestBody']['content']['application/json'] & {
+  customFields?: Record<string, unknown>;
+};
+export type UpdateLeadInput = Paths['/crm/leads/{id}']['patch']['requestBody']['content']['application/json'] & {
+  customFields?: Record<string, unknown>;
+};
 export type ConvertLeadInput = Paths['/crm/leads/{id}/convert']['post']['requestBody']['content']['application/json'];
 
 // -- Pipelines / Stages -----------------------------------------------------
@@ -177,13 +203,20 @@ export interface Opportunity {
   lostReason: string | null;
   ownerId: string;
   lineOfBusiness: string | null;
+  /** Phase 2 — jsonb, keyed by active CustomFieldDefinition.key for entityType=OPPORTUNITY. */
+  customFields: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
 
 export type OpportunityQuery = NonNullable<Paths['/crm/opportunities']['get']['parameters']['query']>;
-export type CreateOpportunityInput = Paths['/crm/opportunities']['post']['requestBody']['content']['application/json'];
-export type UpdateOpportunityInput = Paths['/crm/opportunities/{id}']['patch']['requestBody']['content']['application/json'];
+// See CreateAccountInput's comment — ApiPaths hasn't been regenerated for Phase 2's customFields.
+export type CreateOpportunityInput = Paths['/crm/opportunities']['post']['requestBody']['content']['application/json'] & {
+  customFields?: Record<string, unknown>;
+};
+export type UpdateOpportunityInput = Paths['/crm/opportunities/{id}']['patch']['requestBody']['content']['application/json'] & {
+  customFields?: Record<string, unknown>;
+};
 export type UpdateOpportunityStageInput =
   Paths['/crm/opportunities/{id}/stage']['patch']['requestBody']['content']['application/json'];
 
@@ -256,4 +289,224 @@ export interface DirectoryUser {
   email: string;
   fullName: string;
   status: string;
+}
+
+// -- Phase 2: Custom field definitions ---------------------------------------
+//
+// No ApiPaths entries exist for any of the routes below — the OpenAPI schema
+// (packages/shared-types/src/api-client/schema.d.ts) hasn't been regenerated
+// against Phase 2's backend/api/src/modules/crm/*.controller.ts additions —
+// so every type in this section is hand-mirrored from
+// backend/api/src/modules/crm/dto/*.ts, same convention as this file's header
+// comment already documents for response shapes.
+
+export type CustomFieldEntityType = 'ACCOUNT' | 'CONTACT' | 'LEAD' | 'OPPORTUNITY';
+export type CustomFieldType =
+  | 'TEXT'
+  | 'TEXTAREA'
+  | 'NUMBER'
+  | 'DECIMAL'
+  | 'DATE'
+  | 'BOOLEAN'
+  | 'SELECT'
+  | 'MULTI_SELECT'
+  | 'USER_REFERENCE'
+  | 'URL';
+
+export interface CustomFieldDefinition {
+  id: string;
+  entityType: CustomFieldEntityType;
+  key: string;
+  label: string;
+  fieldType: CustomFieldType;
+  options: string[] | null;
+  isRequired: boolean;
+  isActive: boolean;
+  displayOrder: number;
+  helpText: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCustomFieldDefinitionInput {
+  entityType: CustomFieldEntityType;
+  key: string;
+  label: string;
+  fieldType: CustomFieldType;
+  options?: string[];
+  isRequired?: boolean;
+  isActive?: boolean;
+  displayOrder?: number;
+  helpText?: string;
+}
+
+// entityType/key excluded — immutable once other rows may carry values under
+// this definition, matches UpdateCustomFieldDefinitionDto exactly.
+export interface UpdateCustomFieldDefinitionInput {
+  label?: string;
+  fieldType?: CustomFieldType;
+  options?: string[];
+  isRequired?: boolean;
+  isActive?: boolean;
+  displayOrder?: number;
+  helpText?: string;
+}
+
+// -- Phase 2: Saved views ----------------------------------------------------
+
+export type SavedViewEntityType = 'ACCOUNT' | 'CONTACT' | 'LEAD' | 'OPPORTUNITY' | 'TASK';
+export type SavedViewVisibility = 'PRIVATE' | 'TEAM' | 'DEPARTMENT' | 'ORG';
+
+/** Mirrors saved-view-filters.ts's FilterOperator — kept in sync manually. */
+export type FilterOperator = 'eq' | 'neq' | 'in' | 'gt' | 'lt' | 'contains';
+
+export interface FilterCondition {
+  field: string;
+  operator: FilterOperator;
+  value: unknown;
+}
+
+export interface FilterTree {
+  op: 'AND' | 'OR';
+  conditions: FilterCondition[];
+}
+
+export interface SortSpec {
+  field: string;
+  direction: 'asc' | 'desc';
+}
+
+export interface SavedView {
+  id: string;
+  entityType: SavedViewEntityType;
+  name: string;
+  ownerId: string;
+  visibility: SavedViewVisibility;
+  teamId: string | null;
+  filters: FilterTree;
+  sort: SortSpec[] | null;
+  columns: string[];
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSavedViewInput {
+  entityType: SavedViewEntityType;
+  name: string;
+  visibility?: SavedViewVisibility;
+  teamId?: string;
+  filters: FilterTree;
+  sort?: SortSpec[];
+  columns?: string[];
+  isDefault?: boolean;
+}
+
+export type UpdateSavedViewInput = Partial<Omit<CreateSavedViewInput, 'entityType'>>;
+
+export interface RunSavedViewResult<T> {
+  total: number;
+  rows: T[];
+}
+
+// -- Phase 2: Sales quotas ----------------------------------------------------
+
+export type QuotaScopeType = 'USER' | 'DEPARTMENT' | 'BRANCH' | 'ORG';
+export type QuotaPeriodType = 'MONTH' | 'QUARTER' | 'YEAR';
+
+export interface SalesQuota {
+  id: string;
+  scopeType: QuotaScopeType;
+  userId: string | null;
+  departmentId: string | null;
+  branchId: string | null;
+  periodType: QuotaPeriodType;
+  periodStart: string;
+  periodEnd: string;
+  /** Decimal amount serialized as a string, e.g. "5000000.00". */
+  targetAmount: string;
+  lineOfBusiness: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSalesQuotaInput {
+  scopeType: QuotaScopeType;
+  userId?: string;
+  departmentId?: string;
+  branchId?: string;
+  periodType: QuotaPeriodType;
+  /** YYYY-MM-DD */
+  periodStart: string;
+  /** YYYY-MM-DD */
+  periodEnd: string;
+  targetAmount: string;
+  lineOfBusiness?: string;
+}
+
+export type UpdateSalesQuotaInput = Partial<CreateSalesQuotaInput>;
+
+export interface QuotaAttainment {
+  targetAmount: string;
+  wonAmount: string;
+  attainmentPct: number;
+}
+
+// -- Phase 2: Duplicate detection & merge -------------------------------------
+
+export type DuplicateTier = 'EXACT' | 'STRONG' | 'POSSIBLE';
+
+export interface DuplicateMatch {
+  id: string;
+  displayName: string;
+  matchedOn: string[];
+}
+
+export interface DuplicateGroup {
+  tier: DuplicateTier;
+  matches: DuplicateMatch[];
+}
+
+// Type aliases (not interfaces) so they satisfy buildQuery's Record
+// parameter via TS's implicit index signature on object type literals.
+export type CheckAccountDuplicatesQuery = {
+  name?: string;
+  email?: string;
+  phone?: string;
+};
+
+export type CheckContactOrLeadDuplicatesQuery = {
+  email?: string;
+  phone?: string;
+  firstName?: string;
+  lastName?: string;
+  /** LEAD only. */
+  companyName?: string;
+};
+
+export interface MergeResponse {
+  winnerId: string;
+  loserId: string;
+}
+
+// -- Phase 2: Bulk actions -----------------------------------------------------
+
+export interface BulkActionResponse {
+  requested: string[];
+  updated: string[];
+  skipped: string[];
+}
+
+export interface BulkAssignInput {
+  ids: string[];
+  /** Account/Opportunity bulk/assign body key. */
+  ownerId?: string;
+  /** Contact bulk/assign body key. */
+  accountId?: string;
+  /** Lead bulk/assign body key. */
+  assignedToId?: string;
+}
+
+export interface BulkDeleteInput {
+  ids: string[];
 }

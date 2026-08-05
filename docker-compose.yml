@@ -50,10 +50,13 @@ x-common-app-env: &common-app-env
   KEYCLOAK_JWKS_URI: ${KEYCLOAK_JWKS_URI}
   KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL}
   KEYCLOAK_WEBHOOK_SECRET: ${KEYCLOAK_WEBHOOK_SECRET}
+  CAMPAIGN_WEBHOOK_SECRET: ${CAMPAIGN_WEBHOOK_SECRET}
+  OMNICHANNEL_WEBHOOK_SECRET: ${OMNICHANNEL_WEBHOOK_SECRET}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
   AI_GATEWAY_MODEL: ${AI_GATEWAY_MODEL}
   AI_ORG_MONTHLY_SPEND_CAP_USD: ${AI_ORG_MONTHLY_SPEND_CAP_USD}
   AI_PER_USER_DAILY_REQUEST_CAP: ${AI_PER_USER_DAILY_REQUEST_CAP}
+  VOYAGE_API_KEY: ${VOYAGE_API_KEY}
   SMTP_HOST: ${SMTP_HOST}
   SMTP_PORT: ${SMTP_PORT}
   SMTP_SECURE: ${SMTP_SECURE}
@@ -63,6 +66,9 @@ x-common-app-env: &common-app-env
   IP_WHITELIST_ENFORCED: ${IP_WHITELIST_ENFORCED}
   MFA_REQUIRED_FOR_ROLES: ${MFA_REQUIRED_FOR_ROLES}
   WEB_SESSION_SECRET: ${WEB_SESSION_SECRET}
+  KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID}
+  KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
+  INTEGRATION_TOKEN_ENCRYPTION_KEY: ${INTEGRATION_TOKEN_ENCRYPTION_KEY}
 
 x-logging: &default-logging
   driver: json-file
@@ -262,11 +268,13 @@ services:
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
       # Resolved inside infra/keycloak/realm-export.json via Keycloak's own
-      # `${env.VAR}` substitution for the topiadesk-api client secret —
-      # never written into that file as a literal.
+      # `${env.VAR}` substitution for the topiadesk-api/topiadesk-api-admin
+      # client secrets — never written into that file as a literal.
       KEYCLOAK_CLIENT_SECRET_API: ${KEYCLOAK_CLIENT_SECRET_API}
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
     volumes:
       - ./infra/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      - ./infra/keycloak/themes/topiadesk:/opt/keycloak/themes/topiadesk:ro
     depends_on:
       postgres:
         condition: service_healthy

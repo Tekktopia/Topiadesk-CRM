@@ -29,4 +29,50 @@ BEGIN
         OR (status <> 'PENDING' AND approved_by_id IS NOT NULL AND decided_at IS NOT NULL)
       );
   END IF;
+
+  -- Phase 2: lets a background worker be the "author" of an inbound
+  -- webhook-ingested Activity (see activities_rw in 002_policies.sql) —
+  -- same one-of pair shape as AuditLog's actor columns.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'activities_actor_xor'
+  ) THEN
+    ALTER TABLE activities
+      ADD CONSTRAINT activities_actor_xor
+      CHECK ((created_by_id IS NOT NULL) <> (created_by_system_job IS NOT NULL));
+  END IF;
+
+  -- Phase 2: Claim/Case share cross-cutting tables via a Contact-style
+  -- dual-nullable-FK — a closed two-type set, so this follows Contact's
+  -- pattern rather than DocumentLink's open-ended polymorphism.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'case_watchers_exactly_one_parent'
+  ) THEN
+    ALTER TABLE case_watchers
+      ADD CONSTRAINT case_watchers_exactly_one_parent
+      CHECK (num_nonnulls(claim_id, case_id) = 1);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'sla_clocks_exactly_one_parent'
+  ) THEN
+    ALTER TABLE sla_clocks
+      ADD CONSTRAINT sla_clocks_exactly_one_parent
+      CHECK (num_nonnulls(claim_id, case_id) = 1);
+  END IF;
+
+  -- Phase 2: exactly one of userId/departmentId/branchId set, matching
+  -- scopeType — territory reuses Department/Branch rather than a new
+  -- Territory entity.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'sales_quotas_scope_target_consistent'
+  ) THEN
+    ALTER TABLE sales_quotas
+      ADD CONSTRAINT sales_quotas_scope_target_consistent
+      CHECK (
+        (scope_type = 'USER' AND num_nonnulls(user_id, department_id, branch_id) = 1 AND user_id IS NOT NULL)
+        OR (scope_type = 'DEPARTMENT' AND num_nonnulls(user_id, department_id, branch_id) = 1 AND department_id IS NOT NULL)
+        OR (scope_type = 'BRANCH' AND num_nonnulls(user_id, department_id, branch_id) = 1 AND branch_id IS NOT NULL)
+        OR (scope_type = 'ORG' AND num_nonnulls(user_id, department_id, branch_id) = 0)
+      );
+  END IF;
 END $$;

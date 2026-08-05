@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -24,10 +25,12 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  toast,
 } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
+import { CustomFieldsSection, validateCustomFieldValues, type CustomFieldValues } from '../../_components/custom-fields-section';
 import { LEAD_SOURCES, LEAD_STATUSES, leadStatusLabel, humanize } from '../../_lib/constants';
-import { useCreateLead, useUpdateLead } from '../../_lib/hooks';
+import { useCreateLead, useCustomFieldDefinitions, useUpdateLead } from '../../_lib/hooks';
 import type { Lead } from '../../_lib/types';
 
 const leadFormSchema = z.object({
@@ -76,11 +79,23 @@ export function LeadFormDialog({
     values: defaultsFor(lead),
   });
 
+  const { data: customFieldDefinitions } = useCustomFieldDefinitions('LEAD');
+  const [customFields, setCustomFields] = React.useState<CustomFieldValues>(lead?.customFields ?? {});
+  React.useEffect(() => {
+    setCustomFields(lead?.customFields ?? {});
+  }, [lead]);
+
   const createLead = useCreateLead();
   const updateLead = useUpdateLead(lead?.id ?? '');
   const isPending = createLead.isPending || updateLead.isPending;
 
   const onSubmit = form.handleSubmit(async (values) => {
+    const customFieldError = validateCustomFieldValues(customFieldDefinitions, customFields, !isEdit);
+    if (customFieldError) {
+      toast.error(customFieldError);
+      return;
+    }
+    const hasActiveCustomFields = (customFieldDefinitions ?? []).some((d) => d.isActive);
     const payload = {
       firstName: values.firstName,
       lastName: values.lastName,
@@ -92,6 +107,7 @@ export function LeadFormDialog({
       status: values.status,
       score: values.score,
       qualificationNotes: values.qualificationNotes || undefined,
+      customFields: hasActiveCustomFields ? customFields : undefined,
     };
     if (isEdit && lead) {
       await updateLead.mutateAsync(payload);
@@ -99,6 +115,7 @@ export function LeadFormDialog({
       await createLead.mutateAsync({ ...payload, assignedToId: user?.id });
     }
     onOpenChange(false);
+    setCustomFields({});
   });
 
   return (
@@ -260,6 +277,8 @@ export function LeadFormDialog({
                 </FormItem>
               )}
             />
+
+            <CustomFieldsSection entityType="LEAD" values={customFields} onChange={setCustomFields} />
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>

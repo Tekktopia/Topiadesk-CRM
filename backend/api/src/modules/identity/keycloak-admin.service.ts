@@ -1,0 +1,154 @@
+import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { ENV_TOKEN, type Env } from '../../common/config/config.module';
+
+export interface KeycloakUserRepresentation {
+  id?: string;
+  username: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  enabled: boolean;
+  emailVerified?: boolean;
+  attributes?: Record<string, string[]>;
+}
+
+export interface KeycloakSessionRepresentation {
+  id: string;
+  username: string;
+  userId: string;
+  ipAddress: string;
+  start: number;
+  lastAccess: number;
+  clients: Record<string, string>;
+}
+
+interface CachedAdminToken {
+  accessToken: string;
+  expiresAtMs: number;
+}
+
+/**
+ * Thin wrapper around Keycloak's Admin REST API, authenticated via a
+ * dedicated client-credentials service account (KEYCLOAK_ADMIN_CLIENT_ID/
+ * SECRET — see packages/config/src/env.ts's comment for why this is a
+ * SEPARATE client from KEYCLOAK_CLIENT_ID_API, which only ever verifies
+ * JWTs). Used by ScimController (create/update/deactivate the real
+ * Keycloak-side user — Keycloak has no native SCIM support) and by
+ * UsersController's force-logout/sessions endpoints.
+ *
+ * Same lazy/optional-config contract as anthropic-client.ts/
+ * voyage-client.ts: every public method fails with a clean
+ * ServiceUnavailableException up front if the admin client credentials
+ * aren't configured, rather than letting a `fetch()` call fail opaquely
+ * deep inside a request. Implemented as an injectable service (not a bare
+ * factory function like getAnthropicClient()) because it also needs to
+ * cache the client-credentials access token across calls within its TTL —
+ * that's per-process state a plain function can't hold as cleanly as a
+ * singleton-scoped Nest provider.
+ */
+@Injectable()
+export class KeycloakAdminService {
+  private readonly logger = new Logger(KeycloakAdminService.name);
+  private tokenCache: CachedAdminToken | undefined;
+
+  constructor(@Inject(ENV_TOKEN) private readonly env: Env) {}
+
+  isConfigured(): boolean {
+    return Boolean(this.env.KEYCLOAK_ADMIN_CLIENT_ID && this.env.KEYCLOAK_ADMIN_CLIENT_SECRET);
+  }
+
+  async createUser(user: KeycloakUserRepresentation): Promise<string> {
+    const res = await this.adminFetch('/users', { method: 'POST', body: JSON.stringify(user) });
+    if (res.status !== 201) {
+      throw new Error(`Keycloak create-user failed (${res.status}): ${await safeBody(res)}`);
+    }
+    // Keycloak's create-user response has no body — the new user's id is in
+    // the Location header (.../admin/realms/{realm}/users/{id}).
+    const location = res.headers.get('location');
+    const id = location?.split('/').pop();
+    if (!id) throw new Error('Keycloak create-user succeeded but returned no Location header to read the new user id from');
+    return id;
+  }
+
+  async updateUser(keycloakUserId: string, patch: Partial<KeycloakUserRepresentation>): Promise<void> {
+    const res = await this.adminFetch(`/users/${encodeURIComponent(keycloakUserId)}`, { method: 'PUT', body: JSON.stringify(patch) });
+    if (!res.ok) throw new Error(`Keycloak update-user failed (${res.status}): ${await safeBody(res)}`);
+  }
+
+  async setEnabled(keycloakUserId: string, enabled: boolean): Promise<void> {
+    await this.updateUser(keycloakUserId, { enabled });
+  }
+
+  async findUserByEmail(email: string): Promise<KeycloakUserRepresentation | null> {
+    const res = await this.adminFetch(`/users?email=${encodeURIComponent(email)}&exact=true`, { method: 'GET' });
+    if (!res.ok) throw new Error(`Keycloak find-user-by-email failed (${res.status}): ${await safeBody(res)}`);
+    const users = (await res.json()) as KeycloakUserRepresentation[];
+    return users[0] ?? null;
+  }
+
+  /** Keycloak's own terminology: POST .../users/{id}/logout invalidates every active session + refresh token for that user. Maps to AuditAction.FORCE_LOGOUT at the call site (identity.controller additions). */
+  async forceLogout(keycloakUserId: string): Promise<void> {
+    const res = await this.adminFetch(`/users/${encodeURIComponent(keycloakUserId)}/logout`, { method: 'POST' });
+    if (!res.ok) throw new Error(`Keycloak force-logout failed (${res.status}): ${await safeBody(res)}`);
+  }
+
+  async listSessions(keycloakUserId: string): Promise<KeycloakSessionRepresentation[]> {
+    const res = await this.adminFetch(`/users/${encodeURIComponent(keycloakUserId)}/sessions`, { method: 'GET' });
+    if (!res.ok) throw new Error(`Keycloak list-sessions failed (${res.status}): ${await safeBody(res)}`);
+    return (await res.json()) as KeycloakSessionRepresentation[];
+  }
+
+  private adminBaseUrl(): string {
+    // Same internal-vs-public-hostname reasoning as JwtVerifier's
+    // resolveInternalJwksUri: *.topiadesk.localhost only resolves via
+    // host-machine/browser DNS, not Docker Compose's embedded DNS.
+    const base = this.env.KEYCLOAK_INTERNAL_URL ?? this.env.KEYCLOAK_URL;
+    return `${base}/admin/realms/${this.env.KEYCLOAK_REALM}`;
+  }
+
+  private tokenUrl(): string {
+    const base = this.env.KEYCLOAK_INTERNAL_URL ?? this.env.KEYCLOAK_URL;
+    return `${base}/realms/${this.env.KEYCLOAK_REALM}/protocol/openid-connect/token`;
+  }
+
+  private async getAccessToken(): Promise<string> {
+    const now = Date.now();
+    // 5s safety margin so a token doesn't expire mid-flight between this
+    // check and the admin call it's about to authorize.
+    if (this.tokenCache && this.tokenCache.expiresAtMs > now + 5000) {
+      return this.tokenCache.accessToken;
+    }
+    const res = await fetch(this.tokenUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: this.env.KEYCLOAK_ADMIN_CLIENT_ID!,
+        client_secret: this.env.KEYCLOAK_ADMIN_CLIENT_SECRET!,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`Keycloak admin client-credentials token request failed (${res.status}): ${await safeBody(res)}`);
+    }
+    const json = (await res.json()) as { access_token: string; expires_in: number };
+    this.tokenCache = { accessToken: json.access_token, expiresAtMs: now + json.expires_in * 1000 };
+    return json.access_token;
+  }
+
+  private async adminFetch(path: string, init: RequestInit): Promise<Response> {
+    if (!this.isConfigured()) {
+      throw new ServiceUnavailableException(
+        'Keycloak admin integration is not configured: KEYCLOAK_ADMIN_CLIENT_ID/KEYCLOAK_ADMIN_CLIENT_SECRET are not set.',
+      );
+    }
+    const token = await this.getAccessToken();
+    return fetch(`${this.adminBaseUrl()}${path}`, {
+      ...init,
+      headers: { ...init.headers, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+  }
+}
+
+async function safeBody(res: Response): Promise<string> {
+  return (await res.text().catch(() => '')).slice(0, 500);
+}

@@ -1,5 +1,19 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { IsDateString, IsEmail, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsDateString,
+  IsEmail,
+  IsEnum,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+  MinLength,
+} from 'class-validator';
 import { AccountType, LeadSource, LeadStatus } from '@topiadesk/db';
 
 export class CreateLeadDto {
@@ -14,6 +28,9 @@ export class CreateLeadDto {
   @ApiProperty({ enum: LeadStatus, required: false }) @IsOptional() @IsEnum(LeadStatus) status?: LeadStatus;
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() assignedToId?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() qualificationNotes?: string;
+  // Validated against active CustomFieldDefinition rows for LEAD in
+  // LeadsController before write — see custom-fields.validator.ts.
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true }) @IsOptional() @IsObject() customFields?: Record<string, unknown>;
 }
 
 export class UpdateLeadDto extends PartialType(CreateLeadDto) {}
@@ -44,6 +61,7 @@ export class LeadResponseDto {
   @ApiProperty({ nullable: true }) convertedAccountId!: string | null;
   @ApiProperty({ nullable: true }) convertedOpportunityId!: string | null;
   @ApiProperty({ nullable: true }) qualificationNotes!: string | null;
+  @ApiProperty({ type: 'object', additionalProperties: true }) customFields!: unknown;
   @ApiProperty() createdAt!: Date;
 }
 
@@ -83,4 +101,20 @@ export class ConvertLeadResponseDto {
   @ApiProperty() lead!: LeadResponseDto;
   @ApiProperty() accountId!: string;
   @ApiProperty() opportunityId!: string;
+}
+
+export class BulkAssignLeadsDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @IsUUID(undefined, { each: true }) ids!: string[];
+  @ApiProperty() @IsUUID() assignedToId!: string;
+}
+
+export class BulkUpdateLeadsDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @IsUUID(undefined, { each: true }) ids!: string[];
+  @ApiProperty({ enum: LeadStatus, required: false }) @IsOptional() @IsEnum(LeadStatus) status?: LeadStatus;
+  @ApiProperty({ enum: LeadSource, required: false }) @IsOptional() @IsEnum(LeadSource) source?: LeadSource;
+  @ApiProperty({ required: false, minimum: 0, maximum: 100 }) @IsOptional() @IsInt() @Min(0) @Max(100) score?: number;
+}
+
+export class BulkDeleteLeadsDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @IsUUID(undefined, { each: true }) ids!: string[];
 }

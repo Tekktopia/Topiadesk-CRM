@@ -41,7 +41,7 @@ export default defineConfig({
     },
     {
       name: 'broker',
-      testMatch: /golden-path\.spec\.ts/u,
+      testMatch: /golden-path\.spec\.ts|phase2-golden-path\.spec\.ts/u,
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/broker.json' },
     },

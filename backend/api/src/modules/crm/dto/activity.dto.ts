@@ -37,7 +37,11 @@ export class ActivityResponseDto {
   @ApiProperty() subject!: string;
   @ApiProperty({ nullable: true }) body!: string | null;
   @ApiProperty() occurredAt!: Date;
-  @ApiProperty() createdById!: string;
+  // Nullable: activities.createdById is optional in the schema to allow
+  // system/automation-generated activities with no human actor (see
+  // Activity.createdBySystemJob) — this DTO previously required a string,
+  // pre-existing drift from that schema change, corrected here.
+  @ApiProperty({ nullable: true }) createdById!: string | null;
   @ApiProperty({ nullable: true }) durationMinutes!: number | null;
   @ApiProperty({ nullable: true }) outcome!: string | null;
   @ApiProperty() createdAt!: Date;

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { Button, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from '@topiadesk/ui';
+import { Button, type ColumnDef, DataTable, DataTableColumnHeader, Skeleton, toast } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { PageHeader } from '../_components/page-header';
 import { EmptyState, ErrorState } from '../_components/query-states';
@@ -38,6 +38,50 @@ export default function DepartmentsPage() {
     onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to delete department'),
   });
 
+  const columns = useMemo<ColumnDef<DepartmentDto>[]>(() => {
+    const cols: ColumnDef<DepartmentDto>[] = [
+      {
+        accessorKey: 'name',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
+        cell: ({ row }) => <span className="font-medium text-foreground">{row.original.name}</span>,
+      },
+      {
+        accessorKey: 'code',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Code" />,
+        cell: ({ row }) => <span className="text-muted-foreground">{row.original.code}</span>,
+      },
+      {
+        id: 'parentDepartment',
+        header: 'Parent department',
+        accessorFn: (d) => (d.parentDepartmentId ? (nameById.get(d.parentDepartmentId) ?? '—') : '—'),
+        cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
+      },
+    ];
+    if (canWrite) {
+      cols.push({
+        id: 'actions',
+        header: 'Actions',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" aria-label={`Edit ${row.original.name}`} onClick={() => setFormTarget(row.original)}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Delete ${row.original.name}`}
+              onClick={() => setPendingDelete(row.original)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ),
+      });
+    }
+    return cols;
+  }, [canWrite, nameById]);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -63,46 +107,7 @@ export default function DepartmentsPage() {
       ) : (departmentsQuery.data ?? []).length === 0 ? (
         <EmptyState title="No departments yet" />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Parent department</TableHead>
-                {canWrite ? <TableHead className="w-24">Actions</TableHead> : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(departmentsQuery.data ?? []).map((d) => (
-                <TableRow key={d.id}>
-                  <TableCell className="font-medium text-foreground">{d.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{d.code}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {d.parentDepartmentId ? (nameById.get(d.parentDepartmentId) ?? '—') : '—'}
-                  </TableCell>
-                  {canWrite ? (
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" aria-label={`Edit ${d.name}`} onClick={() => setFormTarget(d)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Delete ${d.name}`}
-                          onClick={() => setPendingDelete(d)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable<DepartmentDto, unknown> columns={columns} data={departmentsQuery.data ?? []} getRowId={(d) => d.id} />
       )}
 
       {formTarget ? (

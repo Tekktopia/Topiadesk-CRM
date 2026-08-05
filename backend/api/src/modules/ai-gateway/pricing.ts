@@ -31,3 +31,36 @@ export function estimateCostUsd(model: string, tokensIn: number, tokensOut: numb
   // AiUsageLedger.estimatedCostUsd is Decimal(10,4) — round to match.
   return Math.round(cost * 10_000) / 10_000;
 }
+
+/**
+ * Voyage AI per-million-token USD pricing — embeddings have no input/output
+ * split (unlike Claude completions), just one `total_tokens` count. Source:
+ * https://docs.voyageai.com/docs/pricing (checked 2026-08-03).
+ *
+ * Routed into the SAME AI_ORG_MONTHLY_SPEND_CAP_USD pool as Claude spend
+ * (ai-gateway.service.ts's enforceOrgMonthlyCap sums AiUsageLedger across
+ * every AiFeature, Voyage-backed ones included) — deliberately not a
+ * separate cap, per the build brief.
+ *
+ * Priced at the real post-free-tier rate rather than crediting Voyage's
+ * "first 200M tokens free" allowance as $0 — same reasoning as the
+ * introductory-vs-standard Claude pricing decision above: treating the free
+ * tier as costless here would make the org cap silently start being "more
+ * correct" (and more restrictive) the day the free allowance runs out,
+ * instead of being conservative and meaningful from day one.
+ */
+const VOYAGE_PRICING_USD_PER_MILLION_TOKENS: Record<string, number> = {
+  'voyage-4': 0.06,
+};
+
+// voyage-code-3's rate ($0.18/M) — the highest of Voyage's current-generation
+// models — used if VOYAGE_MODEL is ever pointed at a model not in the table
+// above, same "stay conservative rather than under-record spend" reasoning
+// as ai-gateway's own FALLBACK_RATE.
+const VOYAGE_FALLBACK_RATE = 0.18;
+
+export function estimateVoyageCostUsd(model: string, totalTokens: number): number {
+  const rate = VOYAGE_PRICING_USD_PER_MILLION_TOKENS[model] ?? VOYAGE_FALLBACK_RATE;
+  const cost = (totalTokens / 1_000_000) * rate;
+  return Math.round(cost * 10_000) / 10_000;
+}

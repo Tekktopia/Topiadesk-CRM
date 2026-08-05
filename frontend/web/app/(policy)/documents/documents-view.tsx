@@ -4,20 +4,16 @@ import * as React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
-  Card,
-  CardContent,
+  type ColumnDef,
+  DataTable,
+  DataTableColumnHeader,
+  Input,
+  type RowSelectionState,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
 } from '@topiadesk/ui';
 import { Download, FileText, FolderOpen } from 'lucide-react';
 import { formatDate } from '@/app/(policy)/lib/format';
@@ -49,6 +45,14 @@ const ALL = 'ALL';
 export function DocumentsView() {
   const queryClient = useQueryClient();
   const [categoryId, setCategoryId] = React.useState(ALL);
+  const [search, setSearch] = React.useState('');
+  const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 20 });
+  // Workaround for a bug in @topiadesk/ui's DataTable — see the matching
+  // comment in policies-view.tsx: omitting `rowSelection` entirely (this
+  // page has no bulk actions) crashes row rendering because the component's
+  // internal state has no fallback for it. A stable empty object avoids
+  // that without adding any selection UI.
+  const [rowSelection] = React.useState<RowSelectionState>({});
 
   const categoriesQuery = useQuery({
     queryKey: ['document-categories'],
@@ -65,7 +69,79 @@ export function DocumentsView() {
     [categoriesQuery.data],
   );
 
-  const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['documents'] });
+  // Client-side filter over the already-fetched (category-scoped) list — no
+  // server-side search endpoint exists, and adding one is out of scope here.
+  const visibleDocuments = React.useMemo(() => {
+    const rows = documentsQuery.data ?? [];
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((doc) => doc.fileName.toLowerCase().includes(q));
+  }, [documentsQuery.data, search]);
+
+  const invalidate = React.useCallback(
+    () => void queryClient.invalidateQueries({ queryKey: ['documents'] }),
+    [queryClient],
+  );
+
+  const columns = React.useMemo<ColumnDef<DocumentDto>[]>(
+    () => [
+      {
+        accessorKey: 'fileName',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="File" />,
+        meta: { label: 'File' },
+        cell: ({ row }) => (
+          <span className="flex items-center gap-2 font-medium text-foreground">
+            <FileText className="h-4 w-4 text-muted-foreground" aria-hidden />
+            {row.original.fileName}
+          </span>
+        ),
+      },
+      {
+        id: 'category',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Category" />,
+        meta: { label: 'Category' },
+        accessorFn: (doc) => (doc.categoryId ? (categoryNameById.get(doc.categoryId) ?? '—') : 'Uncategorized'),
+        cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
+      },
+      {
+        accessorKey: 'sizeBytes',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Size" />,
+        meta: { label: 'Size' },
+        cell: ({ row }) => <span className="text-muted-foreground">{formatBytes(row.original.sizeBytes)}</span>,
+      },
+      {
+        id: 'version',
+        header: 'Version',
+        meta: { label: 'Version' },
+        accessorFn: (doc) => doc.currentVersion?.versionNumber ?? 1,
+        cell: ({ getValue }) => <span className="text-muted-foreground">v{getValue<number>()}</span>,
+      },
+      {
+        accessorKey: 'createdAt',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Uploaded" />,
+        meta: { label: 'Uploaded' },
+        cell: ({ row }) => <span className="text-muted-foreground">{formatDate(row.original.createdAt)}</span>,
+        sortingFn: (a, b) => new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
+      },
+      {
+        id: 'actions',
+        header: '',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div className="flex justify-end gap-1">
+            <Button size="icon" variant="ghost" asChild title="Download">
+              <a href={`/api/documents/${row.original.id}/download`} download>
+                <Download className="h-4 w-4" aria-hidden />
+              </a>
+            </Button>
+            <AddVersionDialog documentId={row.original.id} fileName={row.original.fileName} onAdded={invalidate} />
+            <LinkToPolicyDialog documentId={row.original.id} fileName={row.original.fileName} onLinked={invalidate} />
+          </div>
+        ),
+      },
+    ],
+    [categoryNameById, invalidate],
+  );
 
   return (
     <div className="space-y-6">
@@ -78,7 +154,22 @@ export function DocumentsView() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Select value={categoryId} onValueChange={setCategoryId}>
+        <Input
+          placeholder="Search file name…"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPagination((p) => ({ ...p, pageIndex: 0 }));
+          }}
+          className="w-64"
+        />
+        <Select
+          value={categoryId}
+          onValueChange={(value) => {
+            setCategoryId(value);
+            setPagination((p) => ({ ...p, pageIndex: 0 }));
+          }}
+        >
           <SelectTrigger className="w-56">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
@@ -93,62 +184,24 @@ export function DocumentsView() {
         </Select>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {documentsQuery.isLoading ? (
-            <div className="space-y-2 p-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : documentsQuery.isError ? (
-            <p className="p-6 text-sm text-destructive">Couldn&apos;t load documents.</p>
-          ) : !documentsQuery.data || documentsQuery.data.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-16 text-center">
-              <FolderOpen className="h-8 w-8 text-muted-foreground" aria-hidden />
-              <p className="text-sm text-muted-foreground">No documents yet.</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>File</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Size</TableHead>
-                  <TableHead>Version</TableHead>
-                  <TableHead>Uploaded</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {documentsQuery.data.map((doc) => (
-                  <TableRow key={doc.id}>
-                    <TableCell>
-                      <span className="flex items-center gap-2 font-medium text-foreground">
-                        <FileText className="h-4 w-4 text-muted-foreground" aria-hidden />
-                        {doc.fileName}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{doc.categoryId ? (categoryNameById.get(doc.categoryId) ?? '—') : 'Uncategorized'}</TableCell>
-                    <TableCell className="text-muted-foreground">{formatBytes(doc.sizeBytes)}</TableCell>
-                    <TableCell className="text-muted-foreground">v{doc.currentVersion?.versionNumber ?? 1}</TableCell>
-                    <TableCell className="text-muted-foreground">{formatDate(doc.createdAt)}</TableCell>
-                    <TableCell className="flex justify-end gap-1">
-                      <Button size="icon" variant="ghost" asChild title="Download">
-                        <a href={`/api/documents/${doc.id}/download`} download>
-                          <Download className="h-4 w-4" aria-hidden />
-                        </a>
-                      </Button>
-                      <AddVersionDialog documentId={doc.id} fileName={doc.fileName} onAdded={invalidate} />
-                      <LinkToPolicyDialog documentId={doc.id} fileName={doc.fileName} onLinked={invalidate} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <DataTable<DocumentDto, unknown>
+        columns={columns}
+        data={visibleDocuments}
+        getRowId={(doc) => doc.id}
+        isLoading={documentsQuery.isLoading}
+        isError={documentsQuery.isError}
+        errorState={<span className="text-sm text-destructive">Couldn&apos;t load documents.</span>}
+        rowSelection={rowSelection}
+        pagination={pagination}
+        onPaginationChange={setPagination}
+        emptyState={
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <FolderOpen className="h-8 w-8 text-muted-foreground" aria-hidden />
+            <span className="text-sm text-muted-foreground">No documents yet.</span>
+          </div>
+        }
+        enableColumnVisibility
+      />
     </div>
   );
 }

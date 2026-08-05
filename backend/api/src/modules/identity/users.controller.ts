@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   Body,
   ConflictException,
   Controller,
@@ -18,7 +19,12 @@ import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { AuditService } from '../../common/audit/audit.service';
 import { AssignRoleDto, ListUsersQueryDto, UpdateUserDto, UserResponseDto } from './dto/user.dto';
+import { ForceLogoutResponseDto, KeycloakSessionResponseDto } from './dto/keycloak-session-response.dto';
 import { rethrowAsHttpException } from './prisma-error.util';
+// NOT a type-only import: KeycloakAdminService is constructor-injected
+// below — see the same footgun documented on Reflector in permission.guard.ts.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import { KeycloakAdminService } from './keycloak-admin.service';
 
 type UserWithRoles = Prisma.UserGetPayload<{ include: { roles: { include: { role: true } } } }>;
 
@@ -53,7 +59,10 @@ function toUserResponse(user: UserWithRoles): UserResponseDto {
 @UseGuards(PermissionGuard)
 @Controller('identity/users')
 export class UsersController {
-  constructor(private readonly auditService: AuditService) {}
+  constructor(
+    private readonly auditService: AuditService,
+    private readonly keycloakAdmin: KeycloakAdminService,
+  ) {}
 
   @Get()
   @RequirePermission('identity', 'read')
@@ -142,6 +151,30 @@ export class UsersController {
     }
   }
 
+  /**
+   * Distinct from deactivate(): SUSPENDED is a reversible, temporary hold
+   * (e.g. pending an investigation) vs DEACTIVATED's permanent-offboarding
+   * connotation — both are UserStatus enum members (schema.prisma) and
+   * reactivate() above already unconditionally sets ACTIVE regardless of
+   * which of the two the user is coming from, so no separate "unsuspend"
+   * endpoint is needed.
+   */
+  @Post(':id/suspend')
+  @RequirePermission('identity', 'write')
+  @ApiOkResponse({ type: UserResponseDto })
+  async suspend(@Param('id') id: string): Promise<UserResponseDto> {
+    try {
+      const updated = await getPrismaClient().user.update({
+        where: { id },
+        data: { status: 'SUSPENDED' },
+        include: USER_WITH_ROLES_INCLUDE,
+      });
+      return toUserResponse(updated);
+    } catch (err) {
+      rethrowAsHttpException(err);
+    }
+  }
+
   @Post(':id/roles')
   @RequirePermission('identity', 'write')
   @ApiOkResponse({ type: UserResponseDto })
@@ -197,5 +230,42 @@ export class UsersController {
 
     const updated = await prisma.user.findUniqueOrThrow({ where: { id: userId }, include: USER_WITH_ROLES_INCLUDE });
     return toUserResponse(updated);
+  }
+
+  /**
+   * Calls Keycloak's `POST /admin/realms/{realm}/users/{id}/logout`, which
+   * invalidates every active session AND refresh token for that user —
+   * genuinely forces re-authentication, not just an app-side flag. Records
+   * AuditAction.FORCE_LOGOUT explicitly: this mutates Keycloak-side state,
+   * not a row the generic audit trigger (prisma/triggers/
+   * 002_audit_chain_triggers.sql) ever sees.
+   */
+  @Post(':id/force-logout')
+  @RequirePermission('identity', 'write')
+  @ApiOkResponse({ type: ForceLogoutResponseDto })
+  async forceLogout(@Param('id') id: string): Promise<ForceLogoutResponseDto> {
+    const user = await getPrismaClient().user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+    try {
+      await this.keycloakAdmin.forceLogout(user.keycloakSubjectId);
+    } catch (err) {
+      throw new BadGatewayException(`Keycloak force-logout failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    await this.auditService.recordEvent({ action: 'FORCE_LOGOUT', entityType: 'users', entityId: id });
+    return { status: 'ok' };
+  }
+
+  /** Read-only proxy to Keycloak's session-list endpoint — no local write, so no audit event (see AuditService's header comment: it's for events with no corresponding row mutation, and this doesn't even mutate Keycloak). */
+  @Get(':id/sessions')
+  @RequirePermission('identity', 'read')
+  @ApiOkResponse({ type: [KeycloakSessionResponseDto] })
+  async sessions(@Param('id') id: string): Promise<KeycloakSessionResponseDto[]> {
+    const user = await getPrismaClient().user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+    try {
+      return await this.keycloakAdmin.listSessions(user.keycloakSubjectId);
+    } catch (err) {
+      throw new BadGatewayException(`Keycloak session list failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 }

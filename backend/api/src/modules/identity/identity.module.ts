@@ -10,6 +10,11 @@ import { TeamsController } from './teams.controller';
 import { OrgSettingsController } from './org-settings.controller';
 import { IpWhitelistController } from './ip-whitelist.controller';
 import { KeycloakWebhookController } from './keycloak-webhook.controller';
+import { ScimController } from './scim.controller';
+import { ScimTokensController } from './scim-tokens.controller';
+import { AuditExportController } from './audit-export.controller';
+import { UserProvisioningService } from './user-provisioning.service';
+import { KeycloakAdminService } from './keycloak-admin.service';
 
 // AuditService is registered directly on AppModule's own providers (see
 // app.module.ts) rather than via its own exported module — since AppModule
@@ -29,7 +34,10 @@ import { KeycloakWebhookController } from './keycloak-webhook.controller';
     OrgSettingsController,
     IpWhitelistController,
     KeycloakWebhookController,
+    ScimController,
+    ScimTokensController,
+    AuditExportController,
   ],
-  providers: [AuditService],
+  providers: [AuditService, UserProvisioningService, KeycloakAdminService],
 })
 export class IdentityModule {}

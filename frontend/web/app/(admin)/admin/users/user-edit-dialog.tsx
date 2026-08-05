@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X } from 'lucide-react';
+import { LogOut, X } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -23,10 +23,11 @@ import {
   Skeleton,
   toast,
 } from '@topiadesk/ui';
+import { ConfirmDialog } from '../_components/confirm-dialog';
 import { UserStatusBadge } from '../_components/status-badge';
 import { apiFetch } from '../_lib/api';
 import { useBranches, useDepartments, useRoles } from '../_lib/queries';
-import type { UpdateUserBody, UserDto } from '../_lib/types';
+import type { ForceLogoutResponseDto, UpdateUserBody, UserDto } from '../_lib/types';
 
 const UNASSIGNED = '__unassigned__';
 
@@ -56,6 +57,7 @@ export function UserEditDialog({
   const [departmentId, setDepartmentId] = useState<string>(UNASSIGNED);
   const [branchId, setBranchId] = useState<string>(UNASSIGNED);
   const [roleToAdd, setRoleToAdd] = useState<string>('');
+  const [confirmingForceLogout, setConfirmingForceLogout] = useState(false);
 
   useEffect(() => {
     if (userQuery.data) {
@@ -99,6 +101,19 @@ export function UserEditDialog({
     onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to revoke role'),
   });
 
+  // Invalidates every active Keycloak session/refresh token for this user —
+  // genuine forced re-authentication, not just an app-side flag, hence the
+  // confirmation dialog (this is disruptive to whoever is signed in right
+  // now). See users.controller.ts's forceLogout() doc comment.
+  const forceLogoutMutation = useMutation({
+    mutationFn: () => apiFetch<ForceLogoutResponseDto>(`/api/admin/users/${userId}/force-logout`, { method: 'POST' }),
+    onSuccess: () => {
+      toast.success('All active sessions for this user have been invalidated');
+      setConfirmingForceLogout(false);
+    },
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to force logout'),
+  });
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!userQuery.data) return;
@@ -121,7 +136,8 @@ export function UserEditDialog({
   const availableRoles = (rolesQuery.data ?? []).filter((r) => !assignedRoleIds.has(r.id));
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -247,6 +263,28 @@ export function UserEditDialog({
                 </div>
               ) : null}
             </div>
+
+            {canWrite ? (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>Session</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Immediately invalidates every active session and refresh token for this user at the identity
+                    provider — they&apos;ll be signed out everywhere and required to re-authenticate.
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setConfirmingForceLogout(true)}
+                  >
+                    <LogOut className="h-4 w-4" /> Force logout
+                  </Button>
+                </div>
+              </>
+            ) : null}
           </div>
         )}
 
@@ -256,6 +294,18 @@ export function UserEditDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+
+      <ConfirmDialog
+        open={confirmingForceLogout}
+        onOpenChange={setConfirmingForceLogout}
+        title={`Force logout ${userQuery.data?.fullName ?? 'this user'}?`}
+        description="They will be signed out of every device and session right now and must sign in again. This doesn't change their roles, status, or access — it only ends their current sessions."
+        confirmLabel="Force logout"
+        destructive
+        isPending={forceLogoutMutation.isPending}
+        onConfirm={() => forceLogoutMutation.mutate()}
+      />
+    </>
   );
 }

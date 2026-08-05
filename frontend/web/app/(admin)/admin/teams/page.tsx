@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Users } from 'lucide-react';
-import { Button, Card, CardContent, Skeleton, toast } from '@topiadesk/ui';
+import { Button, type ColumnDef, DataTable, DataTableColumnHeader, Skeleton, toast } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { PageHeader } from '../_components/page-header';
 import { EmptyState, ErrorState } from '../_components/query-states';
@@ -35,6 +35,50 @@ export default function TeamsPage() {
     onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to delete team'),
   });
 
+  const columns = useMemo<ColumnDef<TeamDto>[]>(() => {
+    const cols: ColumnDef<TeamDto>[] = [
+      {
+        accessorKey: 'name',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
+        cell: ({ row }) => (
+          <div className="flex flex-col">
+            <span className="font-medium text-foreground">{row.original.name}</span>
+            <span className="line-clamp-1 text-xs text-muted-foreground">{row.original.description ?? 'No description'}</span>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'memberCount',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Members" className="justify-end" />,
+        cell: ({ row }) => (
+          <span className="block text-right tabular-nums text-muted-foreground">
+            {row.original.memberCount} member{row.original.memberCount === 1 ? '' : 's'}
+          </span>
+        ),
+      },
+    ];
+    if (canWrite) {
+      cols.push({
+        id: 'actions',
+        header: '',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Delete ${row.original.name}`}
+              onClick={() => setPendingDelete(row.original)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ),
+      });
+    }
+    return cols;
+  }, [canWrite]);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -50,9 +94,9 @@ export default function TeamsPage() {
       />
 
       {teamsQuery.isLoading ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-2">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 w-full" />
+            <Skeleton key={i} className="h-12 w-full" />
           ))}
         </div>
       ) : teamsQuery.isError ? (
@@ -60,34 +104,12 @@ export default function TeamsPage() {
       ) : (teamsQuery.data ?? []).length === 0 ? (
         <EmptyState title="No teams yet" icon={<Users className="h-8 w-8" aria-hidden />} />
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {teamsQuery.data?.map((team) => (
-            <Card key={team.id} className="cursor-pointer transition-shadow hover:shadow-brand-md" onClick={() => setDetailTeamId(team.id)}>
-              <CardContent className="flex flex-col gap-2 p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-medium text-foreground">{team.name}</p>
-                  {canWrite ? (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Delete ${team.name}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPendingDelete(team);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  ) : null}
-                </div>
-                <p className="line-clamp-2 text-sm text-muted-foreground">{team.description ?? 'No description'}</p>
-                <p className="text-xs text-muted-foreground">
-                  {team.memberCount} member{team.memberCount === 1 ? '' : 's'}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <DataTable<TeamDto, unknown>
+          columns={columns}
+          data={teamsQuery.data ?? []}
+          getRowId={(t) => t.id}
+          onRowClick={(t) => setDetailTeamId(t.id)}
+        />
       )}
 
       {formTarget ? (

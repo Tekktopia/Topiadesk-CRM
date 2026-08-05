@@ -11,18 +11,16 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  type ColumnDef,
+  DataTable,
+  DataTableColumnHeader,
+  type RowSelectionState,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
   Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
 } from '@topiadesk/ui';
 import { AGING_BUCKET_ORDER, agingBucketLabel, formatDate, formatNaira, premiumStatusVariant } from '@/app/(policy)/lib/format';
 import type { PolicyDto, PremiumAgingRowDto } from '@/app/(policy)/lib/types';
@@ -49,6 +47,13 @@ export function PremiumsView() {
   const queryClient = useQueryClient();
   const [bucket, setBucket] = React.useState(ALL);
   const [recording, setRecording] = React.useState<PremiumAgingRowDto | null>(null);
+  const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 20 });
+  // Workaround for a bug in @topiadesk/ui's DataTable — see the matching
+  // comment in policies-view.tsx: omitting `rowSelection` entirely (this
+  // page has no bulk actions) crashes row rendering because the component's
+  // internal state has no fallback for it. A stable empty object avoids
+  // that without adding any selection UI.
+  const [rowSelection] = React.useState<RowSelectionState>({});
 
   const agingQuery = useQuery({
     queryKey: ['premiums-aging'],
@@ -84,6 +89,89 @@ export function PremiumsView() {
 
   const totalOutstanding = summaries.reduce((sum, s) => sum + s.outstanding, 0);
 
+  const columns = React.useMemo<ColumnDef<PremiumAgingRowDto>[]>(
+    () => [
+      {
+        id: 'policy',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Policy" />,
+        meta: { label: 'Policy' },
+        accessorFn: (row) => policyNumberById.get(row.policyId) ?? row.policyId,
+        cell: ({ row }) => (
+          <Link href={`/policies/${row.original.policyId}`} className="font-medium text-primary hover:underline">
+            {policyNumberById.get(row.original.policyId) ?? row.original.policyId.slice(0, 8)}
+          </Link>
+        ),
+      },
+      {
+        accessorKey: 'dueDate',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Due date" />,
+        meta: { label: 'Due date' },
+        cell: ({ row }) => <span className="text-muted-foreground">{formatDate(row.original.dueDate)}</span>,
+        sortingFn: (a, b) => new Date(a.original.dueDate).getTime() - new Date(b.original.dueDate).getTime(),
+      },
+      {
+        accessorKey: 'daysOverdue',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Days overdue" />,
+        meta: { label: 'Days overdue' },
+        cell: ({ row }) => (
+          <div className="text-right tabular-nums">{row.original.daysOverdue > 0 ? row.original.daysOverdue : '—'}</div>
+        ),
+      },
+      {
+        accessorKey: 'agingBucket',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Bucket" />,
+        meta: { label: 'Bucket' },
+        cell: ({ row }) => (
+          <Badge variant={row.original.agingBucket === 'CURRENT' ? 'success' : row.original.agingBucket === '90_PLUS' ? 'destructive' : 'warning'}>
+            {agingBucketLabel(row.original.agingBucket)}
+          </Badge>
+        ),
+      },
+      {
+        accessorKey: 'grossPremium',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Gross" />,
+        meta: { label: 'Gross' },
+        cell: ({ row }) => <div className="text-right tabular-nums">{formatNaira(row.original.grossPremium)}</div>,
+        sortingFn: (a, b) => Number(a.original.grossPremium ?? 0) - Number(b.original.grossPremium ?? 0),
+      },
+      {
+        accessorKey: 'paidAmount',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Paid" />,
+        meta: { label: 'Paid' },
+        cell: ({ row }) => <div className="text-right tabular-nums">{formatNaira(row.original.paidAmount)}</div>,
+        sortingFn: (a, b) => Number(a.original.paidAmount ?? 0) - Number(b.original.paidAmount ?? 0),
+      },
+      {
+        accessorKey: 'outstandingAmount',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Outstanding" />,
+        meta: { label: 'Outstanding' },
+        cell: ({ row }) => (
+          <div className="text-right font-medium tabular-nums">{formatNaira(row.original.outstandingAmount)}</div>
+        ),
+        sortingFn: (a, b) => Number(a.original.outstandingAmount ?? 0) - Number(b.original.outstandingAmount ?? 0),
+      },
+      {
+        accessorKey: 'status',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Status" />,
+        meta: { label: 'Status' },
+        cell: ({ row }) => <Badge variant={premiumStatusVariant(row.original.status)}>{row.original.status.replace(/_/g, ' ')}</Badge>,
+      },
+      {
+        id: 'actions',
+        header: '',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div className="flex justify-end">
+            <Button size="sm" variant="outline" onClick={() => setRecording(row.original)}>
+              Record payment
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [policyNumberById],
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -102,7 +190,13 @@ export function PremiumsView() {
       </Card>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Select value={bucket} onValueChange={setBucket}>
+        <Select
+          value={bucket}
+          onValueChange={(value) => {
+            setBucket(value);
+            setPagination((p) => ({ ...p, pageIndex: 0 }));
+          }}
+        >
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Aging bucket" />
           </SelectTrigger>
@@ -117,66 +211,19 @@ export function PremiumsView() {
         </Select>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {agingQuery.isLoading ? (
-            <div className="space-y-2 p-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : agingQuery.isError ? (
-            <p className="p-6 text-sm text-destructive">Couldn&apos;t load premium aging.</p>
-          ) : visibleRows.length === 0 ? (
-            <p className="p-6 text-sm text-muted-foreground">Nothing outstanding in this bucket.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Policy</TableHead>
-                  <TableHead>Due date</TableHead>
-                  <TableHead className="text-right">Days overdue</TableHead>
-                  <TableHead>Bucket</TableHead>
-                  <TableHead className="text-right">Gross</TableHead>
-                  <TableHead className="text-right">Paid</TableHead>
-                  <TableHead className="text-right">Outstanding</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visibleRows.map((row) => (
-                  <TableRow key={row.premiumId}>
-                    <TableCell>
-                      <Link href={`/policies/${row.policyId}`} className="font-medium text-primary hover:underline">
-                        {policyNumberById.get(row.policyId) ?? row.policyId.slice(0, 8)}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{formatDate(row.dueDate)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{row.daysOverdue > 0 ? row.daysOverdue : '—'}</TableCell>
-                    <TableCell>
-                      <Badge variant={row.agingBucket === 'CURRENT' ? 'success' : row.agingBucket === '90_PLUS' ? 'destructive' : 'warning'}>
-                        {agingBucketLabel(row.agingBucket)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNaira(row.grossPremium)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNaira(row.paidAmount)}</TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{formatNaira(row.outstandingAmount)}</TableCell>
-                    <TableCell>
-                      <Badge variant={premiumStatusVariant(row.status)}>{row.status.replace(/_/g, ' ')}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="outline" onClick={() => setRecording(row)}>
-                        Record payment
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <DataTable<PremiumAgingRowDto, unknown>
+        columns={columns}
+        data={visibleRows}
+        getRowId={(row) => row.premiumId}
+        isLoading={agingQuery.isLoading}
+        isError={agingQuery.isError}
+        errorState={<span className="text-sm text-destructive">Couldn&apos;t load premium aging.</span>}
+        rowSelection={rowSelection}
+        pagination={pagination}
+        onPaginationChange={setPagination}
+        emptyState={<span className="text-sm text-muted-foreground">Nothing outstanding in this bucket.</span>}
+        enableColumnVisibility
+      />
 
       <RecordPaymentDialog
         premium={recording ? { id: recording.premiumId, dueDate: recording.dueDate, status: recording.status, grossPremium: recording.grossPremium, paidAmount: recording.paidAmount } : null}

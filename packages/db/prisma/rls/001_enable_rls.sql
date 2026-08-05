@@ -26,7 +26,29 @@ BEGIN
     'policies', 'policy_versions', 'premiums', 'renewal_schedules',
     'documents', 'document_versions', 'document_links',
     'approvals', 'notifications', 'ai_usage_ledger',
-    'audit_log', 'integration_connectors', 'sync_jobs', 'integration_logs'
+    'audit_log', 'integration_connectors', 'sync_jobs', 'integration_logs',
+    -- Phase 1 gap, found via research: semantic_embeddings had zero RLS
+    -- protection despite holding potentially OWN-scoped content chunks —
+    -- fixed here alongside the first real consumers of the table (Phase 2
+    -- AI search), never shipped separately.
+    'semantic_embeddings',
+    -- Phase 2 — case management
+    'claims', 'claim_status_history', 'cases', 'case_watchers',
+    'sla_policies', 'sla_targets', 'sla_clocks',
+    'business_hours_calendars', 'business_holidays',
+    'macros', 'assignment_rules', 'agent_skills',
+    -- Phase 2 — knowledge base & surveys
+    'knowledge_categories', 'knowledge_articles', 'knowledge_article_versions',
+    'knowledge_article_feedback', 'surveys', 'survey_responses',
+    -- Phase 2 — CRM enhancements
+    'saved_views', 'sales_quotas',
+    -- Phase 2 — reporting & campaigns
+    'scheduled_reports', 'scheduled_report_recipients', 'scheduled_report_runs',
+    'scheduled_report_deliveries', 'audience_segments', 'campaign_templates',
+    'campaigns', 'campaign_variants', 'campaign_recipients', 'campaign_suppressions',
+    -- Phase 2 — admin & integrations
+    'scim_api_tokens', 'webhook_subscriptions', 'webhook_deliveries',
+    'integration_oauth_credentials'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);

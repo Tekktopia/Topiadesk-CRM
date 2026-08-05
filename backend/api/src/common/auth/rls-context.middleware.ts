@@ -61,11 +61,14 @@ export class RlsContextMiddleware implements NestMiddleware {
     }
 
     const roleNames = localUser.roles.map((r: { role: { name: string } }) => r.role.name);
+    const roleIds = localUser.roles.map((r: { role: { id: string } }) => r.role.id);
     const authenticatedUser: AuthenticatedUser = {
       id: localUser.id,
       email: localUser.email,
       fullName: localUser.fullName,
+      presenceStatus: localUser.presenceStatus,
       roles: roleNames,
+      roleIds,
       departmentId: localUser.departmentId,
       branchId: localUser.branchId,
     };

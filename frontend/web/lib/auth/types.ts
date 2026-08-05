@@ -10,6 +10,7 @@ export interface AuthenticatedUser {
   id: string;
   email: string;
   fullName: string;
+  presenceStatus: 'ONLINE' | 'AWAY' | 'OFFLINE';
   roles: string[];
   departmentId: string | null;
   branchId: string | null;

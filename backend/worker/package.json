@@ -13,11 +13,16 @@
   "dependencies": {
     "@topiadesk/config": "workspace:*",
     "@topiadesk/db": "workspace:*",
+    "@topiadesk/reports": "workspace:*",
     "bullmq": "^6.0.5",
-    "ioredis": "^5.4.1"
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.9.16"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.2",
+    "@types/nodemailer": "^6.4.17",
     "@types/pg": "^8.11.10",
     "dotenv-cli": "^8.0.0",
     "pg": "^8.13.1",

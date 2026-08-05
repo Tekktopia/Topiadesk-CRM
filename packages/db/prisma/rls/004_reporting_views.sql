@@ -62,3 +62,66 @@ FROM premium_aging_summary pas
 JOIN policies p ON p.id = pas.policy_id
 JOIN accounts a ON a.id = p.account_id
 WHERE app_can_access_owner('policy', 'read', a.owner_id);
+
+-- =============================================================================
+-- Phase 2 — cross-type "everything open" queue. A plain (non-materialized)
+-- view, unlike premium_aging_summary — ticket counts can't tolerate nightly
+-- staleness the way aging can, and it inherits claims_rw/cases_rw via the
+-- querying role exactly like premium_aging_summary_scoped does above.
+-- =============================================================================
+
+CREATE OR REPLACE VIEW case_queue_summary AS
+  SELECT id, 'CASE'::text AS entity_type, case_number AS ref_number, subject AS title,
+         status::text AS raw_status,
+         CASE status
+           WHEN 'RESOLVED' THEN 'RESOLVED' WHEN 'CLOSED' THEN 'CLOSED'
+           WHEN 'PENDING_CUSTOMER' THEN 'PENDING' WHEN 'PENDING_CARRIER' THEN 'PENDING'
+           ELSE 'OPEN' END AS bucket,
+         priority::text AS priority, assigned_to_id, assigned_team_id, created_at
+  FROM cases
+  UNION ALL
+  SELECT id, 'CLAIM'::text, claim_number, 'Claim ' || claim_number,
+         status::text,
+         CASE status
+           WHEN 'SETTLED' THEN 'RESOLVED' WHEN 'REPUDIATED' THEN 'CLOSED'
+           WHEN 'WITHDRAWN' THEN 'CLOSED'
+           ELSE 'OPEN' END,
+         priority::text, adjuster_id, assigned_team_id, created_at
+  FROM claims;
+
+-- =============================================================================
+-- Phase 2 — CSAT/NPS agent performance rollup. Same materialized-view +
+-- SECURITY DEFINER refresh + scoped-wrapper pattern as premium_aging_summary
+-- above, refreshed by the worker on the same cron mechanism.
+-- =============================================================================
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS agent_survey_summary AS
+SELECT
+  sr.agent_id,
+  s.type AS survey_type,
+  date_trunc('month', sr.responded_at) AS period_month,
+  count(*) AS response_count,
+  round(100.0 * count(*) FILTER (WHERE s.type = 'CSAT' AND sr.score >= s.scale_max - 1)
+        / NULLIF(count(*) FILTER (WHERE s.type = 'CSAT'), 0), 1) AS csat_pct,
+  round(
+    100.0 * count(*) FILTER (WHERE s.type = 'NPS' AND sr.score >= 9)::numeric / NULLIF(count(*) FILTER (WHERE s.type = 'NPS'), 0)
+    - 100.0 * count(*) FILTER (WHERE s.type = 'NPS' AND sr.score <= 6)::numeric / NULLIF(count(*) FILTER (WHERE s.type = 'NPS'), 0)
+  , 1) AS nps_score
+FROM survey_responses sr
+JOIN surveys s ON s.id = sr.survey_id
+WHERE sr.responded_at IS NOT NULL AND sr.agent_id IS NOT NULL
+GROUP BY sr.agent_id, s.type, date_trunc('month', sr.responded_at);
+
+CREATE UNIQUE INDEX IF NOT EXISTS agent_survey_summary_unique_idx
+  ON agent_survey_summary (agent_id, survey_type, period_month);
+
+CREATE OR REPLACE FUNCTION refresh_agent_survey_summary() RETURNS void AS $$
+BEGIN
+  REFRESH MATERIALIZED VIEW CONCURRENTLY agent_survey_summary;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE VIEW agent_survey_summary_scoped AS
+SELECT ass.*
+FROM agent_survey_summary ass
+WHERE ass.agent_id = app_current_user_id() OR app_max_scope('survey_response', 'read') = 'ALL';

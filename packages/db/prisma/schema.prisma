@@ -14,7 +14,7 @@ datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
   directUrl  = env("DIRECT_URL")
-  extensions = [pgcrypto, vector]
+  extensions = [pgcrypto, vector, pg_trgm]
 }
 
 // =============================================================================
@@ -56,6 +56,15 @@ enum UserStatus {
   ACTIVE
   SUSPENDED
   DEACTIVATED
+}
+
+/// Ephemeral agent availability, distinct from UserStatus (account
+/// lifecycle) — surfaced in the top header presence selector and by
+/// assignment rules that only route to ONLINE agents.
+enum PresenceStatus {
+  ONLINE
+  AWAY
+  OFFLINE
 }
 
 enum TeamMemberRole {
@@ -105,6 +114,8 @@ enum ActivityType {
   WHATSAPP
   PORTAL_MESSAGE
   SMS
+  SOCIAL
+  LIVE_CHAT
 }
 
 enum ActivityDirection {
@@ -168,6 +179,8 @@ enum DocumentEntityType {
   OPPORTUNITY
   LEAD
   TASK
+  CLAIM
+  CASE
 }
 
 enum RetentionAction {
@@ -184,6 +197,7 @@ enum AuditAction {
   PERMISSION_CHANGE
   EXPORT
   VIEW_SENSITIVE
+  FORCE_LOGOUT
 }
 
 enum ConnectorType {
@@ -242,6 +256,7 @@ enum ApprovalEntityType {
   OPPORTUNITY_DISCOUNT
   USER_ROLE_CHANGE
   DOCUMENT_RETENTION_OVERRIDE
+  KNOWLEDGE_ARTICLE_PUBLISH
   OTHER
 }
 
@@ -255,6 +270,10 @@ enum AiFeature {
   SUMMARIZATION
   REPLY_DRAFT
   INSIGHT
+  SENTIMENT_ANALYSIS
+  AUTO_CATEGORIZATION
+  SEMANTIC_EMBEDDING
+  SEMANTIC_SEARCH
 }
 
 enum DashboardVisibility {
@@ -275,6 +294,7 @@ model Department {
   parentDepartment   Department?  @relation("DepartmentHierarchy", fields: [parentDepartmentId], references: [id])
   subDepartments     Department[] @relation("DepartmentHierarchy")
   users              User[]
+  salesQuotas        SalesQuota[]
   createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -282,16 +302,17 @@ model Department {
 }
 
 model Branch {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name      String
-  code      String   @unique
-  address   String?
-  city      String?
-  state     String?
-  country   String?  @default("NG")
-  users     User[]
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  code        String       @unique
+  address     String?
+  city        String?
+  state       String?
+  country     String?      @default("NG")
+  users       User[]
+  salesQuotas SalesQuota[]
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("branches")
 }
@@ -302,6 +323,12 @@ model Team {
   description String?
   members     TeamMember[]
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  assignedClaims         Claim[]
+  assignedCases          Case[]
+  assignmentRulePools    AssignmentRule[]
+  savedViews             SavedView[]
+  slaEscalationTargetFor SlaTarget[]
 
   @@map("teams")
 }
@@ -322,19 +349,21 @@ model TeamMember {
 }
 
 model User {
-  id                String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  keycloakSubjectId String      @unique @map("keycloak_subject_id")
-  email             String      @unique
-  fullName          String      @map("full_name")
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  keycloakSubjectId String         @unique @map("keycloak_subject_id")
+  email             String         @unique
+  fullName          String         @map("full_name")
   phone             String?
-  departmentId      String?     @map("department_id") @db.Uuid
-  department        Department? @relation(fields: [departmentId], references: [id])
-  branchId          String?     @map("branch_id") @db.Uuid
-  branch            Branch?     @relation(fields: [branchId], references: [id])
-  status            UserStatus  @default(ACTIVE)
-  lastSyncedAt      DateTime?   @map("last_synced_at") @db.Timestamptz(6)
-  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  departmentId      String?        @map("department_id") @db.Uuid
+  department        Department?    @relation(fields: [departmentId], references: [id])
+  branchId          String?        @map("branch_id") @db.Uuid
+  branch            Branch?        @relation(fields: [branchId], references: [id])
+  status            UserStatus     @default(ACTIVE)
+  presenceStatus    PresenceStatus @default(OFFLINE) @map("presence_status")
+  presenceUpdatedAt DateTime?      @map("presence_updated_at") @db.Timestamptz(6)
+  lastSyncedAt      DateTime?      @map("last_synced_at") @db.Timestamptz(6)
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   roles           UserRole[]
   teamMemberships TeamMember[]
@@ -358,6 +387,39 @@ model User {
   aiUsage                  AiUsageLedger[]   @relation("AiUsageUser")
   ownedDashboards          SavedDashboard[]  @relation("DashboardOwner")
   updatedOrgSettings       OrgSetting[]      @relation("OrgSettingUpdatedBy")
+
+  // --- Phase 2: Case management ---
+  adjustedClaims          Claim[]              @relation("ClaimAdjuster")
+  assignedCases           Case[]               @relation("CaseAssignee")
+  createdCases            Case[]               @relation("CaseCreatedBy")
+  slaEscalationTargetFor  SlaTarget[]          @relation("SlaEscalationUser")
+  claimStatusChanges      ClaimStatusHistory[] @relation("ClaimStatusHistoryChangedBy")
+  caseWatching            CaseWatcher[]        @relation("CaseWatcherUser")
+  createdMacros           Macro[]              @relation("MacroCreatedBy")
+  assignmentRuleCursorFor AssignmentRule[]     @relation("AssignmentRuleCursor")
+  agentSkills             AgentSkill[]         @relation("AgentSkillUser")
+
+  // --- Phase 2: Knowledge base & surveys ---
+  ownedKnowledgeArticles           KnowledgeArticle[]         @relation("KnowledgeArticleOwner")
+  authoredKnowledgeArticleVersions KnowledgeArticleVersion[]  @relation("KnowledgeArticleVersionAuthoredBy")
+  knowledgeArticleFeedback         KnowledgeArticleFeedback[] @relation("KnowledgeArticleFeedbackUser")
+  createdSurveys                   Survey[]                   @relation("SurveyCreatedBy")
+  ratedSurveyResponses             SurveyResponse[]           @relation("SurveyResponseAgent")
+
+  // --- Phase 2: CRM enhancements ---
+  ownedSavedViews SavedView[]  @relation("SavedViewOwner")
+  salesQuotas     SalesQuota[] @relation("SalesQuotaUser")
+
+  // --- Phase 2: Reporting & campaigns ---
+  ownedScheduledReports        ScheduledReport[]          @relation("ScheduledReportOwner")
+  scheduledReportRecipientOf   ScheduledReportRecipient[] @relation("ScheduledReportRecipientUser")
+  triggeredScheduledReportRuns ScheduledReportRun[]       @relation("ScheduledReportRunTriggeredBy")
+  createdCampaigns             Campaign[]                 @relation("CampaignCreatedBy")
+  createdCampaignTemplates     CampaignTemplate[]         @relation("CampaignTemplateCreatedBy")
+  ownedAudienceSegments        AudienceSegment[]          @relation("AudienceSegmentOwner")
+
+  // --- Phase 2: Admin / integrations ---
+  createdWebhookSubscriptions WebhookSubscription[] @relation("WebhookSubscriptionCreatedBy")
 
   @@map("users")
 }
@@ -465,6 +527,11 @@ model Account {
   owner             User          @relation("AccountOwner", fields: [ownerId], references: [id])
   source            String?
   notes             String?
+  /// Arbitrary org-defined fields (see CustomFieldDefinition) — a jsonb
+  /// column, not an EAV table, so it inherits this row's RLS policy for
+  /// free and needs no join on list queries. Validated against active
+  /// CustomFieldDefinition rows at the service layer before write.
+  customFields      Json          @default("{}") @map("custom_fields")
   createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -476,6 +543,8 @@ model Account {
   policies         Policy[]
   activities       Activity[]
   tasks            Task[]
+  cases            Case[]
+  surveyResponses  SurveyResponse[]
 
   @@index([status])
   @@map("accounts")
@@ -499,19 +568,24 @@ model AccountRelationship {
 /// CHECK constraint (prisma/rls/004_check_constraints.sql); Prisma's DSL
 /// cannot express cross-column checks.
 model Contact {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  accountId String?  @map("account_id") @db.Uuid
-  account   Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  carrierId String?  @map("carrier_id") @db.Uuid
-  carrier   Carrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
-  firstName String   @map("first_name")
-  lastName  String   @map("last_name")
-  email     String?
-  phone     String?
-  title     String?
-  isPrimary Boolean  @default(false) @map("is_primary")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId    String?  @map("account_id") @db.Uuid
+  account      Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  carrierId    String?  @map("carrier_id") @db.Uuid
+  carrier      Carrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  email        String?
+  phone        String?
+  title        String?
+  isPrimary    Boolean  @default(false) @map("is_primary")
+  customFields Json     @default("{}") @map("custom_fields")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  cases                Case[]
+  campaignRecipients   CampaignRecipient[]
+  campaignSuppressions CampaignSuppression[]
 
   @@map("contacts")
 }
@@ -579,6 +653,7 @@ model Lead {
   convertedOpportunityId String?      @unique @map("converted_opportunity_id") @db.Uuid
   convertedOpportunity   Opportunity? @relation("LeadConvertedOpportunity", fields: [convertedOpportunityId], references: [id])
   qualificationNotes     String?      @map("qualification_notes")
+  customFields           Json         @default("{}") @map("custom_fields")
   createdAt              DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -605,6 +680,7 @@ model Opportunity {
   ownerId           String        @map("owner_id") @db.Uuid
   owner             User          @relation("OpportunityOwner", fields: [ownerId], references: [id])
   lineOfBusiness    String?       @map("line_of_business")
+  customFields      Json          @default("{}") @map("custom_fields")
   createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -634,30 +710,55 @@ model OpportunityMarketSubmission {
   @@map("opportunity_market_submissions")
 }
 
-/// Consolidates the BRD's "Activity" and "Interaction" concepts.
+/// Consolidates the BRD's "Activity" and "Interaction" concepts. Also the
+/// omnichannel-lite conversation log: every channel (call/email/WhatsApp/
+/// SMS/portal/social/live chat) writes into this one table against the
+/// same parent-entity FKs, so there's no separate channel subsystem to
+/// reconcile the way Freshdesk/Zendesk have to engineer (Agent Workspace,
+/// omnichannel routing) — see docs/comparison doc.
+/// createdById/createdBySystemJob is a one-of pair (like AuditLog's actor
+/// columns), enforced by activities_actor_xor in
+/// prisma/rls/003_check_constraints.sql — lets a background worker be the
+/// "author" of an inbound webhook-ingested message. externalMessageId is
+/// nullable-unique so a provider's webhook retry is a no-op at the DB
+/// layer, not a duplicate row.
 model Activity {
-  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  accountId       String?           @map("account_id") @db.Uuid
-  account         Account?          @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  contactId       String?           @map("contact_id") @db.Uuid
-  leadId          String?           @map("lead_id") @db.Uuid
-  lead            Lead?             @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  opportunityId   String?           @map("opportunity_id") @db.Uuid
-  opportunity     Opportunity?      @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
-  policyId        String?           @map("policy_id") @db.Uuid
-  policy          Policy?           @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  type            ActivityType
-  direction       ActivityDirection
-  subject         String
-  body            String?
-  occurredAt      DateTime          @map("occurred_at") @db.Timestamptz(6)
-  createdById     String            @map("created_by_id") @db.Uuid
-  createdBy       User              @relation("ActivityCreatedBy", fields: [createdById], references: [id])
-  durationMinutes Int?              @map("duration_minutes")
-  outcome         String?
-  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId          String?           @map("account_id") @db.Uuid
+  account            Account?          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  contactId          String?           @map("contact_id") @db.Uuid
+  leadId             String?           @map("lead_id") @db.Uuid
+  lead               Lead?             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  opportunityId      String?           @map("opportunity_id") @db.Uuid
+  opportunity        Opportunity?      @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  policyId           String?           @map("policy_id") @db.Uuid
+  policy             Policy?           @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  claimId            String?           @map("claim_id") @db.Uuid
+  claim              Claim?            @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  caseId             String?           @map("case_id") @db.Uuid
+  case               Case?             @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  type               ActivityType
+  direction          ActivityDirection
+  subject            String
+  body               String?
+  occurredAt         DateTime          @map("occurred_at") @db.Timestamptz(6)
+  createdById        String?           @map("created_by_id") @db.Uuid
+  createdBy          User?             @relation("ActivityCreatedBy", fields: [createdById], references: [id])
+  createdBySystemJob String?           @map("created_by_system_job")
+  channelDetail      String?           @map("channel_detail")
+  externalThreadId   String?           @map("external_thread_id")
+  externalMessageId  String?           @unique @map("external_message_id")
+  aiSentiment        String?           @map("ai_sentiment")
+  aiSentimentScore   Decimal?          @map("ai_sentiment_score") @db.Decimal(4, 3)
+  aiAnalyzedAt       DateTime?         @map("ai_analyzed_at") @db.Timestamptz(6)
+  durationMinutes    Int?              @map("duration_minutes")
+  outcome            String?
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([accountId, occurredAt])
+  @@index([externalThreadId])
+  @@index([claimId])
+  @@index([caseId])
   @@map("activities")
 }
 
@@ -678,6 +779,10 @@ model Task {
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   leadId        String?      @map("lead_id") @db.Uuid
   lead          Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  claimId       String?      @map("claim_id") @db.Uuid
+  claim         Claim?       @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  caseId        String?      @map("case_id") @db.Uuid
+  case          Case?        @relation(fields: [caseId], references: [id], onDelete: Cascade)
   completedAt   DateTime?    @map("completed_at") @db.Timestamptz(6)
   createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -717,6 +822,8 @@ model Policy {
   renewalSchedule RenewalSchedule?
   activities      Activity[]
   tasks           Task[]
+  claims          Claim[]
+  cases           Case[]
 
   @@index([expiryDate])
   @@map("policies")
@@ -955,8 +1062,9 @@ model IntegrationConnector {
   createdAt              DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  syncJobs SyncJob[]
-  logs     IntegrationLog[]
+  syncJobs         SyncJob[]
+  logs             IntegrationLog[]
+  oauthCredentials IntegrationOAuthCredential[]
 
   @@map("integration_connectors")
 }
@@ -1057,16 +1165,26 @@ model AiUsageLedger {
   @@map("ai_usage_ledger")
 }
 
-/// Chunked embeddings for future semantic search over notes/documents.
+/// Chunked embeddings for semantic search over notes/documents (first real
+/// consumer: backend/api/src/modules/ai-gateway/ POST /ai/index + /ai/search).
 /// `embedding` uses pgvector via Prisma's Unsupported type — vector
 /// similarity queries are raw SQL (Prisma has no typed query API for it).
+/// Dimension is 1024, not the 1536 this column originally shipped with
+/// (sized for OpenAI's ada-002/text-embedding-3-small default): Anthropic has
+/// no embeddings API, so Voyage AI (Anthropic's recommended embeddings
+/// partner — see voyage-client.ts) is the actual provider, and Voyage's
+/// `output_dimension` only offers 256/512/1024(default)/2048 — 1536 isn't one
+/// of them. Changed via a real migration (20260803_.../migration.sql) rather
+/// than editing the original CREATE TABLE, but verified costless first: this
+/// table had zero production rows at the time (see that migration's header
+/// comment).
 model SemanticEmbedding {
   id         String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   entityType String                      @map("entity_type")
   entityId   String                      @map("entity_id") @db.Uuid
   chunkIndex Int                         @default(0) @map("chunk_index")
   content    String
-  embedding  Unsupported("vector(1536)")
+  embedding  Unsupported("vector(1024)")
   model      String
   createdAt  DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -1093,4 +1211,1140 @@ model SavedDashboard {
   updatedAt    DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("saved_dashboards")
+}
+
+// =============================================================================
+// Phase 2 — Case Management (Claims + Enquiry/Service Request/Complaint)
+//
+// Claim and Case are kept as separate, strongly-typed tables rather than one
+// unified Zendesk-style Ticket table — a claim carries money-movement fields
+// (reserveAmount/settledAmount) and a regulator-facing lifecycle that would
+// sit NULL on 95% of general-case rows, and vice versa. SLA/automation/
+// collaboration are still genuinely shared *mechanisms*, so cross-cutting
+// tables (SlaClock, CaseWatcher) use a Contact-style dual-nullable-FK with a
+// "exactly one of claim_id/case_id" CHECK constraint (see
+// prisma/rls/003_check_constraints.sql) — a closed two-type set, so this
+// follows Contact's pattern, not DocumentLink's open-ended polymorphism.
+// Comment/note threading reuses Activity (claimId/caseId, direction:INTERNAL
+// for internal notes) rather than a new CaseComment table.
+// =============================================================================
+
+enum ClaimStatus {
+  NOTIFIED
+  UNDER_REVIEW
+  ADJUSTED
+  SETTLED
+  REPUDIATED
+  REOPENED
+  WITHDRAWN
+}
+
+enum CaseType {
+  ENQUIRY
+  SERVICE_REQUEST
+  COMPLAINT
+}
+
+/// More granular than Freshdesk/Zendesk's generic Pending/Hold — a G2-cited
+/// gap ("limited ticket status options"). PENDING_CUSTOMER vs
+/// PENDING_CARRIER matters in a brokerage: different escalation paths, and
+/// SlaClock pauses/resumes independently for each.
+enum CaseStatus {
+  NEW
+  OPEN
+  PENDING_CUSTOMER
+  PENDING_CARRIER
+  RESOLVED
+  CLOSED
+  REOPENED
+}
+
+/// Non-destructive by default, unlike Zendesk's permanent ticket merge
+/// (third-party "unmerge" apps only appeared in Oct 2025). MERGED is just a
+/// link-type value on a reversible parent/child relationship.
+enum CaseLinkType {
+  PARENT_CHILD
+  MERGED
+}
+
+enum CasePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+/// Discriminator for config tables that describe "applies to which ticket
+/// type" in the abstract (SlaPolicy, AssignmentRule) — not a column on
+/// Claim/Case themselves, which use dual nullable FKs instead.
+enum CaseManagementEntityType {
+  CLAIM
+  CASE
+}
+
+enum SlaMetricType {
+  FIRST_RESPONSE
+  RESOLUTION
+  STAGE_TRANSITION
+}
+
+enum SlaClockStatus {
+  RUNNING
+  PAUSED
+  SATISFIED
+  BREACHED
+}
+
+enum AssignmentStrategy {
+  ROUND_ROBIN
+  LOAD_BASED
+  SKILL_BASED
+}
+
+model Claim {
+  id                    String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  claimNumber           String             @unique @map("claim_number")
+  policyId              String             @map("policy_id") @db.Uuid
+  policy                Policy             @relation(fields: [policyId], references: [id])
+  status                ClaimStatus        @default(NOTIFIED)
+  priority              CasePriority       @default(MEDIUM)
+  dateOfLoss            DateTime           @map("date_of_loss") @db.Date
+  dateReported          DateTime           @default(now()) @map("date_reported") @db.Date
+  causeOfLoss           String?            @map("cause_of_loss")
+  causeOfLossCategoryId String?            @map("cause_of_loss_category_id") @db.Uuid
+  causeOfLossCategory   LossCauseCategory? @relation(fields: [causeOfLossCategoryId], references: [id])
+  reserveAmount         Decimal?           @map("reserve_amount") @db.Decimal(18, 2)
+  settledAmount         Decimal?           @map("settled_amount") @db.Decimal(18, 2)
+  settledAt             DateTime?          @map("settled_at") @db.Timestamptz(6)
+  repudiationReason     String?            @map("repudiation_reason")
+  adjusterId            String?            @map("adjuster_id") @db.Uuid
+  adjuster              User?              @relation("ClaimAdjuster", fields: [adjusterId], references: [id])
+  assignedTeamId        String?            @map("assigned_team_id") @db.Uuid
+  assignedTeam          Team?              @relation(fields: [assignedTeamId], references: [id])
+  slaPolicyId           String?            @map("sla_policy_id") @db.Uuid
+  slaPolicy             SlaPolicy?         @relation(fields: [slaPolicyId], references: [id])
+  catastropheEventId    String?            @map("catastrophe_event_id") @db.Uuid
+  catastropheEvent      CatastropheEvent?  @relation(fields: [catastropheEventId], references: [id])
+  parentClaimId         String?            @map("parent_claim_id") @db.Uuid
+  parentClaim           Claim?             @relation("ClaimRelated", fields: [parentClaimId], references: [id])
+  relatedClaims         Claim[]            @relation("ClaimRelated")
+  externalAdjusterRef   String?            @map("external_adjuster_ref")
+  reopenCount           Int                @default(0) @map("reopen_count")
+  createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  statusHistory ClaimStatusHistory[]
+  slaClocks     SlaClock[]
+  watchers      CaseWatcher[]
+  comments      Activity[]
+  tasks         Task[]
+
+  @@index([policyId])
+  @@index([status])
+  @@index([adjusterId, status])
+  @@map("claims")
+}
+
+model ClaimStatusHistory {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  claimId     String       @map("claim_id") @db.Uuid
+  claim       Claim        @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  fromStatus  ClaimStatus? @map("from_status")
+  toStatus    ClaimStatus  @map("to_status")
+  changedById String?      @map("changed_by_id") @db.Uuid
+  changedBy   User?        @relation("ClaimStatusHistoryChangedBy", fields: [changedById], references: [id])
+  reason      String?
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([claimId, createdAt])
+  @@map("claim_status_history")
+}
+
+/// Groups claims arising from one loss event (flood/fire affecting many
+/// policyholders at once) — an insurance-domain concept no generic
+/// ticketing tool models.
+model CatastropheEvent {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  eventDate   DateTime @map("event_date") @db.Date
+  description String?
+  claims      Claim[]
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("catastrophe_events")
+}
+
+/// Structured lookup so NAICOM-style regulatory rollups aggregate cleanly
+/// instead of parsing free text — mirrors DocumentCategory's {name, code}.
+model LossCauseCategory {
+  id       String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name     String              @unique
+  code     String              @unique
+  parentId String?             @map("parent_id") @db.Uuid
+  parent   LossCauseCategory?  @relation("LossCauseCategoryHierarchy", fields: [parentId], references: [id])
+  children LossCauseCategory[] @relation("LossCauseCategoryHierarchy")
+  claims   Claim[]
+
+  @@map("loss_cause_categories")
+}
+
+model Case {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  caseNumber       String        @unique @map("case_number")
+  caseType         CaseType      @map("case_type")
+  categoryId       String?       @map("category_id") @db.Uuid
+  category         CaseCategory? @relation(fields: [categoryId], references: [id])
+  subject          String
+  description      String?
+  status           CaseStatus    @default(NEW)
+  priority         CasePriority  @default(MEDIUM)
+  accountId        String?       @map("account_id") @db.Uuid
+  account          Account?      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  contactId        String?       @map("contact_id") @db.Uuid
+  contact          Contact?      @relation(fields: [contactId], references: [id])
+  policyId         String?       @map("policy_id") @db.Uuid
+  policy           Policy?       @relation(fields: [policyId], references: [id])
+  assignedToId     String?       @map("assigned_to_id") @db.Uuid
+  assignedTo       User?         @relation("CaseAssignee", fields: [assignedToId], references: [id])
+  assignedTeamId   String?       @map("assigned_team_id") @db.Uuid
+  assignedTeam     Team?         @relation(fields: [assignedTeamId], references: [id])
+  /// The requester/filer — distinct from assignedToId (who's working it).
+  /// Freshdesk/Zendesk always track a ticket's requester independently of
+  /// its assignee; Case never did until now. Nullable because
+  /// system/omnichannel-originated cases (backend/api/src/modules/
+  /// omnichannel/) have no human creator. Also closes a real RLS gap: a
+  /// Case with no accountId/assignedToId/assignedTeamId was invisible to
+  /// its own creator immediately after creation (cases_rw's USING clause
+  /// had no branch for "the person who filed it"), which made Prisma's
+  /// `.create()` fail outright — INSERT...RETURNING also enforces the
+  /// SELECT/USING policy on the new row, not just WITH CHECK.
+  createdById      String?       @map("created_by_id") @db.Uuid
+  createdBy        User?         @relation("CaseCreatedBy", fields: [createdById], references: [id])
+  slaPolicyId      String?       @map("sla_policy_id") @db.Uuid
+  slaPolicy        SlaPolicy?    @relation(fields: [slaPolicyId], references: [id])
+  parentCaseId     String?       @map("parent_case_id") @db.Uuid
+  parentCase       Case?         @relation("CaseHierarchy", fields: [parentCaseId], references: [id])
+  childCases       Case[]        @relation("CaseHierarchy")
+  linkType         CaseLinkType? @map("link_type")
+  reopenCount      Int           @default(0) @map("reopen_count")
+  sourceChannel    ActivityType? @map("source_channel")
+  firstRespondedAt DateTime?     @map("first_responded_at") @db.Timestamptz(6)
+  resolutionNotes  String?       @map("resolution_notes")
+  resolvedAt       DateTime?     @map("resolved_at") @db.Timestamptz(6)
+  closedAt         DateTime?     @map("closed_at") @db.Timestamptz(6)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  slaClocks SlaClock[]
+  watchers  CaseWatcher[]
+  comments  Activity[]
+  tasks     Task[]
+
+  @@index([status, priority])
+  @@index([assignedToId, status])
+  @@index([accountId])
+  @@map("cases")
+}
+
+model CaseCategory {
+  id       String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name     String         @unique
+  code     String         @unique
+  caseType CaseType?      @map("case_type")
+  parentId String?        @map("parent_id") @db.Uuid
+  parent   CaseCategory?  @relation("CaseCategoryHierarchy", fields: [parentId], references: [id])
+  children CaseCategory[] @relation("CaseCategoryHierarchy")
+  cases    Case[]
+
+  @@map("case_categories")
+}
+
+model CaseWatcher {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  claimId   String?  @map("claim_id") @db.Uuid
+  claim     Claim?   @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  caseId    String?  @map("case_id") @db.Uuid
+  case      Case?    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id") @db.Uuid
+  user      User     @relation("CaseWatcherUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([claimId, caseId, userId])
+  @@map("case_watchers")
+}
+
+// --- SLA engine -------------------------------------------------------------
+// One schema serves both Case's two-clock model (First Response/Resolution)
+// and Claim's per-stage model (SlaTarget.metricType = STAGE_TRANSITION,
+// keyed by fromStatus/toStatus) — one engine, one breach-scan job, one
+// compliance report, instead of two parallel SLA systems.
+
+model SlaPolicy {
+  id                      String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                    String
+  entityType              CaseManagementEntityType @map("entity_type")
+  caseType                CaseType?                @map("case_type")
+  priority                CasePriority?
+  /// Admin-orderable tiebreaker (higher wins) for when two policies score
+  /// equally specific for the same (entityType, caseType, priority) — see
+  /// resolveSlaPolicy() in sla-clock.util.ts. Distinct from the
+  /// `priority: CasePriority?` field above (that's the case priority this
+  /// policy targets, e.g. HIGH; this is the policy's own tiebreak rank).
+  rank                    Int                      @default(0)
+  businessHoursCalendarId String?                  @map("business_hours_calendar_id") @db.Uuid
+  businessHoursCalendar   BusinessHoursCalendar?   @relation(fields: [businessHoursCalendarId], references: [id])
+  isActive                Boolean                  @default(true) @map("is_active")
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  targets SlaTarget[]
+  cases   Case[]
+  claims  Claim[]
+
+  @@map("sla_policies")
+}
+
+model SlaTarget {
+  id                   String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slaPolicyId          String        @map("sla_policy_id") @db.Uuid
+  slaPolicy            SlaPolicy     @relation(fields: [slaPolicyId], references: [id], onDelete: Cascade)
+  metricType           SlaMetricType @map("metric_type")
+  fromStatus           String?       @map("from_status")
+  toStatus             String?       @map("to_status")
+  targetMinutes        Int           @map("target_minutes")
+  escalateAfterMinutes Int?          @map("escalate_after_minutes")
+  escalateToUserId     String?       @map("escalate_to_user_id") @db.Uuid
+  escalateToUser       User?         @relation("SlaEscalationUser", fields: [escalateToUserId], references: [id])
+  escalateToTeamId     String?       @map("escalate_to_team_id") @db.Uuid
+  escalateToTeam       Team?         @relation(fields: [escalateToTeamId], references: [id])
+
+  clocks SlaClock[]
+
+  @@map("sla_targets")
+}
+
+/// Runtime instance, one per (ticket, active target). dueAt is the durable
+/// poll column — same role as RenewalSchedule.nextAlertDueAt.
+model SlaClock {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  claimId            String?        @map("claim_id") @db.Uuid
+  claim              Claim?         @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  caseId             String?        @map("case_id") @db.Uuid
+  case               Case?          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  slaTargetId        String         @map("sla_target_id") @db.Uuid
+  slaTarget          SlaTarget      @relation(fields: [slaTargetId], references: [id])
+  status             SlaClockStatus @default(RUNNING)
+  startedAt          DateTime       @default(now()) @map("started_at") @db.Timestamptz(6)
+  dueAt              DateTime       @map("due_at") @db.Timestamptz(6)
+  pausedAt           DateTime?      @map("paused_at") @db.Timestamptz(6)
+  totalPausedMinutes Int            @default(0) @map("total_paused_minutes")
+  satisfiedAt        DateTime?      @map("satisfied_at") @db.Timestamptz(6)
+  breachedAt         DateTime?      @map("breached_at") @db.Timestamptz(6)
+  escalatedAt        DateTime?      @map("escalated_at") @db.Timestamptz(6)
+
+  @@index([status, dueAt])
+  @@map("sla_clocks")
+}
+
+model BusinessHoursCalendar {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  timezone    String
+  weeklyHours Json    @map("weekly_hours")
+  isDefault   Boolean @default(false) @map("is_default")
+
+  holidays    BusinessHoliday[]
+  slaPolicies SlaPolicy[]
+
+  @@map("business_hours_calendars")
+}
+
+model BusinessHoliday {
+  id         String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  calendarId String                @map("calendar_id") @db.Uuid
+  calendar   BusinessHoursCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  date       DateTime              @db.Date
+  name       String
+
+  @@unique([calendarId, date])
+  @@map("business_holidays")
+}
+
+// --- Macros & assignment automation -----------------------------------------
+// AutomationRule (below, pre-existing) already covers SCHEDULE/ENTITY_EVENT
+// triggers. Macro shares the exact same ActionSpec[] jsonb shape and the
+// same action-handler registry (backend/worker/src/automation/), just fired
+// synchronously by an agent clicking "Apply" instead of a background trigger.
+
+model Macro {
+  id          String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  description String?
+  category    String?                   @map("category")
+  entityType  CaseManagementEntityType? @map("entity_type")
+  actions     Json
+  isActive    Boolean                   @default(true) @map("is_active")
+  usageCount  Int                       @default(0) @map("usage_count")
+  createdById String                    @map("created_by_id") @db.Uuid
+  createdBy   User                      @relation("MacroCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("macros")
+}
+
+/// lastAssignedUserId is a durable round-robin cursor — jsonb
+/// conditions/actions elsewhere in this schema can't hold mutable state
+/// safely, hence a real column here.
+model AssignmentRule {
+  id                  String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                String
+  entityType          CaseManagementEntityType @map("entity_type")
+  strategy            AssignmentStrategy
+  conditions          Json
+  candidatePoolTeamId String?                  @map("candidate_pool_team_id") @db.Uuid
+  candidatePoolTeam   Team?                    @relation(fields: [candidatePoolTeamId], references: [id])
+  requiredSkillTags   String[]                 @default([]) @map("required_skill_tags")
+  priority            Int                      @default(0)
+  isActive            Boolean                  @default(true) @map("is_active")
+  lastAssignedUserId  String?                  @map("last_assigned_user_id") @db.Uuid
+  lastAssignedUser    User?                    @relation("AssignmentRuleCursor", fields: [lastAssignedUserId], references: [id])
+  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("assignment_rules")
+}
+
+model AgentSkill {
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String @map("user_id") @db.Uuid
+  user        User   @relation("AgentSkillUser", fields: [userId], references: [id], onDelete: Cascade)
+  skillTag    String @map("skill_tag")
+  proficiency Int?
+
+  @@unique([userId, skillTag])
+  @@map("agent_skills")
+}
+
+// =============================================================================
+// Phase 2 — Knowledge Base
+//
+// Internal, staff-facing KB now — no external customer portal (Contact has
+// no auth surface today; building one is a multi-week identity project of
+// its own, out of scope here). CUSTOMER visibility exists as a documented,
+// unused hook so opening a subset of content later is a policy change, not
+// a migration. Versioning mirrors Document/DocumentVersion; publishing is
+// gated by the existing Approval maker-checker table
+// (KNOWLEDGE_ARTICLE_PUBLISH), not a new workflow engine.
+// =============================================================================
+
+enum KnowledgeArticleStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum KnowledgeArticleVisibility {
+  INTERNAL
+  CUSTOMER
+}
+
+enum KnowledgeFeedbackVote {
+  HELPFUL
+  NOT_HELPFUL
+}
+
+model KnowledgeCategory {
+  id               String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String
+  code             String              @unique
+  parentCategoryId String?             @map("parent_category_id") @db.Uuid
+  parentCategory   KnowledgeCategory?  @relation("KnowledgeCategoryHierarchy", fields: [parentCategoryId], references: [id])
+  subCategories    KnowledgeCategory[] @relation("KnowledgeCategoryHierarchy")
+  order            Int                 @default(0)
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  articles KnowledgeArticle[]
+
+  @@map("knowledge_categories")
+}
+
+model KnowledgeArticle {
+  id                 String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  categoryId         String?                    @map("category_id") @db.Uuid
+  category           KnowledgeCategory?         @relation(fields: [categoryId], references: [id])
+  slug               String                     @unique
+  title              String
+  status             KnowledgeArticleStatus     @default(DRAFT)
+  visibility         KnowledgeArticleVisibility @default(INTERNAL)
+  locale             String                     @default("en")
+  translationGroupId String?                    @map("translation_group_id") @db.Uuid
+  currentVersionId   String?                    @unique @map("current_version_id") @db.Uuid
+  currentVersion     KnowledgeArticleVersion?   @relation("KnowledgeArticleCurrentVersion", fields: [currentVersionId], references: [id])
+  ownerId            String                     @map("owner_id") @db.Uuid
+  owner              User                       @relation("KnowledgeArticleOwner", fields: [ownerId], references: [id])
+  viewCount          Int                        @default(0) @map("view_count")
+  helpfulCount       Int                        @default(0) @map("helpful_count")
+  notHelpfulCount    Int                        @default(0) @map("not_helpful_count")
+  publishedAt        DateTime?                  @map("published_at") @db.Timestamptz(6)
+  archivedAt         DateTime?                  @map("archived_at") @db.Timestamptz(6)
+  createdAt          DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  versions KnowledgeArticleVersion[]  @relation("KnowledgeArticleVersions")
+  feedback KnowledgeArticleFeedback[]
+
+  @@index([status, visibility])
+  @@index([categoryId])
+  @@index([translationGroupId])
+  @@map("knowledge_articles")
+}
+
+model KnowledgeArticleVersion {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId     String           @map("article_id") @db.Uuid
+  article       KnowledgeArticle @relation("KnowledgeArticleVersions", fields: [articleId], references: [id], onDelete: Cascade)
+  versionNumber Int              @map("version_number")
+  bodyMarkdown  String           @map("body_markdown")
+  changeNote    String?          @map("change_note")
+  authoredById  String           @map("authored_by_id") @db.Uuid
+  authoredBy    User             @relation("KnowledgeArticleVersionAuthoredBy", fields: [authoredById], references: [id])
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  currentForArticle KnowledgeArticle? @relation("KnowledgeArticleCurrentVersion")
+
+  @@unique([articleId, versionNumber])
+  @@map("knowledge_article_versions")
+}
+
+/// One vote per (article, user). caseId is a bare column (no relation),
+/// following the same forward-compatible-column precedent Activity.contactId
+/// already set — ties "was this helpful" to the case it was surfaced in.
+model KnowledgeArticleFeedback {
+  id        String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId String                @map("article_id") @db.Uuid
+  article   KnowledgeArticle      @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  userId    String                @map("user_id") @db.Uuid
+  user      User                  @relation("KnowledgeArticleFeedbackUser", fields: [userId], references: [id])
+  vote      KnowledgeFeedbackVote
+  comment   String?
+  caseId    String?               @map("case_id") @db.Uuid
+  createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([articleId, userId])
+  @@map("knowledge_article_feedback")
+}
+
+// =============================================================================
+// Phase 2 — CSAT / NPS surveys
+//
+// One row per triggering event (dedupeKey-enforced) is the direct fix for a
+// cited Freshdesk gap where a revised DSAT->CSAT rating leaves stale data
+// behind: a revision is an UPDATE to this row (captured by the generic audit
+// trigger), never a second row. respondToken supports the one unauthenticated-
+// but-verified write path this schema needs — the respondent is often an
+// external contact, not a logged-in User.
+// =============================================================================
+
+enum SurveyType {
+  CSAT
+  NPS
+  CES
+}
+
+enum SurveyTriggerEvent {
+  CASE_RESOLVED
+  CLAIM_SETTLED
+  POLICY_ISSUED
+  POLICY_RENEWED
+  MANUAL
+}
+
+enum SurveyResponseChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+  PORTAL
+}
+
+model Survey {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String
+  type             SurveyType
+  triggerEvent     SurveyTriggerEvent @map("trigger_event")
+  questionText     String             @map("question_text")
+  scaleMin         Int                @default(0) @map("scale_min")
+  scaleMax         Int                @map("scale_max")
+  isActive         Boolean            @default(true) @map("is_active")
+  sendDelayMinutes Int                @default(0) @map("send_delay_minutes")
+  createdById      String             @map("created_by_id") @db.Uuid
+  createdBy        User               @relation("SurveyCreatedBy", fields: [createdById], references: [id])
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  responses SurveyResponse[]
+
+  @@map("surveys")
+}
+
+model SurveyResponse {
+  id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  surveyId            String                @map("survey_id") @db.Uuid
+  survey              Survey                @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  triggerEntityType   String                @map("trigger_entity_type")
+  triggerEntityId     String                @map("trigger_entity_id") @db.Uuid
+  accountId           String?               @map("account_id") @db.Uuid
+  account             Account?              @relation(fields: [accountId], references: [id])
+  respondentContactId String?               @map("respondent_contact_id") @db.Uuid
+  agentId             String?               @map("agent_id") @db.Uuid
+  agent               User?                 @relation("SurveyResponseAgent", fields: [agentId], references: [id])
+  channel             SurveyResponseChannel
+  dedupeKey           String                @unique @map("dedupe_key")
+  respondToken        String                @unique @map("respond_token")
+  score               Int?
+  comment             String?
+  sentAt              DateTime?             @map("sent_at") @db.Timestamptz(6)
+  respondedAt         DateTime?             @map("responded_at") @db.Timestamptz(6)
+  createdAt           DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([surveyId, respondedAt])
+  @@index([agentId, respondedAt])
+  @@index([triggerEntityType, triggerEntityId])
+  @@map("survey_responses")
+}
+
+// =============================================================================
+// Phase 2 — CRM enhancements: custom fields, saved views, sales quotas
+//
+// Custom fields are a jsonb column on the entity (Account/Contact/Lead/
+// Opportunity), not an EAV CustomFieldValue table — a jsonb column inherits
+// its row's existing RLS policy for free; an EAV table would need its own
+// polymorphic RLS re-deriving visibility by joining back to the parent,
+// multiplying the exact complexity DocumentLink's own doc comment warns
+// against. Deduplication/merge and bulk actions are stateless service-layer
+// operations against existing tables — no new schema needed for those.
+// =============================================================================
+
+enum CustomFieldEntityType {
+  ACCOUNT
+  CONTACT
+  LEAD
+  OPPORTUNITY
+}
+
+enum CustomFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  DECIMAL
+  DATE
+  BOOLEAN
+  SELECT
+  MULTI_SELECT
+  USER_REFERENCE
+  URL
+}
+
+/// Org-wide config, no RLS — same tier as Carrier/Pipeline. Values live
+/// inline on the owning entity's customFields jsonb column, not here.
+model CustomFieldDefinition {
+  id           String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType   CustomFieldEntityType @map("entity_type")
+  key          String
+  label        String
+  fieldType    CustomFieldType       @map("field_type")
+  options      Json?
+  isRequired   Boolean               @default(false) @map("is_required")
+  isActive     Boolean               @default(true) @map("is_active")
+  displayOrder Int                   @default(0) @map("display_order")
+  helpText     String?               @map("help_text")
+  createdAt    DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([entityType, key])
+  @@map("custom_field_definitions")
+}
+
+enum SavedViewEntityType {
+  ACCOUNT
+  CONTACT
+  LEAD
+  OPPORTUNITY
+  TASK
+}
+
+enum SavedViewVisibility {
+  PRIVATE
+  TEAM
+  DEPARTMENT
+  ORG
+}
+
+/// filters is a structured filter tree interpreted server-side against a
+/// fixed, per-entityType allowlist of filterable fields — never a raw query
+/// string from the frontend, mirroring the same principle already
+/// documented on SavedDashboard.widgets.
+model SavedView {
+  id         String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType SavedViewEntityType @map("entity_type")
+  name       String
+  ownerId    String              @map("owner_id") @db.Uuid
+  owner      User                @relation("SavedViewOwner", fields: [ownerId], references: [id])
+  visibility SavedViewVisibility @default(PRIVATE)
+  teamId     String?             @map("team_id") @db.Uuid
+  team       Team?               @relation(fields: [teamId], references: [id])
+  filters    Json
+  sort       Json?
+  columns    String[]            @default([])
+  isDefault  Boolean             @default(false) @map("is_default")
+  createdAt  DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([entityType, ownerId])
+  @@map("saved_views")
+}
+
+enum QuotaPeriodType {
+  MONTH
+  QUARTER
+  YEAR
+}
+
+enum QuotaScopeType {
+  USER
+  DEPARTMENT
+  BRANCH
+  ORG
+}
+
+/// Territory deliberately reuses Department/Branch rather than a new
+/// Territory entity — those already model the org hierarchy a brokerage
+/// actually uses. Exactly one of userId/departmentId/branchId should be set
+/// depending on scopeType, enforced via a raw SQL CHECK
+/// (prisma/rls/003_check_constraints.sql), same convention as Contact's
+/// accountId/carrierId XOR.
+model SalesQuota {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scopeType      QuotaScopeType  @map("scope_type")
+  userId         String?         @map("user_id") @db.Uuid
+  user           User?           @relation("SalesQuotaUser", fields: [userId], references: [id])
+  departmentId   String?         @map("department_id") @db.Uuid
+  department     Department?     @relation(fields: [departmentId], references: [id])
+  branchId       String?         @map("branch_id") @db.Uuid
+  branch         Branch?         @relation(fields: [branchId], references: [id])
+  periodType     QuotaPeriodType @map("period_type")
+  periodStart    DateTime        @map("period_start") @db.Date
+  periodEnd      DateTime        @map("period_end") @db.Date
+  targetAmount   Decimal         @map("target_amount") @db.Decimal(15, 2)
+  lineOfBusiness String?         @map("line_of_business")
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([scopeType, userId, departmentId, branchId, periodType, periodStart, lineOfBusiness])
+  @@map("sales_quotas")
+}
+
+// =============================================================================
+// Phase 2 — Reporting: scheduled report delivery
+//
+// Reports themselves are hand-written TypeScript ReportDefinition functions
+// (backend/api/src/modules/reports/registry/) keyed by a fixed reportKey,
+// executed via Prisma's typed API or parameterized $queryRaw tagged
+// templates — never raw SQL strings from the client, and `dimension` only
+// ever selects a post-query JS pivot, never a SQL identifier. This table is
+// just the recurring-delivery half (who gets which report, how often).
+// =============================================================================
+
+enum ScheduledReportFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+}
+
+enum ScheduledReportFormat {
+  PDF
+  EXCEL
+  CSV
+}
+
+enum ScheduledReportRunStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum ScheduledReportDeliveryChannel {
+  EMAIL
+  IN_APP
+  WEBHOOK
+}
+
+enum ScheduledReportDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model ScheduledReport {
+  id           String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  reportKey    String                   @map("report_key")
+  filters      Json
+  dimension    String?
+  format       ScheduledReportFormat    @default(PDF)
+  frequency    ScheduledReportFrequency
+  dayOfWeek    Int?                     @map("day_of_week")
+  dayOfMonth   Int?                     @map("day_of_month")
+  hourOfDayUtc Int                      @default(6) @map("hour_of_day_utc")
+  isActive     Boolean                  @default(true) @map("is_active")
+  ownerId      String                   @map("owner_id") @db.Uuid
+  owner        User                     @relation("ScheduledReportOwner", fields: [ownerId], references: [id])
+  nextRunAt    DateTime                 @map("next_run_at") @db.Timestamptz(6)
+  lastRunAt    DateTime?                @map("last_run_at") @db.Timestamptz(6)
+  createdAt    DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  recipients ScheduledReportRecipient[]
+  runs       ScheduledReportRun[]
+
+  @@index([nextRunAt, isActive])
+  @@map("scheduled_reports")
+}
+
+model ScheduledReportRecipient {
+  id                String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scheduledReportId String                         @map("scheduled_report_id") @db.Uuid
+  scheduledReport   ScheduledReport                @relation(fields: [scheduledReportId], references: [id], onDelete: Cascade)
+  userId            String?                        @map("user_id") @db.Uuid
+  user              User?                          @relation("ScheduledReportRecipientUser", fields: [userId], references: [id])
+  channel           ScheduledReportDeliveryChannel @default(EMAIL)
+  webhookUrl        String?                        @map("webhook_url")
+  createdAt         DateTime                       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  deliveries ScheduledReportDelivery[]
+
+  @@unique([scheduledReportId, userId, channel])
+  @@map("scheduled_report_recipients")
+}
+
+/// One row per execution — mirrors SyncJob's status-lifecycle.
+model ScheduledReportRun {
+  id                String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scheduledReportId String?                  @map("scheduled_report_id") @db.Uuid
+  scheduledReport   ScheduledReport?         @relation(fields: [scheduledReportId], references: [id], onDelete: SetNull)
+  reportKey         String                   @map("report_key")
+  filters           Json
+  dimension         String?
+  format            ScheduledReportFormat
+  status            ScheduledReportRunStatus @default(PENDING)
+  triggeredById     String?                  @map("triggered_by_id") @db.Uuid
+  triggeredBy       User?                    @relation("ScheduledReportRunTriggeredBy", fields: [triggeredById], references: [id])
+  storageKey        String?                  @map("storage_key")
+  storageBucket     String?                  @map("storage_bucket")
+  rowCount          Int?                     @map("row_count")
+  errorMessage      String?                  @map("error_message")
+  startedAt         DateTime?                @map("started_at") @db.Timestamptz(6)
+  completedAt       DateTime?                @map("completed_at") @db.Timestamptz(6)
+  createdAt         DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  deliveries ScheduledReportDelivery[]
+
+  @@index([scheduledReportId, createdAt])
+  @@map("scheduled_report_runs")
+}
+
+/// Per-recipient delivery tracking — dedupeKey follows the exact
+/// Notification.dedupeKey idempotency pattern.
+model ScheduledReportDelivery {
+  id           String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId        String                         @map("run_id") @db.Uuid
+  run          ScheduledReportRun             @relation(fields: [runId], references: [id], onDelete: Cascade)
+  recipientId  String                         @map("recipient_id") @db.Uuid
+  recipient    ScheduledReportRecipient       @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  channel      ScheduledReportDeliveryChannel
+  status       ScheduledReportDeliveryStatus  @default(PENDING)
+  dedupeKey    String                         @unique @map("dedupe_key")
+  sentAt       DateTime?                      @map("sent_at") @db.Timestamptz(6)
+  errorMessage String?                        @map("error_message")
+  createdAt    DateTime                       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("scheduled_report_deliveries")
+}
+
+// =============================================================================
+// Phase 2 — Campaign management
+//
+// One unified Campaign/CampaignTemplate/CampaignRecipient model across
+// EMAIL/SMS/WHATSAPP, owned by the same data layer as Contact/Account — no
+// separate marketing vendor, no app-marketplace tax (Zendesk has no native
+// email-marketing feature at all; Freshdesk fragments this into two
+// disjoint features). AudienceSegment reaches directly into Policy/Premium/
+// Opportunity fields via the same fixed-filter-schema registry pattern as
+// SavedView/SavedDashboard — never raw SQL from the frontend.
+// =============================================================================
+
+enum CampaignChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  PAUSED
+  CANCELLED
+}
+
+enum CampaignRecipientStatus {
+  PENDING
+  QUEUED
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  BOUNCED
+  FAILED
+  UNSUBSCRIBED
+}
+
+enum CampaignAbTestMetric {
+  OPEN_RATE
+  CLICK_RATE
+}
+
+model AudienceSegment {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  description String?
+  filters     Json
+  isDynamic   Boolean  @default(true) @map("is_dynamic")
+  ownerId     String?  @map("owner_id") @db.Uuid
+  owner       User?    @relation("AudienceSegmentOwner", fields: [ownerId], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  campaigns Campaign[]
+
+  @@map("audience_segments")
+}
+
+model CampaignTemplate {
+  id                   String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                 String
+  channel              CampaignChannel
+  subject              String?
+  bodyHtml             String?         @map("body_html")
+  bodyText             String?         @map("body_text")
+  mergeFields          String[]        @map("merge_fields")
+  whatsappTemplateName String?         @map("whatsapp_template_name")
+  whatsappTemplateLang String?         @map("whatsapp_template_lang")
+  isActive             Boolean         @default(true) @map("is_active")
+  createdById          String          @map("created_by_id") @db.Uuid
+  createdBy            User            @relation("CampaignTemplateCreatedBy", fields: [createdById], references: [id])
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  campaigns        Campaign[]
+  campaignVariants CampaignVariant[]
+
+  @@map("campaign_templates")
+}
+
+model Campaign {
+  id                    String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                  String
+  channel               CampaignChannel
+  status                CampaignStatus        @default(DRAFT)
+  templateId            String?               @map("template_id") @db.Uuid
+  template              CampaignTemplate?     @relation(fields: [templateId], references: [id])
+  segmentId             String?               @map("segment_id") @db.Uuid
+  segment               AudienceSegment?      @relation(fields: [segmentId], references: [id])
+  scheduledSendAt       DateTime?             @map("scheduled_send_at") @db.Timestamptz(6)
+  sentAt                DateTime?             @map("sent_at") @db.Timestamptz(6)
+  abTestEnabled         Boolean               @default(false) @map("ab_test_enabled")
+  abTestSamplePercent   Int?                  @map("ab_test_sample_percent")
+  abTestMetric          CampaignAbTestMetric? @map("ab_test_metric")
+  abTestWinnerVariantId String?               @map("ab_test_winner_variant_id") @db.Uuid
+  abTestDecidedAt       DateTime?             @map("ab_test_decided_at") @db.Timestamptz(6)
+  createdById           String                @map("created_by_id") @db.Uuid
+  createdBy             User                  @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  variants   CampaignVariant[]
+  recipients CampaignRecipient[]
+
+  @@index([status, scheduledSendAt])
+  @@map("campaigns")
+}
+
+model CampaignVariant {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId   String           @map("campaign_id") @db.Uuid
+  campaign     Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  label        String
+  templateId   String           @map("template_id") @db.Uuid
+  template     CampaignTemplate @relation(fields: [templateId], references: [id])
+  splitPercent Int              @map("split_percent")
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  recipients CampaignRecipient[]
+
+  @@unique([campaignId, label])
+  @@map("campaign_variants")
+}
+
+/// dedupeKey follows the exact Notification.dedupeKey idempotency pattern:
+/// campaign:{campaignId}:{contactId}:{channel}.
+model CampaignRecipient {
+  id                String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId        String                  @map("campaign_id") @db.Uuid
+  campaign          Campaign                @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId         String                  @map("contact_id") @db.Uuid
+  contact           Contact                 @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  variantId         String?                 @map("variant_id") @db.Uuid
+  variant           CampaignVariant?        @relation(fields: [variantId], references: [id])
+  channel           CampaignChannel
+  status            CampaignRecipientStatus @default(PENDING)
+  dedupeKey         String                  @unique @map("dedupe_key")
+  externalMessageId String?                 @map("external_message_id")
+  queuedAt          DateTime?               @map("queued_at") @db.Timestamptz(6)
+  sentAt            DateTime?               @map("sent_at") @db.Timestamptz(6)
+  deliveredAt       DateTime?               @map("delivered_at") @db.Timestamptz(6)
+  openedAt          DateTime?               @map("opened_at") @db.Timestamptz(6)
+  clickedAt         DateTime?               @map("clicked_at") @db.Timestamptz(6)
+  bouncedAt         DateTime?               @map("bounced_at") @db.Timestamptz(6)
+  unsubscribedAt    DateTime?               @map("unsubscribed_at") @db.Timestamptz(6)
+  failureReason     String?                 @map("failure_reason")
+  createdAt         DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId, status])
+  @@map("campaign_recipients")
+}
+
+/// Checked before every send, regardless of segment membership. Keyed on
+/// normalized address/number (not just contactId) so suppression survives
+/// contact deletion — relevant for NDPR obligations.
+model CampaignSuppression {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contactId    String?         @map("contact_id") @db.Uuid
+  contact      Contact?        @relation(fields: [contactId], references: [id])
+  emailOrPhone String          @map("email_or_phone")
+  channel      CampaignChannel
+  reason       String
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([emailOrPhone, channel])
+  @@map("campaign_suppressions")
+}
+
+// =============================================================================
+// Phase 2 — Admin & Integrations: SCIM, outbound webhooks, OAuth connectors
+//
+// SCIM 2.0 is TopiaDesk's sharpest admin differentiator — Zendesk has none
+// on any plan, Freshdesk gates it behind a 427%-markup Enterprise tier.
+// WebhookSubscription/WebhookDelivery is sourced by a worker job polling
+// audit_log by cursor (the same durable-poll pattern as renewal-scan),
+// mapping (entityType, action) to WebhookEventType — reusing the audit
+// trigger's already-comprehensive coverage as the single source of truth
+// for "what changed," rather than hand-wiring emit calls into every service
+// (exactly the "could forget to call it" failure mode the audit trigger
+// itself was built to avoid).
+// =============================================================================
+
+model ScimApiToken {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  description String
+  tokenHash   String    @unique @map("token_hash")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt  DateTime? @map("last_used_at") @db.Timestamptz(6)
+
+  @@map("scim_api_tokens")
+}
+
+enum WebhookEventType {
+  ACCOUNT_CREATED
+  ACCOUNT_UPDATED
+  OPPORTUNITY_STAGE_CHANGED
+  POLICY_BOUND
+  POLICY_CANCELLED
+  POLICY_RENEWED
+  PREMIUM_OVERDUE
+  DOCUMENT_UPLOADED
+  TASK_COMPLETED
+  APPROVAL_DECIDED
+  CLAIM_STATUS_CHANGED
+  CASE_STATUS_CHANGED
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  EXHAUSTED
+}
+
+model WebhookSubscription {
+  id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  targetUrl     String             @map("target_url")
+  eventTypes    WebhookEventType[] @map("event_types")
+  signingSecret String             @map("signing_secret")
+  isActive      Boolean            @default(true) @map("is_active")
+  createdById   String             @map("created_by_id") @db.Uuid
+  createdBy     User               @relation("WebhookSubscriptionCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  deliveries WebhookDelivery[]
+
+  @@map("webhook_subscriptions")
+}
+
+model WebhookDelivery {
+  id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subscriptionId      String                @map("subscription_id") @db.Uuid
+  subscription        WebhookSubscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  eventType           WebhookEventType      @map("event_type")
+  payload             Json
+  status              WebhookDeliveryStatus @default(PENDING)
+  attemptCount        Int                   @default(0) @map("attempt_count")
+  lastAttemptAt       DateTime?             @map("last_attempt_at") @db.Timestamptz(6)
+  nextAttemptAt       DateTime?             @map("next_attempt_at") @db.Timestamptz(6)
+  responseStatus      Int?                  @map("response_status")
+  responseBodySnippet String?               @map("response_body_snippet")
+  correlationId       String                @map("correlation_id")
+  createdAt           DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([subscriptionId, createdAt])
+  @@index([status, nextAttemptAt])
+  @@map("webhook_deliveries")
+}
+
+/// App-layer AES-256-GCM encryption (INTEGRATION_TOKEN_ENCRYPTION_KEY env
+/// var) rather than routing through pgcrypto transparently on every
+/// Prisma read/write — simpler, and keeps the encryption boundary explicit
+/// in application code rather than implicit in SQL.
+model IntegrationOAuthCredential {
+  id                    String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  connectorId           String               @map("connector_id") @db.Uuid
+  connector             IntegrationConnector @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  provider              String
+  encryptedAccessToken  String               @map("encrypted_access_token")
+  encryptedRefreshToken String?              @map("encrypted_refresh_token")
+  expiresAt             DateTime?            @map("expires_at") @db.Timestamptz(6)
+  scopes                String[]             @default([])
+  createdAt             DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([connectorId, provider])
+  @@map("integration_oauth_credentials")
 }

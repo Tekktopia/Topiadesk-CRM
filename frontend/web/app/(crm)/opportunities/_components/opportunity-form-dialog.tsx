@@ -25,9 +25,11 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  toast,
 } from '@topiadesk/ui';
 import { AccountCombobox, type AccountRef } from '../../_components/account-combobox';
-import { useAllPipelineStages, useCreateOpportunity, useUpdateOpportunity } from '../../_lib/hooks';
+import { CustomFieldsSection, validateCustomFieldValues, type CustomFieldValues } from '../../_components/custom-fields-section';
+import { useAllPipelineStages, useCreateOpportunity, useCustomFieldDefinitions, useUpdateOpportunity } from '../../_lib/hooks';
 import type { Opportunity } from '../../_lib/types';
 
 const opportunityFormSchema = z.object({
@@ -106,11 +108,23 @@ export function OpportunityFormDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pipelineId, stagesById]);
 
+  const { data: customFieldDefinitions } = useCustomFieldDefinitions('OPPORTUNITY');
+  const [customFields, setCustomFields] = React.useState<CustomFieldValues>(opportunity?.customFields ?? {});
+  React.useEffect(() => {
+    setCustomFields(opportunity?.customFields ?? {});
+  }, [opportunity]);
+
   const createOpportunity = useCreateOpportunity();
   const updateOpportunity = useUpdateOpportunity(opportunity?.id ?? '');
   const isPending = createOpportunity.isPending || updateOpportunity.isPending;
 
   const onSubmit = form.handleSubmit(async (values) => {
+    const customFieldError = validateCustomFieldValues(customFieldDefinitions, customFields, !isEdit);
+    if (customFieldError) {
+      toast.error(customFieldError);
+      return;
+    }
+    const hasActiveCustomFields = (customFieldDefinitions ?? []).some((d) => d.isActive);
     const payload = {
       accountId: values.accountId,
       name: values.name,
@@ -118,6 +132,7 @@ export function OpportunityFormDialog({
       amount: values.amount,
       expectedCloseDate: new Date(values.expectedCloseDate).toISOString(),
       lineOfBusiness: values.lineOfBusiness || undefined,
+      customFields: hasActiveCustomFields ? customFields : undefined,
     };
     if (isEdit && opportunity) {
       await updateOpportunity.mutateAsync(payload);
@@ -125,6 +140,7 @@ export function OpportunityFormDialog({
       await createOpportunity.mutateAsync(payload);
     }
     onOpenChange(false);
+    setCustomFields({});
   });
 
   return (
@@ -266,6 +282,8 @@ export function OpportunityFormDialog({
                 </FormItem>
               )}
             />
+
+            <CustomFieldsSection entityType="OPPORTUNITY" values={customFields} onChange={setCustomFields} />
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>

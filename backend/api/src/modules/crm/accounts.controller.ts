@@ -1,17 +1,31 @@
 import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { getPrismaClient } from '@topiadesk/db';
+import { getPrismaClient, type Prisma } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
-import { AccountQueryDto, CreateAccountDto, UpdateAccountDto } from './dto/account.dto';
+import {
+  AccountQueryDto,
+  BulkAssignAccountsDto,
+  BulkDeleteAccountsDto,
+  BulkUpdateAccountsDto,
+  CreateAccountDto,
+  UpdateAccountDto,
+} from './dto/account.dto';
 import { AccountDetailResponseDto, AccountResponseDto } from './dto/account-response.dto';
 import {
   AccountRelationshipResponseDto,
   CreateAccountRelationshipDto,
   UpdateAccountRelationshipDto,
 } from './dto/account-relationship.dto';
+import { BulkActionResponseDto } from './dto/bulk-action.dto';
+import { CheckAccountDuplicatesQueryDto, DuplicateGroupDto } from './dto/duplicate-check.dto';
+import { MergeRequestDto, MergeResponseDto } from './dto/merge.dto';
+import { validateCustomFields } from './custom-fields.validator';
+import { diffBulkIds } from './bulk-actions';
+import { checkAccountDuplicates } from './duplicate-detection';
+import { mergeAccounts } from './merge';
 
 /**
  * Account/Contact/AccountRelationship all key off 'account' — the only
@@ -41,6 +55,16 @@ export class AccountsController {
       take: query.take ?? 50,
       skip: query.skip ?? 0,
     });
+  }
+
+  // Must precede ':id' — Nest matches literal segments in declaration order
+  // ahead of a dynamic param competing for the same position (see
+  // tasks.controller.ts's 'mine' route for the same precedent).
+  @Get('check-duplicates')
+  @RequirePermission('account', 'read')
+  @ApiOkResponse({ type: [DuplicateGroupDto] })
+  async checkDuplicates(@Query() query: CheckAccountDuplicatesQueryDto): Promise<DuplicateGroupDto[]> {
+    return checkAccountDuplicates(query);
   }
 
   @Get(':id')
@@ -77,8 +101,9 @@ export class AccountsController {
   @RequirePermission('account', 'write')
   @ApiOkResponse({ type: AccountResponseDto })
   async create(@Body() dto: CreateAccountDto, @CurrentUser() user: AuthenticatedUser): Promise<AccountResponseDto> {
+    await validateCustomFields('ACCOUNT', dto.customFields, { isCreate: true });
     return getPrismaClient().account.create({
-      data: { ...dto, ownerId: dto.ownerId ?? user.id },
+      data: { ...dto, ownerId: dto.ownerId ?? user.id, customFields: dto.customFields as Prisma.InputJsonValue | undefined },
     });
   }
 
@@ -88,7 +113,11 @@ export class AccountsController {
   async update(@Param('id') id: string, @Body() dto: UpdateAccountDto): Promise<AccountResponseDto> {
     const existing = await getPrismaClient().account.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Account not found');
-    return getPrismaClient().account.update({ where: { id }, data: dto });
+    await validateCustomFields('ACCOUNT', dto.customFields, { isCreate: false });
+    return getPrismaClient().account.update({
+      where: { id },
+      data: { ...dto, customFields: dto.customFields as Prisma.InputJsonValue | undefined },
+    });
   }
 
   @Delete(':id')
@@ -98,6 +127,61 @@ export class AccountsController {
     if (!existing) throw new NotFoundException('Account not found');
     await getPrismaClient().account.delete({ where: { id } });
     return { deleted: true };
+  }
+
+  // Bulk endpoints — updateMany/deleteMany fire the audit trigger once per
+  // affected row automatically (Prisma's compiled form, not raw SQL), so no
+  // manual audit call here (same as opportunities.controller.ts's
+  // updateStage()). RLS restricts updateMany/deleteMany to rows in scope;
+  // requested ids outside that scope land in `skipped`, never silently
+  // dropped — the pre-check findMany below is what makes that diff possible.
+  @Post('bulk/assign')
+  @RequirePermission('account', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkAssign(@Body() dto: BulkAssignAccountsDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.account.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((a) => a.id));
+    if (matched.length > 0) {
+      await prisma.account.updateMany({ where: { id: { in: matched } }, data: { ownerId: dto.ownerId } });
+    }
+    return { requested: dto.ids, updated: matched, skipped };
+  }
+
+  @Post('bulk/update')
+  @RequirePermission('account', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkUpdate(@Body() dto: BulkUpdateAccountsDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.account.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((a) => a.id));
+    if (matched.length > 0) {
+      await prisma.account.updateMany({
+        where: { id: { in: matched } },
+        data: { status: dto.status, riskRating: dto.riskRating, ownerId: dto.ownerId, industryId: dto.industryId },
+      });
+    }
+    return { requested: dto.ids, updated: matched, skipped };
+  }
+
+  @Post('bulk/delete')
+  @RequirePermission('account', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkDelete(@Body() dto: BulkDeleteAccountsDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.account.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((a) => a.id));
+    if (matched.length > 0) {
+      await prisma.account.deleteMany({ where: { id: { in: matched } } });
+    }
+    return { requested: dto.ids, updated: matched, skipped };
+  }
+
+  @Post(':id/merge')
+  @RequirePermission('account', 'write')
+  @ApiOkResponse({ type: MergeResponseDto })
+  async merge(@Param('id') id: string, @Body() dto: MergeRequestDto): Promise<MergeResponseDto> {
+    return mergeAccounts(id, dto.loserId);
   }
 
   // Relationships are narrow FK joins keyed off accountA (see schema.prisma

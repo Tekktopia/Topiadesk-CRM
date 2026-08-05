@@ -1,4 +1,4 @@
-import { LayoutDashboard } from 'lucide-react';
+import { LayoutDashboard, MessageCircle } from 'lucide-react';
 import type { NavItem } from '@/lib/nav-types';
 
 /**
@@ -13,4 +13,5 @@ import type { NavItem } from '@/lib/nav-types';
  */
 export const dashboardNav: NavItem[] = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { label: 'Live Chat Widget (demo)', href: '/widget-demo', icon: MessageCircle },
 ];

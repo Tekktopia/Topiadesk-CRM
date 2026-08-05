@@ -14,11 +14,21 @@ import {
   SelectValue,
   Skeleton,
 } from '@topiadesk/ui';
+import { BulkActionToolbar } from '../../_components/bulk-action-toolbar';
 import { EmptyState } from '../../_components/empty-state';
 import { PageHeader } from '../../_components/page-header';
+import { SavedViewBar } from '../../_components/saved-view-bar';
 import { formatCurrency } from '../../_lib/format';
-import { useAccountsLookup, usePipeline, usePipelines, useOpportunities, useUpdateOpportunityStage } from '../../_lib/hooks';
-import type { Opportunity } from '../../_lib/types';
+import {
+  useAccountsLookup,
+  useBulkAssignOpportunities,
+  useBulkDeleteOpportunities,
+  usePipeline,
+  usePipelines,
+  useOpportunities,
+  useUpdateOpportunityStage,
+} from '../../_lib/hooks';
+import type { FilterTree, Opportunity } from '../../_lib/types';
 import { OpportunityCard } from './opportunity-card';
 import { OpportunityFormDialog } from './opportunity-form-dialog';
 
@@ -30,6 +40,10 @@ export function OpportunitiesKanbanView() {
   const [pipelineId, setPipelineId] = React.useState<string | undefined>(undefined);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [movingId, setMovingId] = React.useState<string | null>(null);
+  // Non-null while a saved view is applied — its rows replace the live query
+  // on the board (still bucketed by stage). See accounts-list-view.tsx.
+  const [savedViewRows, setSavedViewRows] = React.useState<Opportunity[] | null>(null);
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
 
   React.useEffect(() => {
     if (!pipelineId && pipelines && pipelines.length > 0) {
@@ -38,12 +52,15 @@ export function OpportunitiesKanbanView() {
   }, [pipelines, pipelineId]);
 
   const { data: pipelineDetail, isLoading: stagesLoading } = usePipeline(pipelineId);
-  const { data: opportunities, isLoading: oppsLoading } = useOpportunities({
+  const { data: liveOpportunities, isLoading: oppsLoading } = useOpportunities({
     pipelineId,
     accountId: accountIdFilter,
   });
+  const opportunities = savedViewRows ?? liveOpportunities;
   const { accountsById } = useAccountsLookup();
   const updateStage = useUpdateOpportunityStage();
+  const bulkAssign = useBulkAssignOpportunities();
+  const bulkDelete = useBulkDeleteOpportunities();
 
   const isLoading = pipelinesLoading || stagesLoading || oppsLoading || !pipelineId;
 
@@ -56,12 +73,31 @@ export function OpportunitiesKanbanView() {
     else byStage.set(opp.pipelineStageId, [opp]);
   }
 
+  // The board's own controls only cover accountId — that's the one live
+  // filter this view exposes that saved-view-filters.ts's OPPORTUNITY
+  // allowlist also accepts (pipelineId filters via the pipelineStage
+  // relation, which isn't a filterable column there).
+  function buildFilters(): FilterTree {
+    const conditions: FilterTree['conditions'] = [];
+    if (accountIdFilter) conditions.push({ field: 'accountId', operator: 'eq', value: accountIdFilter });
+    return { op: 'AND', conditions };
+  }
+
   function handleMoveStage(opportunityId: string, targetStageId: string) {
     setMovingId(opportunityId);
     updateStage.mutate(
       { id: opportunityId, input: { pipelineStageId: targetStageId } },
       { onSettled: () => setMovingId(null) },
     );
+  }
+
+  function toggleSelected(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   }
 
   return (
@@ -90,6 +126,8 @@ export function OpportunitiesKanbanView() {
         }
       />
 
+      <SavedViewBar<Opportunity> entityType="OPPORTUNITY" buildFilters={buildFilters} onApply={setSavedViewRows} />
+
       {accountIdFilter ? (
         <div className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">Filtered to account:</span>
@@ -99,6 +137,19 @@ export function OpportunitiesKanbanView() {
           </Link>
         </div>
       ) : null}
+
+      <BulkActionToolbar
+        selectedCount={selectedIds.size}
+        onClearSelection={() => setSelectedIds(new Set())}
+        reassignLabel="Reassign owner"
+        onReassign={(ownerId) =>
+          bulkAssign.mutate({ ids: [...selectedIds], ownerId }, { onSuccess: () => setSelectedIds(new Set()) })
+        }
+        isReassigning={bulkAssign.isPending}
+        onDelete={() => bulkDelete.mutate({ ids: [...selectedIds] }, { onSuccess: () => setSelectedIds(new Set()) })}
+        isDeleting={bulkDelete.isPending}
+        entityNamePlural="opportunities"
+      />
 
       {isLoading ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -134,6 +185,8 @@ export function OpportunitiesKanbanView() {
                         stages={stages}
                         onMoveStage={(stageId) => handleMoveStage(opp.id, stageId)}
                         isMoving={movingId === opp.id}
+                        selected={selectedIds.has(opp.id)}
+                        onSelectChange={(checked) => toggleSelected(opp.id, checked)}
                       />
                     ))
                   )}

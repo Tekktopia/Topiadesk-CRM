@@ -16,6 +16,13 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { AiGatewayModule } from './modules/ai-gateway/ai-gateway.module';
 import { DashboardsModule } from './modules/dashboards/dashboards.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { CaseManagementModule } from './modules/case-management/case-management.module';
+import { KnowledgeBaseModule } from './modules/knowledge-base/knowledge-base.module';
+import { SurveysModule } from './modules/surveys/surveys.module';
+import { CampaignsModule } from './modules/campaigns/campaigns.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { SearchModule } from './modules/search/search.module';
+import { OmnichannelModule } from './modules/omnichannel/omnichannel.module';
 
 @Module({
   imports: [
@@ -43,6 +50,13 @@ import { AuditModule } from './modules/audit/audit.module';
     AiGatewayModule,
     DashboardsModule,
     AuditModule,
+    CaseManagementModule,
+    KnowledgeBaseModule,
+    SurveysModule,
+    CampaignsModule,
+    ReportsModule,
+    SearchModule,
+    OmnichannelModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
@@ -65,6 +79,41 @@ export class AppModule implements NestModule {
         // check, not RLS context. See keycloak-webhook.controller.ts's
         // header comment for why this exclusion belongs here.
         { path: 'identity/webhooks/keycloak', method: RequestMethod.POST },
+        // Public, token-verified survey response submission — the
+        // respondent is an external contact, not a logged-in User. See
+        // survey-responses.controller.ts's header comment.
+        { path: 'surveys/responses/:id/submit', method: RequestMethod.POST },
+        // Campaign provider callbacks (independently secured by
+        // CampaignWebhookGuard's shared-secret check) and the public
+        // unsubscribe link (signed-token verified). See
+        // campaign-webhooks.controller.ts / public-unsubscribe.controller.ts.
+        { path: 'campaigns/webhooks/email/events', method: RequestMethod.POST },
+        { path: 'campaigns/webhooks/sms/events', method: RequestMethod.POST },
+        { path: 'campaigns/webhooks/whatsapp/events', method: RequestMethod.POST },
+        { path: 'public/unsubscribe', method: RequestMethod.GET },
+        { path: 'public/unsubscribe', method: RequestMethod.POST },
+        // Omnichannel: the live chat widget's own endpoints (anonymous
+        // website visitor, no TopiaDesk session) and the inbound email/
+        // WhatsApp/SMS webhooks (independently secured by
+        // OmnichannelWebhookGuard's shared-secret check). See
+        // omnichannel/live-chat.controller.ts's header comment — every
+        // handler here binds SYSTEM_JOB_CONTEXT itself.
+        { path: 'public/live-chat/sessions', method: RequestMethod.POST },
+        { path: 'public/live-chat/sessions/:caseId/messages', method: RequestMethod.POST },
+        { path: 'public/live-chat/sessions/:caseId/messages', method: RequestMethod.GET },
+        { path: 'public/webhooks/inbound-email', method: RequestMethod.POST },
+        { path: 'public/webhooks/whatsapp', method: RequestMethod.POST },
+        { path: 'public/webhooks/sms', method: RequestMethod.POST },
+        // Public knowledge base portal — anonymous external visitors (e.g.
+        // a customer looking up a policy FAQ) reading CUSTOMER-visibility
+        // PUBLISHED articles, with no TopiaDesk session at all. See
+        // knowledge-base/public-knowledge.controller.ts's header comment —
+        // every handler here binds SYSTEM_JOB_CONTEXT itself and explicitly
+        // filters status/visibility in the Prisma query (RLS is bypassed
+        // under that context, not enforced by it).
+        { path: 'public/knowledge/articles', method: RequestMethod.GET },
+        { path: 'public/knowledge/articles/:slug', method: RequestMethod.GET },
+        { path: 'public/knowledge/categories', method: RequestMethod.GET },
       )
       .forRoutes('*');
   }

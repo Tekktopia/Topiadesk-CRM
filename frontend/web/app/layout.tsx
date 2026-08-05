@@ -1,14 +1,6 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { dashboardNav } from './(dashboard)/nav';
-// Pre-registered so no Batch 2 agent needs to edit this shared file — same
-// "spine" pattern as backend/api/src/app.module.ts in Phase 0. Each agent
-// only edits the body of its own already-imported nav.ts.
-import { crmNav } from './(crm)/nav';
-import { policyNav } from './(policy)/nav';
-import { adminNav } from './(admin)/nav';
-import { AppHeader } from './app-header';
+import { AppShell } from './app-shell';
 import { Providers } from './providers';
 import './globals.css';
 
@@ -20,8 +12,6 @@ export const metadata: Metadata = {
   description: 'TopiaDesk CRM — the engagement layer for Scib Nigeria insurance brokerage operations.',
 };
 
-const nav = [...dashboardNav, ...crmNav, ...policyNav, ...adminNav];
-
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     // suppressHydrationWarning is required by next-themes: it sets the
@@ -31,43 +21,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         <Providers>
-          <div className="flex min-h-screen">
-            <AppSidebar nav={nav} />
-            <div className="flex min-w-0 flex-1 flex-col">
-              <AppHeader />
-              <main className="flex-1 p-6">{children}</main>
-            </div>
-          </div>
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>
-  );
-}
-
-/** Minimal server-rendered sidebar shell — Batch 2 can replace this with a
- * richer composite (collapsible sections, active-route highlighting,
- * per-role visibility) without touching how `nav` is assembled above. */
-function AppSidebar({ nav }: { nav: typeof dashboardNav }) {
-  return (
-    <aside className="hidden w-60 shrink-0 border-r border-border bg-card md:flex md:flex-col">
-      <div className="flex h-14 items-center border-b border-border px-4">
-        <span className="text-sm font-semibold tracking-tight text-foreground">TopiaDesk CRM</span>
-      </div>
-      <nav className="flex-1 space-y-0.5 p-2">
-        {nav.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground"
-            >
-              <Icon className="h-4 w-4" aria-hidden />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </aside>
   );
 }

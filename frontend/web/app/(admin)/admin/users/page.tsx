@@ -6,6 +6,9 @@ import { Ban, CheckCircle2, MoreHorizontal, Search } from 'lucide-react';
 import {
   Badge,
   Button,
+  type ColumnDef,
+  DataTable,
+  DataTableColumnHeader,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -16,13 +19,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   toast,
 } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
@@ -61,6 +57,7 @@ export default function UsersPage() {
   const [pendingStatusChange, setPendingStatusChange] = useState<{ user: UserDto; action: 'deactivate' | 'reactivate' } | null>(
     null,
   );
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 });
 
   const departmentsQuery = useDepartments();
   const branchesQuery = useBranches();
@@ -83,6 +80,12 @@ export default function UsersPage() {
     queryFn: () => apiFetch<UserDto[]>(`/api/admin/users?${qs}`),
   });
 
+  // A search/filter edit can shrink the result set below the current page —
+  // drop back to page 1 whenever the query itself changes.
+  useEffect(() => {
+    setPagination((p) => ({ ...p, pageIndex: 0 }));
+  }, [qs]);
+
   const statusMutation = useMutation({
     mutationFn: ({ id, action }: { id: string; action: 'deactivate' | 'reactivate' }) =>
       apiFetch<UserDto>(`/api/admin/users/${id}/${action}`, { method: 'POST' }),
@@ -95,6 +98,106 @@ export default function UsersPage() {
       toast.error(err instanceof Error ? err.message : 'Failed to update user status');
     },
   });
+
+  const columns = useMemo<ColumnDef<UserDto>[]>(() => {
+    const cols: ColumnDef<UserDto>[] = [
+      {
+        accessorKey: 'fullName',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
+        meta: { label: 'Name' },
+        cell: ({ row }) => <span className="font-medium text-foreground">{row.original.fullName}</span>,
+      },
+      {
+        accessorKey: 'email',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Email" />,
+        meta: { label: 'Email' },
+        cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.email}</span>,
+      },
+      {
+        id: 'department',
+        header: 'Department',
+        meta: { label: 'Department' },
+        accessorFn: (u) => (u.departmentId ? (departmentById.get(u.departmentId) ?? '—') : '—'),
+        cell: ({ getValue }) => <span className="text-sm text-muted-foreground">{getValue<string>()}</span>,
+      },
+      {
+        id: 'branch',
+        header: 'Branch',
+        meta: { label: 'Branch' },
+        accessorFn: (u) => (u.branchId ? (branchById.get(u.branchId) ?? '—') : '—'),
+        cell: ({ getValue }) => <span className="text-sm text-muted-foreground">{getValue<string>()}</span>,
+      },
+      {
+        id: 'roles',
+        header: 'Roles',
+        meta: { label: 'Roles' },
+        enableSorting: false,
+        cell: ({ row }) => (
+          <div className="flex flex-wrap gap-1">
+            {row.original.roles.length === 0 ? (
+              <span className="text-xs text-muted-foreground">No roles</span>
+            ) : (
+              row.original.roles.map((r) => (
+                <Badge key={r.id} variant="outline">
+                  {r.name}
+                </Badge>
+              ))
+            )}
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        meta: { label: 'Status' },
+        enableSorting: false,
+        cell: ({ row }) => <UserStatusBadge status={row.original.status} />,
+      },
+      {
+        accessorKey: 'createdAt',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Created" />,
+        meta: { label: 'Created' },
+        cell: ({ row }) => (
+          <span className="text-xs text-muted-foreground">{new Date(row.original.createdAt).toLocaleDateString()}</span>
+        ),
+        sortingFn: (a, b) => new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
+      },
+    ];
+    if (canWrite) {
+      cols.push({
+        id: 'actions',
+        header: '',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div onClick={(e) => e.stopPropagation()}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label={`Actions for ${row.original.fullName}`}>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setEditingUserId(row.original.id)}>Edit &amp; manage roles</DropdownMenuItem>
+                {row.original.status === 'DEACTIVATED' ? (
+                  <DropdownMenuItem onSelect={() => setPendingStatusChange({ user: row.original, action: 'reactivate' })}>
+                    <CheckCircle2 className="h-4 w-4" aria-hidden /> Reactivate
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onSelect={() => setPendingStatusChange({ user: row.original, action: 'deactivate' })}
+                  >
+                    <Ban className="h-4 w-4" aria-hidden /> Deactivate
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        ),
+      });
+    }
+    return cols;
+  }, [canWrite, departmentById, branchById]);
 
   return (
     <div className="space-y-6">
@@ -141,91 +244,22 @@ export default function UsersPage() {
         </Select>
       </div>
 
-      {usersQuery.isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
-        </div>
-      ) : usersQuery.isError ? (
-        <ErrorState error={usersQuery.error} />
-      ) : (usersQuery.data ?? []).length === 0 ? (
+      {!usersQuery.isLoading && !usersQuery.isError && (usersQuery.data ?? []).length === 0 ? (
         <EmptyState title="No users match these filters" description="Try clearing the search or filters above." />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Branch</TableHead>
-                <TableHead>Roles</TableHead>
-                <TableHead>Status</TableHead>
-                {canWrite ? <TableHead className="w-10" /> : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(usersQuery.data ?? []).map((u) => (
-                <TableRow key={u.id} className="cursor-pointer" onClick={() => canWrite && setEditingUserId(u.id)}>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-medium text-foreground">{u.fullName}</span>
-                      <span className="text-xs text-muted-foreground">{u.email}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {u.departmentId ? (departmentById.get(u.departmentId) ?? '—') : '—'}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {u.branchId ? (branchById.get(u.branchId) ?? '—') : '—'}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {u.roles.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">No roles</span>
-                      ) : (
-                        u.roles.map((r) => (
-                          <Badge key={r.id} variant="outline">
-                            {r.name}
-                          </Badge>
-                        ))
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <UserStatusBadge status={u.status} />
-                  </TableCell>
-                  {canWrite ? (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label={`Actions for ${u.fullName}`}>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onSelect={() => setEditingUserId(u.id)}>Edit &amp; manage roles</DropdownMenuItem>
-                          {u.status === 'DEACTIVATED' ? (
-                            <DropdownMenuItem onSelect={() => setPendingStatusChange({ user: u, action: 'reactivate' })}>
-                              <CheckCircle2 className="h-4 w-4" aria-hidden /> Reactivate
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onSelect={() => setPendingStatusChange({ user: u, action: 'deactivate' })}
-                            >
-                              <Ban className="h-4 w-4" aria-hidden /> Deactivate
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable<UserDto, unknown>
+          columns={columns}
+          data={usersQuery.data ?? []}
+          getRowId={(u) => u.id}
+          isLoading={usersQuery.isLoading}
+          isError={usersQuery.isError}
+          errorState={<ErrorState error={usersQuery.error} />}
+          pagination={pagination}
+          onPaginationChange={setPagination}
+          totalRowCount={(usersQuery.data ?? []).length}
+          onRowClick={canWrite ? (u) => setEditingUserId(u.id) : undefined}
+          enableColumnVisibility
+        />
       )}
 
       {editingUserId ? (

@@ -8,17 +8,14 @@ import {
   Button,
   Card,
   CardContent,
+  type ColumnDef,
+  DataTable,
+  DataTableColumnHeader,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  type RowSelectionState,
 } from '@topiadesk/ui';
 import { ConfirmDialog } from '../../_components/confirm-dialog';
 import { EmptyState } from '../../_components/empty-state';
@@ -29,11 +26,84 @@ import type { Carrier } from '../../_lib/types';
 import { CarrierFormDialog } from './carrier-form-dialog';
 
 export function CarriersListView() {
-  const { data, isLoading } = useCarriers();
+  const { data, isLoading, isError } = useCarriers();
   const deleteCarrier = useDeleteCarrier();
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Carrier | null>(null);
   const [deleting, setDeleting] = React.useState<Carrier | null>(null);
+  const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 20 });
+  // No bulk actions on this page (no selection column in `columns` below), but
+  // DataTable's row.getIsSelected() is called unconditionally per row — it
+  // throws if `rowSelection` state is left undefined instead of `{}`. See
+  // packages/ui/src/composite/data-table.tsx: unlike `sorting`/`columnVisibility`,
+  // the `rowSelection` state has no internal-state fallback when the prop is
+  // omitted.
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+
+  const rows = data ?? [];
+
+  const columns = React.useMemo<ColumnDef<Carrier>[]>(
+    () => [
+      {
+        accessorKey: 'name',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
+        meta: { label: 'Name' },
+        cell: ({ row }) => (
+          <Link href={`/carriers/${row.original.id}`} className="font-medium text-foreground hover:underline">
+            {row.original.name}
+          </Link>
+        ),
+      },
+      {
+        id: 'type',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Type" />,
+        meta: { label: 'Type' },
+        accessorFn: (c) => carrierTypeLabel(c.carrierType),
+        cell: ({ getValue }) => <Badge variant="outline">{getValue<string>()}</Badge>,
+      },
+      {
+        accessorKey: 'amBestRating',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="A.M. Best" />,
+        meta: { label: 'A.M. Best' },
+        cell: ({ row }) => <span className="text-muted-foreground">{row.original.amBestRating ?? '—'}</span>,
+      },
+      {
+        id: 'linesOfBusiness',
+        header: 'Lines of business',
+        meta: { label: 'Lines of business' },
+        enableSorting: false,
+        accessorFn: (c) => (c.linesOfBusiness.length > 0 ? c.linesOfBusiness.join(', ') : '—'),
+        cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
+      },
+      {
+        accessorKey: 'panelStatus',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Panel status" />,
+        meta: { label: 'Panel status' },
+        cell: ({ row }) => <span className="text-muted-foreground">{row.original.panelStatus ?? '—'}</span>,
+      },
+      {
+        id: 'actions',
+        header: '',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="Carrier actions">
+                <MoreHorizontal aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setEditing(row.original)}>Edit</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleting(row.original)}>
+                <Trash2 aria-hidden /> Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ),
+      },
+    ],
+    [],
+  );
 
   return (
     <div className="space-y-6">
@@ -47,14 +117,9 @@ export function CarriersListView() {
         }
       />
 
-      <Card>
-        <CardContent className="pt-6">
-          {isLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : !data || data.length === 0 ? (
+      {!isLoading && !isError && rows.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
             <EmptyState
               title="No carriers yet"
               description="Add insurers and reinsurers to shop opportunities to them."
@@ -64,59 +129,23 @@ export function CarriersListView() {
                 </Button>
               }
             />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>A.M. Best</TableHead>
-                  <TableHead>Lines of business</TableHead>
-                  <TableHead>Panel status</TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.map((carrier) => (
-                  <TableRow key={carrier.id}>
-                    <TableCell className="font-medium text-foreground">
-                      <Link href={`/carriers/${carrier.id}`} className="hover:underline">
-                        {carrier.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{carrierTypeLabel(carrier.carrierType)}</Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{carrier.amBestRating ?? '—'}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {carrier.linesOfBusiness.length > 0 ? carrier.linesOfBusiness.join(', ') : '—'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{carrier.panelStatus ?? '—'}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label="Carrier actions">
-                            <MoreHorizontal aria-hidden />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onSelect={() => setEditing(carrier)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onSelect={() => setDeleting(carrier)}
-                          >
-                            <Trash2 aria-hidden /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable<Carrier, unknown>
+          columns={columns}
+          data={rows}
+          getRowId={(c) => c.id}
+          isLoading={isLoading}
+          isError={isError}
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
+          pagination={pagination}
+          onPaginationChange={setPagination}
+          totalRowCount={rows.length}
+          enableColumnVisibility
+        />
+      )}
 
       <CarrierFormDialog open={createOpen} onOpenChange={setCreateOpen} />
       {editing ? (

@@ -1,0 +1,32 @@
+-- SemanticEmbedding.embedding: vector(1536) -> vector(1024).
+--
+-- The column originally shipped sized for OpenAI's ada-002/text-embedding-3-
+-- small default (1536 dims). Anthropic has no embeddings API, so this
+-- project's actual embeddings provider is Voyage AI (Anthropic's recommended
+-- embeddings partner — see backend/api/src/modules/ai-gateway/voyage-client.ts)
+-- and Voyage's `output_dimension` parameter only offers 256/512/1024
+-- (default)/2048 — 1536 is not one of them. 1024 was chosen: Voyage's own
+-- default, and a solid quality/storage/latency tradeoff for CRM note/
+-- knowledge-article search (2048 buys little here and doubles pgvector index
+-- size/cost).
+--
+-- Prisma's `migrate diff` cannot generate this automatically — verified via
+-- an isolated reproduction (two single-model schemas differing only in
+-- Unsupported("vector(1536)") vs Unsupported("vector(1024)")) that it emits
+-- "This is an empty migration.": the schema-engine treats `Unsupported(...)`
+-- column types as opaque for diffing purposes, so this is hand-written, same
+-- as prisma/rls/*.sql and prisma/triggers/*.sql are for what Prisma's DSL
+-- can't express.
+--
+-- DROP+ADD rather than `ALTER COLUMN ... TYPE vector(1024) USING ...`:
+-- semantic_embeddings had zero rows at the time this migration was written
+-- (confirmed via `SELECT count(*) FROM semantic_embeddings` against the live
+-- stack), so there is no real embedding data to reinterpret/cast between
+-- dimensions — DROP+ADD sidesteps entirely having to reason about whether
+-- pgvector even supports an implicit vector(1536)->vector(1024) cast, which
+-- would be a meaningless operation on real data anyway (truncating/padding a
+-- trained embedding doesn't produce a valid embedding). If this migration is
+-- ever adapted for a codebase with real rows already indexed, do not reuse
+-- this DROP+ADD approach as-is — re-embed and backfill instead.
+ALTER TABLE "semantic_embeddings" DROP COLUMN "embedding";
+ALTER TABLE "semantic_embeddings" ADD COLUMN "embedding" vector(1024) NOT NULL;

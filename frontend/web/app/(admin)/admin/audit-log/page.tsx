@@ -32,7 +32,7 @@ const TAKE = 50;
 
 // Hand-mirrored from packages/db/prisma/schema.prisma's AuditAction enum —
 // same convention as e.g. admin/users/page.tsx's local STATUS_OPTIONS.
-const AUDIT_ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGIN_FAILED', 'PERMISSION_CHANGE', 'EXPORT', 'VIEW_SENSITIVE'] as const;
+const AUDIT_ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGIN_FAILED', 'PERMISSION_CHANGE', 'FORCE_LOGOUT', 'EXPORT', 'VIEW_SENSITIVE'] as const;
 
 function useDebounced<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);

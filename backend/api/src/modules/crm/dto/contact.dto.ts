@@ -1,5 +1,5 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { IsBoolean, IsEmail, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ArrayMinSize, IsArray, IsBoolean, IsEmail, IsObject, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class CreateContactDto {
   // Exactly one of accountId/carrierId must be set (contacts_exactly_one_parent
@@ -13,6 +13,9 @@ export class CreateContactDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() phone?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() title?: string;
   @ApiProperty({ required: false, default: false }) @IsOptional() @IsBoolean() isPrimary?: boolean;
+  // Validated against active CustomFieldDefinition rows for CONTACT in
+  // ContactsController before write — see custom-fields.validator.ts.
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true }) @IsOptional() @IsObject() customFields?: Record<string, unknown>;
 }
 
 export class UpdateContactDto extends PartialType(CreateContactDto) {}
@@ -32,5 +35,25 @@ export class ContactResponseDto {
   @ApiProperty({ nullable: true }) phone!: string | null;
   @ApiProperty({ nullable: true }) title!: string | null;
   @ApiProperty() isPrimary!: boolean;
+  @ApiProperty({ type: 'object', additionalProperties: true }) customFields!: unknown;
   @ApiProperty() createdAt!: Date;
+}
+
+// Contact has no owner/assignee column — bulk/assign reassigns accountId
+// instead (the closest analog: "move these contacts under a different
+// account"), matching how AccountsController's own comment already frames
+// Contact as always reached through an Account.
+export class BulkAssignContactsDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @IsUUID(undefined, { each: true }) ids!: string[];
+  @ApiProperty() @IsUUID() accountId!: string;
+}
+
+export class BulkUpdateContactsDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @IsUUID(undefined, { each: true }) ids!: string[];
+  @ApiProperty({ required: false }) @IsOptional() @IsString() title?: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsBoolean() isPrimary?: boolean;
+}
+
+export class BulkDeleteContactsDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @IsUUID(undefined, { each: true }) ids!: string[];
 }

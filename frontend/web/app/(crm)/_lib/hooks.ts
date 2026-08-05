@@ -9,7 +9,12 @@ import type {
   AccountQuery,
   Activity,
   ActivityQuery,
+  BulkActionResponse,
+  BulkAssignInput,
+  BulkDeleteInput,
   Carrier,
+  CheckAccountDuplicatesQuery,
+  CheckContactOrLeadDuplicatesQuery,
   Contact,
   ContactQuery,
   ConvertLeadInput,
@@ -18,26 +23,41 @@ import type {
   CreateActivityInput,
   CreateCarrierInput,
   CreateContactInput,
+  CreateCustomFieldDefinitionInput,
   CreateLeadInput,
   CreateMarketSubmissionInput,
   CreateOpportunityInput,
+  CreateSalesQuotaInput,
+  CreateSavedViewInput,
   CreateTaskInput,
+  CustomFieldDefinition,
+  CustomFieldEntityType,
   DirectoryUser,
+  DuplicateGroup,
   Lead,
   LeadQuery,
   MarketSubmission,
+  MergeResponse,
   Opportunity,
   OpportunityQuery,
   PipelineDetail,
   Pipeline,
+  QuotaAttainment,
+  RunSavedViewResult,
+  SalesQuota,
+  SavedView,
+  SavedViewEntityType,
   Task,
   TaskQuery,
   UpdateAccountInput,
   UpdateCarrierInput,
   UpdateContactInput,
+  UpdateCustomFieldDefinitionInput,
   UpdateLeadInput,
   UpdateOpportunityInput,
   UpdateOpportunityStageInput,
+  UpdateSalesQuotaInput,
+  UpdateSavedViewInput,
   UpdateTaskInput,
 } from './types';
 
@@ -574,4 +594,311 @@ export function useDirectoryUsers() {
   const byId = new Map<string, DirectoryUser>();
   for (const user of query.data ?? []) byId.set(user.id, user);
   return { usersById: byId, isLoading: query.isLoading };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Custom field definitions
+// ---------------------------------------------------------------------------
+
+export function useCustomFieldDefinitions(entityType?: CustomFieldEntityType) {
+  return useQuery({
+    queryKey: ['crm', 'custom-field-definitions', entityType],
+    queryFn: () => apiFetch<CustomFieldDefinition[]>(`/api/crm/custom-field-definitions${buildQuery({ entityType })}`),
+    staleTime: 60_000,
+  });
+}
+
+export function useCreateCustomFieldDefinition() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateCustomFieldDefinitionInput) =>
+      apiFetch<CustomFieldDefinition>('/api/crm/custom-field-definitions', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (def) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'custom-field-definitions'] });
+      toast.success(`Custom field "${def.label}" created`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useUpdateCustomFieldDefinition(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateCustomFieldDefinitionInput) =>
+      apiFetch<CustomFieldDefinition>(`/api/crm/custom-field-definitions/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'custom-field-definitions'] });
+      toast.success('Custom field updated');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+/** Soft-delete only (sets isActive=false) — see custom-field-definitions.controller.ts's header comment. */
+export function useDeactivateCustomFieldDefinition() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<{ deactivated: boolean }>(`/api/crm/custom-field-definitions/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'custom-field-definitions'] });
+      toast.success('Custom field deactivated');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Saved views
+// ---------------------------------------------------------------------------
+
+export function useSavedViews(entityType: SavedViewEntityType) {
+  return useQuery({
+    queryKey: ['crm', 'saved-views', entityType],
+    queryFn: () => apiFetch<SavedView[]>(`/api/crm/saved-views${buildQuery({ entityType })}`),
+  });
+}
+
+export function useCreateSavedView() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateSavedViewInput) =>
+      apiFetch<SavedView>('/api/crm/saved-views', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (view) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'saved-views', view.entityType] });
+      toast.success(`View "${view.name}" saved`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useUpdateSavedView(id: string, entityType: SavedViewEntityType) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateSavedViewInput) =>
+      apiFetch<SavedView>(`/api/crm/saved-views/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'saved-views', entityType] });
+      toast.success('View updated');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useDeleteSavedView(entityType: SavedViewEntityType) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<{ deleted: boolean }>(`/api/crm/saved-views/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'saved-views', entityType] });
+      toast.success('View deleted');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+/** Runs a saved view server-side (its stored filters/sort) and returns the matching rows, already shaped like the entity's normal list response. */
+export function useRunSavedView<T>() {
+  return useMutation({
+    mutationFn: ({ id, take, skip }: { id: string; take?: number; skip?: number }) =>
+      apiFetch<RunSavedViewResult<T>>(`/api/crm/saved-views/${id}/run${buildQuery({ take, skip })}`, { method: 'POST' }),
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Sales quotas
+// ---------------------------------------------------------------------------
+
+export function useSalesQuotas(query: { scopeType?: SalesQuota['scopeType']; userId?: string } = {}) {
+  return useQuery({
+    queryKey: ['crm', 'sales-quotas', query],
+    queryFn: () => apiFetch<SalesQuota[]>(`/api/crm/sales-quotas${buildQuery(query)}`),
+  });
+}
+
+export function useCreateSalesQuota() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateSalesQuotaInput) =>
+      apiFetch<SalesQuota>('/api/crm/sales-quotas', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'sales-quotas'] });
+      toast.success('Sales quota created');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useUpdateSalesQuota(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateSalesQuotaInput) =>
+      apiFetch<SalesQuota>(`/api/crm/sales-quotas/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'sales-quotas'] });
+      toast.success('Sales quota updated');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useQuotaAttainment(id: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'sales-quotas', id, 'attainment'],
+    queryFn: () => apiFetch<QuotaAttainment>(`/api/crm/sales-quotas/${id}/attainment`),
+    enabled: Boolean(id),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Duplicate detection & merge
+// ---------------------------------------------------------------------------
+
+export function useCheckAccountDuplicates() {
+  return useMutation({
+    mutationFn: (query: CheckAccountDuplicatesQuery) =>
+      apiFetch<DuplicateGroup[]>(`/api/crm/accounts/check-duplicates${buildQuery(query)}`),
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useCheckContactDuplicates() {
+  return useMutation({
+    mutationFn: (query: CheckContactOrLeadDuplicatesQuery) =>
+      apiFetch<DuplicateGroup[]>(`/api/crm/contacts/check-duplicates${buildQuery(query)}`),
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useCheckLeadDuplicates() {
+  return useMutation({
+    mutationFn: (query: CheckContactOrLeadDuplicatesQuery) =>
+      apiFetch<DuplicateGroup[]>(`/api/crm/leads/check-duplicates${buildQuery(query)}`),
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+/**
+ * Merge mutations deliberately do NOT toast on error (unlike every other
+ * mutation in this file) — merge.ts can reject with a specific
+ * BadRequestException (e.g. "N case(s) still reference the loser account")
+ * that the merge dialog needs to show inline next to the form, not just as a
+ * transient toast. Callers should read `.error` off the mutation result.
+ */
+export function useMergeAccounts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ winnerId, loserId }: { winnerId: string; loserId: string }) =>
+      apiFetch<MergeResponse>(`/api/crm/accounts/${winnerId}/merge`, { method: 'POST', body: JSON.stringify({ loserId }) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts'] });
+      toast.success('Accounts merged');
+    },
+  });
+}
+
+export function useMergeContacts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ winnerId, loserId }: { winnerId: string; loserId: string }) =>
+      apiFetch<MergeResponse>(`/api/crm/contacts/${winnerId}/merge`, { method: 'POST', body: JSON.stringify({ loserId }) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'contacts'] });
+      toast.success('Contacts merged');
+    },
+  });
+}
+
+export function useMergeLeads() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ winnerId, loserId }: { winnerId: string; loserId: string }) =>
+      apiFetch<MergeResponse>(`/api/crm/leads/${winnerId}/merge`, { method: 'POST', body: JSON.stringify({ loserId }) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'leads'] });
+      toast.success('Leads merged');
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Bulk actions
+// ---------------------------------------------------------------------------
+
+export function useBulkAssignAccounts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BulkAssignInput) =>
+      apiFetch<BulkActionResponse>('/api/crm/accounts/bulk/assign', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts'] });
+      toast.success(`Reassigned ${res.updated.length} account(s)${res.skipped.length ? `, ${res.skipped.length} skipped` : ''}`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useBulkDeleteAccounts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BulkDeleteInput) =>
+      apiFetch<BulkActionResponse>('/api/crm/accounts/bulk/delete', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts'] });
+      toast.success(`Deleted ${res.updated.length} account(s)${res.skipped.length ? `, ${res.skipped.length} skipped` : ''}`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useBulkAssignLeads() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BulkAssignInput) =>
+      apiFetch<BulkActionResponse>('/api/crm/leads/bulk/assign', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'leads'] });
+      toast.success(`Reassigned ${res.updated.length} lead(s)${res.skipped.length ? `, ${res.skipped.length} skipped` : ''}`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useBulkDeleteLeads() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BulkDeleteInput) =>
+      apiFetch<BulkActionResponse>('/api/crm/leads/bulk/delete', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'leads'] });
+      toast.success(`Deleted ${res.updated.length} lead(s)${res.skipped.length ? `, ${res.skipped.length} skipped` : ''}`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useBulkAssignOpportunities() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BulkAssignInput) =>
+      apiFetch<BulkActionResponse>('/api/crm/opportunities/bulk/assign', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'opportunities'] });
+      toast.success(`Reassigned ${res.updated.length} opportunity(ies)${res.skipped.length ? `, ${res.skipped.length} skipped` : ''}`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useBulkDeleteOpportunities() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BulkDeleteInput) =>
+      apiFetch<BulkActionResponse>('/api/crm/opportunities/bulk/delete', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'opportunities'] });
+      toast.success(`Deleted ${res.updated.length} opportunity(ies)${res.skipped.length ? `, ${res.skipped.length} skipped` : ''}`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
 }

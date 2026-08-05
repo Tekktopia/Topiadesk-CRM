@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -19,8 +20,10 @@ import {
   FormLabel,
   FormMessage,
   Input,
+  toast,
 } from '@topiadesk/ui';
-import { useCreateContact, useUpdateContact } from '../../_lib/hooks';
+import { CustomFieldsSection, validateCustomFieldValues, type CustomFieldValues } from '../../_components/custom-fields-section';
+import { useCreateContact, useCustomFieldDefinitions, useUpdateContact } from '../../_lib/hooks';
 import type { Contact } from '../../_lib/types';
 
 const contactFormSchema = z.object({
@@ -65,11 +68,23 @@ export function ContactFormDialog({
     values: defaultsFor(contact),
   });
 
+  const { data: customFieldDefinitions } = useCustomFieldDefinitions('CONTACT');
+  const [customFields, setCustomFields] = React.useState<CustomFieldValues>(contact?.customFields ?? {});
+  React.useEffect(() => {
+    setCustomFields(contact?.customFields ?? {});
+  }, [contact]);
+
   const createContact = useCreateContact();
   const updateContact = useUpdateContact(accountId);
   const isPending = createContact.isPending || updateContact.isPending;
 
   const onSubmit = form.handleSubmit(async (values) => {
+    const customFieldError = validateCustomFieldValues(customFieldDefinitions, customFields, !isEdit);
+    if (customFieldError) {
+      toast.error(customFieldError);
+      return;
+    }
+    const hasActiveCustomFields = (customFieldDefinitions ?? []).some((d) => d.isActive);
     const payload = {
       firstName: values.firstName,
       lastName: values.lastName,
@@ -77,6 +92,7 @@ export function ContactFormDialog({
       phone: values.phone || undefined,
       title: values.title || undefined,
       isPrimary: values.isPrimary,
+      customFields: hasActiveCustomFields ? customFields : undefined,
     };
     if (isEdit && contact) {
       await updateContact.mutateAsync({ id: contact.id, input: payload });
@@ -84,6 +100,7 @@ export function ContactFormDialog({
       await createContact.mutateAsync({ accountId, carrierId, ...payload });
     }
     onOpenChange(false);
+    setCustomFields({});
   });
 
   return (
@@ -181,6 +198,8 @@ export function ContactFormDialog({
                 </FormItem>
               )}
             />
+
+            <CustomFieldsSection entityType="CONTACT" values={customFields} onChange={setCustomFields} />
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>

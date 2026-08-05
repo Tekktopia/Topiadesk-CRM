@@ -1,5 +1,5 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { IsBoolean, IsDateString, IsInt, IsOptional, IsString, IsUUID, Max, Min, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ArrayMinSize, IsArray, IsBoolean, IsDateString, IsInt, IsObject, IsOptional, IsString, IsUUID, Max, Min, MinLength } from 'class-validator';
 
 export class CreateOpportunityDto {
   @ApiProperty() @IsUUID() accountId!: string;
@@ -18,6 +18,9 @@ export class CreateOpportunityDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() lostReason?: string;
   @ApiProperty({ required: false, description: 'Defaults to the calling user' }) @IsOptional() @IsUUID() ownerId?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() lineOfBusiness?: string;
+  // Validated against active CustomFieldDefinition rows for OPPORTUNITY in
+  // OpportunitiesController before write — see custom-fields.validator.ts.
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true }) @IsOptional() @IsObject() customFields?: Record<string, unknown>;
 }
 
 export class UpdateOpportunityDto extends PartialType(CreateOpportunityDto) {}
@@ -60,6 +63,27 @@ export class OpportunityResponseDto {
   @ApiProperty({ nullable: true }) lostReason!: string | null;
   @ApiProperty() ownerId!: string;
   @ApiProperty({ nullable: true }) lineOfBusiness!: string | null;
+  @ApiProperty({ type: 'object', additionalProperties: true }) customFields!: unknown;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
+}
+
+export class BulkAssignOpportunitiesDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @IsUUID(undefined, { each: true }) ids!: string[];
+  @ApiProperty() @IsUUID() ownerId!: string;
+}
+
+// pipelineStageId deliberately excluded — stage transitions go through
+// PATCH :id/stage so probability stays derived correctly; bulk/update only
+// covers fields with no side effects on other columns.
+export class BulkUpdateOpportunitiesDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @IsUUID(undefined, { each: true }) ids!: string[];
+  @ApiProperty({ required: false }) @IsOptional() @IsString() lineOfBusiness?: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsUUID() ownerId?: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() wonReason?: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() lostReason?: string;
+}
+
+export class BulkDeleteOpportunitiesDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @IsUUID(undefined, { each: true }) ids!: string[];
 }

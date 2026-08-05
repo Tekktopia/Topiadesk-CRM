@@ -74,9 +74,18 @@ COPY backend/worker/package.json backend/worker/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/shared-types/package.json packages/shared-types/package.json
+COPY packages/reports/package.json packages/reports/package.json
 # frontend/web and packages/ui are intentionally omitted here — backend/api
 # doesn't depend on either, and `pnpm install --frozen-lockfile` below only
 # needs manifests for packages actually in this build's dependency graph.
+# packages/reports WAS omitted on that same reasoning until
+# backend/api/package.json picked up a "@topiadesk/reports": "workspace:*"
+# dependency (reports/scheduled-reports controllers) — without its
+# manifest here, `pnpm install --frozen-lockfile` below never links
+# packages/reports' own deps (zod/pdfkit/exceljs/@aws-sdk/*), so `nest
+# build`'s type-check of the full dependency graph in the `build` stage
+# below fails with "Cannot find module" from inside packages/reports/src,
+# not from anything backend/api itself changed.
 RUN pnpm install --frozen-lockfile
 
 # --- build: full source, generate Prisma client, compile backend/api ----------

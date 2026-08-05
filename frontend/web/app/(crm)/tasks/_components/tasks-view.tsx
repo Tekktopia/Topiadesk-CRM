@@ -9,22 +9,19 @@ import {
   Button,
   Card,
   CardContent,
+  type ColumnDef,
+  DataTable,
+  DataTableColumnHeader,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  type RowSelectionState,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   Tabs,
   TabsContent,
   TabsList,
@@ -97,6 +94,114 @@ function TaskTable({ scope }: { scope: 'mine' | 'all' }) {
 
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
+  const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 20 });
+  // No bulk actions here (no selection column below), but DataTable's
+  // row.getIsSelected() is called unconditionally per row and throws if
+  // `rowSelection` state is left undefined instead of `{}` — see the same
+  // note in carriers-list-view.tsx.
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+
+  const rows = data ?? [];
+
+  const columns = React.useMemo<ColumnDef<Task>[]>(
+    () => [
+      {
+        id: 'complete',
+        header: '',
+        enableSorting: false,
+        enableHiding: false,
+        size: 32,
+        cell: ({ row }) => (
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-input accent-primary"
+            checked={row.original.status === 'COMPLETED'}
+            disabled={updateTask.isPending}
+            onChange={(e) =>
+              updateTask.mutate({
+                id: row.original.id,
+                input: { status: e.target.checked ? 'COMPLETED' : 'OPEN' },
+              })
+            }
+            aria-label={`Mark "${row.original.title}" ${row.original.status === 'COMPLETED' ? 'open' : 'complete'}`}
+          />
+        ),
+      },
+      {
+        accessorKey: 'title',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Title" />,
+        meta: { label: 'Title' },
+        cell: ({ row }) => (
+          <span className={row.original.status === 'COMPLETED' ? 'text-muted-foreground line-through' : 'font-medium text-foreground'}>
+            {row.original.title}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'priority',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Priority" />,
+        meta: { label: 'Priority' },
+        cell: ({ row }) => <Badge variant={taskPriorityVariant(row.original.priority)}>{taskPriorityLabel(row.original.priority)}</Badge>,
+      },
+      {
+        accessorKey: 'status',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Status" />,
+        meta: { label: 'Status' },
+        cell: ({ row }) => <Badge variant={taskStatusVariant(row.original.status)}>{taskStatusLabel(row.original.status)}</Badge>,
+      },
+      {
+        accessorKey: 'dueDate',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Due" />,
+        meta: { label: 'Due' },
+        cell: ({ row }) => (
+          <span className={isOverdue(row.original) ? 'font-medium text-destructive' : 'text-muted-foreground'}>
+            {formatDate(row.original.dueDate)}
+            {isOverdue(row.original) ? ' (overdue)' : ''}
+          </span>
+        ),
+        sortingFn: (a, b) => {
+          const aTime = a.original.dueDate ? new Date(a.original.dueDate).getTime() : Infinity;
+          const bTime = b.original.dueDate ? new Date(b.original.dueDate).getTime() : Infinity;
+          return aTime - bTime;
+        },
+      },
+      {
+        id: 'linkedTo',
+        header: 'Linked to',
+        meta: { label: 'Linked to' },
+        enableSorting: false,
+        cell: ({ row }) =>
+          row.original.accountId ? (
+            <Link href={`/accounts/${row.original.accountId}`} className="text-muted-foreground hover:underline">
+              Account
+            </Link>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        id: 'actions',
+        header: '',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="Task actions">
+                <MoreHorizontal aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setEditing(row.original)}>Edit</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleting(row.original)}>
+                <Trash2 aria-hidden /> Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ),
+      },
+    ],
+    [updateTask],
+  );
 
   return (
     <Card>
@@ -118,79 +223,21 @@ function TaskTable({ scope }: { scope: 'mine' | 'all' }) {
           </Select>
         </div>
 
-        {isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : !data || data.length === 0 ? (
+        {!isLoading && rows.length === 0 ? (
           <EmptyState title="No tasks match these filters" />
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10" />
-                <TableHead>Title</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Due</TableHead>
-                <TableHead>Linked to</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.map((task) => (
-                <TableRow key={task.id}>
-                  <TableCell>
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-input accent-primary"
-                      checked={task.status === 'COMPLETED'}
-                      disabled={updateTask.isPending}
-                      onChange={(e) =>
-                        updateTask.mutate({
-                          id: task.id,
-                          input: { status: e.target.checked ? 'COMPLETED' : 'OPEN' },
-                        })
-                      }
-                      aria-label={`Mark "${task.title}" ${task.status === 'COMPLETED' ? 'open' : 'complete'}`}
-                    />
-                  </TableCell>
-                  <TableCell className={task.status === 'COMPLETED' ? 'text-muted-foreground line-through' : 'font-medium text-foreground'}>
-                    {task.title}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={taskPriorityVariant(task.priority)}>{taskPriorityLabel(task.priority)}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={taskStatusVariant(task.status)}>{taskStatusLabel(task.status)}</Badge>
-                  </TableCell>
-                  <TableCell className={isOverdue(task) ? 'font-medium text-destructive' : 'text-muted-foreground'}>
-                    {formatDate(task.dueDate)}
-                    {isOverdue(task) ? ' (overdue)' : ''}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {task.accountId ? <Link href={`/accounts/${task.accountId}`} className="hover:underline">Account</Link> : '—'}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" aria-label="Task actions">
-                          <MoreHorizontal aria-hidden />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setEditing(task)}>Edit</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleting(task)}>
-                          <Trash2 aria-hidden /> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable<Task, unknown>
+            columns={columns}
+            data={rows}
+            getRowId={(t) => t.id}
+            isLoading={isLoading}
+            rowSelection={rowSelection}
+            onRowSelectionChange={setRowSelection}
+            pagination={pagination}
+            onPaginationChange={setPagination}
+            totalRowCount={rows.length}
+            enableColumnVisibility
+          />
         )}
       </CardContent>
 

@@ -1,8 +1,9 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, Check } from 'lucide-react';
-import { Badge, Button, Card, CardContent, Skeleton, toast } from '@topiadesk/ui';
+import { Badge, Button, type ColumnDef, DataTable, DataTableColumnHeader, toast } from '@topiadesk/ui';
 import { PageHeader } from '../_components/page-header';
 import { EmptyState, ErrorState } from '../_components/query-states';
 import { apiFetch } from '../_lib/api';
@@ -10,6 +11,7 @@ import type { NotificationDto } from '../_lib/types';
 
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 });
   const notificationsQuery = useQuery({
     queryKey: ['admin', 'notifications'],
     queryFn: () => apiFetch<NotificationDto[]>('/api/admin/notifications'),
@@ -23,7 +25,56 @@ export default function NotificationsPage() {
     onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to mark as read'),
   });
 
-  const unreadCount = (notificationsQuery.data ?? []).filter((n) => !n.readAt).length;
+  const notifications = notificationsQuery.data ?? [];
+  const unreadCount = notifications.filter((n) => !n.readAt).length;
+
+  const columns = useMemo<ColumnDef<NotificationDto>[]>(
+    () => [
+      {
+        accessorKey: 'title',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Notification" />,
+        cell: ({ row }) => (
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              {!row.original.readAt ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden /> : null}
+              <span className="text-sm font-medium text-foreground">{row.original.title}</span>
+              <Badge variant="outline" className="text-[10px]">
+                {row.original.type}
+              </Badge>
+            </div>
+            <p className="line-clamp-1 text-sm text-muted-foreground">{row.original.body}</p>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'createdAt',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Received" />,
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap text-xs text-muted-foreground">{new Date(row.original.createdAt).toLocaleString()}</span>
+        ),
+        sortingFn: (a, b) => new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
+      },
+      {
+        id: 'actions',
+        header: '',
+        enableHiding: false,
+        enableSorting: false,
+        cell: ({ row }) =>
+          !row.original.readAt ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0"
+              disabled={markReadMutation.isPending}
+              onClick={() => markReadMutation.mutate(row.original.id)}
+            >
+              <Check className="h-4 w-4" /> Mark read
+            </Button>
+          ) : null,
+      },
+    ],
+    [markReadMutation],
+  );
 
   return (
     <div className="space-y-6">
@@ -36,47 +87,20 @@ export default function NotificationsPage() {
         }
       />
 
-      {notificationsQuery.isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full" />
-          ))}
-        </div>
-      ) : notificationsQuery.isError ? (
-        <ErrorState error={notificationsQuery.error} />
-      ) : (notificationsQuery.data ?? []).length === 0 ? (
+      {!notificationsQuery.isLoading && !notificationsQuery.isError && notifications.length === 0 ? (
         <EmptyState title="No notifications" icon={<Bell className="h-8 w-8" aria-hidden />} description="You're all caught up." />
       ) : (
-        <div className="space-y-2">
-          {notificationsQuery.data?.map((n) => (
-            <Card key={n.id} className={!n.readAt ? 'border-primary/40 bg-primary/5' : undefined}>
-              <CardContent className="flex items-start justify-between gap-4 p-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground">{n.title}</p>
-                    <Badge variant="outline" className="text-[10px]">
-                      {n.type}
-                    </Badge>
-                    {!n.readAt ? <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden /> : null}
-                  </div>
-                  <p className="text-sm text-muted-foreground">{n.body}</p>
-                  <p className="text-xs text-muted-foreground">{new Date(n.createdAt).toLocaleString()}</p>
-                </div>
-                {!n.readAt ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    disabled={markReadMutation.isPending}
-                    onClick={() => markReadMutation.mutate(n.id)}
-                  >
-                    <Check className="h-4 w-4" /> Mark read
-                  </Button>
-                ) : null}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <DataTable<NotificationDto, unknown>
+          columns={columns}
+          data={notifications}
+          getRowId={(n) => n.id}
+          isLoading={notificationsQuery.isLoading}
+          isError={notificationsQuery.isError}
+          errorState={<ErrorState error={notificationsQuery.error} />}
+          pagination={pagination}
+          onPaginationChange={setPagination}
+          totalRowCount={notifications.length}
+        />
       )}
     </div>
   );

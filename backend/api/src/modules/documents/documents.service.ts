@@ -23,6 +23,8 @@ const ENTITY_EXISTS_CHECK: Record<DocumentEntityType, (id: string) => Promise<bo
   OPPORTUNITY: async (id) => (await getPrismaClient().opportunity.findUnique({ where: { id }, select: { id: true } })) !== null,
   LEAD: async (id) => (await getPrismaClient().lead.findUnique({ where: { id }, select: { id: true } })) !== null,
   TASK: async (id) => (await getPrismaClient().task.findUnique({ where: { id }, select: { id: true } })) !== null,
+  CLAIM: async (id) => (await getPrismaClient().claim.findUnique({ where: { id }, select: { id: true } })) !== null,
+  CASE: async (id) => (await getPrismaClient().case.findUnique({ where: { id }, select: { id: true } })) !== null,
 };
 
 export interface DocumentWithCurrentVersion extends Document {

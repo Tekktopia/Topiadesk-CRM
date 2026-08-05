@@ -47,9 +47,25 @@ const AUDIT_ACTION_VARIANT: Record<string, 'success' | 'warning' | 'destructive'
   PERMISSION_CHANGE: 'warning',
   EXPORT: 'outline',
   VIEW_SENSITIVE: 'outline',
+  // Mutates Keycloak-side session state, same "identity-admin action, not a
+  // CRUD mutation" grouping as PERMISSION_CHANGE — see users.controller.ts's
+  // forceLogout().
+  FORCE_LOGOUT: 'warning',
 };
 
 export function AuditActionBadge({ action }: { action: string }) {
   const variant = AUDIT_ACTION_VARIANT[action] ?? 'outline';
   return <Badge variant={variant}>{action}</Badge>;
+}
+
+const WEBHOOK_DELIVERY_STATUS_VARIANT: Record<string, 'success' | 'warning' | 'destructive' | 'secondary' | 'outline'> = {
+  PENDING: 'secondary',
+  SUCCEEDED: 'success',
+  FAILED: 'warning',
+  EXHAUSTED: 'destructive',
+};
+
+export function WebhookDeliveryStatusBadge({ status }: { status: string }) {
+  const variant = WEBHOOK_DELIVERY_STATUS_VARIANT[status] ?? 'outline';
+  return <Badge variant={variant}>{status}</Badge>;
 }

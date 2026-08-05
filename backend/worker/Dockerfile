@@ -26,6 +26,12 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY backend/worker/package.json backend/worker/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/config/package.json packages/config/package.json
+# packages/reports' own manifest must be present here too — see
+# backend/api/Dockerfile's `deps` stage comment for why (same
+# --frozen-lockfile dependency-graph reasoning): backend/worker/package.json
+# picked up "@topiadesk/reports": "workspace:*" for the scheduled-report
+# dispatch/generate-and-deliver jobs, which need the shared report registry.
+COPY packages/reports/package.json packages/reports/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS build

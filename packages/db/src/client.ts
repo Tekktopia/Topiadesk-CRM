@@ -32,7 +32,7 @@ let base: PrismaClient | undefined;
 function basePrisma(): PrismaClient {
   if (!base) {
     base = new PrismaClient({
-      log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+      log: process.env.DEBUG_SQL ? ['query', 'warn', 'error'] : process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
     });
   }
   return base;

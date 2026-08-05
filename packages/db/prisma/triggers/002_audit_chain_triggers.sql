@@ -62,7 +62,32 @@ BEGIN
     'documents', 'document_versions', 'document_links',
     'approvals', 'automation_rules', 'integration_connectors',
     'users', 'roles',
-    'departments', 'branches', 'ip_whitelist_entries'
+    'departments', 'branches', 'ip_whitelist_entries',
+    -- Phase 2 — case management. sla_clocks and case_watchers excluded on
+    -- purpose: high-frequency derived/operational state whose meaningful
+    -- moments (breachedAt/escalatedAt) are already durable on the row
+    -- itself — chaining every pause/resume would bloat audit_log with
+    -- noise that isn't itself a compliance-relevant business record.
+    'claims', 'claim_status_history', 'cases',
+    'sla_policies', 'sla_targets', 'business_hours_calendars', 'business_holidays',
+    'macros', 'assignment_rules', 'agent_skills',
+    -- Phase 2 — knowledge base & surveys. knowledge_article_feedback
+    -- excluded (high-volume, low compliance value, same reasoning as
+    -- notifications). survey_responses IS included on purpose — this is
+    -- what makes a revised CSAT/NPS score's full history recoverable
+    -- instead of silently overwritten (the cited Freshdesk gap).
+    'knowledge_categories', 'knowledge_articles', 'knowledge_article_versions',
+    'surveys', 'survey_responses',
+    -- Phase 2 — CRM enhancements. saved_views excluded (personal
+    -- preference churn, same tier as notifications).
+    'custom_field_definitions', 'sales_quotas',
+    -- Phase 2 — reporting & campaigns. Delivery/run logs excluded
+    -- (operational, same tier as sync_jobs/integration_logs today).
+    'scheduled_reports', 'audience_segments', 'campaign_templates',
+    'campaigns', 'campaign_variants',
+    -- Phase 2 — admin & integrations. webhook_deliveries excluded
+    -- (operational log, same tier as integration_logs).
+    'scim_api_tokens', 'webhook_subscriptions', 'integration_oauth_credentials'
   ]
   LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS %I_audit_trigger ON %I', t, t);

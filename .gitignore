@@ -4,6 +4,7 @@ node_modules/
 
 # Local Claude Code session state (not project content)
 .claude/
+.tmp-screenshots/
 
 # Build outputs
 dist/

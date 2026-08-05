@@ -7,6 +7,10 @@ import { PipelineStagesController, PipelinesController } from './pipelines.contr
 import { MarketSubmissionsController, OpportunitiesController } from './opportunities.controller';
 import { ActivitiesController } from './activities.controller';
 import { TasksController } from './tasks.controller';
+import { CustomFieldDefinitionsController } from './custom-field-definitions.controller';
+import { SavedViewsController } from './saved-views.controller';
+import { SalesQuotasController } from './sales-quotas.controller';
+import { AutomationRulesController } from './automation-rules.controller';
 
 @Module({
   controllers: [
@@ -21,6 +25,10 @@ import { TasksController } from './tasks.controller';
     MarketSubmissionsController,
     ActivitiesController,
     TasksController,
+    CustomFieldDefinitionsController,
+    SavedViewsController,
+    SalesQuotasController,
+    AutomationRulesController,
   ],
 })
 export class CrmModule {}

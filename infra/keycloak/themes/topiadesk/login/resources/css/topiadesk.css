@@ -1,0 +1,236 @@
+/* TopiaDesk CRM — branded Keycloak login theme.
+   Loaded after keycloak.v2's own css/styles.css (see theme.properties) so
+   these rules win the cascade without needing to override any .ftl. */
+
+:root {
+  --td-bg: #080d16;
+  --td-bg-deep: #04070d;
+  --td-panel: rgba(13, 19, 29, 0.82);
+  --td-panel-border: rgba(255, 255, 255, 0.09);
+  --td-orange: #f5901e;
+  --td-blue: #147bc6;
+  --td-ink: #eef2f7;
+  --td-ink-muted: #97a3b6;
+  --td-input-bg: rgba(255, 255, 255, 0.06);
+  --td-input-border: rgba(255, 255, 255, 0.14);
+}
+
+html,
+body#keycloak-bg {
+  background: var(--td-bg) !important;
+  background-image: none !important;
+  min-height: 100vh;
+}
+
+/* The animated <canvas> injected by topiadesk-wave.js sits fixed behind
+   everything; the rest of this file just makes the existing PatternFly
+   login card read correctly floating on top of it. */
+#topiadesk-wave-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.pf-v5-c-login {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+  min-height: 100vh;
+}
+
+.pf-v5-c-login__container {
+  position: relative;
+  z-index: 1;
+  grid-template-columns: 21rem !important;
+}
+
+/* ---------- Header / brand mark ----------
+   topiadesk-wave.js moves #kc-header to be the first child of
+   .pf-v5-c-login__main at runtime — Keycloak's template renders it as a
+   sibling *before* <main>, but a logo floating outside the card reads as
+   unfinished; nesting it inside is what makes this read as one composed
+   card instead of two stacked pieces. */
+#kc-header {
+  margin: 0 0 0.7rem;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+#kc-header-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--td-ink-muted) !important;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-weight: 700;
+  font-size: 0.65rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  text-align: center;
+}
+#kc-header-wrapper::before {
+  content: "";
+  display: block;
+  width: 36px;
+  height: 36px;
+  background-image: url("../img/logo-mark.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  filter: drop-shadow(0 0 10px rgba(245, 144, 30, 0.28)) drop-shadow(0 0 10px rgba(20, 123, 198, 0.2));
+}
+
+/* ---------- Card ---------- */
+.pf-v5-c-login__main {
+  background: var(--td-panel);
+  border: 1px solid var(--td-panel-border);
+  border-radius: 12px;
+  padding: 1.1rem 1.1rem 0.9rem;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  position: relative;
+  overflow: hidden;
+}
+.pf-v5-c-login__main::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--td-orange), var(--td-blue));
+}
+
+.pf-v5-c-login__main-header {
+  text-align: center;
+  margin-bottom: 0.7rem;
+  border-top: none !important;
+  padding-top: 0 !important;
+}
+
+.pf-v5-c-title,
+#kc-page-title {
+  color: var(--td-ink) !important;
+  font-weight: 600 !important;
+  font-size: 1rem !important;
+  line-height: 1.3 !important;
+}
+
+.pf-v5-c-form__group {
+  margin-bottom: 0.4rem;
+}
+
+.pf-v5-c-form-control {
+  padding-top: 0.28rem !important;
+  padding-bottom: 0.28rem !important;
+  font-size: 0.8rem !important;
+  min-height: 0 !important;
+}
+
+.pf-v5-c-form__label {
+  padding-bottom: 0.05rem !important;
+}
+
+.pf-v5-c-form__label-text {
+  font-size: 0.68rem !important;
+}
+
+.pf-v5-c-form__actions {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0 !important;
+  margin: 0 !important;
+}
+
+.pf-v5-c-button.pf-m-primary,
+.pf-v5-c-button.pf-m-secondary {
+  padding-top: 0.45rem !important;
+  padding-bottom: 0.45rem !important;
+  font-size: 0.88rem !important;
+  margin: 0 !important;
+}
+
+.pf-v5-c-login__main-body a {
+  font-size: 0.78rem !important;
+}
+
+.pf-v5-c-login__main-footer {
+  margin-top: 0.2rem !important;
+  padding-top: 0 !important;
+}
+
+.pf-v5-c-form__label-text,
+.pf-v5-c-login__main-footer-band-item,
+.pf-v5-u-color-200,
+label {
+  color: var(--td-ink-muted) !important;
+}
+
+/* ---------- Inputs ---------- */
+.pf-v5-c-form-control,
+input.pf-v5-c-form-control {
+  background: var(--td-input-bg) !important;
+  border: 1px solid var(--td-input-border) !important;
+  color: var(--td-ink) !important;
+}
+.pf-v5-c-form-control::placeholder {
+  color: var(--td-ink-muted) !important;
+  opacity: 0.7;
+}
+.pf-v5-c-form-control:focus {
+  border-color: var(--td-blue) !important;
+  box-shadow: 0 0 0 1px var(--td-blue) !important;
+}
+
+/* ---------- Buttons ---------- */
+.pf-v5-c-button.pf-m-primary {
+  background: linear-gradient(90deg, var(--td-orange), var(--td-blue)) !important;
+  border: none !important;
+  font-weight: 600;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+.pf-v5-c-button.pf-m-primary:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+.pf-v5-c-button.pf-m-secondary {
+  background: transparent !important;
+  border: 1px solid var(--td-input-border) !important;
+  color: var(--td-ink) !important;
+}
+.pf-v5-c-button.pf-m-control {
+  background: var(--td-input-bg) !important;
+  border: 1px solid var(--td-input-border) !important;
+  border-left: none !important;
+  color: var(--td-ink-muted) !important;
+}
+.pf-v5-c-button.pf-m-control:hover {
+  color: var(--td-ink) !important;
+}
+
+a,
+a:visited {
+  color: #7cb8ea;
+}
+a:hover {
+  color: #a6d2fb;
+}
+
+.pf-v5-c-alert.pf-m-danger {
+  background: rgba(217, 83, 79, 0.14) !important;
+  border-color: rgba(217, 83, 79, 0.4) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #topiadesk-wave-canvas {
+    display: none;
+  }
+  html,
+  body#keycloak-bg {
+    background: radial-gradient(ellipse at 30% 20%, #0d1a2b 0%, var(--td-bg-deep) 65%) !important;
+  }
+}

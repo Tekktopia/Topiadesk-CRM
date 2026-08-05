@@ -23,6 +23,7 @@ import type { ApiPaths } from '@topiadesk/shared-types';
  * everything else still flows straight from the generated schema.
  */
 type NullableString = string | null;
+type NullableNumber = number | null;
 
 type Json200<P extends keyof ApiPaths, M extends keyof ApiPaths[P]> = ApiPaths[P][M] extends {
   responses: { 200: { content: { 'application/json': infer R } } };
@@ -163,3 +164,76 @@ export type AuditLogDto = Omit<
   changedFields: unknown;
 };
 export type AuditLogActorDto = NonNullable<AuditLogDto['actorUser']>;
+
+// -- SCIM tokens --------------------------------------------------------------
+type RawScimTokenDto = Json200<'/identity/scim-tokens', 'get'>[number];
+export type ScimTokenDto = Omit<RawScimTokenDto, 'lastUsedAt'> & { lastUsedAt: NullableString };
+export type CreateScimTokenBody = JsonBody<'/identity/scim-tokens', 'post'>;
+/** Only present on the create response — the raw token is never retrievable again afterward, see scim-token-create-dialog.tsx. */
+type RawScimTokenCreatedDto = Json200<'/identity/scim-tokens', 'post'>;
+export type ScimTokenCreatedDto = Omit<RawScimTokenCreatedDto, 'lastUsedAt'> & { lastUsedAt: NullableString };
+
+// -- Webhook subscriptions -----------------------------------------------------
+type RawWebhookSubscriptionDto = Json200<'/integrations/webhook-subscriptions', 'get'>[number];
+export type WebhookSubscriptionDto = RawWebhookSubscriptionDto;
+export type CreateWebhookSubscriptionBody = JsonBody<'/integrations/webhook-subscriptions', 'post'>;
+export type UpdateWebhookSubscriptionBody = JsonBody<'/integrations/webhook-subscriptions/{id}', 'patch'>;
+/** Only present on the create response — the raw signing secret is never retrievable again afterward, see webhook-form-dialog.tsx. */
+export type WebhookSubscriptionCreatedDto = Json200<'/integrations/webhook-subscriptions', 'post'>;
+
+type RawWebhookDeliveryDto = Json200<'/integrations/webhook-subscriptions/{id}/deliveries', 'get'>[number];
+export type WebhookDeliveryDto = Omit<
+  RawWebhookDeliveryDto,
+  'lastAttemptAt' | 'nextAttemptAt' | 'responseStatus' | 'responseBodySnippet'
+> & {
+  lastAttemptAt: NullableString;
+  nextAttemptAt: NullableString;
+  responseStatus: NullableNumber;
+  responseBodySnippet: NullableString;
+};
+
+// -- Automation rules (Triggers + Automations) -----------------------------
+// Split by AutomationTriggerType per Zendesk's "Triggers" (ENTITY_EVENT,
+// real-time, fires on a record event) vs "Automations" (SCHEDULE, time-based
+// scan) admin concepts — see backend/api/src/modules/crm/
+// automation-rules.controller.ts and app/(admin)/admin/triggers|automations.
+// Fetched via the CRM domain's own BFF proxy (app/api/crm/automation-rules/**,
+// not app/api/admin/**) since the backend controller is mounted at
+// crm/automation-rules alongside accounts/leads/opportunities, not under
+// identity/**; the generated-ApiPaths pattern below still applies regardless
+// of which frontend BFF route reaches it, since ApiPaths mirrors backend/api
+// paths directly.
+export type AutomationTriggerType = 'SCHEDULE' | 'ENTITY_EVENT';
+
+type RawAutomationRuleDto = Json200<'/crm/automation-rules', 'get'>[number];
+// `conditions`/`actions` are intentionally left as `unknown` past the
+// generated `{ [key: string]: unknown }` object shape — actions is really a
+// JSON *array* of `{ actionType: string, params: Record<string, unknown> }`
+// per CreateAutomationRuleDto's own doc comment, which the generator can't
+// express — same "generated shape is too narrow" rationale as
+// SetOrgSettingBody above.
+export type AutomationRuleDto = Omit<RawAutomationRuleDto, 'conditions' | 'actions'> & {
+  conditions: unknown;
+  actions: unknown[];
+};
+
+type RawCreateAutomationRuleBody = JsonBody<'/crm/automation-rules', 'post'>;
+// KNOWN GENERATOR GAP: `isActive` carries `@IsOptional() isActive?: boolean`
+// on the backend DTO (CreateAutomationRuleDto) but the generator still
+// emits it as required — patched optional here like the other gaps noted
+// at the top of this file.
+export type CreateAutomationRuleBody = Omit<RawCreateAutomationRuleBody, 'conditions' | 'actions' | 'isActive'> & {
+  conditions: unknown;
+  actions: unknown[];
+  isActive?: boolean;
+};
+
+type RawUpdateAutomationRuleBody = JsonBody<'/crm/automation-rules/{id}', 'patch'>;
+export type UpdateAutomationRuleBody = Omit<RawUpdateAutomationRuleBody, 'conditions' | 'actions' | 'isActive'> & {
+  conditions?: unknown;
+  actions?: unknown[];
+  isActive?: boolean;
+};
+
+// -- Force logout ---------------------------------------------------------------
+export type ForceLogoutResponseDto = Json200<'/identity/users/{id}/force-logout', 'post'>;

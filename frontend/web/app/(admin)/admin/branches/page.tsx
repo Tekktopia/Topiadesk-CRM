@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { Button, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from '@topiadesk/ui';
+import { Button, type ColumnDef, DataTable, DataTableColumnHeader, Skeleton, toast } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { PageHeader } from '../_components/page-header';
 import { EmptyState, ErrorState } from '../_components/query-states';
@@ -33,6 +33,59 @@ export default function BranchesPage() {
     onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to delete branch'),
   });
 
+  const columns = useMemo<ColumnDef<BranchDto>[]>(() => {
+    const cols: ColumnDef<BranchDto>[] = [
+      {
+        accessorKey: 'name',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
+        cell: ({ row }) => <span className="font-medium text-foreground">{row.original.name}</span>,
+      },
+      {
+        accessorKey: 'code',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Code" />,
+        cell: ({ row }) => <span className="text-muted-foreground">{row.original.code}</span>,
+      },
+      {
+        accessorKey: 'city',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="City" />,
+        cell: ({ row }) => <span className="text-muted-foreground">{row.original.city ?? '—'}</span>,
+      },
+      {
+        accessorKey: 'state',
+        header: 'State',
+        cell: ({ row }) => <span className="text-muted-foreground">{row.original.state ?? '—'}</span>,
+      },
+      {
+        accessorKey: 'country',
+        header: 'Country',
+        cell: ({ row }) => <span className="text-muted-foreground">{row.original.country ?? '—'}</span>,
+      },
+    ];
+    if (canWrite) {
+      cols.push({
+        id: 'actions',
+        header: 'Actions',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" aria-label={`Edit ${row.original.name}`} onClick={() => setFormTarget(row.original)}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Delete ${row.original.name}`}
+              onClick={() => setPendingDelete(row.original)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ),
+      });
+    }
+    return cols;
+  }, [canWrite]);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -58,48 +111,7 @@ export default function BranchesPage() {
       ) : (branchesQuery.data ?? []).length === 0 ? (
         <EmptyState title="No branches yet" />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>City</TableHead>
-                <TableHead>State</TableHead>
-                <TableHead>Country</TableHead>
-                {canWrite ? <TableHead className="w-24">Actions</TableHead> : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(branchesQuery.data ?? []).map((b) => (
-                <TableRow key={b.id}>
-                  <TableCell className="font-medium text-foreground">{b.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{b.code}</TableCell>
-                  <TableCell className="text-muted-foreground">{b.city ?? '—'}</TableCell>
-                  <TableCell className="text-muted-foreground">{b.state ?? '—'}</TableCell>
-                  <TableCell className="text-muted-foreground">{b.country ?? '—'}</TableCell>
-                  {canWrite ? (
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" aria-label={`Edit ${b.name}`} onClick={() => setFormTarget(b)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Delete ${b.name}`}
-                          onClick={() => setPendingDelete(b)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable<BranchDto, unknown> columns={columns} data={branchesQuery.data ?? []} getRowId={(b) => b.id} />
       )}
 
       {formTarget ? (

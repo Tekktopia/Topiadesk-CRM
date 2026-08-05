@@ -5,7 +5,17 @@ import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
-import { CreateTaskDto, TaskQueryDto, TaskResponseDto, UpdateTaskDto } from './dto/task.dto';
+import {
+  BulkAssignTasksDto,
+  BulkDeleteTasksDto,
+  BulkUpdateTasksDto,
+  CreateTaskDto,
+  TaskQueryDto,
+  TaskResponseDto,
+  UpdateTaskDto,
+} from './dto/task.dto';
+import { BulkActionResponseDto } from './dto/bulk-action.dto';
+import { diffBulkIds } from './bulk-actions';
 
 @ApiTags('crm')
 @ApiBearerAuth()
@@ -113,6 +123,53 @@ export class TasksController {
     if (!existing) throw new NotFoundException('Task not found');
     await prisma.task.delete({ where: { id } });
     return { deleted: true };
+  }
+
+  @Post('bulk/assign')
+  @RequirePermission('task', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkAssign(@Body() dto: BulkAssignTasksDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.task.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((t) => t.id));
+    if (matched.length > 0) {
+      await prisma.task.updateMany({ where: { id: { in: matched } }, data: { assigneeId: dto.assigneeId } });
+    }
+    return { requested: dto.ids, updated: matched, skipped };
+  }
+
+  @Post('bulk/update')
+  @RequirePermission('task', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkUpdate(@Body() dto: BulkUpdateTasksDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.task.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((t) => t.id));
+    if (matched.length > 0) {
+      // Uniformly applied across every matched row, unlike update()'s
+      // per-row previous-status comparison (updateMany can't branch per
+      // row) — bulk-setting status to COMPLETED stamps completedAt=now for
+      // all of them; any other status clears it.
+      const completedAt = dto.status === undefined ? undefined : dto.status === 'COMPLETED' ? new Date() : null;
+      await prisma.task.updateMany({
+        where: { id: { in: matched } },
+        data: { status: dto.status, priority: dto.priority, completedAt },
+      });
+    }
+    return { requested: dto.ids, updated: matched, skipped };
+  }
+
+  @Post('bulk/delete')
+  @RequirePermission('task', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkDelete(@Body() dto: BulkDeleteTasksDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.task.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((t) => t.id));
+    if (matched.length > 0) {
+      await prisma.task.deleteMany({ where: { id: { in: matched } } });
+    }
+    return { requested: dto.ids, updated: matched, skipped };
   }
 }
 

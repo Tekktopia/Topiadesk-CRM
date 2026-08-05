@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { DashboardsController } from './dashboards.controller';
+import { RoleDashboardsController } from './role-dashboards.controller';
 
 @Module({
-  controllers: [DashboardsController],
+  controllers: [DashboardsController, RoleDashboardsController],
 })
 export class DashboardsModule {}

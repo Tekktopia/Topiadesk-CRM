@@ -11,13 +11,10 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  type ColumnDef,
+  DataTable,
+  DataTableColumnHeader,
   Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -46,6 +43,7 @@ export default function RolesPage() {
   const [showGrantDialog, setShowGrantDialog] = useState(false);
   const [pendingDeleteRole, setPendingDeleteRole] = useState<RoleDto | null>(null);
   const [pendingRevokeGrant, setPendingRevokeGrant] = useState<PermissionSummaryDto | null>(null);
+  const [grantsPagination, setGrantsPagination] = useState({ pageIndex: 0, pageSize: 10 });
 
   useEffect(() => {
     const first = rolesQuery.data?.[0];
@@ -59,16 +57,72 @@ export default function RolesPage() {
     [rolesQuery.data, selectedRoleId],
   );
 
-  const groupedGrants = useMemo(() => {
+  // Default view groups grants by resource (alphabetical) same as before —
+  // DataTable's column sort then layers asc/desc toggling for
+  // resource/action/scope on top of this baseline order.
+  const grantRows = useMemo(() => {
     if (!selectedRole) return [];
-    const byResource = new Map<string, PermissionSummaryDto[]>();
-    for (const p of selectedRole.permissions) {
-      const list = byResource.get(p.resource) ?? [];
-      list.push(p);
-      byResource.set(p.resource, list);
-    }
-    return Array.from(byResource.entries()).sort(([a], [b]) => a.localeCompare(b));
+    return [...selectedRole.permissions].sort((a, b) => a.resource.localeCompare(b.resource));
   }, [selectedRole]);
+
+  useEffect(() => {
+    setGrantsPagination((p) => ({ ...p, pageIndex: 0 }));
+  }, [selectedRoleId]);
+
+  const grantColumns = useMemo<ColumnDef<PermissionSummaryDto>[]>(() => {
+    const cols: ColumnDef<PermissionSummaryDto>[] = [
+      {
+        accessorKey: 'resource',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Resource" />,
+        cell: ({ row }) => <span className="font-medium text-foreground">{resourceLabel(row.original.resource)}</span>,
+      },
+      {
+        accessorKey: 'action',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Action" />,
+        cell: ({ row }) => <Badge variant={row.original.action === 'write' ? 'default' : 'secondary'}>{row.original.action}</Badge>,
+      },
+      {
+        accessorKey: 'scope',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Scope" />,
+        cell: ({ row }) => (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline">{row.original.scope}</Badge>
+            </TooltipTrigger>
+            <TooltipContent>{scopeLabel(row.original.scope)}</TooltipContent>
+          </Tooltip>
+        ),
+      },
+      {
+        id: 'meaning',
+        header: 'What this means',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {grantSentence(row.original.resource, row.original.action, row.original.scope)}
+          </span>
+        ),
+      },
+    ];
+    if (canWrite) {
+      cols.push({
+        id: 'actions',
+        header: '',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Revoke ${row.original.resource} ${row.original.action} ${row.original.scope}`}
+            onClick={() => setPendingRevokeGrant(row.original)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        ),
+      });
+    }
+    return cols;
+  }, [canWrite]);
 
   function invalidateRoles() {
     queryClient.invalidateQueries({ queryKey: ['admin', 'roles'] });
@@ -177,57 +231,17 @@ export default function RolesPage() {
                   </Button>
                 ) : null}
 
-                {groupedGrants.length === 0 ? (
+                {grantRows.length === 0 ? (
                   <EmptyState title="No permission grants" description="This role currently cannot access any resource." />
                 ) : (
-                  <div className="overflow-hidden rounded-lg border border-border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Resource</TableHead>
-                          <TableHead>Action</TableHead>
-                          <TableHead>Scope</TableHead>
-                          <TableHead>What this means</TableHead>
-                          {canWrite ? <TableHead className="w-10" /> : null}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {groupedGrants.flatMap(([resource, grants]) =>
-                          grants.map((g) => (
-                            <TableRow key={g.id}>
-                              <TableCell className="font-medium text-foreground">{resourceLabel(resource)}</TableCell>
-                              <TableCell>
-                                <Badge variant={g.action === 'write' ? 'default' : 'secondary'}>{g.action}</Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Badge variant="outline">{g.scope}</Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent>{scopeLabel(g.scope)}</TooltipContent>
-                                </Tooltip>
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {grantSentence(g.resource, g.action, g.scope)}
-                              </TableCell>
-                              {canWrite ? (
-                                <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    aria-label={`Revoke ${g.resource} ${g.action} ${g.scope}`}
-                                    onClick={() => setPendingRevokeGrant(g)}
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </TableCell>
-                              ) : null}
-                            </TableRow>
-                          )),
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  <DataTable<PermissionSummaryDto, unknown>
+                    columns={grantColumns}
+                    data={grantRows}
+                    getRowId={(g) => g.id}
+                    pagination={grantsPagination}
+                    onPaginationChange={setGrantsPagination}
+                    totalRowCount={grantRows.length}
+                  />
                 )}
               </CardContent>
             </Card>

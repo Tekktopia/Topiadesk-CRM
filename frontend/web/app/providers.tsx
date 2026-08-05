@@ -28,6 +28,22 @@ export function Providers({ children }: { children: React.ReactNode }) {
           queries: {
             staleTime: 30_000,
             refetchOnWindowFocus: false,
+            // Every route group's _lib/api.ts throws an Error subclass
+            // carrying `.status` (ApiError/ApiRequestError — six
+            // near-identical copies, different names, same shape) — a 4xx
+            // means the request is wrong or not permitted, and retrying it
+            // with the exact same input can never turn that into success.
+            // Without this, TanStack Query's default 3-retry exponential
+            // backoff (~7s+ before giving up) left every 403 page — e.g.
+            // a non-admin hitting /admin/* directly — stuck showing a
+            // loading skeleton for that whole stretch before the real
+            // "you don't have access" state underneath ever had a chance
+            // to render.
+            retry: (failureCount, error) => {
+              const status = error && typeof error === 'object' && 'status' in error ? (error as { status?: unknown }).status : undefined;
+              if (typeof status === 'number' && status >= 400 && status < 500) return false;
+              return failureCount < 3;
+            },
           },
         },
       }),

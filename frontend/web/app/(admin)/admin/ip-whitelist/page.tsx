@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { Badge, Button, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from '@topiadesk/ui';
+import { Badge, Button, type ColumnDef, DataTable, DataTableColumnHeader, toast } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { PageHeader } from '../_components/page-header';
 import { EmptyState, ErrorState } from '../_components/query-states';
@@ -39,6 +39,61 @@ export default function IpWhitelistPage() {
     onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to delete entry'),
   });
 
+  const columns = useMemo<ColumnDef<IpWhitelistEntryDto>[]>(() => {
+    const cols: ColumnDef<IpWhitelistEntryDto>[] = [
+      {
+        accessorKey: 'cidrRange',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="CIDR range" />,
+        cell: ({ row }) => <span className="font-mono text-sm text-foreground">{row.original.cidrRange}</span>,
+      },
+      {
+        accessorKey: 'description',
+        header: 'Description',
+        cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.description ?? '—'}</span>,
+      },
+      {
+        id: 'appliesTo',
+        header: 'Applies to',
+        accessorFn: (e) => (e.appliesToRoleId ? (roleNameById.get(e.appliesToRoleId) ?? '—') : 'All roles'),
+        cell: ({ getValue }) => <span className="text-sm text-muted-foreground">{getValue<string>()}</span>,
+      },
+      {
+        accessorKey: 'isActive',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Active" />,
+        cell: ({ row }) => <Badge variant={row.original.isActive ? 'success' : 'secondary'}>{row.original.isActive ? 'Active' : 'Inactive'}</Badge>,
+      },
+      {
+        accessorKey: 'createdAt',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Created" />,
+        cell: ({ row }) => <span className="text-xs text-muted-foreground">{new Date(row.original.createdAt).toLocaleDateString()}</span>,
+        sortingFn: (a, b) => new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
+      },
+    ];
+    if (canWrite) {
+      cols.push({
+        id: 'actions',
+        header: 'Actions',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" aria-label={`Edit ${row.original.cidrRange}`} onClick={() => setFormTarget(row.original)}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Delete ${row.original.cidrRange}`}
+              onClick={() => setPendingDelete(row.original)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ),
+      });
+    }
+    return cols;
+  }, [canWrite, roleNameById]);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -53,63 +108,17 @@ export default function IpWhitelistPage() {
         }
       />
 
-      {entriesQuery.isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
-        </div>
-      ) : entriesQuery.isError ? (
-        <ErrorState error={entriesQuery.error} />
-      ) : (entriesQuery.data ?? []).length === 0 ? (
+      {!entriesQuery.isLoading && !entriesQuery.isError && (entriesQuery.data ?? []).length === 0 ? (
         <EmptyState title="No whitelist entries yet" />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>CIDR range</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Applies to</TableHead>
-                <TableHead>Active</TableHead>
-                <TableHead>Created</TableHead>
-                {canWrite ? <TableHead className="w-24">Actions</TableHead> : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(entriesQuery.data ?? []).map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell className="font-mono text-sm text-foreground">{entry.cidrRange}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{entry.description ?? '—'}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {entry.appliesToRoleId ? (roleNameById.get(entry.appliesToRoleId) ?? '—') : 'All roles'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={entry.isActive ? 'success' : 'secondary'}>{entry.isActive ? 'Active' : 'Inactive'}</Badge>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{new Date(entry.createdAt).toLocaleDateString()}</TableCell>
-                  {canWrite ? (
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" aria-label={`Edit ${entry.cidrRange}`} onClick={() => setFormTarget(entry)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Delete ${entry.cidrRange}`}
-                          onClick={() => setPendingDelete(entry)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable<IpWhitelistEntryDto, unknown>
+          columns={columns}
+          data={entriesQuery.data ?? []}
+          getRowId={(e) => e.id}
+          isLoading={entriesQuery.isLoading}
+          isError={entriesQuery.isError}
+          errorState={<ErrorState error={entriesQuery.error} />}
+        />
       )}
 
       {formTarget ? (

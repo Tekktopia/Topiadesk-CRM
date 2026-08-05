@@ -1,7 +1,11 @@
 import { BadRequestException, Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT } from '@topiadesk/db';
+import { runWithRlsContext, SYSTEM_JOB_CONTEXT } from '@topiadesk/db';
 import { KeycloakWebhookGuard } from './keycloak-webhook.guard';
+// NOT a type-only import: UserProvisioningService is constructor-injected
+// below — see the same footgun documented on Reflector in permission.guard.ts.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import { UserProvisioningService } from './user-provisioning.service';
 // Neither DTO here is type-only: KeycloakWebhookEventDto is a @Body()
 // parameter type (NestJS's ValidationPipe needs the real class reference at
 // runtime — see ai-gateway.controller.ts's comment on this footgun), and
@@ -29,12 +33,19 @@ import { KeycloakWebhookEventDto, KeycloakWebhookEventType, KeycloakWebhookRespo
  * (`new row violates row-level security policy for table "audit_log"`).
  * Fixed by explicitly running the handler under SYSTEM_JOB_CONTEXT, the
  * same principal apps/worker's background jobs use.
+ *
+ * The actual create/update/deactivate-by-keycloakSubjectId logic now lives
+ * in UserProvisioningService (extracted so the new SCIM controller —
+ * scim.controller.ts — can reuse the exact same local-row upsert semantics
+ * instead of a second hand-rolled copy).
  */
 @ApiTags('identity')
 @ApiHeader({ name: 'x-keycloak-webhook-secret', required: true, description: 'Shared secret — see KEYCLOAK_WEBHOOK_SECRET' })
 @UseGuards(KeycloakWebhookGuard)
 @Controller('identity/webhooks/keycloak')
 export class KeycloakWebhookController {
+  constructor(private readonly provisioning: UserProvisioningService) {}
+
   @Post()
   @ApiOkResponse({ type: KeycloakWebhookResponseDto })
   handleEvent(@Body() dto: KeycloakWebhookEventDto): Promise<KeycloakWebhookResponseDto> {
@@ -42,65 +53,24 @@ export class KeycloakWebhookController {
   }
 
   private async process(dto: KeycloakWebhookEventDto): Promise<KeycloakWebhookResponseDto> {
-    const prisma = getPrismaClient();
-
     if (dto.eventType === KeycloakWebhookEventType.USER_DELETED || dto.eventType === KeycloakWebhookEventType.USER_DISABLED) {
-      const existing = await prisma.user.findUnique({ where: { keycloakSubjectId: dto.keycloakSubjectId } });
-      if (!existing) return { status: 'ok', action: 'skipped', userId: null };
-      // Deactivate rather than delete: Users are referenced widely (Account
-      // owners, Policy broker-of-record, ...) — a hard delete would either
-      // cascade destructively or fail on FK constraints. DEACTIVATED is the
-      // correct "this identity should no longer act" signal.
-      await prisma.user.update({ where: { id: existing.id }, data: { status: 'DEACTIVATED', lastSyncedAt: new Date() } });
-      return { status: 'ok', action: 'deactivated', userId: existing.id };
+      const result = await this.provisioning.deactivateByKeycloakSubjectId(dto.keycloakSubjectId);
+      return { status: 'ok', action: result.action, userId: result.userId };
     }
 
     if (!dto.email) {
       throw new BadRequestException('email is required for USER_CREATED/USER_UPDATED/USER_ENABLED events');
     }
 
-    const fullName = [dto.firstName, dto.lastName].filter(Boolean).join(' ').trim() || dto.email;
-    const status = dto.enabled === false ? 'DEACTIVATED' : 'ACTIVE';
-
-    let departmentId: string | undefined;
-    let branchId: string | undefined;
-    if (dto.attributes?.departmentCode) {
-      const dept = await prisma.department.findUnique({ where: { code: dto.attributes.departmentCode } });
-      departmentId = dept?.id;
-    }
-    if (dto.attributes?.branchCode) {
-      const branch = await prisma.branch.findUnique({ where: { code: dto.attributes.branchCode } });
-      branchId = branch?.id;
-    }
-
-    const existing = await prisma.user.findUnique({ where: { keycloakSubjectId: dto.keycloakSubjectId } });
-
-    if (existing) {
-      const updated = await prisma.user.update({
-        where: { id: existing.id },
-        data: {
-          email: dto.email,
-          fullName,
-          status,
-          ...(departmentId !== undefined && { departmentId }),
-          ...(branchId !== undefined && { branchId }),
-          lastSyncedAt: new Date(),
-        },
-      });
-      return { status: 'ok', action: 'updated', userId: updated.id };
-    }
-
-    const created = await prisma.user.create({
-      data: {
-        keycloakSubjectId: dto.keycloakSubjectId,
-        email: dto.email,
-        fullName,
-        status,
-        departmentId,
-        branchId,
-        lastSyncedAt: new Date(),
-      },
+    const result = await this.provisioning.upsertLocalUser({
+      keycloakSubjectId: dto.keycloakSubjectId,
+      email: dto.email,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      enabled: dto.enabled,
+      departmentCode: dto.attributes?.departmentCode,
+      branchCode: dto.attributes?.branchCode,
     });
-    return { status: 'ok', action: 'created', userId: created.id };
+    return { status: 'ok', action: result.action, userId: result.userId };
   }
 }

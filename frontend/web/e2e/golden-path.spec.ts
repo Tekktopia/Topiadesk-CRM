@@ -17,7 +17,10 @@ const runId = Date.now();
 test('dashboard loads for an authenticated user', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'TopiaDesk CRM' })).toBeVisible();
-  await expect(page.getByText('Open opportunities')).toBeVisible();
+  // Scoped to the role — the plain text now also appears in the pipeline
+  // funnel widget's own description ("Open opportunities by stage,
+  // current pipeline."), so an unscoped getByText is ambiguous.
+  await expect(page.getByRole('heading', { name: 'Open opportunities' })).toBeVisible();
 });
 
 test('create an Account', async ({ page }) => {
@@ -54,7 +57,13 @@ test('create a Lead and convert it to an Opportunity', async ({ page }) => {
   await expect(page.getByRole('dialog', { name: 'Convert lead' })).toBeVisible();
 
   // Opportunity name/pipeline/stage are pre-filled by the dialog per the
-  // lead — only amount and close date are genuinely required blanks.
+  // lead, but asynchronously (a useEffect sets them once the pipeline/stage
+  // lists finish loading) — wait for the actual text to land instead of
+  // just the dialog's presence, otherwise submitting can race the effect
+  // and hit client-side "Select a pipeline"/"Select a stage" validation
+  // even though the fields visibly fill in a moment later.
+  await expect(page.getByLabel('Pipeline')).not.toHaveText('Select pipeline');
+  await expect(page.getByLabel('Stage')).not.toHaveText('Select stage');
   await page.getByLabel('Amount (NGN)').fill('5000000');
   await page.locator('input[type="date"]').fill('2026-12-31');
   await page.getByRole('button', { name: 'Convert lead' }).click();

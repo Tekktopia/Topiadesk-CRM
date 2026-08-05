@@ -2,6 +2,7 @@
   "realm": "topiadesk",
   "enabled": true,
   "displayName": "TopiaDesk CRM",
+  "loginTheme": "topiadesk",
   "sslRequired": "external",
   "registrationAllowed": false,
   "resetPasswordAllowed": true,
@@ -64,10 +65,30 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
       "bearerOnly": false
+    },
+    {
+      "clientId": "topiadesk-api-admin",
+      "name": "TopiaDesk API Admin (Keycloak Admin REST API service account)",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${env.KEYCLOAK_ADMIN_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "bearerOnly": false
     }
   ],
 
   "users": [
+    {
+      "username": "service-account-topiadesk-api-admin",
+      "enabled": true,
+      "serviceAccountClientId": "topiadesk-api-admin",
+      "clientRoles": {
+        "realm-management": ["manage-users", "view-users"]
+      }
+    },
     {
       "id": "11111111-1111-1111-1111-111111111111",
       "username": "admin",

@@ -1,0 +1,39 @@
+'use client';
+
+import { usePathname } from 'next/navigation';
+import type { ReactNode } from 'react';
+import { AppHeader } from './app-header';
+import { AppSidebar } from './app-sidebar';
+
+/**
+ * Route prefixes reached by anonymous external visitors with no
+ * `td_session` cookie (see middleware.ts's matcher, which excludes these
+ * same prefixes from the login redirect). The internal AppSidebar/AppHeader
+ * shell assumes a signed-in staff member — module nav, presence, quick
+ * create, notifications — none of which make sense (and shouldn't be
+ * exposed) to a customer looking up a policy FAQ or submitting a survey
+ * response. Keep this list in sync with middleware.ts's `config.matcher`.
+ */
+const PUBLIC_PATH_PREFIXES = ['/survey-respond', '/kb'];
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+export function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+
+  if (isPublicPath(pathname)) {
+    return <main className="flex-1 p-6">{children}</main>;
+  }
+
+  return (
+    <div className="flex min-h-screen">
+      <AppSidebar />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <AppHeader />
+        <main className="flex-1 p-6">{children}</main>
+      </div>
+    </div>
+  );
+}

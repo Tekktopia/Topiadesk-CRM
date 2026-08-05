@@ -11,6 +11,7 @@ import {
   Network,
   Pencil,
   Plus,
+  Sparkles,
   ShieldCheck,
   Trash2,
   Users,
@@ -27,6 +28,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  RecordHistory,
   Skeleton,
   StatTile,
   Table,
@@ -71,6 +73,7 @@ import {
 import type { Contact } from '../../../_lib/types';
 import { AccountFormDialog } from '../../_components/account-form-dialog';
 import { ContactFormDialog } from '../../_components/contact-form-dialog';
+import { AiInsightPanel } from './ai-insight-panel';
 
 export function AccountDetailView({ accountId }: { accountId: string }) {
   const router = useRouter();
@@ -145,6 +148,10 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
           <TabsTrigger value="opportunities">Opportunities</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="ai-insights" className="gap-1.5">
+            <Sparkles className="h-3.5 w-3.5" aria-hidden /> AI Insights
+          </TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -180,6 +187,21 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
 
         <TabsContent value="activity">
           <ActivityTab accountId={accountId} />
+        </TabsContent>
+
+        <TabsContent value="ai-insights">
+          <AiInsightPanel accountId={accountId} accountName={account.name} />
+        </TabsContent>
+
+        <TabsContent value="history">
+          <Card>
+            <CardHeader>
+              <CardTitle>History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RecordHistory entityType="accounts" entityId={accountId} />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

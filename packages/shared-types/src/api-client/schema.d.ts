@@ -148,6 +148,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/identity/users/{id}/force-logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UsersController_forceLogout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/identity/users/{id}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["UsersController_sessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/identity/roles": {
         parameters: {
             query?: never;
@@ -436,6 +468,198 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/scim/v2/ServiceProviderConfig": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ScimController_serviceProviderConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scim/v2/ResourceTypes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ScimController_resourceTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scim/v2/Schemas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ScimController_schemas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scim/v2/Users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ScimController_listUsers"];
+        put?: never;
+        post: operations["ScimController_createUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scim/v2/Users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ScimController_getUser"];
+        put: operations["ScimController_replaceUser"];
+        post?: never;
+        delete: operations["ScimController_deleteUser"];
+        options?: never;
+        head?: never;
+        patch: operations["ScimController_patchUser"];
+        trace?: never;
+    };
+    "/scim/v2/Groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ScimController_listGroups"];
+        put?: never;
+        post: operations["ScimController_createGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scim/v2/Groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ScimController_getGroup"];
+        put: operations["ScimController_replaceGroup"];
+        post?: never;
+        delete: operations["ScimController_deleteGroup"];
+        options?: never;
+        head?: never;
+        patch: operations["ScimController_patchGroup"];
+        trace?: never;
+    };
+    "/identity/scim-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ScimTokensController_list"];
+        put?: never;
+        post: operations["ScimTokensController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/identity/scim-tokens/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ScimTokensController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/identity/scim-tokens/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ScimTokensController_deactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/identity/audit-log/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AuditExportController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/identity/audit-log/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AuditExportController_verify"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/crm/accounts": {
         parameters: {
             query?: never;
@@ -446,6 +670,22 @@ export interface paths {
         get: operations["AccountsController_list"];
         put?: never;
         post: operations["AccountsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/accounts/check-duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AccountsController_checkDuplicates"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -466,6 +706,70 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["AccountsController_update"];
+        trace?: never;
+    };
+    "/crm/accounts/bulk/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AccountsController_bulkAssign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/accounts/bulk/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AccountsController_bulkUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/accounts/bulk/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AccountsController_bulkDelete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/accounts/{id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AccountsController_merge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/crm/accounts/{id}/relationships": {
@@ -516,6 +820,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/crm/contacts/check-duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContactsController_checkDuplicates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/crm/contacts/{id}": {
         parameters: {
             query?: never;
@@ -530,6 +850,70 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["ContactsController_update"];
+        trace?: never;
+    };
+    "/crm/contacts/bulk/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContactsController_bulkAssign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/contacts/bulk/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContactsController_bulkUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/contacts/bulk/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContactsController_bulkDelete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/contacts/{id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContactsController_merge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/crm/carriers": {
@@ -580,6 +964,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/crm/leads/check-duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LeadsController_checkDuplicates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/crm/leads/{id}": {
         parameters: {
             query?: never;
@@ -610,6 +1010,70 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["LeadsController_updateScore"];
+        trace?: never;
+    };
+    "/crm/leads/bulk/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LeadsController_bulkAssign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/leads/bulk/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LeadsController_bulkUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/leads/bulk/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LeadsController_bulkDelete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/leads/{id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LeadsController_merge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/crm/leads/{id}/convert": {
@@ -722,6 +1186,54 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["OpportunitiesController_update"];
+        trace?: never;
+    };
+    "/crm/opportunities/bulk/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["OpportunitiesController_bulkAssign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/opportunities/bulk/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["OpportunitiesController_bulkUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/opportunities/bulk/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["OpportunitiesController_bulkDelete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/crm/opportunities/{id}/stage": {
@@ -850,6 +1362,214 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["TasksController_update"];
+        trace?: never;
+    };
+    "/crm/tasks/bulk/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TasksController_bulkAssign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/tasks/bulk/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TasksController_bulkUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/tasks/bulk/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TasksController_bulkDelete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/custom-field-definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomFieldDefinitionsController_list"];
+        put?: never;
+        post: operations["CustomFieldDefinitionsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/custom-field-definitions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomFieldDefinitionsController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["CustomFieldDefinitionsController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["CustomFieldDefinitionsController_update"];
+        trace?: never;
+    };
+    "/crm/saved-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SavedViewsController_list"];
+        put?: never;
+        post: operations["SavedViewsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/saved-views/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SavedViewsController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["SavedViewsController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["SavedViewsController_update"];
+        trace?: never;
+    };
+    "/crm/saved-views/{id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SavedViewsController_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/sales-quotas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesQuotasController_list"];
+        put?: never;
+        post: operations["SalesQuotasController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/sales-quotas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesQuotasController_getOne"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["SalesQuotasController_update"];
+        trace?: never;
+    };
+    "/crm/sales-quotas/{id}/attainment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesQuotasController_getAttainment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/automation-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AutomationRulesController_list"];
+        put?: never;
+        post: operations["AutomationRulesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/automation-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AutomationRulesController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["AutomationRulesController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["AutomationRulesController_update"];
         trace?: never;
     };
     "/policies": {
@@ -1188,6 +1908,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/integrations/webhook-subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["WebhookSubscriptionsController_list"];
+        put?: never;
+        post: operations["WebhookSubscriptionsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations/webhook-subscriptions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["WebhookSubscriptionsController_get"];
+        put?: never;
+        post?: never;
+        delete: operations["WebhookSubscriptionsController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["WebhookSubscriptionsController_update"];
+        trace?: never;
+    };
+    "/integrations/webhook-subscriptions/{id}/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["WebhookSubscriptionsController_listDeliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations/webhook-subscriptions/{id}/deliveries/{deliveryId}/redeliver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WebhookSubscriptionsController_redeliver"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations/webhooks/{webhookPath}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["WebhookReceiverController_receive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations/oauth/{connectorId}/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OAuthController_authorize"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/notifications": {
         parameters: {
             query?: never;
@@ -1252,6 +2068,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ai/sentiment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AiGatewayController_sentiment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/categorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AiGatewayController_categorize"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/account-insight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AiGatewayController_accountInsight"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AiGatewayController_index"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AiGatewayController_search"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/usage-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AiGatewayController_usageSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dashboards/operational-kpis": {
         parameters: {
             query?: never;
@@ -1268,6 +2180,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboards/operational-kpis/sales-forecast": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DashboardsController_getSalesForecast"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboards/executive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RoleDashboardsController_executive"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboards/branch-manager": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RoleDashboardsController_branchManager"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboards/broker": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RoleDashboardsController_broker"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboards/compliance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RoleDashboardsController_compliance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/audit-log": {
         parameters: {
             query?: never;
@@ -1276,6 +2268,1414 @@ export interface paths {
             cookie?: never;
         };
         get: operations["AuditLogController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClaimsController_list"];
+        put?: never;
+        post: operations["ClaimsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/claims/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClaimsController_listMine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/claims/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClaimsController_getOne"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ClaimsController_update"];
+        trace?: never;
+    };
+    "/claims/{id}/status-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClaimsController_statusHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/claims/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ClaimsController_changeStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/claims/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ClaimsController_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/claims/{id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClaimsController_listComments"];
+        put?: never;
+        post: operations["ClaimsController_addComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/claims/{id}/watchers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClaimsController_listWatchers"];
+        put?: never;
+        post: operations["ClaimsController_addWatcher"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/claims/{id}/watchers/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ClaimsController_removeWatcher"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CasesController_list"];
+        put?: never;
+        post: operations["CasesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CasesController_listMine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CasesController_queue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CasesController_getOne"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["CasesController_update"];
+        trace?: never;
+    };
+    "/cases/{id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CasesController_claimCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CasesController_changeStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{id}/link-child": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CasesController_linkChild"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CasesController_merge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{id}/apply-macro/{macroId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CasesController_applyMacro"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CasesController_listComments"];
+        put?: never;
+        post: operations["CasesController_addComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{id}/watchers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CasesController_listWatchers"];
+        put?: never;
+        post: operations["CasesController_addWatcher"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{id}/watchers/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["CasesController_removeWatcher"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sla-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SlaPoliciesController_list"];
+        put?: never;
+        post: operations["SlaPoliciesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sla-policies/reports/compliance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SlaPoliciesController_complianceReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sla-policies/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SlaPoliciesController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["SlaPoliciesController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["SlaPoliciesController_update"];
+        trace?: never;
+    };
+    "/sla-policies/{id}/clocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SlaPoliciesController_clocks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sla-policies/{id}/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SlaPoliciesController_addTarget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sla-policies/{id}/targets/{targetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["SlaPoliciesController_removeTarget"];
+        options?: never;
+        head?: never;
+        patch: operations["SlaPoliciesController_updateTarget"];
+        trace?: never;
+    };
+    "/business-hours-calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BusinessHoursController_list"];
+        put?: never;
+        post: operations["BusinessHoursController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/business-hours-calendars/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BusinessHoursController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["BusinessHoursController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["BusinessHoursController_update"];
+        trace?: never;
+    };
+    "/business-hours-calendars/{id}/holidays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BusinessHoursController_listHolidays"];
+        put?: never;
+        post: operations["BusinessHoursController_addHoliday"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/business-hours-calendars/{id}/holidays/{holidayId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["BusinessHoursController_removeHoliday"];
+        options?: never;
+        head?: never;
+        patch: operations["BusinessHoursController_updateHoliday"];
+        trace?: never;
+    };
+    "/macros": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MacrosController_list"];
+        put?: never;
+        post: operations["MacrosController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/macros/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MacrosController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["MacrosController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["MacrosController_update"];
+        trace?: never;
+    };
+    "/macros/{id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MacrosController_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assignment-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AssignmentRulesController_list"];
+        put?: never;
+        post: operations["AssignmentRulesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assignment-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AssignmentRulesController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["AssignmentRulesController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["AssignmentRulesController_update"];
+        trace?: never;
+    };
+    "/assignment-rules/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AssignmentRulesController_test"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent-skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AgentSkillsController_list"];
+        put?: never;
+        post: operations["AgentSkillsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent-skills/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AgentSkillsController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["AgentSkillsController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["AgentSkillsController_update"];
+        trace?: never;
+    };
+    "/case-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CaseCategoriesController_list"];
+        put?: never;
+        post: operations["CaseCategoriesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/case-categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CaseCategoriesController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["CaseCategoriesController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["CaseCategoriesController_update"];
+        trace?: never;
+    };
+    "/loss-cause-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LossCauseCategoriesController_list"];
+        put?: never;
+        post: operations["LossCauseCategoriesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loss-cause-categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LossCauseCategoriesController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["LossCauseCategoriesController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["LossCauseCategoriesController_update"];
+        trace?: never;
+    };
+    "/knowledge/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["KnowledgeCategoriesController_list"];
+        put?: never;
+        post: operations["KnowledgeCategoriesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["KnowledgeCategoriesController_findOne"];
+        put?: never;
+        post?: never;
+        delete: operations["KnowledgeCategoriesController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["KnowledgeCategoriesController_update"];
+        trace?: never;
+    };
+    "/knowledge/articles/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["KnowledgeArticlesController_suggest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/articles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["KnowledgeArticlesController_list"];
+        put?: never;
+        post: operations["KnowledgeArticlesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/articles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["KnowledgeArticlesController_findOne"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/articles/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["KnowledgeArticlesController_listVersions"];
+        put?: never;
+        post: operations["KnowledgeArticlesController_addVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/articles/{id}/submit-for-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["KnowledgeArticlesController_submitForReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/articles/{id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["KnowledgeArticlesController_decideApproval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/articles/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["KnowledgeArticlesController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/articles/{id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["KnowledgeArticlesController_feedback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/articles/{id}/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["KnowledgeArticlesController_analytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/surveys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SurveysController_list"];
+        put?: never;
+        post: operations["SurveysController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/surveys/reports/csat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SurveysController_csatReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/surveys/reports/nps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SurveysController_npsReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/surveys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SurveysController_findOne"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["SurveysController_update"];
+        trace?: never;
+    };
+    "/surveys/{id}/responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SurveysController_responses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/surveys/responses/{id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SurveyResponsesController_submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audience-segments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AudienceSegmentsController_list"];
+        put?: never;
+        post: operations["AudienceSegmentsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audience-segments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AudienceSegmentsController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["AudienceSegmentsController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["AudienceSegmentsController_update"];
+        trace?: never;
+    };
+    "/audience-segments/{id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AudienceSegmentsController_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaign-templates/merge-fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CampaignTemplatesController_getMergeFields"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaign-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CampaignTemplatesController_list"];
+        put?: never;
+        post: operations["CampaignTemplatesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaign-templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CampaignTemplatesController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["CampaignTemplatesController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["CampaignTemplatesController_update"];
+        trace?: never;
+    };
+    "/campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CampaignsController_list"];
+        put?: never;
+        post: operations["CampaignsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CampaignsController_getOne"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["CampaignsController_update"];
+        trace?: never;
+    };
+    "/campaigns/{id}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CampaignsController_schedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CampaignsController_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CampaignsController_pause"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CampaignsController_resume"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CampaignsController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/recipients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CampaignsController_recipients"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CampaignsController_performance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/ab-test/decide-winner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CampaignsController_decideAbTestWinner"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/webhooks/email/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CampaignWebhooksController_handleEmailEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/webhooks/sms/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CampaignWebhooksController_handleSmsEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/webhooks/whatsapp/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CampaignWebhooksController_handleWhatsappEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicUnsubscribeController_unsubscribeGet"];
+        put?: never;
+        post: operations["PublicUnsubscribeController_unsubscribePost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReportsController_listCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/{key}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ReportsController_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/{key}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReportsController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scheduled-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ScheduledReportsController_list"];
+        put?: never;
+        post: operations["ScheduledReportsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scheduled-reports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ScheduledReportsController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["ScheduledReportsController_update"];
+        trace?: never;
+    };
+    "/scheduled-reports/{id}/run-now": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ScheduledReportsController_runNow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scheduled-reports/{id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ScheduledReportsController_listRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scheduled-reports/runs/{runId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ScheduledReportsController_downloadRun"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1326,6 +3726,23 @@ export interface components {
         };
         AssignRoleDto: {
             roleId: string;
+        };
+        ForceLogoutResponseDto: {
+            status: string;
+        };
+        KeycloakSessionResponseDto: {
+            id: string;
+            username: string;
+            userId: string;
+            ipAddress: string;
+            /** @description Epoch milliseconds */
+            start: number;
+            /** @description Epoch milliseconds */
+            lastAccess: number;
+            /** @description clientId -> clientSessionId */
+            clients: {
+                [key: string]: string;
+            };
         };
         PermissionResponseDto: {
             id: string;
@@ -1509,6 +3926,72 @@ export interface components {
             action: string;
             userId?: Record<string, never> | null;
         };
+        ScimNameDto: {
+            givenName?: string;
+            familyName?: string;
+        };
+        ScimEmailDto: {
+            value: string;
+            primary?: boolean;
+        };
+        ScimUserRequestDto: {
+            schemas?: string[];
+            /** @description Treated as this user's email — TopiaDesk keys users by email, not a separate username */
+            userName: string;
+            name?: components["schemas"]["ScimNameDto"];
+            emails?: components["schemas"]["ScimEmailDto"][];
+            /** @default true */
+            active: boolean;
+            /** @description Maps to departments.code — same custom-attribute convention as the Keycloak sync webhook */
+            departmentCode?: string;
+            /** @description Maps to branches.code */
+            branchCode?: string;
+        };
+        ScimPatchOperationDto: {
+            /** @enum {string} */
+            op: "add" | "replace" | "remove";
+            path?: string;
+            value?: {
+                [key: string]: unknown;
+            };
+        };
+        ScimPatchRequestDto: {
+            schemas?: string[];
+            Operations: components["schemas"]["ScimPatchOperationDto"][];
+        };
+        ScimGroupMemberDto: {
+            /** @description TopiaDesk user id */
+            value: string;
+            display?: string;
+        };
+        ScimGroupRequestDto: {
+            schemas?: string[];
+            /** @description Maps to departments.name (and, under the department_code mapping strategy, also used to derive departments.code) */
+            displayName: string;
+            members?: components["schemas"]["ScimGroupMemberDto"][];
+        };
+        ScimTokenResponseDto: {
+            id: string;
+            description: string;
+            isActive: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            lastUsedAt: Record<string, never> | null;
+        };
+        CreateScimTokenDto: {
+            /** @description Human-readable label, e.g. "Okta provisioning" or "Azure AD SCIM" */
+            description: string;
+        };
+        ScimTokenCreatedResponseDto: {
+            id: string;
+            description: string;
+            isActive: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            lastUsedAt: Record<string, never> | null;
+            /** @description The raw bearer token — shown once, store it now. Use as `Authorization: Bearer <token>` against /scim/v2/*. */
+            token: string;
+        };
         AccountResponseDto: {
             id: string;
             name: string;
@@ -1520,10 +4003,23 @@ export interface components {
             parentAccountId: Record<string, never> | null;
             city: Record<string, never> | null;
             country: Record<string, never> | null;
+            customFields: {
+                [key: string]: unknown;
+            };
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        DuplicateMatchDto: {
+            id: string;
+            displayName: string;
+            matchedOn: string[];
+        };
+        DuplicateGroupDto: {
+            /** @enum {string} */
+            tier: "EXACT" | "STRONG" | "POSSIBLE";
+            matches: components["schemas"]["DuplicateMatchDto"][];
         };
         ContactSummaryDto: {
             id: string;
@@ -1553,6 +4049,9 @@ export interface components {
             parentAccountId: Record<string, never> | null;
             city: Record<string, never> | null;
             country: Record<string, never> | null;
+            customFields: {
+                [key: string]: unknown;
+            };
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -1580,6 +4079,9 @@ export interface components {
             ownerId?: string;
             source?: string;
             notes?: string;
+            customFields?: {
+                [key: string]: unknown;
+            };
         };
         UpdateAccountDto: {
             name?: string;
@@ -1601,6 +4103,38 @@ export interface components {
             ownerId?: string;
             source?: string;
             notes?: string;
+            customFields?: {
+                [key: string]: unknown;
+            };
+        };
+        BulkAssignAccountsDto: {
+            ids: string[];
+            ownerId: string;
+        };
+        BulkActionResponseDto: {
+            requested: string[];
+            updated: string[];
+            skipped: string[];
+        };
+        BulkUpdateAccountsDto: {
+            ids: string[];
+            /** @enum {string} */
+            status?: "PROSPECT" | "CLIENT" | "FORMER_CLIENT";
+            /** @enum {string} */
+            riskRating?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            ownerId?: string;
+            industryId?: string;
+        };
+        BulkDeleteAccountsDto: {
+            ids: string[];
+        };
+        MergeRequestDto: {
+            /** @description Id of the record to merge into :id (the winner) and delete */
+            loserId: string;
+        };
+        MergeResponseDto: {
+            winnerId: string;
+            loserId: string;
         };
         AccountRelationshipResponseDto: {
             id: string;
@@ -1635,6 +4169,9 @@ export interface components {
             phone: Record<string, never> | null;
             title: Record<string, never> | null;
             isPrimary: boolean;
+            customFields: {
+                [key: string]: unknown;
+            };
             /** Format: date-time */
             createdAt: string;
         };
@@ -1648,6 +4185,9 @@ export interface components {
             title?: string;
             /** @default false */
             isPrimary: boolean;
+            customFields?: {
+                [key: string]: unknown;
+            };
         };
         UpdateContactDto: {
             accountId?: string;
@@ -1659,6 +4199,21 @@ export interface components {
             title?: string;
             /** @default false */
             isPrimary: boolean;
+            customFields?: {
+                [key: string]: unknown;
+            };
+        };
+        BulkAssignContactsDto: {
+            ids: string[];
+            accountId: string;
+        };
+        BulkUpdateContactsDto: {
+            ids: string[];
+            title?: string;
+            isPrimary?: boolean;
+        };
+        BulkDeleteContactsDto: {
+            ids: string[];
         };
         CarrierResponseDto: {
             id: string;
@@ -1707,6 +4262,9 @@ export interface components {
             convertedAccountId: Record<string, never> | null;
             convertedOpportunityId: Record<string, never> | null;
             qualificationNotes: Record<string, never> | null;
+            customFields: {
+                [key: string]: unknown;
+            };
             /** Format: date-time */
             createdAt: string;
         };
@@ -1725,6 +4283,9 @@ export interface components {
             status?: "NEW" | "CONTACTED" | "QUALIFIED" | "DISQUALIFIED" | "CONVERTED";
             assignedToId?: string;
             qualificationNotes?: string;
+            customFields?: {
+                [key: string]: unknown;
+            };
         };
         UpdateLeadDto: {
             /** @enum {string} */
@@ -1741,9 +4302,27 @@ export interface components {
             status?: "NEW" | "CONTACTED" | "QUALIFIED" | "DISQUALIFIED" | "CONVERTED";
             assignedToId?: string;
             qualificationNotes?: string;
+            customFields?: {
+                [key: string]: unknown;
+            };
         };
         UpdateLeadScoreDto: {
             score: number;
+        };
+        BulkAssignLeadsDto: {
+            ids: string[];
+            assignedToId: string;
+        };
+        BulkUpdateLeadsDto: {
+            ids: string[];
+            /** @enum {string} */
+            status?: "NEW" | "CONTACTED" | "QUALIFIED" | "DISQUALIFIED" | "CONVERTED";
+            /** @enum {string} */
+            source?: "WEB" | "EMAIL" | "REFERRAL" | "PARTNER" | "SOCIAL" | "PHONE" | "EVENT" | "OTHER";
+            score?: number;
+        };
+        BulkDeleteLeadsDto: {
+            ids: string[];
         };
         ConvertLeadRequestDto: {
             existingAccountId?: string;
@@ -1840,6 +4419,9 @@ export interface components {
             lostReason: Record<string, never> | null;
             ownerId: string;
             lineOfBusiness: Record<string, never> | null;
+            customFields: {
+                [key: string]: unknown;
+            };
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -1860,6 +4442,9 @@ export interface components {
             /** @description Defaults to the calling user */
             ownerId?: string;
             lineOfBusiness?: string;
+            customFields?: {
+                [key: string]: unknown;
+            };
         };
         UpdateOpportunityDto: {
             accountId?: string;
@@ -1876,6 +4461,23 @@ export interface components {
             /** @description Defaults to the calling user */
             ownerId?: string;
             lineOfBusiness?: string;
+            customFields?: {
+                [key: string]: unknown;
+            };
+        };
+        BulkAssignOpportunitiesDto: {
+            ids: string[];
+            ownerId: string;
+        };
+        BulkUpdateOpportunitiesDto: {
+            ids: string[];
+            lineOfBusiness?: string;
+            ownerId?: string;
+            wonReason?: string;
+            lostReason?: string;
+        };
+        BulkDeleteOpportunitiesDto: {
+            ids: string[];
         };
         UpdateOpportunityStageDto: {
             pipelineStageId: string;
@@ -1925,7 +4527,7 @@ export interface components {
             body: Record<string, never> | null;
             /** Format: date-time */
             occurredAt: string;
-            createdById: string;
+            createdById: Record<string, never> | null;
             durationMinutes: Record<string, never> | null;
             outcome: Record<string, never> | null;
             /** Format: date-time */
@@ -1938,7 +4540,7 @@ export interface components {
             opportunityId?: string;
             policyId?: string;
             /** @enum {string} */
-            type: "CALL" | "EMAIL" | "MEETING" | "NOTE" | "WHATSAPP" | "PORTAL_MESSAGE" | "SMS";
+            type: "CALL" | "EMAIL" | "MEETING" | "NOTE" | "WHATSAPP" | "PORTAL_MESSAGE" | "SMS" | "SOCIAL" | "LIVE_CHAT";
             /** @enum {string} */
             direction: "INBOUND" | "OUTBOUND" | "INTERNAL";
             subject: string;
@@ -1994,6 +4596,253 @@ export interface components {
             policyId?: string;
             opportunityId?: string;
             leadId?: string;
+        };
+        BulkAssignTasksDto: {
+            ids: string[];
+            assigneeId: string;
+        };
+        BulkUpdateTasksDto: {
+            ids: string[];
+            /** @enum {string} */
+            status?: "OPEN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+            /** @enum {string} */
+            priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+        };
+        BulkDeleteTasksDto: {
+            ids: string[];
+        };
+        CustomFieldDefinitionResponseDto: {
+            id: string;
+            /** @enum {string} */
+            entityType: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY";
+            key: string;
+            label: string;
+            /** @enum {string} */
+            fieldType: "TEXT" | "TEXTAREA" | "NUMBER" | "DECIMAL" | "DATE" | "BOOLEAN" | "SELECT" | "MULTI_SELECT" | "USER_REFERENCE" | "URL";
+            options: string[] | null;
+            isRequired: boolean;
+            isActive: boolean;
+            displayOrder: number;
+            helpText: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateCustomFieldDefinitionDto: {
+            /** @enum {string} */
+            entityType: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY";
+            /** @description Stable jsonb key, e.g. "renewalRiskTier" */
+            key: string;
+            label: string;
+            /** @enum {string} */
+            fieldType: "TEXT" | "TEXTAREA" | "NUMBER" | "DECIMAL" | "DATE" | "BOOLEAN" | "SELECT" | "MULTI_SELECT" | "USER_REFERENCE" | "URL";
+            /** @description Required for SELECT/MULTI_SELECT */
+            options?: string[];
+            /** @default false */
+            isRequired: boolean;
+            /** @default true */
+            isActive: boolean;
+            /** @default 0 */
+            displayOrder: number;
+            helpText?: string;
+        };
+        UpdateCustomFieldDefinitionDto: {
+            label?: string;
+            /** @enum {string} */
+            fieldType?: "TEXT" | "TEXTAREA" | "NUMBER" | "DECIMAL" | "DATE" | "BOOLEAN" | "SELECT" | "MULTI_SELECT" | "USER_REFERENCE" | "URL";
+            options?: string[];
+            isRequired?: boolean;
+            /** @description Soft-delete flag — set false instead of deleting the row */
+            isActive?: boolean;
+            displayOrder?: number;
+            helpText?: string;
+        };
+        SavedViewResponseDto: {
+            id: string;
+            /** @enum {string} */
+            entityType: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY" | "TASK";
+            name: string;
+            ownerId: string;
+            /** @enum {string} */
+            visibility: "PRIVATE" | "TEAM" | "DEPARTMENT" | "ORG";
+            teamId: Record<string, never> | null;
+            filters: {
+                [key: string]: unknown;
+            };
+            sort: {
+                [key: string]: unknown;
+            } | null;
+            columns: string[];
+            isDefault: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateSavedViewDto: {
+            /** @enum {string} */
+            entityType: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY" | "TASK";
+            name: string;
+            /**
+             * @default PRIVATE
+             * @enum {string}
+             */
+            visibility: "PRIVATE" | "TEAM" | "DEPARTMENT" | "ORG";
+            /** @description Required when visibility=TEAM */
+            teamId?: string;
+            /** @description Structured filter tree: { op: "AND"|"OR", conditions: [{ field, operator, value }] } — see saved-view-filters.ts for the allowed fields/operators per entityType */
+            filters: {
+                [key: string]: unknown;
+            };
+            /** @description Array of { field, direction: "asc"|"desc" } */
+            sort?: {
+                [key: string]: unknown;
+            }[];
+            columns?: string[];
+            /** @default false */
+            isDefault: boolean;
+        };
+        UpdateSavedViewDto: {
+            /** @enum {string} */
+            entityType?: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY" | "TASK";
+            name?: string;
+            /**
+             * @default PRIVATE
+             * @enum {string}
+             */
+            visibility: "PRIVATE" | "TEAM" | "DEPARTMENT" | "ORG";
+            /** @description Required when visibility=TEAM */
+            teamId?: string;
+            /** @description Structured filter tree: { op: "AND"|"OR", conditions: [{ field, operator, value }] } — see saved-view-filters.ts for the allowed fields/operators per entityType */
+            filters?: {
+                [key: string]: unknown;
+            };
+            /** @description Array of { field, direction: "asc"|"desc" } */
+            sort?: {
+                [key: string]: unknown;
+            }[];
+            columns?: string[];
+            /** @default false */
+            isDefault: boolean;
+        };
+        RunSavedViewResponseDto: {
+            total: number;
+            rows: Record<string, never>[];
+        };
+        SalesQuotaResponseDto: {
+            id: string;
+            /** @enum {string} */
+            scopeType: "USER" | "DEPARTMENT" | "BRANCH" | "ORG";
+            userId: Record<string, never> | null;
+            departmentId: Record<string, never> | null;
+            branchId: Record<string, never> | null;
+            /** @enum {string} */
+            periodType: "MONTH" | "QUARTER" | "YEAR";
+            /** Format: date-time */
+            periodStart: string;
+            /** Format: date-time */
+            periodEnd: string;
+            /** @description Decimal serialized as string */
+            targetAmount: string;
+            lineOfBusiness: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateSalesQuotaDto: {
+            /** @enum {string} */
+            scopeType: "USER" | "DEPARTMENT" | "BRANCH" | "ORG";
+            /** @description Required when scopeType=USER */
+            userId?: string;
+            /** @description Required when scopeType=DEPARTMENT */
+            departmentId?: string;
+            /** @description Required when scopeType=BRANCH */
+            branchId?: string;
+            /** @enum {string} */
+            periodType: "MONTH" | "QUARTER" | "YEAR";
+            /** @description YYYY-MM-DD */
+            periodStart: string;
+            /** @description YYYY-MM-DD */
+            periodEnd: string;
+            /** @description Decimal amount, e.g. "5000000.00" */
+            targetAmount: string;
+            lineOfBusiness?: string;
+        };
+        UpdateSalesQuotaDto: {
+            /** @enum {string} */
+            scopeType?: "USER" | "DEPARTMENT" | "BRANCH" | "ORG";
+            /** @description Required when scopeType=USER */
+            userId?: string;
+            /** @description Required when scopeType=DEPARTMENT */
+            departmentId?: string;
+            /** @description Required when scopeType=BRANCH */
+            branchId?: string;
+            /** @enum {string} */
+            periodType?: "MONTH" | "QUARTER" | "YEAR";
+            /** @description YYYY-MM-DD */
+            periodStart?: string;
+            /** @description YYYY-MM-DD */
+            periodEnd?: string;
+            /** @description Decimal amount, e.g. "5000000.00" */
+            targetAmount?: string;
+            lineOfBusiness?: string;
+        };
+        QuotaAttainmentResponseDto: {
+            /** @description Decimal serialized as string */
+            targetAmount: string;
+            /** @description Decimal serialized as string — sum of won Opportunities in the quota's period/scope */
+            wonAmount: string;
+            attainmentPct: number;
+        };
+        AutomationRuleResponseDto: {
+            id: string;
+            name: string;
+            /** @enum {string} */
+            triggerType: "SCHEDULE" | "ENTITY_EVENT";
+            conditions: {
+                [key: string]: unknown;
+            };
+            actions: {
+                [key: string]: unknown;
+            }[];
+            isActive: boolean;
+            createdById: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateAutomationRuleDto: {
+            name: string;
+            /** @enum {string} */
+            triggerType: "SCHEDULE" | "ENTITY_EVENT";
+            /** @description For the Renewal Playbooks consumer (ENTITY_EVENT): { entityType: "RENEWAL_SCHEDULE", thresholds?: number[] (days; omit to match every threshold), filters?: { lineOfBusiness?: string } } — see renewal-playbook.ts (backend/worker) for the matcher. */
+            conditions: {
+                [key: string]: unknown;
+            };
+            /** @description ActionSpec[] = [{ actionType: string, params: Record<string, unknown> }]. Currently registered: CREATE_TASK — params: { title: string, description?: string, dueInDays?: number (default 3), assigneeId?: string (defaults to the renewal's assignee/broker-of-record) }. */
+            actions: {
+                [key: string]: unknown;
+            }[];
+            /** @default true */
+            isActive: boolean;
+        };
+        UpdateAutomationRuleDto: {
+            name?: string;
+            /** @enum {string} */
+            triggerType?: "SCHEDULE" | "ENTITY_EVENT";
+            /** @description For the Renewal Playbooks consumer (ENTITY_EVENT): { entityType: "RENEWAL_SCHEDULE", thresholds?: number[] (days; omit to match every threshold), filters?: { lineOfBusiness?: string } } — see renewal-playbook.ts (backend/worker) for the matcher. */
+            conditions?: {
+                [key: string]: unknown;
+            };
+            /** @description ActionSpec[] = [{ actionType: string, params: Record<string, unknown> }]. Currently registered: CREATE_TASK — params: { title: string, description?: string, dueInDays?: number (default 3), assigneeId?: string (defaults to the renewal's assignee/broker-of-record) }. */
+            actions?: {
+                [key: string]: unknown;
+            }[];
+            /** @default true */
+            isActive: boolean;
         };
         PolicyResponseDto: {
             id: string;
@@ -2202,7 +5051,7 @@ export interface components {
             id: string;
             documentId: string;
             /** @enum {string} */
-            entityType: "ACCOUNT" | "CONTACT" | "POLICY" | "OPPORTUNITY" | "LEAD" | "TASK";
+            entityType: "ACCOUNT" | "CONTACT" | "POLICY" | "OPPORTUNITY" | "LEAD" | "TASK" | "CLAIM" | "CASE";
             entityId: string;
             linkedById: string;
             /** Format: date-time */
@@ -2210,7 +5059,7 @@ export interface components {
         };
         CreateDocumentLinkDto: {
             /** @enum {string} */
-            entityType: "ACCOUNT" | "CONTACT" | "POLICY" | "OPPORTUNITY" | "LEAD" | "TASK";
+            entityType: "ACCOUNT" | "CONTACT" | "POLICY" | "OPPORTUNITY" | "LEAD" | "TASK" | "CLAIM" | "CASE";
             entityId: string;
         };
         ConnectorResponseDto: {
@@ -2248,6 +5097,60 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        WebhookSubscriptionResponseDto: {
+            id: string;
+            name: string;
+            targetUrl: string;
+            eventTypes: string[];
+            isActive: boolean;
+            createdById: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateWebhookSubscriptionDto: {
+            name: string;
+            targetUrl: string;
+            eventTypes: ("ACCOUNT_CREATED" | "ACCOUNT_UPDATED" | "OPPORTUNITY_STAGE_CHANGED" | "POLICY_BOUND" | "POLICY_CANCELLED" | "POLICY_RENEWED" | "PREMIUM_OVERDUE" | "DOCUMENT_UPLOADED" | "TASK_COMPLETED" | "APPROVAL_DECIDED" | "CLAIM_STATUS_CHANGED" | "CASE_STATUS_CHANGED")[];
+        };
+        WebhookSubscriptionCreatedResponseDto: {
+            id: string;
+            name: string;
+            targetUrl: string;
+            eventTypes: string[];
+            isActive: boolean;
+            createdById: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description HMAC-SHA256 signing secret — shown once, store it now. Verify inbound deliveries with it (see webhook-signing.util.ts). */
+            signingSecret: string;
+        };
+        UpdateWebhookSubscriptionDto: {
+            name?: string;
+            targetUrl?: string;
+            eventTypes?: ("ACCOUNT_CREATED" | "ACCOUNT_UPDATED" | "OPPORTUNITY_STAGE_CHANGED" | "POLICY_BOUND" | "POLICY_CANCELLED" | "POLICY_RENEWED" | "PREMIUM_OVERDUE" | "DOCUMENT_UPLOADED" | "TASK_COMPLETED" | "APPROVAL_DECIDED" | "CLAIM_STATUS_CHANGED" | "CASE_STATUS_CHANGED")[];
+            isActive?: boolean;
+        };
+        WebhookDeliveryResponseDto: {
+            id: string;
+            subscriptionId: string;
+            eventType: string;
+            payload: {
+                [key: string]: unknown;
+            };
+            status: string;
+            attemptCount: number;
+            lastAttemptAt: Record<string, never> | null;
+            nextAttemptAt: Record<string, never> | null;
+            responseStatus: Record<string, never> | null;
+            responseBodySnippet: Record<string, never> | null;
+            correlationId: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
         NotificationResponseDto: {
             id: string;
             type: string;
@@ -2271,11 +5174,70 @@ export interface components {
             /** @description Optional tone/content guidance, e.g. "keep it short", "offer a callback" */
             instructions?: string;
         };
+        SentimentRequestDto: {
+            entityId: string;
+            entityType: string;
+            text: string;
+        };
+        CategorizeRequestDto: {
+            entityId: string;
+            entityType: string;
+            text: string;
+        };
+        AccountInsightRequestDto: {
+            accountId: string;
+        };
+        SemanticIndexRequestDto: {
+            /** @enum {string} */
+            entityType: "account" | "knowledge_article";
+            entityId: string;
+        };
+        SemanticSearchRequestDto: {
+            query: string;
+            /** @description Restrict to these entity types; omit to search all indexable types */
+            entityTypes?: ("account" | "knowledge_article")[];
+            /** @default 10 */
+            limit: number;
+        };
         OperationalKpiResponseDto: {
             openOpportunities: number;
             pipelineValue: string;
             renewalsDueNext90Days: number;
             activeClients: number;
+        };
+        SalesForecastGroupDto: {
+            key: string;
+            label: Record<string, never> | null;
+            count: number;
+            /** @description sum(amount * probability/100), decimal serialized as string */
+            weightedAmount: string;
+            /** @description sum(amount), decimal serialized as string */
+            unweightedAmount: string;
+        };
+        SalesForecastResponseDto: {
+            /** @description e.g. "2026-08" or "2026-Q3" */
+            period: string;
+            periodStart: string;
+            periodEnd: string;
+            groups: components["schemas"]["SalesForecastGroupDto"][];
+            totalWeightedAmount: string;
+            totalUnweightedAmount: string;
+        };
+        RenderedDashboardWidgetDto: {
+            id: string;
+            title: string;
+            reportKey: string;
+            chartType: string;
+            /** @description Present when the report executed successfully — shape is @topiadesk/reports' ReportResult */
+            result?: Record<string, never>;
+            /** @description Present instead of `result` when this one widget failed to render — the rest of the dashboard still returns */
+            error?: string;
+        };
+        RenderedDashboardResponseDto: {
+            id: string;
+            name: string;
+            layoutConfig: Record<string, never>;
+            widgets: components["schemas"]["RenderedDashboardWidgetDto"][];
         };
         AuditLogActorDto: {
             id: string;
@@ -2288,7 +5250,7 @@ export interface components {
             entityType: string;
             entityId: string;
             /** @enum {string} */
-            action: "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGIN_FAILED" | "PERMISSION_CHANGE" | "EXPORT" | "VIEW_SENSITIVE";
+            action: "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGIN_FAILED" | "PERMISSION_CHANGE" | "EXPORT" | "VIEW_SENSITIVE" | "FORCE_LOGOUT";
             actorUserId: Record<string, never> | null;
             actorUser: components["schemas"]["AuditLogActorDto"] | null;
             actorSystemJob: Record<string, never> | null;
@@ -2300,6 +5262,1114 @@ export interface components {
             currentHash: string;
             /** Format: date-time */
             createdAt: string;
+        };
+        ClaimResponseDto: {
+            id: string;
+            claimNumber: string;
+            policyId: string;
+            status: string;
+            priority: string;
+            /** Format: date-time */
+            dateOfLoss: string;
+            /** Format: date-time */
+            dateReported: string;
+            causeOfLoss: Record<string, never> | null;
+            causeOfLossCategoryId: Record<string, never> | null;
+            reserveAmount: Record<string, never> | null;
+            settledAmount: Record<string, never> | null;
+            settledAt: Record<string, never> | null;
+            repudiationReason: Record<string, never> | null;
+            adjusterId: Record<string, never> | null;
+            assignedTeamId: Record<string, never> | null;
+            slaPolicyId: Record<string, never> | null;
+            catastropheEventId: Record<string, never> | null;
+            parentClaimId: Record<string, never> | null;
+            externalAdjusterRef: Record<string, never> | null;
+            reopenCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ClaimStatusHistoryResponseDto: {
+            id: string;
+            claimId: string;
+            fromStatus: Record<string, never> | null;
+            toStatus: string;
+            changedById: Record<string, never> | null;
+            reason: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreateClaimDto: {
+            claimNumber: string;
+            policyId: string;
+            /** @enum {string} */
+            priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+            dateOfLoss: string;
+            /** @description Defaults to today */
+            dateReported?: string;
+            causeOfLoss?: string;
+            causeOfLossCategoryId?: string;
+            /** @description Decimal amount, e.g. "500000.00" */
+            reserveAmount?: string;
+            adjusterId?: string;
+            assignedTeamId?: string;
+            /** @description Explicit SlaPolicy override — otherwise resolved automatically by entityType/priority */
+            slaPolicyId?: string;
+            catastropheEventId?: string;
+            parentClaimId?: string;
+            externalAdjusterRef?: string;
+        };
+        UpdateClaimDto: {
+            /** @enum {string} */
+            priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+            causeOfLoss?: string;
+            causeOfLossCategoryId?: string;
+            reserveAmount?: string;
+            settledAmount?: string;
+            repudiationReason?: string;
+            adjusterId?: string;
+            assignedTeamId?: string;
+            catastropheEventId?: string;
+            externalAdjusterRef?: string;
+        };
+        ChangeClaimStatusDto: {
+            /** @enum {string} */
+            status: "NOTIFIED" | "UNDER_REVIEW" | "ADJUSTED" | "SETTLED" | "REPUDIATED" | "REOPENED" | "WITHDRAWN";
+            /** @description Recorded on ClaimStatusHistory; also stored as repudiationReason when status is REPUDIATED */
+            reason?: string;
+            /** @description Decimal amount — set when status is SETTLED */
+            settledAmount?: string;
+        };
+        ReopenClaimDto: {
+            /** @description Why this settled/repudiated claim is being reopened */
+            reason: string;
+        };
+        CommentResponseDto: {
+            id: string;
+            claimId: Record<string, never> | null;
+            caseId: Record<string, never> | null;
+            type: string;
+            direction: string;
+            subject: string;
+            body: Record<string, never> | null;
+            /** Format: date-time */
+            occurredAt: string;
+            createdById: Record<string, never> | null;
+            createdBySystemJob: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreateCommentDto: {
+            subject: string;
+            body?: string;
+            /**
+             * @default NOTE
+             * @enum {string}
+             */
+            type: "CALL" | "EMAIL" | "MEETING" | "NOTE" | "WHATSAPP" | "PORTAL_MESSAGE" | "SMS" | "SOCIAL" | "LIVE_CHAT";
+            /**
+             * @default INTERNAL
+             * @enum {string}
+             */
+            direction: "INBOUND" | "OUTBOUND" | "INTERNAL";
+            /** @description Defaults to now */
+            occurredAt?: string;
+        };
+        CaseWatcherResponseDto: {
+            id: string;
+            claimId: Record<string, never> | null;
+            caseId: Record<string, never> | null;
+            userId: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AddWatcherDto: {
+            userId: string;
+        };
+        CaseResponseDto: {
+            id: string;
+            caseNumber: string;
+            caseType: string;
+            categoryId: Record<string, never> | null;
+            subject: string;
+            description: Record<string, never> | null;
+            status: string;
+            priority: string;
+            accountId: Record<string, never> | null;
+            contactId: Record<string, never> | null;
+            policyId: Record<string, never> | null;
+            assignedToId: Record<string, never> | null;
+            assignedTeamId: Record<string, never> | null;
+            slaPolicyId: Record<string, never> | null;
+            parentCaseId: Record<string, never> | null;
+            linkType: Record<string, never> | null;
+            reopenCount: number;
+            sourceChannel: Record<string, never> | null;
+            firstRespondedAt: Record<string, never> | null;
+            resolutionNotes: Record<string, never> | null;
+            resolvedAt: Record<string, never> | null;
+            closedAt: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateCaseDto: {
+            /** @enum {string} */
+            caseType: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
+            categoryId?: string;
+            subject: string;
+            description?: string;
+            /** @enum {string} */
+            priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+            accountId?: string;
+            contactId?: string;
+            policyId?: string;
+            assignedToId?: string;
+            assignedTeamId?: string;
+            /** @description Explicit SlaPolicy override — otherwise resolved automatically by entityType/caseType/priority */
+            slaPolicyId?: string;
+            /** @enum {string} */
+            sourceChannel?: "CALL" | "EMAIL" | "MEETING" | "NOTE" | "WHATSAPP" | "PORTAL_MESSAGE" | "SMS" | "SOCIAL" | "LIVE_CHAT";
+        };
+        UpdateCaseDto: {
+            categoryId?: string;
+            subject?: string;
+            description?: string;
+            /** @enum {string} */
+            priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+            accountId?: string;
+            contactId?: string;
+            policyId?: string;
+            assignedToId?: string;
+            assignedTeamId?: string;
+            slaPolicyId?: string;
+            /** @enum {string} */
+            sourceChannel?: "CALL" | "EMAIL" | "MEETING" | "NOTE" | "WHATSAPP" | "PORTAL_MESSAGE" | "SMS" | "SOCIAL" | "LIVE_CHAT";
+        };
+        ChangeCaseStatusDto: {
+            /** @enum {string} */
+            status: "NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED";
+            /** @description Stored as resolutionNotes when status is RESOLVED */
+            reason?: string;
+        };
+        LinkChildCaseDto: {
+            childCaseId: string;
+        };
+        MergeCaseDto: {
+            /** @description The case that survives — the case in the URL becomes its (non-destructive) MERGED child */
+            targetCaseId: string;
+        };
+        ApplyMacroResponseDto: {
+            macroId: string;
+            entityType: string;
+            entityId: string;
+            results: {
+                [key: string]: unknown;
+            }[];
+        };
+        SlaTargetResponseDto: {
+            id: string;
+            slaPolicyId: string;
+            metricType: string;
+            fromStatus: Record<string, never> | null;
+            toStatus: Record<string, never> | null;
+            targetMinutes: number;
+            escalateAfterMinutes: Record<string, never> | null;
+            escalateToUserId: Record<string, never> | null;
+            escalateToTeamId: Record<string, never> | null;
+        };
+        SlaPolicyResponseDto: {
+            id: string;
+            name: string;
+            entityType: string;
+            caseType: Record<string, never> | null;
+            priority: Record<string, never> | null;
+            businessHoursCalendarId: Record<string, never> | null;
+            isActive: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            targets?: components["schemas"]["SlaTargetResponseDto"][];
+        };
+        SlaComplianceReportRowDto: {
+            slaTargetId: string;
+            slaPolicyId: string;
+            policyName: string;
+            metricType: string;
+            totalClocks: number;
+            satisfiedCount: number;
+            breachedCount: number;
+            runningCount: number;
+            pausedCount: number;
+            /** @description satisfiedCount / (satisfiedCount + breachedCount), as a percentage — clocks still RUNNING/PAUSED are excluded from the denominator (not yet decided) */
+            percentAchieved: Record<string, never>;
+        };
+        SlaClockResponseDto: {
+            id: string;
+            claimId: Record<string, never> | null;
+            caseId: Record<string, never> | null;
+            slaTargetId: string;
+            status: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            dueAt: string;
+            pausedAt: Record<string, never> | null;
+            totalPausedMinutes: number;
+            satisfiedAt: Record<string, never> | null;
+            breachedAt: Record<string, never> | null;
+            escalatedAt: Record<string, never> | null;
+        };
+        CreateSlaTargetDto: {
+            /** @enum {string} */
+            metricType: "FIRST_RESPONSE" | "RESOLUTION" | "STAGE_TRANSITION";
+            /** @description ClaimStatus/CaseStatus value this target starts from — only meaningful for STAGE_TRANSITION */
+            fromStatus?: string;
+            /** @description ClaimStatus/CaseStatus value this target ends at — only meaningful for STAGE_TRANSITION */
+            toStatus?: string;
+            targetMinutes: number;
+            escalateAfterMinutes?: number;
+            escalateToUserId?: string;
+            escalateToTeamId?: string;
+        };
+        CreateSlaPolicyDto: {
+            name: string;
+            /** @enum {string} */
+            entityType: "CLAIM" | "CASE";
+            /** @enum {string} */
+            caseType?: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
+            /** @enum {string} */
+            priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+            businessHoursCalendarId?: string;
+            /** @default true */
+            isActive: boolean;
+            /** @description Optional initial targets, created alongside the policy */
+            targets?: components["schemas"]["CreateSlaTargetDto"][];
+        };
+        UpdateSlaPolicyDto: {
+            name?: string;
+            /** @enum {string} */
+            caseType?: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
+            /** @enum {string} */
+            priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+            businessHoursCalendarId?: string;
+            isActive?: boolean;
+        };
+        UpdateSlaTargetDto: {
+            /** @enum {string} */
+            metricType?: "FIRST_RESPONSE" | "RESOLUTION" | "STAGE_TRANSITION";
+            /** @description ClaimStatus/CaseStatus value this target starts from — only meaningful for STAGE_TRANSITION */
+            fromStatus?: string;
+            /** @description ClaimStatus/CaseStatus value this target ends at — only meaningful for STAGE_TRANSITION */
+            toStatus?: string;
+            targetMinutes?: number;
+            escalateAfterMinutes?: number;
+            escalateToUserId?: string;
+            escalateToTeamId?: string;
+        };
+        BusinessHoursCalendarResponseDto: {
+            id: string;
+            name: string;
+            timezone: string;
+            weeklyHours: {
+                [key: string]: unknown;
+            };
+            isDefault: boolean;
+        };
+        BusinessHolidayResponseDto: {
+            id: string;
+            calendarId: string;
+            /** Format: date-time */
+            date: string;
+            name: string;
+        };
+        CreateBusinessHoursCalendarDto: {
+            name: string;
+            /** @example Africa/Lagos */
+            timezone: string;
+            weeklyHours: {
+                [key: string]: unknown;
+            };
+            /** @default false */
+            isDefault: boolean;
+        };
+        UpdateBusinessHoursCalendarDto: {
+            name?: string;
+            /** @example Africa/Lagos */
+            timezone?: string;
+            weeklyHours?: {
+                [key: string]: unknown;
+            };
+            /** @default false */
+            isDefault: boolean;
+        };
+        CreateBusinessHolidayDto: {
+            date: string;
+            name: string;
+        };
+        UpdateBusinessHolidayDto: {
+            date?: string;
+            name?: string;
+        };
+        ActionSpecDto: {
+            /** @enum {string} */
+            actionType: "SET_STATUS" | "ASSIGN_TO_USER" | "ASSIGN_TO_TEAM" | "SET_PRIORITY" | "ADD_INTERNAL_NOTE" | "SEND_NOTIFICATION";
+            params: {
+                [key: string]: unknown;
+            };
+        };
+        MacroResponseDto: {
+            id: string;
+            name: string;
+            description: Record<string, never> | null;
+            entityType: Record<string, never> | null;
+            actions: components["schemas"]["ActionSpecDto"][];
+            isActive: boolean;
+            usageCount: number;
+            createdById: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateMacroDto: {
+            name: string;
+            description?: string;
+            /** @enum {string} */
+            entityType?: "CLAIM" | "CASE";
+            actions: components["schemas"]["ActionSpecDto"][];
+            /** @default true */
+            isActive: boolean;
+        };
+        UpdateMacroDto: {
+            name?: string;
+            description?: string;
+            /** @enum {string} */
+            entityType?: "CLAIM" | "CASE";
+            actions?: components["schemas"]["ActionSpecDto"][];
+            isActive?: boolean;
+        };
+        MacroPreviewRequestDto: {
+            /** @enum {string} */
+            entityType: "CLAIM" | "CASE";
+            entityId: string;
+        };
+        MacroPreviewChangeDto: {
+            actionType: string;
+            description: string;
+            currentValue?: Record<string, never>;
+            newValue?: Record<string, never>;
+        };
+        MacroPreviewResponseDto: {
+            macroId: string;
+            entityType: string;
+            entityId: string;
+            changes: components["schemas"]["MacroPreviewChangeDto"][];
+        };
+        AssignmentRuleResponseDto: {
+            id: string;
+            name: string;
+            entityType: string;
+            strategy: string;
+            conditions: {
+                [key: string]: unknown;
+            };
+            candidatePoolTeamId: Record<string, never> | null;
+            requiredSkillTags: string[];
+            priority: number;
+            isActive: boolean;
+            lastAssignedUserId: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateAssignmentRuleDto: {
+            name: string;
+            /** @enum {string} */
+            entityType: "CLAIM" | "CASE";
+            /** @enum {string} */
+            strategy: "ROUND_ROBIN" | "LOAD_BASED" | "SKILL_BASED";
+            /** @default {} */
+            conditions: {
+                [key: string]: unknown;
+            };
+            candidatePoolTeamId?: string;
+            /** @default [] */
+            requiredSkillTags: string[];
+            /**
+             * @description Higher priority rules are considered first
+             * @default 0
+             */
+            priority: number;
+            /** @default true */
+            isActive: boolean;
+        };
+        UpdateAssignmentRuleDto: {
+            name?: string;
+            /** @enum {string} */
+            strategy?: "ROUND_ROBIN" | "LOAD_BASED" | "SKILL_BASED";
+            conditions?: {
+                [key: string]: unknown;
+            };
+            candidatePoolTeamId?: string;
+            requiredSkillTags?: string[];
+            priority?: number;
+            isActive?: boolean;
+        };
+        AssignmentTestResponseDto: {
+            ruleId: string;
+            userId: Record<string, never> | null;
+            reasoning: string;
+        };
+        AgentSkillResponseDto: {
+            id: string;
+            userId: string;
+            skillTag: string;
+            proficiency: Record<string, never> | null;
+        };
+        CreateAgentSkillDto: {
+            userId: string;
+            skillTag: string;
+            proficiency?: number;
+        };
+        UpdateAgentSkillDto: {
+            userId?: string;
+            skillTag?: string;
+            proficiency?: number;
+        };
+        CaseCategoryResponseDto: {
+            id: string;
+            name: string;
+            code: string;
+            caseType: Record<string, never> | null;
+        };
+        CreateCaseCategoryDto: {
+            name: string;
+            code: string;
+            /**
+             * @description Restricts this category to one CaseType — omit for a category usable across all types
+             * @enum {string}
+             */
+            caseType?: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
+        };
+        UpdateCaseCategoryDto: {
+            name?: string;
+            code?: string;
+            /**
+             * @description Restricts this category to one CaseType — omit for a category usable across all types
+             * @enum {string}
+             */
+            caseType?: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
+        };
+        LossCauseCategoryResponseDto: {
+            id: string;
+            name: string;
+            code: string;
+        };
+        CreateLossCauseCategoryDto: {
+            name: string;
+            code: string;
+        };
+        UpdateLossCauseCategoryDto: {
+            name?: string;
+            code?: string;
+        };
+        KnowledgeCategoryResponseDto: {
+            id: string;
+            name: string;
+            code: string;
+            parentCategoryId?: Record<string, never> | null;
+            order: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreateKnowledgeCategoryDto: {
+            name: string;
+            code: string;
+            /** @description Parent category — omit for a top-level category */
+            parentCategoryId?: string;
+            /** @default 0 */
+            order: number;
+        };
+        UpdateKnowledgeCategoryDto: {
+            name?: string;
+            code?: string;
+            /** @description Parent category — omit for a top-level category */
+            parentCategoryId?: string;
+            /** @default 0 */
+            order: number;
+        };
+        KnowledgeArticleResponseDto: {
+            id: string;
+            categoryId?: Record<string, never> | null;
+            slug: string;
+            title: string;
+            /** @enum {string} */
+            status: "DRAFT" | "IN_REVIEW" | "PUBLISHED" | "ARCHIVED";
+            /** @enum {string} */
+            visibility: "INTERNAL" | "CUSTOMER";
+            locale: string;
+            translationGroupId?: Record<string, never> | null;
+            currentVersionId?: Record<string, never> | null;
+            ownerId: string;
+            viewCount: number;
+            helpfulCount: number;
+            notHelpfulCount: number;
+            publishedAt?: Record<string, never> | null;
+            archivedAt?: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateKnowledgeArticleDto: {
+            categoryId?: string;
+            slug: string;
+            title: string;
+            /**
+             * @default INTERNAL
+             * @enum {string}
+             */
+            visibility: "INTERNAL" | "CUSTOMER";
+            /** @default en */
+            locale: string;
+            translationGroupId?: string;
+            bodyMarkdown: string;
+        };
+        KnowledgeArticleVersionResponseDto: {
+            id: string;
+            articleId: string;
+            versionNumber: number;
+            bodyMarkdown: string;
+            changeNote?: Record<string, never> | null;
+            authoredById: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreateKnowledgeArticleVersionDto: {
+            bodyMarkdown: string;
+            changeNote?: string;
+        };
+        DecideKnowledgeApprovalDto: {
+            /** @enum {string} */
+            decision: "APPROVED" | "REJECTED";
+            reason?: string;
+        };
+        UpsertKnowledgeArticleFeedbackDto: {
+            /** @enum {string} */
+            vote: "HELPFUL" | "NOT_HELPFUL";
+            comment?: string;
+            /** @description Case this article was surfaced against, if any */
+            caseId?: string;
+        };
+        KnowledgeArticleFeedbackResponseDto: {
+            id: string;
+            articleId: string;
+            userId: string;
+            /** @enum {string} */
+            vote: "HELPFUL" | "NOT_HELPFUL";
+            comment?: Record<string, never> | null;
+            caseId?: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        KnowledgeArticleAnalyticsResponseDto: {
+            articleId: string;
+            viewCount: number;
+            helpfulCount: number;
+            notHelpfulCount: number;
+            /** @description helpfulCount / (helpfulCount + notHelpfulCount), null if no votes yet */
+            helpfulRatio?: Record<string, never> | null;
+        };
+        SurveyDto: {
+            id: string;
+            name: string;
+            /** @enum {string} */
+            type: "CSAT" | "NPS" | "CES";
+            /** @enum {string} */
+            triggerEvent: "CASE_RESOLVED" | "CLAIM_SETTLED" | "POLICY_ISSUED" | "POLICY_RENEWED" | "MANUAL";
+            questionText: string;
+            scaleMin: number;
+            scaleMax: number;
+            isActive: boolean;
+            sendDelayMinutes: number;
+            createdById: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateSurveyDto: {
+            name: string;
+            /** @enum {string} */
+            type: "CSAT" | "NPS" | "CES";
+            /** @enum {string} */
+            triggerEvent: "CASE_RESOLVED" | "CLAIM_SETTLED" | "POLICY_ISSUED" | "POLICY_RENEWED" | "MANUAL";
+            questionText: string;
+            /** @default 0 */
+            scaleMin: number;
+            scaleMax: number;
+            /** @default true */
+            isActive: boolean;
+            /**
+             * @description Minutes to wait after the trigger event before dispatching
+             * @default 0
+             */
+            sendDelayMinutes: number;
+        };
+        AgentSurveySummaryRowDto: {
+            agentId: string;
+            /** @enum {string} */
+            surveyType: "CSAT" | "NPS" | "CES";
+            periodMonth: string;
+            responseCount: number;
+            /** @description % of CSAT responses scoring in the top band (scaleMax or scaleMax-1) */
+            csatPct?: Record<string, never> | null;
+            /** @description %Promoters (9-10) minus %Detractors (0-6) */
+            npsScore?: Record<string, never> | null;
+        };
+        UpdateSurveyDto: {
+            name?: string;
+            /** @enum {string} */
+            type?: "CSAT" | "NPS" | "CES";
+            /** @enum {string} */
+            triggerEvent?: "CASE_RESOLVED" | "CLAIM_SETTLED" | "POLICY_ISSUED" | "POLICY_RENEWED" | "MANUAL";
+            questionText?: string;
+            /** @default 0 */
+            scaleMin: number;
+            scaleMax?: number;
+            /** @default true */
+            isActive: boolean;
+            /**
+             * @description Minutes to wait after the trigger event before dispatching
+             * @default 0
+             */
+            sendDelayMinutes: number;
+        };
+        SurveyResponseRecordDto: {
+            id: string;
+            surveyId: string;
+            triggerEntityType: string;
+            triggerEntityId: string;
+            accountId?: Record<string, never> | null;
+            respondentContactId?: Record<string, never> | null;
+            agentId?: Record<string, never> | null;
+            /** @enum {string} */
+            channel: "EMAIL" | "SMS" | "WHATSAPP" | "PORTAL";
+            score?: Record<string, never> | null;
+            comment?: Record<string, never> | null;
+            sentAt?: Record<string, never> | null;
+            respondedAt?: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SubmitSurveyResponseDto: {
+            /** @description The respondToken issued when this response row was created */
+            respondToken: string;
+            score: number;
+            comment?: string;
+        };
+        AudienceSegmentResponseDto: {
+            id: string;
+            name: string;
+            description: Record<string, never> | null;
+            filters: Record<string, never>;
+            isDynamic: boolean;
+            ownerId: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        SegmentFilterConditionDto: {
+            /** @description Field key from the fixed allowlist, e.g. "policy.lineOfBusiness" — see GET /audience-segments/filterable-fields */
+            field: string;
+            /** @description One of: eq, neq, gt, gte, lt, lte, in, notIn, contains — subset allowed depends on the field's type */
+            operator: string;
+            /** @description String/number/date-string/enum value, or an array of those for in/notIn — type-checked server-side against the field's allowlisted type */
+            value: Record<string, never>;
+        };
+        SegmentFilterGroupDto: {
+            /**
+             * @description ALL = AND (policy/premium/renewal conditions correlate onto the same policy); ANY = OR
+             * @enum {string}
+             */
+            match: "ALL" | "ANY";
+            conditions: components["schemas"]["SegmentFilterConditionDto"][];
+        };
+        CreateAudienceSegmentDto: {
+            name: string;
+            description?: string;
+            filters: components["schemas"]["SegmentFilterGroupDto"];
+            /**
+             * @description Dynamic segments re-evaluate at send time; non-dynamic segments are materialized once, at schedule time
+             * @default true
+             */
+            isDynamic: boolean;
+            /** @description Defaults to the calling user */
+            ownerId?: string;
+        };
+        UpdateAudienceSegmentDto: {
+            name?: string;
+            description?: string;
+            filters?: components["schemas"]["SegmentFilterGroupDto"];
+            /**
+             * @description Dynamic segments re-evaluate at send time; non-dynamic segments are materialized once, at schedule time
+             * @default true
+             */
+            isDynamic: boolean;
+            /** @description Defaults to the calling user */
+            ownerId?: string;
+        };
+        PreviewAudienceSegmentDto: {
+            /** @description Override the segment's saved filters for a live preview before saving — defaults to the saved filters when omitted */
+            filters?: components["schemas"]["SegmentFilterGroupDto"];
+        };
+        SegmentContactSampleDto: {
+            id: string;
+            firstName: string;
+            lastName: string;
+            email: Record<string, never> | null;
+            phone: Record<string, never> | null;
+            accountId: Record<string, never> | null;
+        };
+        SegmentPreviewResponseDto: {
+            count: number;
+            sample: components["schemas"]["SegmentContactSampleDto"][];
+        };
+        MergeFieldDescriptorResponseDto: {
+            key: string;
+            label: string;
+            example: string;
+        };
+        CampaignTemplateResponseDto: {
+            id: string;
+            name: string;
+            /** @enum {string} */
+            channel: "EMAIL" | "SMS" | "WHATSAPP";
+            subject: Record<string, never> | null;
+            bodyHtml: Record<string, never> | null;
+            bodyText: Record<string, never> | null;
+            mergeFields: string[];
+            whatsappTemplateName: Record<string, never> | null;
+            whatsappTemplateLang: Record<string, never> | null;
+            isActive: boolean;
+            createdById: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateCampaignTemplateDto: {
+            name: string;
+            /** @enum {string} */
+            channel: "EMAIL" | "SMS" | "WHATSAPP";
+            subject?: string;
+            bodyHtml?: string;
+            bodyText?: string;
+            /** @description Merge field keys this template uses — validated against GET /campaign-templates/merge-fields */
+            mergeFields?: string[];
+            /** @description Required when channel = WHATSAPP (pre-approved WhatsApp Business template name) */
+            whatsappTemplateName?: string;
+            whatsappTemplateLang?: string;
+            /** @default true */
+            isActive: boolean;
+        };
+        UpdateCampaignTemplateDto: {
+            name?: string;
+            /** @enum {string} */
+            channel?: "EMAIL" | "SMS" | "WHATSAPP";
+            subject?: string;
+            bodyHtml?: string;
+            bodyText?: string;
+            /** @description Merge field keys this template uses — validated against GET /campaign-templates/merge-fields */
+            mergeFields?: string[];
+            /** @description Required when channel = WHATSAPP (pre-approved WhatsApp Business template name) */
+            whatsappTemplateName?: string;
+            whatsappTemplateLang?: string;
+            /** @default true */
+            isActive: boolean;
+        };
+        CampaignVariantResponseDto: {
+            id: string;
+            label: string;
+            templateId: string;
+            splitPercent: number;
+        };
+        CampaignResponseDto: {
+            id: string;
+            name: string;
+            /** @enum {string} */
+            channel: "EMAIL" | "SMS" | "WHATSAPP";
+            /** @enum {string} */
+            status: "DRAFT" | "SCHEDULED" | "SENDING" | "SENT" | "PAUSED" | "CANCELLED";
+            templateId: Record<string, never> | null;
+            segmentId: Record<string, never> | null;
+            scheduledSendAt: Record<string, never> | null;
+            sentAt: Record<string, never> | null;
+            abTestEnabled: boolean;
+            abTestSamplePercent: Record<string, never> | null;
+            /** @enum {string|null} */
+            abTestMetric: "OPEN_RATE" | "CLICK_RATE" | null;
+            abTestWinnerVariantId: Record<string, never> | null;
+            abTestDecidedAt: Record<string, never> | null;
+            createdById: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            variants?: components["schemas"]["CampaignVariantResponseDto"][];
+        };
+        CreateCampaignVariantDto: {
+            label: string;
+            templateId: string;
+            splitPercent: number;
+        };
+        CreateCampaignDto: {
+            name: string;
+            /** @enum {string} */
+            channel: "EMAIL" | "SMS" | "WHATSAPP";
+            /** @description Required unless abTestEnabled with variants supplied */
+            templateId?: string;
+            segmentId: string;
+            /** @default false */
+            abTestEnabled: boolean;
+            /** @description % of the audience in the initial test sample; remainder goes to the decided winner */
+            abTestSamplePercent?: number;
+            /** @enum {string} */
+            abTestMetric?: "OPEN_RATE" | "CLICK_RATE";
+            /** @description Required when abTestEnabled — splitPercent must sum to 100 */
+            variants?: components["schemas"]["CreateCampaignVariantDto"][];
+        };
+        UpdateCampaignDto: {
+            name?: string;
+            /** @enum {string} */
+            channel?: "EMAIL" | "SMS" | "WHATSAPP";
+            /** @description Required unless abTestEnabled with variants supplied */
+            templateId?: string;
+            segmentId?: string;
+            /** @default false */
+            abTestEnabled: boolean;
+            /** @description % of the audience in the initial test sample; remainder goes to the decided winner */
+            abTestSamplePercent?: number;
+            /** @enum {string} */
+            abTestMetric?: "OPEN_RATE" | "CLICK_RATE";
+            /** @description Required when abTestEnabled — splitPercent must sum to 100 */
+            variants?: components["schemas"]["CreateCampaignVariantDto"][];
+        };
+        ScheduleCampaignDto: {
+            /** @description ISO 8601 timestamp — when the worker's dispatch poll should send this campaign */
+            scheduledSendAt: string;
+        };
+        CampaignRecipientResponseDto: {
+            id: string;
+            contactId: string;
+            variantId: Record<string, never> | null;
+            /** @enum {string} */
+            status: "PENDING" | "QUEUED" | "SENT" | "DELIVERED" | "OPENED" | "CLICKED" | "BOUNCED" | "FAILED" | "UNSUBSCRIBED";
+            externalMessageId: Record<string, never> | null;
+            queuedAt: Record<string, never> | null;
+            sentAt: Record<string, never> | null;
+            deliveredAt: Record<string, never> | null;
+            openedAt: Record<string, never> | null;
+            clickedAt: Record<string, never> | null;
+            bouncedAt: Record<string, never> | null;
+            unsubscribedAt: Record<string, never> | null;
+            failureReason: Record<string, never> | null;
+        };
+        CampaignPerformanceResponseDto: {
+            totalRecipients: number;
+            sent: number;
+            delivered: number;
+            opened: number;
+            clicked: number;
+            bounced: number;
+            failed: number;
+            unsubscribed: number;
+            /** @description delivered / sent, 0 if none sent */
+            deliveryRate: number;
+            /** @description opened / delivered, 0 if none delivered */
+            openRate: number;
+            /** @description clicked / delivered, 0 if none delivered */
+            clickRate: number;
+            /** @description bounced / sent, 0 if none sent */
+            bounceRate: number;
+            /** @description Per-variant breakdown, present only for A/B-test campaigns */
+            byVariant?: Record<string, never>[];
+        };
+        AbTestDecideWinnerResponseDto: {
+            abTestWinnerVariantId: string;
+            /** Format: date-time */
+            abTestDecidedAt: string;
+            remainingRecipientsEnqueued: number;
+        };
+        CampaignWebhookEventDto: {
+            /** @description The provider-assigned message id set on CampaignRecipient.externalMessageId at send time */
+            externalMessageId: string;
+            /** @enum {string} */
+            eventType: "DELIVERED" | "OPENED" | "CLICKED" | "BOUNCED" | "COMPLAINED" | "FAILED";
+            /** @description Defaults to now() if omitted */
+            occurredAt?: string;
+            /** @description Bounce/complaint/failure reason from the provider */
+            reason?: string;
+        };
+        CampaignWebhookResponseDto: {
+            matched: boolean;
+            recipientId: Record<string, never> | null;
+        };
+        UnsubscribeResponseDto: {
+            unsubscribed: boolean;
+            emailOrPhone: string;
+            channel: string;
+        };
+        ReportDimensionDto: {
+            key: string;
+            label: string;
+        };
+        ReportMeasureDto: {
+            key: string;
+            label: string;
+            /** @enum {string} */
+            aggregate: "sum" | "count" | "avg";
+            /** @enum {string} */
+            format: "currency" | "number" | "percent" | "days";
+        };
+        ReportCatalogEntryDto: {
+            key: string;
+            name: string;
+            description: string;
+            /** @enum {string} */
+            category: "FINANCE" | "SALES" | "RENEWALS" | "CLAIMS" | "COMPLIANCE" | "PRODUCTIVITY" | "MARKETING";
+            filterSchema: Record<string, never>;
+            allowedDimensions: components["schemas"]["ReportDimensionDto"][];
+            measures: components["schemas"]["ReportMeasureDto"][];
+            /** @enum {string} */
+            defaultChartType: "bar" | "stackedBar" | "line" | "funnel" | "table" | "treemap" | "gauge";
+        };
+        RunReportDto: {
+            /** @description Validated server-side against the target report's own filterSchema */
+            filters: Record<string, never>;
+            /** @description Must be one of the report's allowedDimensions keys */
+            dimension?: string;
+            page?: number;
+            pageSize?: number;
+        };
+        ReportColumnDto: {
+            key: string;
+            label: string;
+            format: string;
+        };
+        ReportResultDto: {
+            columns: components["schemas"]["ReportColumnDto"][];
+            rows: Record<string, never>[];
+            totalRowCount: number;
+            generatedAt: string;
+        };
+        ReportDownloadResponseDto: {
+            downloadUrl: string;
+            rowCount: number;
+            expiresInSeconds: number;
+        };
+        ScheduledReportRecipientResponseDto: {
+            id: string;
+            userId: Record<string, never> | null;
+            channel: string;
+            webhookUrl: Record<string, never> | null;
+        };
+        ScheduledReportResponseDto: {
+            id: string;
+            name: string;
+            reportKey: string;
+            filters: Record<string, never>;
+            dimension: Record<string, never> | null;
+            format: string;
+            frequency: string;
+            dayOfWeek: Record<string, never> | null;
+            dayOfMonth: Record<string, never> | null;
+            hourOfDayUtc: number;
+            isActive: boolean;
+            ownerId: string;
+            /** Format: date-time */
+            nextRunAt: string;
+            lastRunAt: Record<string, never> | null;
+            recipients: components["schemas"]["ScheduledReportRecipientResponseDto"][];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ScheduledReportRecipientInputDto: {
+            /** @description Required for EMAIL/IN_APP channels */
+            userId?: string;
+            /** @enum {string} */
+            channel: "EMAIL" | "IN_APP" | "WEBHOOK";
+            /** @description Required for WEBHOOK channel */
+            webhookUrl?: string;
+        };
+        CreateScheduledReportDto: {
+            name: string;
+            /** @description Must be a key returned by GET /reports */
+            reportKey: string;
+            /** @description Validated server-side against the target report's own filterSchema */
+            filters: Record<string, never>;
+            dimension?: string;
+            /**
+             * @default PDF
+             * @enum {string}
+             */
+            format: "PDF" | "EXCEL" | "CSV";
+            /** @enum {string} */
+            frequency: "DAILY" | "WEEKLY" | "MONTHLY" | "QUARTERLY";
+            /** @description 0=Sunday, used for WEEKLY */
+            dayOfWeek?: number;
+            /** @description Used for MONTHLY/QUARTERLY, clamped to the shortest month */
+            dayOfMonth?: number;
+            /** @default 6 */
+            hourOfDayUtc: number;
+            recipients: components["schemas"]["ScheduledReportRecipientInputDto"][];
+        };
+        UpdateScheduledReportDto: {
+            name?: string;
+            /** @description Must be a key returned by GET /reports */
+            reportKey?: string;
+            /** @description Validated server-side against the target report's own filterSchema */
+            filters?: Record<string, never>;
+            dimension?: string;
+            /**
+             * @default PDF
+             * @enum {string}
+             */
+            format: "PDF" | "EXCEL" | "CSV";
+            /** @enum {string} */
+            frequency?: "DAILY" | "WEEKLY" | "MONTHLY" | "QUARTERLY";
+            /** @description 0=Sunday, used for WEEKLY */
+            dayOfWeek?: number;
+            /** @description Used for MONTHLY/QUARTERLY, clamped to the shortest month */
+            dayOfMonth?: number;
+            /** @default 6 */
+            hourOfDayUtc: number;
+            recipients?: components["schemas"]["ScheduledReportRecipientInputDto"][];
+            isActive?: boolean;
+        };
+        ScheduledReportRunResponseDto: {
+            id: string;
+            scheduledReportId: Record<string, never> | null;
+            reportKey: string;
+            format: string;
+            status: string;
+            rowCount: Record<string, never> | null;
+            errorMessage: Record<string, never> | null;
+            startedAt: Record<string, never> | null;
+            completedAt: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ScheduledReportRunDownloadResponseDto: {
+            downloadUrl: string;
+            expiresInSeconds: number;
         };
     };
     responses: never;
@@ -2723,6 +6793,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponseDto"];
+                };
+            };
+        };
+    };
+    UsersController_forceLogout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForceLogoutResponseDto"];
+                };
+            };
+        };
+    };
+    UsersController_sessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeycloakSessionResponseDto"][];
                 };
             };
         };
@@ -3494,6 +7606,437 @@ export interface operations {
             };
         };
     };
+    ScimController_serviceProviderConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimController_resourceTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimController_schemas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimController_listUsers: {
+        parameters: {
+            query: {
+                filter: string;
+                startIndex: string;
+                count: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimController_createUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScimUserRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimController_getUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimController_replaceUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScimUserRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimController_deleteUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimController_patchUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScimPatchRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimController_listGroups: {
+        parameters: {
+            query: {
+                startIndex: string;
+                count: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimController_createGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScimGroupRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimController_getGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimController_replaceGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScimGroupRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimController_deleteGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimController_patchGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScimPatchRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimTokensController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScimTokenResponseDto"][];
+                };
+            };
+        };
+    };
+    ScimTokensController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateScimTokenDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScimTokenCreatedResponseDto"];
+                };
+            };
+        };
+    };
+    ScimTokensController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScimTokensController_deactivate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScimTokenResponseDto"];
+                };
+            };
+        };
+    };
+    AuditExportController_export: {
+        parameters: {
+            query: {
+                format: "csv" | "ndjson";
+                /** @description ISO 8601 — matches createdAt >= from */
+                from?: string;
+                /** @description ISO 8601 — matches createdAt <= to */
+                to?: string;
+                entityType?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuditExportController_verify: {
+        parameters: {
+            query?: {
+                /** @description Bounds the verified range to createdAt > this checkpoint's checkpointAt; omit to verify from genesis */
+                fromCheckpointId?: string;
+                /** @description Bounds the verified range to createdAt <= this checkpoint's checkpointAt; omit to verify up to now */
+                toCheckpointId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description AuditVerifyResponseDto */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AccountsController_list: {
         parameters: {
             query?: {
@@ -3541,6 +8084,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountResponseDto"];
+                };
+            };
+        };
+    };
+    AccountsController_checkDuplicates: {
+        parameters: {
+            query?: {
+                name?: string;
+                email?: string;
+                phone?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateGroupDto"][];
                 };
             };
         };
@@ -3606,6 +8172,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountResponseDto"];
+                };
+            };
+        };
+    };
+    AccountsController_bulkAssign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkAssignAccountsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    AccountsController_bulkUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUpdateAccountsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    AccountsController_bulkDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkDeleteAccountsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    AccountsController_merge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeResponseDto"];
                 };
             };
         };
@@ -3745,6 +8405,30 @@ export interface operations {
             };
         };
     };
+    ContactsController_checkDuplicates: {
+        parameters: {
+            query?: {
+                email?: string;
+                phone?: string;
+                firstName?: string;
+                lastName?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateGroupDto"][];
+                };
+            };
+        };
+    };
     ContactsController_getOne: {
         parameters: {
             query?: never;
@@ -3806,6 +8490,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContactResponseDto"];
+                };
+            };
+        };
+    };
+    ContactsController_bulkAssign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkAssignContactsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    ContactsController_bulkUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUpdateContactsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    ContactsController_bulkDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkDeleteContactsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    ContactsController_merge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeResponseDto"];
                 };
             };
         };
@@ -3964,6 +8742,31 @@ export interface operations {
             };
         };
     };
+    LeadsController_checkDuplicates: {
+        parameters: {
+            query?: {
+                email?: string;
+                phone?: string;
+                firstName?: string;
+                lastName?: string;
+                companyName?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateGroupDto"][];
+                };
+            };
+        };
+    };
     LeadsController_getOne: {
         parameters: {
             query?: never;
@@ -4050,6 +8853,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LeadResponseDto"];
+                };
+            };
+        };
+    };
+    LeadsController_bulkAssign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkAssignLeadsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    LeadsController_bulkUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUpdateLeadsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    LeadsController_bulkDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkDeleteLeadsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    LeadsController_merge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeResponseDto"];
                 };
             };
         };
@@ -4370,6 +9267,75 @@ export interface operations {
             };
         };
     };
+    OpportunitiesController_bulkAssign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkAssignOpportunitiesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    OpportunitiesController_bulkUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUpdateOpportunitiesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    OpportunitiesController_bulkDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkDeleteOpportunitiesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
     OpportunitiesController_updateStage: {
         parameters: {
             query?: never;
@@ -4492,7 +9458,7 @@ export interface operations {
                 opportunityId?: string;
                 leadId?: string;
                 policyId?: string;
-                type?: "CALL" | "EMAIL" | "MEETING" | "NOTE" | "WHATSAPP" | "PORTAL_MESSAGE" | "SMS";
+                type?: "CALL" | "EMAIL" | "MEETING" | "NOTE" | "WHATSAPP" | "PORTAL_MESSAGE" | "SMS" | "SOCIAL" | "LIVE_CHAT";
             };
             header?: never;
             path?: never;
@@ -4686,6 +9652,538 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskResponseDto"];
+                };
+            };
+        };
+    };
+    TasksController_bulkAssign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkAssignTasksDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    TasksController_bulkUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUpdateTasksDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    TasksController_bulkDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkDeleteTasksDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    CustomFieldDefinitionsController_list: {
+        parameters: {
+            query?: {
+                entityType?: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomFieldDefinitionResponseDto"][];
+                };
+            };
+        };
+    };
+    CustomFieldDefinitionsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCustomFieldDefinitionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomFieldDefinitionResponseDto"];
+                };
+            };
+        };
+    };
+    CustomFieldDefinitionsController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomFieldDefinitionResponseDto"];
+                };
+            };
+        };
+    };
+    CustomFieldDefinitionsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomFieldDefinitionsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCustomFieldDefinitionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomFieldDefinitionResponseDto"];
+                };
+            };
+        };
+    };
+    SavedViewsController_list: {
+        parameters: {
+            query?: {
+                entityType?: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY" | "TASK";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewResponseDto"][];
+                };
+            };
+        };
+    };
+    SavedViewsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSavedViewDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewResponseDto"];
+                };
+            };
+        };
+    };
+    SavedViewsController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewResponseDto"];
+                };
+            };
+        };
+    };
+    SavedViewsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SavedViewsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSavedViewDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewResponseDto"];
+                };
+            };
+        };
+    };
+    SavedViewsController_run: {
+        parameters: {
+            query?: {
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunSavedViewResponseDto"];
+                };
+            };
+        };
+    };
+    SalesQuotasController_list: {
+        parameters: {
+            query?: {
+                scopeType?: "USER" | "DEPARTMENT" | "BRANCH" | "ORG";
+                userId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesQuotaResponseDto"][];
+                };
+            };
+        };
+    };
+    SalesQuotasController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSalesQuotaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesQuotaResponseDto"];
+                };
+            };
+        };
+    };
+    SalesQuotasController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesQuotaResponseDto"];
+                };
+            };
+        };
+    };
+    SalesQuotasController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSalesQuotaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesQuotaResponseDto"];
+                };
+            };
+        };
+    };
+    SalesQuotasController_getAttainment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaAttainmentResponseDto"];
+                };
+            };
+        };
+    };
+    AutomationRulesController_list: {
+        parameters: {
+            query?: {
+                triggerType?: "SCHEDULE" | "ENTITY_EVENT";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRuleResponseDto"][];
+                };
+            };
+        };
+    };
+    AutomationRulesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAutomationRuleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRuleResponseDto"];
+                };
+            };
+        };
+    };
+    AutomationRulesController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRuleResponseDto"];
+                };
+            };
+        };
+    };
+    AutomationRulesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AutomationRulesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAutomationRuleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRuleResponseDto"];
                 };
             };
         };
@@ -5354,6 +10852,195 @@ export interface operations {
             };
         };
     };
+    WebhookSubscriptionsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookSubscriptionResponseDto"][];
+                };
+            };
+        };
+    };
+    WebhookSubscriptionsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWebhookSubscriptionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookSubscriptionCreatedResponseDto"];
+                };
+            };
+        };
+    };
+    WebhookSubscriptionsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookSubscriptionResponseDto"];
+                };
+            };
+        };
+    };
+    WebhookSubscriptionsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WebhookSubscriptionsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWebhookSubscriptionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookSubscriptionResponseDto"];
+                };
+            };
+        };
+    };
+    WebhookSubscriptionsController_listDeliveries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDeliveryResponseDto"][];
+                };
+            };
+        };
+    };
+    WebhookSubscriptionsController_redeliver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDeliveryResponseDto"];
+                };
+            };
+        };
+    };
+    WebhookReceiverController_receive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                webhookPath: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OAuthController_authorize: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connectorId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirects (302) to the connector's authorizeUrl */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     NotificationsController_listMine: {
         parameters: {
             query?: never;
@@ -5436,6 +11123,128 @@ export interface operations {
             };
         };
     };
+    AiGatewayController_sentiment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SentimentRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AiGatewayController_categorize: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategorizeRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AiGatewayController_accountInsight: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountInsightRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AiGatewayController_index: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SemanticIndexRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AiGatewayController_search: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SemanticSearchRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AiGatewayController_usageSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     DashboardsController_getOperationalKpis: {
         parameters: {
             query?: never;
@@ -5455,13 +11264,114 @@ export interface operations {
             };
         };
     };
+    DashboardsController_getSalesForecast: {
+        parameters: {
+            query?: {
+                /** @description The current month/quarter containing today */
+                period?: "month" | "quarter";
+                pipelineId?: string;
+                ownerId?: string;
+                groupBy?: "owner" | "stage" | "lineOfBusiness";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesForecastResponseDto"];
+                };
+            };
+        };
+    };
+    RoleDashboardsController_executive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderedDashboardResponseDto"];
+                };
+            };
+        };
+    };
+    RoleDashboardsController_branchManager: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderedDashboardResponseDto"];
+                };
+            };
+        };
+    };
+    RoleDashboardsController_broker: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderedDashboardResponseDto"];
+                };
+            };
+        };
+    };
+    RoleDashboardsController_compliance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderedDashboardResponseDto"];
+                };
+            };
+        };
+    };
     AuditLogController_list: {
         parameters: {
             query?: {
                 entityType?: string;
                 entityId?: string;
                 actorUserId?: string;
-                action?: "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGIN_FAILED" | "PERMISSION_CHANGE" | "EXPORT" | "VIEW_SENSITIVE";
+                action?: "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGIN_FAILED" | "PERMISSION_CHANGE" | "EXPORT" | "VIEW_SENSITIVE" | "FORCE_LOGOUT";
                 /** @description ISO 8601 — matches createdAt >= from */
                 from?: string;
                 /** @description ISO 8601 — matches createdAt <= to */
@@ -5481,6 +11391,3089 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditLogResponseDto"][];
+                };
+            };
+        };
+    };
+    ClaimsController_list: {
+        parameters: {
+            query?: {
+                status?: "NOTIFIED" | "UNDER_REVIEW" | "ADJUSTED" | "SETTLED" | "REPUDIATED" | "REOPENED" | "WITHDRAWN";
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                adjusterId?: string;
+                policyId?: string;
+                assignedTeamId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponseDto"][];
+                };
+            };
+        };
+    };
+    ClaimsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateClaimDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponseDto"];
+                };
+            };
+        };
+    };
+    ClaimsController_listMine: {
+        parameters: {
+            query?: {
+                status?: "NOTIFIED" | "UNDER_REVIEW" | "ADJUSTED" | "SETTLED" | "REPUDIATED" | "REOPENED" | "WITHDRAWN";
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                adjusterId?: string;
+                policyId?: string;
+                assignedTeamId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponseDto"][];
+                };
+            };
+        };
+    };
+    ClaimsController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponseDto"];
+                };
+            };
+        };
+    };
+    ClaimsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateClaimDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponseDto"];
+                };
+            };
+        };
+    };
+    ClaimsController_statusHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimStatusHistoryResponseDto"][];
+                };
+            };
+        };
+    };
+    ClaimsController_changeStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeClaimStatusDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponseDto"];
+                };
+            };
+        };
+    };
+    ClaimsController_reopen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReopenClaimDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponseDto"];
+                };
+            };
+        };
+    };
+    ClaimsController_listComments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentResponseDto"][];
+                };
+            };
+        };
+    };
+    ClaimsController_addComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCommentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentResponseDto"];
+                };
+            };
+        };
+    };
+    ClaimsController_listWatchers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseWatcherResponseDto"][];
+                };
+            };
+        };
+    };
+    ClaimsController_addWatcher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddWatcherDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseWatcherResponseDto"];
+                };
+            };
+        };
+    };
+    ClaimsController_removeWatcher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CasesController_list: {
+        parameters: {
+            query?: {
+                status?: "NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED";
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                caseType?: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
+                assignedToId?: string;
+                assignedTeamId?: string;
+                accountId?: string;
+                categoryId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResponseDto"][];
+                };
+            };
+        };
+    };
+    CasesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCaseDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_listMine: {
+        parameters: {
+            query?: {
+                status?: "NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED";
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                caseType?: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
+                assignedToId?: string;
+                assignedTeamId?: string;
+                accountId?: string;
+                categoryId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResponseDto"][];
+                };
+            };
+        };
+    };
+    CasesController_queue: {
+        parameters: {
+            query?: {
+                /** @description Restrict the unassigned queue to one team */
+                teamId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResponseDto"][];
+                };
+            };
+        };
+    };
+    CasesController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCaseDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_claimCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_changeStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeCaseStatusDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_linkChild: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkChildCaseDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_merge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeCaseDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_applyMacro: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                macroId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyMacroResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_listComments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentResponseDto"][];
+                };
+            };
+        };
+    };
+    CasesController_addComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCommentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_listWatchers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseWatcherResponseDto"][];
+                };
+            };
+        };
+    };
+    CasesController_addWatcher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddWatcherDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseWatcherResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_removeWatcher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SlaPoliciesController_list: {
+        parameters: {
+            query: {
+                entityType: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaPolicyResponseDto"][];
+                };
+            };
+        };
+    };
+    SlaPoliciesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSlaPolicyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaPolicyResponseDto"];
+                };
+            };
+        };
+    };
+    SlaPoliciesController_complianceReport: {
+        parameters: {
+            query: {
+                slaPolicyId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaComplianceReportRowDto"][];
+                };
+            };
+        };
+    };
+    SlaPoliciesController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaPolicyResponseDto"];
+                };
+            };
+        };
+    };
+    SlaPoliciesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SlaPoliciesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSlaPolicyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaPolicyResponseDto"];
+                };
+            };
+        };
+    };
+    SlaPoliciesController_clocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaClockResponseDto"][];
+                };
+            };
+        };
+    };
+    SlaPoliciesController_addTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSlaTargetDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaTargetResponseDto"];
+                };
+            };
+        };
+    };
+    SlaPoliciesController_removeTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                targetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SlaPoliciesController_updateTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                targetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSlaTargetDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaTargetResponseDto"];
+                };
+            };
+        };
+    };
+    BusinessHoursController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessHoursCalendarResponseDto"][];
+                };
+            };
+        };
+    };
+    BusinessHoursController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBusinessHoursCalendarDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessHoursCalendarResponseDto"];
+                };
+            };
+        };
+    };
+    BusinessHoursController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessHoursCalendarResponseDto"];
+                };
+            };
+        };
+    };
+    BusinessHoursController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BusinessHoursController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBusinessHoursCalendarDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessHoursCalendarResponseDto"];
+                };
+            };
+        };
+    };
+    BusinessHoursController_listHolidays: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessHolidayResponseDto"][];
+                };
+            };
+        };
+    };
+    BusinessHoursController_addHoliday: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBusinessHolidayDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessHolidayResponseDto"];
+                };
+            };
+        };
+    };
+    BusinessHoursController_removeHoliday: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                holidayId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BusinessHoursController_updateHoliday: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                holidayId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBusinessHolidayDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessHolidayResponseDto"];
+                };
+            };
+        };
+    };
+    MacrosController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MacroResponseDto"][];
+                };
+            };
+        };
+    };
+    MacrosController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMacroDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MacroResponseDto"];
+                };
+            };
+        };
+    };
+    MacrosController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MacroResponseDto"];
+                };
+            };
+        };
+    };
+    MacrosController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MacrosController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMacroDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MacroResponseDto"];
+                };
+            };
+        };
+    };
+    MacrosController_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MacroPreviewRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MacroPreviewResponseDto"];
+                };
+            };
+        };
+    };
+    AssignmentRulesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentRuleResponseDto"][];
+                };
+            };
+        };
+    };
+    AssignmentRulesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAssignmentRuleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentRuleResponseDto"];
+                };
+            };
+        };
+    };
+    AssignmentRulesController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentRuleResponseDto"];
+                };
+            };
+        };
+    };
+    AssignmentRulesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AssignmentRulesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAssignmentRuleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentRuleResponseDto"];
+                };
+            };
+        };
+    };
+    AssignmentRulesController_test: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentTestResponseDto"];
+                };
+            };
+        };
+    };
+    AgentSkillsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSkillResponseDto"][];
+                };
+            };
+        };
+    };
+    AgentSkillsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAgentSkillDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSkillResponseDto"];
+                };
+            };
+        };
+    };
+    AgentSkillsController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSkillResponseDto"];
+                };
+            };
+        };
+    };
+    AgentSkillsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AgentSkillsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentSkillDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSkillResponseDto"];
+                };
+            };
+        };
+    };
+    CaseCategoriesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseCategoryResponseDto"][];
+                };
+            };
+        };
+    };
+    CaseCategoriesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCaseCategoryDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseCategoryResponseDto"];
+                };
+            };
+        };
+    };
+    CaseCategoriesController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseCategoryResponseDto"];
+                };
+            };
+        };
+    };
+    CaseCategoriesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CaseCategoriesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCaseCategoryDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseCategoryResponseDto"];
+                };
+            };
+        };
+    };
+    LossCauseCategoriesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LossCauseCategoryResponseDto"][];
+                };
+            };
+        };
+    };
+    LossCauseCategoriesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLossCauseCategoryDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LossCauseCategoryResponseDto"];
+                };
+            };
+        };
+    };
+    LossCauseCategoriesController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LossCauseCategoryResponseDto"];
+                };
+            };
+        };
+    };
+    LossCauseCategoriesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LossCauseCategoriesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLossCauseCategoryDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LossCauseCategoryResponseDto"];
+                };
+            };
+        };
+    };
+    KnowledgeCategoriesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeCategoryResponseDto"][];
+                };
+            };
+        };
+    };
+    KnowledgeCategoriesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateKnowledgeCategoryDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeCategoryResponseDto"];
+                };
+            };
+        };
+    };
+    KnowledgeCategoriesController_findOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeCategoryResponseDto"];
+                };
+            };
+        };
+    };
+    KnowledgeCategoriesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    KnowledgeCategoriesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateKnowledgeCategoryDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeCategoryResponseDto"];
+                };
+            };
+        };
+    };
+    KnowledgeArticlesController_suggest: {
+        parameters: {
+            query: {
+                q: string;
+                caseId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeArticleResponseDto"][];
+                };
+            };
+        };
+    };
+    KnowledgeArticlesController_list: {
+        parameters: {
+            query?: {
+                categoryId?: string;
+                status?: "DRAFT" | "IN_REVIEW" | "PUBLISHED" | "ARCHIVED";
+                locale?: string;
+                visibility?: "INTERNAL" | "CUSTOMER";
+                /** @description Case-insensitive substring match on title */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeArticleResponseDto"][];
+                };
+            };
+        };
+    };
+    KnowledgeArticlesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateKnowledgeArticleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeArticleResponseDto"];
+                };
+            };
+        };
+    };
+    KnowledgeArticlesController_findOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeArticleResponseDto"];
+                };
+            };
+        };
+    };
+    KnowledgeArticlesController_listVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeArticleVersionResponseDto"][];
+                };
+            };
+        };
+    };
+    KnowledgeArticlesController_addVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateKnowledgeArticleVersionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeArticleResponseDto"];
+                };
+            };
+        };
+    };
+    KnowledgeArticlesController_submitForReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeArticleResponseDto"];
+                };
+            };
+        };
+    };
+    KnowledgeArticlesController_decideApproval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideKnowledgeApprovalDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeArticleResponseDto"];
+                };
+            };
+        };
+    };
+    KnowledgeArticlesController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeArticleResponseDto"];
+                };
+            };
+        };
+    };
+    KnowledgeArticlesController_feedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertKnowledgeArticleFeedbackDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeArticleFeedbackResponseDto"];
+                };
+            };
+        };
+    };
+    KnowledgeArticlesController_analytics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeArticleAnalyticsResponseDto"];
+                };
+            };
+        };
+    };
+    SurveysController_list: {
+        parameters: {
+            query?: {
+                type?: "CSAT" | "NPS" | "CES";
+                isActive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SurveyDto"][];
+                };
+            };
+        };
+    };
+    SurveysController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSurveyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SurveyDto"];
+                };
+            };
+        };
+    };
+    SurveysController_csatReport: {
+        parameters: {
+            query?: {
+                agentId?: string;
+                teamId?: string;
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSurveySummaryRowDto"][];
+                };
+            };
+        };
+    };
+    SurveysController_npsReport: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSurveySummaryRowDto"][];
+                };
+            };
+        };
+    };
+    SurveysController_findOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SurveyDto"];
+                };
+            };
+        };
+    };
+    SurveysController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSurveyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SurveyDto"];
+                };
+            };
+        };
+    };
+    SurveysController_responses: {
+        parameters: {
+            query?: {
+                agentId?: string;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SurveyResponseRecordDto"][];
+                };
+            };
+        };
+    };
+    SurveyResponsesController_submit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitSurveyResponseDto"];
+            };
+        };
+        responses: {
+            /** @description Records the respondent score/comment; rejects an invalid token or an already-answered response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AudienceSegmentsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudienceSegmentResponseDto"][];
+                };
+            };
+        };
+    };
+    AudienceSegmentsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAudienceSegmentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudienceSegmentResponseDto"];
+                };
+            };
+        };
+    };
+    AudienceSegmentsController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudienceSegmentResponseDto"];
+                };
+            };
+        };
+    };
+    AudienceSegmentsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AudienceSegmentsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAudienceSegmentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudienceSegmentResponseDto"];
+                };
+            };
+        };
+    };
+    AudienceSegmentsController_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewAudienceSegmentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentPreviewResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignTemplatesController_getMergeFields: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeFieldDescriptorResponseDto"][];
+                };
+            };
+        };
+    };
+    CampaignTemplatesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignTemplateResponseDto"][];
+                };
+            };
+        };
+    };
+    CampaignTemplatesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCampaignTemplateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignTemplateResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignTemplatesController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignTemplateResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignTemplatesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CampaignTemplatesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCampaignTemplateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignTemplateResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignsController_list: {
+        parameters: {
+            query?: {
+                status?: "DRAFT" | "SCHEDULED" | "SENDING" | "SENT" | "PAUSED" | "CANCELLED";
+                channel?: "EMAIL" | "SMS" | "WHATSAPP";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignResponseDto"][];
+                };
+            };
+        };
+    };
+    CampaignsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCampaignDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignsController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCampaignDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignsController_schedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleCampaignDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignsController_send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignsController_pause: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignsController_resume: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignsController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignsController_recipients: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignRecipientResponseDto"][];
+                };
+            };
+        };
+    };
+    CampaignsController_performance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignPerformanceResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignsController_decideAbTestWinner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AbTestDecideWinnerResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignWebhooksController_handleEmailEvent: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Shared secret — see CAMPAIGN_WEBHOOK_SECRET */
+                "x-campaign-webhook-secret": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignWebhookEventDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignWebhookResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignWebhooksController_handleSmsEvent: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Shared secret — see CAMPAIGN_WEBHOOK_SECRET */
+                "x-campaign-webhook-secret": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignWebhookEventDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignWebhookResponseDto"];
+                };
+            };
+        };
+    };
+    CampaignWebhooksController_handleWhatsappEvent: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Shared secret — see CAMPAIGN_WEBHOOK_SECRET */
+                "x-campaign-webhook-secret": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignWebhookEventDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignWebhookResponseDto"];
+                };
+            };
+        };
+    };
+    PublicUnsubscribeController_unsubscribeGet: {
+        parameters: {
+            query: {
+                /** @description Signed token embedded in the campaign send — see unsubscribe-token.util.ts */
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnsubscribeResponseDto"];
+                };
+            };
+        };
+    };
+    PublicUnsubscribeController_unsubscribePost: {
+        parameters: {
+            query: {
+                /** @description Signed token embedded in the campaign send — see unsubscribe-token.util.ts */
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnsubscribeResponseDto"];
+                };
+            };
+        };
+    };
+    ReportsController_listCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportCatalogEntryDto"][];
+                };
+            };
+        };
+    };
+    ReportsController_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunReportDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportResultDto"];
+                };
+            };
+        };
+    };
+    ReportsController_export: {
+        parameters: {
+            query: {
+                format: "xlsx" | "csv" | "pdf";
+                /** @description JSON-encoded filters object, validated the same way as POST .../run */
+                filters?: string;
+                dimension?: string;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDownloadResponseDto"];
+                };
+            };
+        };
+    };
+    ScheduledReportsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduledReportResponseDto"][];
+                };
+            };
+        };
+    };
+    ScheduledReportsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateScheduledReportDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduledReportResponseDto"];
+                };
+            };
+        };
+    };
+    ScheduledReportsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScheduledReportsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateScheduledReportDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduledReportResponseDto"];
+                };
+            };
+        };
+    };
+    ScheduledReportsController_runNow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduledReportRunResponseDto"];
+                };
+            };
+        };
+    };
+    ScheduledReportsController_listRuns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduledReportRunResponseDto"][];
+                };
+            };
+        };
+    };
+    ScheduledReportsController_downloadRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduledReportRunDownloadResponseDto"];
                 };
             };
         };

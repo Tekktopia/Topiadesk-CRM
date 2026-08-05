@@ -25,6 +25,7 @@ import { Queue, Worker, type Job } from 'bullmq';
 import type Redis from 'ioredis';
 import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT } from '@topiadesk/db';
 import { applicableThreshold, dateBucket, daysBetween, nextAlertDate } from './threshold';
+import { runRenewalPlaybooks } from './renewal-playbook';
 
 export const RENEWAL_SCAN_QUEUE_NAME = 'renewal-scan';
 const RENEWAL_SCAN_SCHEDULER_ID = 'renewal-scan-scheduler';
@@ -92,6 +93,22 @@ export async function runRenewalScan(now: Date = new Date()): Promise<RenewalSca
             },
           });
           notificationsCreated++;
+
+          // Renewal Playbooks — see renewal-playbook.ts's header comment for
+          // why this sits specifically in the fresh-notification branch
+          // (that dedupeKey create succeeding is this feature's own
+          // idempotency gate too, not just the notification's).
+          try {
+            await runRenewalPlaybooks({
+              policyId: schedule.policyId,
+              lineOfBusiness: schedule.policy.lineOfBusiness,
+              accountId: schedule.policy.accountId,
+              threshold,
+              defaultAssigneeId: recipientUserId,
+            });
+          } catch (err) {
+            console.error(`[renewal-scan] renewal playbook run failed for schedule ${schedule.id}`, err);
+          }
         } catch (err) {
           if (isUniqueConstraintViolation(err)) {
             notificationsDeduped++;

@@ -44,9 +44,15 @@ WORKDIR /app
 RUN groupadd --system --gid 1001 topiadesk \
     && useradd --system --uid 1001 --gid topiadesk --create-home topiadesk
 
-COPY --from=builder --chown=topiadesk:topiadesk /app/frontend/web/public ./public
 COPY --from=builder --chown=topiadesk:topiadesk /app/frontend/web/.next/standalone ./
 COPY --from=builder --chown=topiadesk:topiadesk /app/frontend/web/.next/static ./frontend/web/.next/static
+# Must land next to server.js (frontend/web/server.js), not at the
+# container's top-level ./public — Next's standalone server resolves
+# public/ relative to its own location, the same way it resolves
+# .next/static above. Was pointed at the wrong path: static assets under
+# public/ (e.g. logo-mark.png) 404'd at runtime despite the file being
+# present in the image, just at a path the server never looks at.
+COPY --from=builder --chown=topiadesk:topiadesk /app/frontend/web/public ./frontend/web/public
 
 USER topiadesk
 EXPOSE 3000

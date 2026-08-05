@@ -11,6 +11,7 @@ export class AccountResponseDto {
   @ApiProperty({ nullable: true }) parentAccountId!: string | null;
   @ApiProperty({ nullable: true }) city!: string | null;
   @ApiProperty({ nullable: true }) country!: string | null;
+  @ApiProperty({ type: 'object', additionalProperties: true }) customFields!: unknown;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
 }

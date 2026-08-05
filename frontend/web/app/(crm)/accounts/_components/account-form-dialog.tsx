@@ -26,9 +26,11 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  toast,
 } from '@topiadesk/ui';
+import { CustomFieldsSection, validateCustomFieldValues, type CustomFieldValues } from '../../_components/custom-fields-section';
 import { ACCOUNT_STATUSES, ACCOUNT_TYPES, RISK_RATINGS, accountStatusLabel, riskRatingLabel } from '../../_lib/constants';
-import { useCreateAccount, useUpdateAccount } from '../../_lib/hooks';
+import { useCreateAccount, useCustomFieldDefinitions, useUpdateAccount } from '../../_lib/hooks';
 import type { Account } from '../../_lib/types';
 
 const accountFormSchema = z.object({
@@ -76,11 +78,23 @@ export function AccountFormDialog({
     values: defaultsFor(account),
   });
 
+  const { data: customFieldDefinitions } = useCustomFieldDefinitions('ACCOUNT');
+  const [customFields, setCustomFields] = React.useState<CustomFieldValues>(account?.customFields ?? {});
+  React.useEffect(() => {
+    setCustomFields(account?.customFields ?? {});
+  }, [account]);
+
   const createAccount = useCreateAccount();
   const updateAccount = useUpdateAccount(account?.id ?? '');
   const isPending = createAccount.isPending || updateAccount.isPending;
 
   const onSubmit = form.handleSubmit(async (values) => {
+    const customFieldError = validateCustomFieldValues(customFieldDefinitions, customFields, !isEdit);
+    if (customFieldError) {
+      toast.error(customFieldError);
+      return;
+    }
+    const hasActiveCustomFields = (customFieldDefinitions ?? []).some((d) => d.isActive);
     const payload = {
       name: values.name,
       accountType: values.accountType,
@@ -92,6 +106,7 @@ export function AccountFormDialog({
       source: values.source || undefined,
       industryId: values.industryId || undefined,
       notes: values.notes || undefined,
+      customFields: hasActiveCustomFields ? customFields : undefined,
     };
     if (isEdit && account) {
       await updateAccount.mutateAsync(payload);
@@ -100,6 +115,7 @@ export function AccountFormDialog({
     }
     onOpenChange(false);
     form.reset(defaultsFor(undefined));
+    setCustomFields({});
   });
 
   return (
@@ -283,6 +299,8 @@ export function AccountFormDialog({
                 </FormItem>
               )}
             />
+
+            <CustomFieldsSection entityType="ACCOUNT" values={customFields} onChange={setCustomFields} />
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>

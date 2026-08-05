@@ -1,9 +1,12 @@
 import { BadRequestException, Body, ConflictException, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { getPrismaClient, getRlsContext } from '@topiadesk/db';
+import { getPrismaClient, getRlsContext, type Prisma } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import {
+  BulkAssignLeadsDto,
+  BulkDeleteLeadsDto,
+  BulkUpdateLeadsDto,
   ConvertLeadRequestDto,
   ConvertLeadResponseDto,
   CreateLeadDto,
@@ -12,6 +15,13 @@ import {
   UpdateLeadDto,
   UpdateLeadScoreDto,
 } from './dto/lead.dto';
+import { BulkActionResponseDto } from './dto/bulk-action.dto';
+import { CheckLeadDuplicatesQueryDto, DuplicateGroupDto } from './dto/duplicate-check.dto';
+import { MergeRequestDto, MergeResponseDto } from './dto/merge.dto';
+import { validateCustomFields } from './custom-fields.validator';
+import { diffBulkIds } from './bulk-actions';
+import { checkLeadDuplicates } from './duplicate-detection';
+import { mergeLeads } from './merge';
 
 @ApiTags('crm')
 @ApiBearerAuth()
@@ -33,6 +43,15 @@ export class LeadsController {
     });
   }
 
+  // Must precede ':id' — Nest matches literal segments in declaration order
+  // ahead of a dynamic param competing for the same position.
+  @Get('check-duplicates')
+  @RequirePermission('lead', 'read')
+  @ApiOkResponse({ type: [DuplicateGroupDto] })
+  async checkDuplicates(@Query() query: CheckLeadDuplicatesQueryDto): Promise<DuplicateGroupDto[]> {
+    return checkLeadDuplicates(query);
+  }
+
   @Get(':id')
   @RequirePermission('lead', 'read')
   @ApiOkResponse({ type: LeadResponseDto })
@@ -46,7 +65,10 @@ export class LeadsController {
   @RequirePermission('lead', 'write')
   @ApiOkResponse({ type: LeadResponseDto })
   async create(@Body() dto: CreateLeadDto): Promise<LeadResponseDto> {
-    return getPrismaClient().lead.create({ data: dto });
+    await validateCustomFields('LEAD', dto.customFields, { isCreate: true });
+    return getPrismaClient().lead.create({
+      data: { ...dto, customFields: dto.customFields as Prisma.InputJsonValue | undefined },
+    });
   }
 
   @Patch(':id')
@@ -56,7 +78,11 @@ export class LeadsController {
     const prisma = getPrismaClient();
     const existing = await prisma.lead.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Lead not found');
-    return prisma.lead.update({ where: { id }, data: dto });
+    await validateCustomFields('LEAD', dto.customFields, { isCreate: false });
+    return prisma.lead.update({
+      where: { id },
+      data: { ...dto, customFields: dto.customFields as Prisma.InputJsonValue | undefined },
+    });
   }
 
   @Patch(':id/score')
@@ -77,6 +103,55 @@ export class LeadsController {
     if (!existing) throw new NotFoundException('Lead not found');
     await prisma.lead.delete({ where: { id } });
     return { deleted: true };
+  }
+
+  @Post('bulk/assign')
+  @RequirePermission('lead', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkAssign(@Body() dto: BulkAssignLeadsDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.lead.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((l) => l.id));
+    if (matched.length > 0) {
+      await prisma.lead.updateMany({ where: { id: { in: matched } }, data: { assignedToId: dto.assignedToId } });
+    }
+    return { requested: dto.ids, updated: matched, skipped };
+  }
+
+  @Post('bulk/update')
+  @RequirePermission('lead', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkUpdate(@Body() dto: BulkUpdateLeadsDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.lead.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((l) => l.id));
+    if (matched.length > 0) {
+      await prisma.lead.updateMany({
+        where: { id: { in: matched } },
+        data: { status: dto.status, source: dto.source, score: dto.score },
+      });
+    }
+    return { requested: dto.ids, updated: matched, skipped };
+  }
+
+  @Post('bulk/delete')
+  @RequirePermission('lead', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkDelete(@Body() dto: BulkDeleteLeadsDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.lead.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((l) => l.id));
+    if (matched.length > 0) {
+      await prisma.lead.deleteMany({ where: { id: { in: matched } } });
+    }
+    return { requested: dto.ids, updated: matched, skipped };
+  }
+
+  @Post(':id/merge')
+  @RequirePermission('lead', 'write')
+  @ApiOkResponse({ type: MergeResponseDto })
+  async merge(@Param('id') id: string, @Body() dto: MergeRequestDto): Promise<MergeResponseDto> {
+    return mergeLeads(id, dto.loserId);
   }
 
   /**

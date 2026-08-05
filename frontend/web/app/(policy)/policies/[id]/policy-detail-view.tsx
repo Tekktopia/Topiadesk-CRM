@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
-import { Badge, Card, CardContent, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger } from '@topiadesk/ui';
+import { Badge, Card, CardContent, RecordHistory, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger } from '@topiadesk/ui';
 import { formatDate, formatNaira, policyStatusVariant } from '@/app/(policy)/lib/format';
 import type { LookupOption, PolicyDto } from '@/app/(policy)/lib/types';
 import { LifecycleActions } from './lifecycle-actions';
@@ -105,6 +105,7 @@ export function PolicyDetailView({ policyId }: { policyId: string }) {
           <TabsTrigger value="premiums">Premiums</TabsTrigger>
           <TabsTrigger value="renewal">Renewal</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
         <TabsContent value="versions" className="pt-4">
           <VersionHistory policyId={policyId} onChanged={invalidatePolicy} />
@@ -117,6 +118,9 @@ export function PolicyDetailView({ policyId }: { policyId: string }) {
         </TabsContent>
         <TabsContent value="documents" className="pt-4">
           <DocumentsPanel policyId={policyId} />
+        </TabsContent>
+        <TabsContent value="history" className="pt-4">
+          <RecordHistory entityType="policies" entityId={policyId} />
         </TabsContent>
       </Tabs>
     </div>

@@ -15,4 +15,10 @@ export interface NavItem {
   /** Route groups sharing a section heading in the sidebar, e.g. "CRM",
    * "Policy", "Admin". Omit for top-level items like the dashboard home. */
   section?: string;
+  /** Requires ADMIN or COMPLIANCE_OFFICER — mirrors canReadAdmin() in
+   * app/(admin)/admin/_lib/permissions.ts. Duplicated as a plain boolean
+   * here (rather than importing that helper) so the shared root layout
+   * doesn't reach into one route group's private _lib; hidden from the
+   * sidebar entirely for other roles rather than showing a link that 403s. */
+  adminOnly?: boolean;
 }

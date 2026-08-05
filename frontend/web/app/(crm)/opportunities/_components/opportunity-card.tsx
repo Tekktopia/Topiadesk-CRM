@@ -31,6 +31,8 @@ export function OpportunityCard({
   stages,
   onMoveStage,
   isMoving,
+  selected,
+  onSelectChange,
 }: {
   opportunity: Opportunity;
   accountName?: string;
@@ -38,6 +40,9 @@ export function OpportunityCard({
   stages: KanbanStage[];
   onMoveStage: (stageId: string) => void;
   isMoving: boolean;
+  /** Bulk-selection state — the checkbox only renders when onSelectChange is provided. */
+  selected?: boolean;
+  onSelectChange?: (checked: boolean) => void;
 }) {
   const currentIndex = stages.findIndex((s) => s.id === opportunity.pipelineStageId);
   const nextStage = currentIndex >= 0 ? stages[currentIndex + 1] : undefined;
@@ -46,9 +51,20 @@ export function OpportunityCard({
   return (
     <Card className="shadow-brand-sm">
       <CardContent className="space-y-2 p-3">
-        <Link href={`/opportunities/${opportunity.id}`} className="block text-sm font-medium text-foreground hover:underline">
-          {opportunity.name}
-        </Link>
+        <div className="flex items-start gap-2">
+          {onSelectChange ? (
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary"
+              aria-label={`Select ${opportunity.name}`}
+              checked={Boolean(selected)}
+              onChange={(e) => onSelectChange(e.target.checked)}
+            />
+          ) : null}
+          <Link href={`/opportunities/${opportunity.id}`} className="block text-sm font-medium text-foreground hover:underline">
+            {opportunity.name}
+          </Link>
+        </div>
         <p className="truncate text-xs text-muted-foreground">{accountName ?? 'Unknown account'}</p>
         <div className="flex items-center justify-between text-xs">
           <span className="font-medium text-foreground">{formatCurrency(opportunity.amount)}</span>

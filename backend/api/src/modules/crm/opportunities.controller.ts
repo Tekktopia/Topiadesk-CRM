@@ -1,11 +1,14 @@
 import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { getPrismaClient } from '@topiadesk/db';
+import { getPrismaClient, type Prisma } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
 import {
+  BulkAssignOpportunitiesDto,
+  BulkDeleteOpportunitiesDto,
+  BulkUpdateOpportunitiesDto,
   CreateOpportunityDto,
   OpportunityQueryDto,
   OpportunityResponseDto,
@@ -14,6 +17,9 @@ import {
 } from './dto/opportunity.dto';
 import { CreateMarketSubmissionDto, MarketSubmissionResponseDto, UpdateMarketSubmissionDto } from './dto/opportunity-market-submission.dto';
 import { toMarketSubmissionDto, toOpportunityDto } from './mapping';
+import { BulkActionResponseDto } from './dto/bulk-action.dto';
+import { validateCustomFields } from './custom-fields.validator';
+import { diffBulkIds } from './bulk-actions';
 
 @ApiTags('crm')
 @ApiBearerAuth()
@@ -61,6 +67,7 @@ export class OpportunitiesController {
   @ApiOkResponse({ type: OpportunityResponseDto })
   async create(@Body() dto: CreateOpportunityDto, @CurrentUser() user: AuthenticatedUser): Promise<OpportunityResponseDto> {
     const prisma = getPrismaClient();
+    await validateCustomFields('OPPORTUNITY', dto.customFields, { isCreate: true });
     let probability = dto.probability;
     if (probability === undefined) {
       const stage = await prisma.pipelineStage.findUnique({ where: { id: dto.pipelineStageId } });
@@ -80,6 +87,7 @@ export class OpportunitiesController {
         lostReason: dto.lostReason,
         ownerId: dto.ownerId ?? user.id,
         lineOfBusiness: dto.lineOfBusiness,
+        customFields: dto.customFields as Prisma.InputJsonValue | undefined,
       },
     });
     return toOpportunityDto(opportunity);
@@ -92,12 +100,14 @@ export class OpportunitiesController {
     const prisma = getPrismaClient();
     const existing = await prisma.opportunity.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Opportunity not found');
+    await validateCustomFields('OPPORTUNITY', dto.customFields, { isCreate: false });
     const updated = await prisma.opportunity.update({
       where: { id },
       data: {
         ...dto,
         expectedCloseDate: dto.expectedCloseDate ? new Date(dto.expectedCloseDate) : undefined,
         actualCloseDate: dto.actualCloseDate ? new Date(dto.actualCloseDate) : undefined,
+        customFields: dto.customFields as Prisma.InputJsonValue | undefined,
       },
     });
     return toOpportunityDto(updated);
@@ -111,6 +121,48 @@ export class OpportunitiesController {
     if (!existing) throw new NotFoundException('Opportunity not found');
     await prisma.opportunity.delete({ where: { id } });
     return { deleted: true };
+  }
+
+  @Post('bulk/assign')
+  @RequirePermission('opportunity', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkAssign(@Body() dto: BulkAssignOpportunitiesDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.opportunity.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((o) => o.id));
+    if (matched.length > 0) {
+      await prisma.opportunity.updateMany({ where: { id: { in: matched } }, data: { ownerId: dto.ownerId } });
+    }
+    return { requested: dto.ids, updated: matched, skipped };
+  }
+
+  @Post('bulk/update')
+  @RequirePermission('opportunity', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkUpdate(@Body() dto: BulkUpdateOpportunitiesDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.opportunity.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((o) => o.id));
+    if (matched.length > 0) {
+      await prisma.opportunity.updateMany({
+        where: { id: { in: matched } },
+        data: { lineOfBusiness: dto.lineOfBusiness, ownerId: dto.ownerId, wonReason: dto.wonReason, lostReason: dto.lostReason },
+      });
+    }
+    return { requested: dto.ids, updated: matched, skipped };
+  }
+
+  @Post('bulk/delete')
+  @RequirePermission('opportunity', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkDelete(@Body() dto: BulkDeleteOpportunitiesDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.opportunity.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((o) => o.id));
+    if (matched.length > 0) {
+      await prisma.opportunity.deleteMany({ where: { id: { in: matched } } });
+    }
+    return { requested: dto.ids, updated: matched, skipped };
   }
 
   // Stage transition. No manual AuditService call — 'opportunities' is on

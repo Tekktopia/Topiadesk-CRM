@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Network, RefreshCw } from 'lucide-react';
 import {
@@ -8,13 +8,10 @@ import {
   Button,
   Card,
   CardContent,
+  type ColumnDef,
+  DataTable,
+  DataTableColumnHeader,
   Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   toast,
 } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
@@ -38,6 +35,7 @@ export default function IntegrationsPage() {
 
   const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
   const [logsJobId, setLogsJobId] = useState<string | null>(null);
+  const [syncJobsPagination, setSyncJobsPagination] = useState({ pageIndex: 0, pageSize: 10 });
 
   useEffect(() => {
     const first = connectorsQuery.data?.[0];
@@ -52,6 +50,10 @@ export default function IntegrationsPage() {
     enabled: !!selectedConnectorId,
   });
 
+  useEffect(() => {
+    setSyncJobsPagination((p) => ({ ...p, pageIndex: 0 }));
+  }, [selectedConnectorId]);
+
   const triggerSyncMutation = useMutation({
     mutationFn: (connectorId: string) =>
       apiFetch<SyncJobDto>(`/api/admin/integrations/connectors/${connectorId}/sync`, { method: 'POST' }),
@@ -63,6 +65,49 @@ export default function IntegrationsPage() {
   });
 
   const selectedConnector = connectorsQuery.data?.find((c) => c.id === selectedConnectorId) ?? null;
+
+  const syncJobColumns = useMemo<ColumnDef<SyncJobDto>[]>(
+    () => [
+      {
+        accessorKey: 'jobType',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Job type" />,
+        cell: ({ row }) => <span className="text-sm text-foreground">{row.original.jobType}</span>,
+      },
+      {
+        accessorKey: 'status',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Status" />,
+        cell: ({ row }) => <SyncJobStatusBadge status={row.original.status} />,
+      },
+      {
+        accessorKey: 'startedAt',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Started" />,
+        cell: ({ row }) => (
+          <span className="text-xs text-muted-foreground">
+            {row.original.startedAt ? new Date(row.original.startedAt).toLocaleString() : '—'}
+          </span>
+        ),
+        sortingFn: (a, b) =>
+          new Date(a.original.startedAt ?? 0).getTime() - new Date(b.original.startedAt ?? 0).getTime(),
+      },
+      {
+        id: 'records',
+        header: 'Records (ok/fail)',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <span className="text-xs text-muted-foreground">
+            {row.original.recordsSucceeded}/{row.original.recordsProcessed} ok · {row.original.recordsFailed} failed
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'correlationId',
+        header: 'Correlation ID',
+        enableSorting: false,
+        cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground">{row.original.correlationId}</span>,
+      },
+    ],
+    [],
+  );
 
   return (
     <div className="space-y-6">
@@ -128,43 +173,21 @@ export default function IntegrationsPage() {
                   ) : null}
                 </div>
 
-                {syncJobsQuery.isLoading ? (
-                  <Skeleton className="h-48 w-full" />
-                ) : syncJobsQuery.isError ? (
-                  <ErrorState error={syncJobsQuery.error} />
-                ) : (syncJobsQuery.data ?? []).length === 0 ? (
+                {!syncJobsQuery.isLoading && !syncJobsQuery.isError && (syncJobsQuery.data ?? []).length === 0 ? (
                   <EmptyState title="No sync jobs yet for this connector" />
                 ) : (
-                  <div className="overflow-hidden rounded-lg border border-border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Job type</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Started</TableHead>
-                          <TableHead>Records (ok/fail)</TableHead>
-                          <TableHead>Correlation ID</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {syncJobsQuery.data?.map((job) => (
-                          <TableRow key={job.id} className="cursor-pointer" onClick={() => setLogsJobId(job.id)}>
-                            <TableCell className="text-sm text-foreground">{job.jobType}</TableCell>
-                            <TableCell>
-                              <SyncJobStatusBadge status={job.status} />
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {job.startedAt ? new Date(job.startedAt).toLocaleString() : '—'}
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {job.recordsSucceeded}/{job.recordsProcessed} ok · {job.recordsFailed} failed
-                            </TableCell>
-                            <TableCell className="font-mono text-xs text-muted-foreground">{job.correlationId}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  <DataTable<SyncJobDto, unknown>
+                    columns={syncJobColumns}
+                    data={syncJobsQuery.data ?? []}
+                    getRowId={(job) => job.id}
+                    isLoading={syncJobsQuery.isLoading}
+                    isError={syncJobsQuery.isError}
+                    errorState={<ErrorState error={syncJobsQuery.error} />}
+                    pagination={syncJobsPagination}
+                    onPaginationChange={setSyncJobsPagination}
+                    totalRowCount={(syncJobsQuery.data ?? []).length}
+                    onRowClick={(job) => setLogsJobId(job.id)}
+                  />
                 )}
               </CardContent>
             </Card>

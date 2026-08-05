@@ -31,6 +31,36 @@ export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 export const ACTIVITY_DIRECTIONS = ['INBOUND', 'OUTBOUND', 'INTERNAL'] as const;
 export type ActivityDirection = (typeof ACTIVITY_DIRECTIONS)[number];
 
+// Phase 2 — mirrors packages/db/prisma/schema.prisma's CustomFieldEntityType/
+// CustomFieldType, SavedViewEntityType/SavedViewVisibility, and
+// QuotaScopeType/QuotaPeriodType enums (same "keep in sync manually"
+// convention as the rest of this file).
+export const CUSTOM_FIELD_ENTITY_TYPES = ['ACCOUNT', 'CONTACT', 'LEAD', 'OPPORTUNITY'] as const;
+export const CUSTOM_FIELD_TYPES = [
+  'TEXT',
+  'TEXTAREA',
+  'NUMBER',
+  'DECIMAL',
+  'DATE',
+  'BOOLEAN',
+  'SELECT',
+  'MULTI_SELECT',
+  'USER_REFERENCE',
+  'URL',
+] as const;
+export const CUSTOM_FIELD_OPTION_TYPES = new Set(['SELECT', 'MULTI_SELECT']);
+
+export const SAVED_VIEW_ENTITY_TYPES = ['ACCOUNT', 'CONTACT', 'LEAD', 'OPPORTUNITY', 'TASK'] as const;
+export const SAVED_VIEW_VISIBILITIES = ['PRIVATE', 'TEAM', 'DEPARTMENT', 'ORG'] as const;
+
+export const QUOTA_SCOPE_TYPES = ['USER', 'DEPARTMENT', 'BRANCH', 'ORG'] as const;
+export const QUOTA_PERIOD_TYPES = ['MONTH', 'QUARTER', 'YEAR'] as const;
+
+export function savedViewVisibilityLabel(visibility: string): string {
+  if (visibility === 'PRIVATE') return 'Only me';
+  return humanize(visibility);
+}
+
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'outline';
 
 const humanize = (value: string): string =>

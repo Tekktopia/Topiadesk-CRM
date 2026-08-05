@@ -23,6 +23,35 @@ import { getWebEnv } from '@/lib/env';
  *
  * `/api/auth/**` is excluded from the matcher below so /login, /callback,
  * /logout, and /session can run without recursively guarding themselves.
+ *
+ * `/survey-respond/**` and `/api/surveys/responses/**` are also excluded —
+ * the one public, unauthenticated surface in app/(knowledge)/**. An external
+ * contact clicking an emailed/SMS'd survey link has no `td_session` cookie
+ * at all; without this exclusion this middleware would redirect them to
+ * /api/auth/login before survey-respond/[token]/page.tsx or its BFF route
+ * (app/api/surveys/responses/[id]/submit/route.ts) ever ran. Security for
+ * that surface is "possession of respondToken", verified server-side by the
+ * backend (constant-time compare in SurveysService.submitResponse()), not a
+ * session cookie — see that BFF route's header comment.
+ *
+ * `/api/public/**` is excluded the same way — the live chat widget's own
+ * fetch calls (app/api/public/live-chat/**) simulate what an anonymous
+ * website visitor's browser would send, with no TopiaDesk session cookie
+ * at all, even though the demo page hosting the widget
+ * (app/(dashboard)/widget-demo/) stays behind the normal auth gate (it's an
+ * internal tool for seeing the flow work, not a page real external
+ * customers are meant to load). Security for the widget's own endpoints is
+ * a signed session token (an HMAC of the chat's case id), not this cookie
+ * — see live-chat.controller.ts's header comment.
+ *
+ * `/kb/**` is excluded the same way as `/survey-respond/**` above — the
+ * public knowledge base portal (app/(knowledge)/kb/**), reached by an
+ * anonymous external visitor (e.g. a customer looking up a policy FAQ) with
+ * no `td_session` cookie at all. Its data comes through `/api/public/**`
+ * (already excluded, see above), which forwards to
+ * public-knowledge.controller.ts — a route with no session/token gate of
+ * its own, since a CUSTOMER-visibility PUBLISHED article isn't
+ * per-recipient-secret the way an unsubscribe link or survey response is.
  */
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
@@ -56,10 +85,19 @@ export const config = {
     /*
      * Match all request paths except:
      * - /api/auth/* (login/callback/logout/session — must stay public)
+     * - /survey-respond/* (public survey response page) and
+     *   /api/surveys/responses/* (its BFF submit route) — token-verified,
+     *   not session-verified
+     * - /api/public/* (live chat widget's BFF proxies, and the public
+     *   knowledge base portal's BFF proxies) — anonymous, no cookie
+     *   involved at all (the demo page hosting the live chat widget itself
+     *   stays behind the normal auth gate)
+     * - /kb/* (public knowledge base portal) — anonymous, no cookie or
+     *   token involved; see the header comment above
      * - Next internals (_next/static, _next/image)
      * - common static file extensions
      * - favicon.ico
      */
-    '/((?!api/auth|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).*)',
+    '/((?!api/auth|survey-respond|api/surveys/responses|api/public|kb|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).*)',
   ],
 };

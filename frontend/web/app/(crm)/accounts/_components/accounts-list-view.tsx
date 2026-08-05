@@ -2,38 +2,39 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Loader2, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
+import { CopyX, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import {
   Badge,
   Button,
   Card,
   CardContent,
+  type ColumnDef,
+  DataTable,
+  DataTableColumnHeader,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   Input,
+  type RowSelectionState,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  selectionColumn,
 } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
+import { useQuickCreateParam } from '@/lib/use-quick-create-param';
+import { BulkActionToolbar } from '../../_components/bulk-action-toolbar';
 import { EmptyState } from '../../_components/empty-state';
 import { PageHeader } from '../../_components/page-header';
+import { SavedViewBar } from '../../_components/saved-view-bar';
 import { ACCOUNT_STATUSES, RISK_RATINGS, accountStatusLabel, accountStatusVariant, riskRatingLabel, riskRatingVariant } from '../../_lib/constants';
 import { formatDate } from '../../_lib/format';
-import { useAccounts, useDeleteAccount } from '../../_lib/hooks';
+import { useAccounts, useBulkAssignAccounts, useBulkDeleteAccounts, useDeleteAccount } from '../../_lib/hooks';
 import { useDebouncedValue } from '../../_lib/use-debounced-value';
-import type { Account, AccountQuery } from '../../_lib/types';
+import type { Account, AccountQuery, FilterTree } from '../../_lib/types';
 import { AccountFormDialog } from './account-form-dialog';
 import { ConfirmDialog } from '../../_components/confirm-dialog';
 
@@ -49,6 +50,12 @@ export function AccountsListView() {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Account | null>(null);
   const [deleting, setDeleting] = React.useState<Account | null>(null);
+  // Non-null while a saved view is applied — its server-run rows replace the
+  // live filtered query until the view is cleared or a manual filter changes.
+  const [savedViewRows, setSavedViewRows] = React.useState<Account[] | null>(null);
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+  const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 20 });
+  useQuickCreateParam(() => setCreateOpen(true));
 
   const debouncedSearch = useDebouncedValue(search, 300);
 
@@ -61,8 +68,109 @@ export function AccountsListView() {
     take: 100,
   };
 
-  const { data, isLoading, isFetching } = useAccounts(query);
+  const { data: liveData, isLoading, isError } = useAccounts(query);
+  const data = savedViewRows ?? liveData ?? [];
   const deleteAccount = useDeleteAccount();
+  const bulkAssign = useBulkAssignAccounts();
+  const bulkDelete = useBulkDeleteAccounts();
+
+  /** Manual filter edits always drop back to the live query — a stale saved-view result would silently ignore them. */
+  function withViewReset<T>(setter: (value: T) => void): (value: T) => void {
+    return (value) => {
+      setSavedViewRows(null);
+      setPagination((p) => ({ ...p, pageIndex: 0 }));
+      setter(value);
+    };
+  }
+
+  // Translates the current filter controls into the FilterTree shape
+  // saved-view-filters.ts accepts for ACCOUNT (status/riskRating/industryId/
+  // ownerId eq; name contains).
+  function buildFilters(): FilterTree {
+    const conditions: FilterTree['conditions'] = [];
+    if (debouncedSearch) conditions.push({ field: 'name', operator: 'contains', value: debouncedSearch });
+    if (status !== UNSET) conditions.push({ field: 'status', operator: 'eq', value: status });
+    if (riskRating !== UNSET) conditions.push({ field: 'riskRating', operator: 'eq', value: riskRating });
+    if (industryId) conditions.push({ field: 'industryId', operator: 'eq', value: industryId });
+    if (mineOnly && user) conditions.push({ field: 'ownerId', operator: 'eq', value: user.id });
+    return { op: 'AND', conditions };
+  }
+
+  const selectedIds = React.useMemo(() => Object.keys(rowSelection).filter((id) => rowSelection[id]), [rowSelection]);
+
+  const columns = React.useMemo<ColumnDef<Account>[]>(
+    () => [
+      selectionColumn<Account>(),
+      {
+        accessorKey: 'name',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
+        meta: { label: 'Name' },
+        cell: ({ row }) => (
+          <Link href={`/accounts/${row.original.id}`} className="font-medium text-foreground hover:underline">
+            {row.original.name}
+          </Link>
+        ),
+      },
+      {
+        id: 'type',
+        header: 'Type',
+        meta: { label: 'Type' },
+        accessorFn: (a) => (a.accountType === 'CORPORATE' ? 'Corporate' : 'Individual'),
+        cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
+      },
+      {
+        accessorKey: 'status',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Status" />,
+        meta: { label: 'Status' },
+        cell: ({ row }) => (
+          <Badge variant={accountStatusVariant(row.original.status)}>{accountStatusLabel(row.original.status)}</Badge>
+        ),
+      },
+      {
+        accessorKey: 'riskRating',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Risk" />,
+        meta: { label: 'Risk' },
+        cell: ({ row }) => (
+          <Badge variant={riskRatingVariant(row.original.riskRating)}>{riskRatingLabel(row.original.riskRating)}</Badge>
+        ),
+      },
+      {
+        id: 'location',
+        header: 'Location',
+        meta: { label: 'Location' },
+        accessorFn: (a) => [a.city, a.country].filter(Boolean).join(', ') || '—',
+        cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
+      },
+      {
+        accessorKey: 'createdAt',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Created" />,
+        meta: { label: 'Created' },
+        cell: ({ row }) => <span className="text-muted-foreground">{formatDate(row.original.createdAt)}</span>,
+        sortingFn: (a, b) => new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
+      },
+      {
+        id: 'actions',
+        header: '',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="Account actions">
+                <MoreHorizontal aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setEditing(row.original)}>Edit</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleting(row.original)}>
+                <Trash2 aria-hidden /> Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ),
+      },
+    ],
+    [],
+  );
 
   return (
     <div className="space-y-6">
@@ -70,11 +178,20 @@ export function AccountsListView() {
         title="Accounts"
         description="Client and prospect organizations your team manages."
         actions={
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus aria-hidden /> New account
-          </Button>
+          <>
+            <Button variant="outline" asChild>
+              <Link href="/duplicates?entity=ACCOUNT">
+                <CopyX aria-hidden /> Find duplicates
+              </Link>
+            </Button>
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus aria-hidden /> New account
+            </Button>
+          </>
         }
       />
+
+      <SavedViewBar<Account> entityType="ACCOUNT" buildFilters={buildFilters} onApply={setSavedViewRows} />
 
       <Card>
         <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:flex-wrap sm:items-end">
@@ -86,12 +203,12 @@ export function AccountsListView() {
               id="account-search"
               placeholder="Search by name…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => withViewReset(setSearch)(e.target.value)}
             />
           </div>
           <div className="w-full space-y-1.5 sm:w-44">
             <label className="text-xs font-medium text-muted-foreground">Status</label>
-            <Select value={status} onValueChange={setStatus}>
+            <Select value={status} onValueChange={withViewReset(setStatus)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -107,7 +224,7 @@ export function AccountsListView() {
           </div>
           <div className="w-full space-y-1.5 sm:w-44">
             <label className="text-xs font-medium text-muted-foreground">Risk rating</label>
-            <Select value={riskRating} onValueChange={setRiskRating}>
+            <Select value={riskRating} onValueChange={withViewReset(setRiskRating)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -129,7 +246,7 @@ export function AccountsListView() {
               id="account-industry"
               placeholder="Optional UUID"
               value={industryId}
-              onChange={(e) => setIndustryId(e.target.value)}
+              onChange={(e) => withViewReset(setIndustryId)(e.target.value)}
             />
           </div>
           <label className="flex items-center gap-2 pb-2 text-sm text-foreground">
@@ -137,7 +254,7 @@ export function AccountsListView() {
               type="checkbox"
               className="h-4 w-4 rounded border-input accent-primary"
               checked={mineOnly}
-              onChange={(e) => setMineOnly(e.target.checked)}
+              onChange={(e) => withViewReset(setMineOnly)(e.target.checked)}
               disabled={!user}
             />
             My accounts only
@@ -145,15 +262,20 @@ export function AccountsListView() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="pt-6">
-          {isLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : !data || data.length === 0 ? (
+      <BulkActionToolbar
+        selectedCount={selectedIds.length}
+        onClearSelection={() => setRowSelection({})}
+        reassignLabel="Reassign owner"
+        onReassign={(ownerId) => bulkAssign.mutate({ ids: selectedIds, ownerId }, { onSuccess: () => setRowSelection({}) })}
+        isReassigning={bulkAssign.isPending}
+        onDelete={() => bulkDelete.mutate({ ids: selectedIds }, { onSuccess: () => setRowSelection({}) })}
+        isDeleting={bulkDelete.isPending}
+        entityNamePlural="accounts"
+      />
+
+      {!isLoading && !isError && data.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
             <EmptyState
               title="No accounts match these filters"
               description="Try clearing a filter, or create a new account to get started."
@@ -163,70 +285,23 @@ export function AccountsListView() {
                 </Button>
               }
             />
-          ) : (
-            <div className="relative">
-              {isFetching ? (
-                <Loader2 className="absolute right-0 top-0 h-4 w-4 animate-spin text-muted-foreground" aria-hidden />
-              ) : null}
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Risk</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="w-10" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.map((account) => (
-                    <TableRow key={account.id}>
-                      <TableCell className="font-medium text-foreground">
-                        <Link href={`/accounts/${account.id}`} className="hover:underline">
-                          {account.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {account.accountType === 'CORPORATE' ? 'Corporate' : 'Individual'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={accountStatusVariant(account.status)}>{accountStatusLabel(account.status)}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={riskRatingVariant(account.riskRating)}>{riskRatingLabel(account.riskRating)}</Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {[account.city, account.country].filter(Boolean).join(', ') || '—'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{formatDate(account.createdAt)}</TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label="Account actions">
-                              <MoreHorizontal aria-hidden />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => setEditing(account)}>Edit</DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onSelect={() => setDeleting(account)}
-                            >
-                              <Trash2 aria-hidden /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable<Account, unknown>
+          columns={columns}
+          data={data}
+          getRowId={(a) => a.id}
+          isLoading={isLoading}
+          isError={isError}
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
+          pagination={pagination}
+          onPaginationChange={setPagination}
+          totalRowCount={data.length}
+          enableColumnVisibility
+        />
+      )}
 
       <AccountFormDialog open={createOpen} onOpenChange={setCreateOpen} />
       {editing ? (

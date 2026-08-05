@@ -48,6 +48,12 @@ export type ActivityTimelineType = (typeof ACTIVITY_TIMELINE_TYPES)[number];
 export const ACTIVITY_TIMELINE_DIRECTIONS = ['INBOUND', 'OUTBOUND', 'INTERNAL'] as const;
 export type ActivityTimelineDirection = (typeof ACTIVITY_TIMELINE_DIRECTIONS)[number];
 
+// Mirrors Activity.aiSentiment (packages/db/prisma/schema.prisma) and the
+// AI Gateway's POST /ai/sentiment response label — see
+// backend/api/src/modules/ai-gateway/dto/sentiment-request.dto.ts.
+export const ACTIVITY_TIMELINE_SENTIMENTS = ['POSITIVE', 'NEUTRAL', 'NEGATIVE'] as const;
+export type ActivityTimelineSentiment = (typeof ACTIVITY_TIMELINE_SENTIMENTS)[number];
+
 export interface ActivityTimelineItem {
   id: string;
   type: ActivityTimelineType;
@@ -59,6 +65,17 @@ export interface ActivityTimelineItem {
   outcome?: string | null;
   /** Display name of who logged it, if the caller has one to hand. */
   authorName?: string | null;
+  /**
+   * Advisory AI sentiment for this item's text, if it's been analyzed —
+   * omit or leave null/undefined when no analysis has happened yet (the
+   * normal case: nothing in this codebase populates this automatically,
+   * every AI Gateway call is a human-triggered, advisory-only suggestion —
+   * see ai-gateway.service.ts's class-level comment). Purely additive:
+   * existing callers that never pass this render exactly as before.
+   */
+  aiSentiment?: ActivityTimelineSentiment | null;
+  /** Sentiment polarity, -1 (very negative) to 1 (very positive), alongside `aiSentiment`. */
+  aiSentimentScore?: number | null;
 }
 
 export interface LogActivityFormValues {
@@ -106,6 +123,18 @@ const DIRECTION_LABEL: Record<ActivityTimelineDirection, string> = {
   INBOUND: 'Inbound',
   OUTBOUND: 'Outbound',
   INTERNAL: 'Internal',
+};
+
+const SENTIMENT_LABEL: Record<ActivityTimelineSentiment, string> = {
+  POSITIVE: 'Positive',
+  NEUTRAL: 'Neutral',
+  NEGATIVE: 'Negative',
+};
+
+const SENTIMENT_BADGE_VARIANT: Record<ActivityTimelineSentiment, 'success' | 'secondary' | 'destructive'> = {
+  POSITIVE: 'success',
+  NEUTRAL: 'secondary',
+  NEGATIVE: 'destructive',
 };
 
 const dateTimeFormatter = new Intl.DateTimeFormat('en-NG', { dateStyle: 'medium', timeStyle: 'short' });
@@ -259,6 +288,9 @@ function ActivityTimeline({
                   <span className="text-sm font-medium text-foreground">{item.subject}</span>
                   <Badge variant="outline">{TYPE_LABEL[item.type]}</Badge>
                   <Badge variant="secondary">{DIRECTION_LABEL[item.direction]}</Badge>
+                  {item.aiSentiment ? (
+                    <Badge variant={SENTIMENT_BADGE_VARIANT[item.aiSentiment]}>{SENTIMENT_LABEL[item.aiSentiment]}</Badge>
+                  ) : null}
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {formatOccurredAt(item.occurredAt)}

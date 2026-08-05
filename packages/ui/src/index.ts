@@ -19,6 +19,8 @@ export * from './primitives/avatar';
 export * from './primitives/badge';
 export * from './primitives/button';
 export * from './primitives/card';
+export * from './primitives/checkbox';
+export * from './primitives/command';
 export * from './primitives/dialog';
 export * from './primitives/dropdown-menu';
 export * from './primitives/form';
@@ -35,3 +37,5 @@ export * from './primitives/tooltip';
 // -- Composite components -----------------------------------------------------
 export * from './composite/stat-tile';
 export * from './composite/activity-timeline';
+export * from './composite/data-table';
+export * from './composite/record-history';
