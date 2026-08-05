@@ -81,6 +81,16 @@ export class AppModule implements NestModule {
         // check, not RLS context. See keycloak-webhook.controller.ts's
         // header comment for why this exclusion belongs here.
         { path: 'identity/webhooks/keycloak', method: RequestMethod.POST },
+        // SCIM 2.0 provisioning (scim.controller.ts) — the caller is an
+        // external IdP/provisioning tool presenting a ScimApiToken bearer
+        // token, not a TopiaDesk-issued Keycloak JWT; independently secured
+        // by ScimAuthGuard instead. Found missing here via live testing: its
+        // absence meant this middleware rejected every SCIM request with
+        // "Invalid or expired token" (failed JWT verification on a token
+        // that was never a JWT) before ScimAuthGuard ever ran — the entire
+        // SCIM API was unreachable despite scim.controller.ts's own header
+        // comment claiming this exclusion already existed.
+        { path: 'scim/v2/(.*)', method: RequestMethod.ALL },
         // Public, token-verified survey response submission — the
         // respondent is an external contact, not a logged-in User. See
         // survey-responses.controller.ts's header comment.

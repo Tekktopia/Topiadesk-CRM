@@ -1,25 +1,29 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, Briefcase, Building2, ChevronRight, Circle, Home, LifeBuoy, LogOut, Moon, Plus, Sun, User as UserIcon, UserPlus } from 'lucide-react';
-import { useTheme } from 'next-themes';
 import {
-  Avatar,
-  AvatarFallback,
-  Badge,
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  Skeleton,
-} from '@topiadesk/ui';
+  Bell,
+  Briefcase,
+  Building2,
+  ChevronRight,
+  Circle,
+  HelpCircle,
+  Home,
+  LifeBuoy,
+  Mail,
+  Moon,
+  Plus,
+  Sun,
+  UserPlus,
+} from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { Badge, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Skeleton } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
+import { AccountMenu } from './account-menu';
 import { activeNavItem, activeNavModule } from './nav-modules';
 import { CommandPalette } from './command-palette';
 
@@ -29,22 +33,20 @@ function Breadcrumb() {
   const item = activeNavItem(pathname, mod);
 
   return (
-    <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
-      <Link href="/" className="flex shrink-0 items-center rounded p-1 hover:bg-secondary hover:text-foreground" aria-label="Dashboard">
-        <Home className="h-4 w-4" aria-hidden />
+    <div className="flex min-w-0 items-center gap-3">
+      <Link href="/" className="hidden shrink-0 items-center sm:flex" aria-label="TopiaDesk home">
+        <Image src="/logo-mark.png" alt="" width={22} height={22} className="shrink-0" />
       </Link>
-      <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
-      <span className="truncate font-medium text-foreground">{item && item.label !== mod.label ? item.label : mod.label}</span>
-    </nav>
+      <span className="hidden h-5 w-px shrink-0 bg-border sm:block" aria-hidden />
+      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+        <Link href="/" className="flex shrink-0 items-center rounded p-1 hover:bg-secondary hover:text-foreground" aria-label="Dashboard">
+          <Home className="h-4 w-4" aria-hidden />
+        </Link>
+        <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        <span className="truncate font-medium text-foreground">{item && item.label !== mod.label ? item.label : mod.label}</span>
+      </nav>
+    </div>
   );
-}
-
-function initials(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  return parts
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? '')
-    .join('');
 }
 
 function relativeTime(iso: string): string {
@@ -69,14 +71,8 @@ interface NotificationRow {
 const QUICK_CREATE_ITEMS = [
   { label: 'Account', href: '/accounts?new=1', icon: Building2 },
   { label: 'Lead', href: '/leads?new=1', icon: UserPlus },
-  { label: 'Case', href: '/cases?new=1', icon: LifeBuoy },
+  { label: 'Ticket', href: '/cases?new=1', icon: LifeBuoy },
   { label: 'Policy', href: '/policies', icon: Briefcase },
-] as const;
-
-const PRESENCE_OPTIONS = [
-  { value: 'ONLINE', label: 'Online', dotClass: 'fill-emerald-500 text-emerald-500' },
-  { value: 'AWAY', label: 'Away', dotClass: 'fill-amber-500 text-amber-500' },
-  { value: 'OFFLINE', label: 'Offline', dotClass: 'fill-muted-foreground text-muted-foreground' },
 ] as const;
 
 function QuickCreateMenu() {
@@ -96,42 +92,6 @@ function QuickCreateMenu() {
               <item.icon className="h-4 w-4" aria-hidden />
               {item.label}
             </Link>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function PresenceMenu({ presenceStatus }: { presenceStatus: 'ONLINE' | 'AWAY' | 'OFFLINE' }) {
-  const queryClient = useQueryClient();
-  const current = PRESENCE_OPTIONS.find((o) => o.value === presenceStatus) ?? PRESENCE_OPTIONS[2];
-
-  const setPresence = useMutation({
-    mutationFn: (value: 'ONLINE' | 'AWAY' | 'OFFLINE') =>
-      fetch('/api/auth/presence', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ presenceStatus: value }),
-      }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['auth', 'current-user'] }),
-  });
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-1.5 px-2" aria-label="Set your status">
-          <Circle className={`h-2.5 w-2.5 ${current.dotClass}`} aria-hidden />
-          <span className="hidden text-xs font-medium text-muted-foreground sm:inline">{current.label}</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
-        <DropdownMenuLabel>Your status</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {PRESENCE_OPTIONS.map((option) => (
-          <DropdownMenuItem key={option.value} onClick={() => setPresence.mutate(option.value)} className="flex items-center gap-2">
-            <Circle className={`h-2.5 w-2.5 ${option.dotClass}`} aria-hidden />
-            {option.label}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
@@ -199,14 +159,44 @@ function NotificationBell() {
   );
 }
 
-/** Persistent top bar: global search, quick-create, presence status, live
- * notification feed, theme toggle, and the current-user menu. */
+function HelpMenu() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Help">
+          <HelpCircle className="h-4 w-4" aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>Help</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/knowledge" className="flex w-full cursor-pointer items-center gap-2">
+            <LifeBuoy className="h-4 w-4" aria-hidden />
+            Knowledge base
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <a href="mailto:support@topiadesk.local" className="flex w-full cursor-pointer items-center gap-2">
+            <Mail className="h-4 w-4" aria-hidden />
+            Contact support
+          </a>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** Persistent top bar: global search, quick-create, live notification
+ * feed, help menu, theme toggle, and the current-user menu (see
+ * ./account-menu.tsx — also reused at the bottom of AppSidebar's icon
+ * rail). */
 export function AppHeader() {
   const { resolvedTheme, setTheme } = useTheme();
   const { user, isLoading } = useCurrentUser();
 
   return (
-    <header className="flex h-14 items-center justify-between gap-4 border-b border-border px-6">
+    <header className="flex h-16 items-center justify-between gap-4 border-b border-border bg-background/95 px-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <Breadcrumb />
 
       <div className="hidden max-w-md flex-1 md:block">
@@ -216,7 +206,7 @@ export function AppHeader() {
       <div className="flex items-center gap-1">
         {user ? <QuickCreateMenu /> : null}
         {user ? <NotificationBell /> : null}
-        {user ? <PresenceMenu presenceStatus={user.presenceStatus} /> : null}
+        <HelpMenu />
 
         <Button
           variant="ghost"
@@ -229,39 +219,9 @@ export function AppHeader() {
         </Button>
 
         {isLoading ? (
-          <Skeleton className="h-8 w-8 rounded-full" />
+          <Skeleton className="h-9 w-9 rounded-full" />
         ) : user ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full" aria-label="Account menu">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback>{initials(user.fullName)}</AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium">{user.fullName}</span>
-                  <span className="text-xs font-normal text-muted-foreground">{user.email}</span>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/profile" className="flex w-full cursor-pointer items-center gap-2">
-                  <UserIcon className="h-4 w-4" aria-hidden />
-                  My profile
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <a href="/api/auth/logout" className="flex w-full cursor-pointer items-center gap-2">
-                  <LogOut className="h-4 w-4" aria-hidden />
-                  Log out
-                </a>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <AccountMenu user={user} trigger="chip" />
         ) : (
           <Button asChild size="sm">
             <a href="/api/auth/login">Sign in</a>

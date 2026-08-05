@@ -1,20 +1,10 @@
 import { Controller, Get, NotFoundException, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { getPrismaClient, type PrismaClient } from '@topiadesk/db';
-import { buildDefaultRegistry, type ReportResult } from '@topiadesk/reports';
+import { getPrismaClient } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { RenderedDashboardResponseDto } from './dto/rendered-dashboard-response.dto';
-
-const registry = buildDefaultRegistry();
-
-interface DashboardWidgetSpec {
-  id: string;
-  title: string;
-  reportKey: string;
-  filters?: Record<string, unknown>;
-  dimension?: string;
-}
+import { renderDashboardWidgets } from './dashboard-render.util';
 
 /**
  * /dashboards/executive, /branch-manager, /broker, /compliance — fixed,
@@ -69,8 +59,7 @@ export class RoleDashboardsController {
     const dashboard = await prisma.savedDashboard.findFirst({ where: { name, visibility: 'ORG' } });
     if (!dashboard) throw new NotFoundException(`Dashboard "${name}" is not seeded on this instance`);
 
-    const specs = Array.isArray(dashboard.widgets) ? (dashboard.widgets as unknown as DashboardWidgetSpec[]) : [];
-    const widgets = await Promise.all(specs.map((spec) => this.renderWidget(prisma, spec)));
+    const widgets = await renderDashboardWidgets(prisma, dashboard.widgets);
 
     return {
       id: dashboard.id,
@@ -78,25 +67,5 @@ export class RoleDashboardsController {
       layoutConfig: dashboard.layoutConfig as Record<string, unknown>,
       widgets,
     };
-  }
-
-  private async renderWidget(
-    prisma: PrismaClient,
-    spec: DashboardWidgetSpec,
-  ): Promise<{ id: string; title: string; reportKey: string; chartType: string; result?: ReportResult; error?: string }> {
-    const definition = registry.get(spec.reportKey);
-    if (!definition) {
-      return { id: spec.id, title: spec.title, reportKey: spec.reportKey, chartType: 'table', error: `Unknown report key: ${spec.reportKey}` };
-    }
-    const parsed = definition.filterSchema.safeParse(spec.filters ?? {});
-    if (!parsed.success) {
-      return { id: spec.id, title: spec.title, reportKey: spec.reportKey, chartType: definition.defaultChartType, error: 'Stored widget filters no longer validate against this report\'s filterSchema' };
-    }
-    try {
-      const result = await definition.execute(prisma, parsed.data, spec.dimension);
-      return { id: spec.id, title: spec.title, reportKey: spec.reportKey, chartType: definition.defaultChartType, result };
-    } catch (err) {
-      return { id: spec.id, title: spec.title, reportKey: spec.reportKey, chartType: definition.defaultChartType, error: err instanceof Error ? err.message : String(err) };
-    }
   }
 }

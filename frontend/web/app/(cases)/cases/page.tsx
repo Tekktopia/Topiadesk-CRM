@@ -3,7 +3,7 @@ import { Skeleton } from '@topiadesk/ui';
 import { CasesListView } from './_components/cases-list-view';
 
 export const metadata = {
-  title: 'Cases',
+  title: 'Tickets',
 };
 
 export default function CasesPage() {

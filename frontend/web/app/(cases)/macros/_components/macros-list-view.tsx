@@ -84,7 +84,7 @@ export function MacrosListView() {
         id: 'appliesTo',
         header: 'Applies to',
         meta: { label: 'Applies to' },
-        accessorFn: (m) => (m.entityType ? humanize(m.entityType) : 'Claim & Case'),
+        accessorFn: (m) => (m.entityType ? humanize(m.entityType) : 'Claim & Ticket'),
         cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
       },
       {
@@ -137,7 +137,7 @@ export function MacrosListView() {
     <div className="space-y-6">
       <PageHeader
         title="Macros"
-        description="One-click action bundles agents apply to a claim or case (status change, reassignment, internal note, and more), grouped by category."
+        description="One-click action bundles agents apply to a claim or ticket (status change, reassignment, internal note, and more), grouped by category."
         actions={
           canWrite ? (
             <Button onClick={() => setCreateOpen(true)}>

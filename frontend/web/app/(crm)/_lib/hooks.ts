@@ -783,7 +783,7 @@ export function useCheckLeadDuplicates() {
 /**
  * Merge mutations deliberately do NOT toast on error (unlike every other
  * mutation in this file) — merge.ts can reject with a specific
- * BadRequestException (e.g. "N case(s) still reference the loser account")
+ * BadRequestException (e.g. "N ticket(s) still reference the loser account")
  * that the merge dialog needs to show inline next to the form, not just as a
  * transient toast. Callers should read `.error` off the mutation result.
  */

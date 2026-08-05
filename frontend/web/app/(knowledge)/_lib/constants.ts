@@ -46,7 +46,7 @@ export const SURVEY_TRIGGER_EVENTS: SurveyTriggerEvent[] = [
 ];
 
 export const SURVEY_TRIGGER_EVENT_LABEL: Record<SurveyTriggerEvent, string> = {
-  CASE_RESOLVED: 'Case resolved',
+  CASE_RESOLVED: 'Ticket resolved',
   CLAIM_SETTLED: 'Claim settled',
   POLICY_ISSUED: 'Policy issued',
   POLICY_RENEWED: 'Policy renewed',

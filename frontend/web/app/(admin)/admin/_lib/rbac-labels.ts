@@ -21,6 +21,10 @@ export const RESOURCE_LABELS: Record<string, string> = {
   audit_log: 'Audit log',
   integration: 'Integrations',
   identity: 'Identity & admin (users, roles, org settings)',
+  // Permission resource name stays "case" internally (DB/RLS/backend
+  // unchanged) — this label is purely the Admin RBAC grid's display text,
+  // matching the "Ticket" rename everywhere else a user reads this word.
+  case: 'Tickets',
 };
 
 export function resourceLabel(resource: string): string {

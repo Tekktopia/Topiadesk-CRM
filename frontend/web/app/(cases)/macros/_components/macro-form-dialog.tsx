@@ -92,8 +92,8 @@ export function MacroFormDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit macro' : 'New macro'}</DialogTitle>
           <DialogDescription>
-            A macro is a bundle of actions an agent applies to a claim or case in one click — see the &quot;Apply macro&quot; button on a
-            case&apos;s detail page.
+            A macro is a bundle of actions an agent applies to a claim or ticket in one click — see the &quot;Apply macro&quot; button on a
+            ticket&apos;s detail page.
           </DialogDescription>
         </DialogHeader>
 
@@ -132,7 +132,7 @@ export function MacroFormDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={UNSET}>Claim & Case</SelectItem>
+                  <SelectItem value={UNSET}>Claim & Ticket</SelectItem>
                   {CASE_MANAGEMENT_ENTITY_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
                       {humanize(t)}

@@ -368,6 +368,17 @@ CREATE POLICY cases_rw ON cases FOR ALL
     -- failed outright with an RLS violation despite the WITH CHECK below
     -- correctly permitting the write. Discovered live, not theoretical.
     OR (created_by_id IS NOT NULL AND created_by_id = app_current_user_id())
+    -- Every branch above requires a non-null owner-bearing column
+    -- (assigned_to_id/account_id/assigned_team_id/created_by_id) before
+    -- app_can_access_owner's internal ALL-scope check is even reached —
+    -- so a fully bare case (no assignee/account/team, created by someone
+    -- else) was invisible to ADMIN/COMPLIANCE_OFFICER despite their
+    -- case:read ALL grant. Discovered live via the CASE_CLOSURE approval
+    -- flow: a compliance officer deciding a complaint they didn't
+    -- personally create got a 404. This branch is the unconditional
+    -- ALL-scope escape hatch every other ALL-scope-aware policy in this
+    -- file already has (e.g. sla_clocks_rw).
+    OR app_max_scope('case', 'read') = 'ALL'
     OR app_current_role() = 'SYSTEM_JOB'
   )
   WITH CHECK (app_max_scope('case', 'write') IS NOT NULL OR app_current_role() = 'SYSTEM_JOB');
@@ -515,6 +526,19 @@ CREATE POLICY saved_views_rw ON saved_views FOR ALL
   )
   WITH CHECK (owner_id = app_current_user_id());
 
+-- Same shape as saved_views_rw above, minus the TEAM tier —
+-- DashboardVisibility (schema.prisma) is only PRIVATE|DEPARTMENT|ORG,
+-- SavedDashboard has no team_id column to key a TEAM tier off of.
+DROP POLICY IF EXISTS saved_dashboards_rw ON saved_dashboards;
+CREATE POLICY saved_dashboards_rw ON saved_dashboards FOR ALL
+  USING (
+    owner_id = app_current_user_id()
+    OR (visibility = 'DEPARTMENT' AND EXISTS (
+          SELECT 1 FROM users u1, users u2 WHERE u1.id = owner_id AND u2.id = app_current_user_id() AND u1.department_id = u2.department_id))
+    OR visibility = 'ORG'
+  )
+  WITH CHECK (owner_id = app_current_user_id());
+
 DROP POLICY IF EXISTS sales_quotas_rw ON sales_quotas;
 CREATE POLICY sales_quotas_rw ON sales_quotas FOR ALL
   USING (user_id = app_current_user_id() OR app_max_scope('sales_quota', 'read') = 'ALL' OR app_current_role() = 'SYSTEM_JOB')
@@ -632,3 +656,29 @@ CREATE POLICY loyalty_transactions_rw ON loyalty_transactions FOR ALL
     OR app_current_role() = 'SYSTEM_JOB'
   )
   WITH CHECK (app_max_scope('loyalty', 'write') IS NOT NULL OR app_current_role() = 'SYSTEM_JOB');
+
+-- =============================================================================
+-- Phase 3 — Workflow engine (AutomationRule.steps multi-step runs).
+-- automation_run_states scopes through whichever Case/Claim it's running
+-- against — same join-through-entity shape as sla_clocks_rw, plus an
+-- 'approval'-oversight branch (a compliance officer deciding an
+-- APPROVAL_GATE step needs to see the run it belongs to, regardless of
+-- whether they'd otherwise have case/claim visibility). automation_rules
+-- itself is deliberately NOT enabled here — see
+-- automation-rules.controller.ts's header comment, same RLS-free "config
+-- tier" as carriers/pipelines/custom_field_definitions.
+-- =============================================================================
+
+DROP POLICY IF EXISTS automation_run_states_rw ON automation_run_states;
+CREATE POLICY automation_run_states_rw ON automation_run_states FOR ALL
+  USING (
+    app_current_role() = 'SYSTEM_JOB'
+    OR app_max_scope('approval', 'read') = 'ALL'
+    OR (entity_type = 'CASE' AND EXISTS (SELECT 1 FROM cases cs WHERE cs.id = entity_id
+          AND ((cs.assigned_to_id IS NOT NULL AND app_can_access_owner('case', 'read', cs.assigned_to_id))
+            OR (cs.account_id IS NOT NULL AND EXISTS (SELECT 1 FROM accounts a WHERE a.id = cs.account_id AND app_can_access_owner('case', 'read', a.owner_id))))))
+    OR (entity_type = 'CLAIM' AND EXISTS (SELECT 1 FROM claims c WHERE c.id = entity_id
+          AND ((c.adjuster_id IS NOT NULL AND app_can_access_owner('claim', 'read', c.adjuster_id))
+            OR EXISTS (SELECT 1 FROM policies p JOIN accounts a ON a.id = p.account_id WHERE p.id = c.policy_id AND app_can_access_owner('claim', 'read', a.owner_id)))))
+  )
+  WITH CHECK (app_current_role() = 'SYSTEM_JOB' OR app_max_scope('approval', 'write') = 'ALL');

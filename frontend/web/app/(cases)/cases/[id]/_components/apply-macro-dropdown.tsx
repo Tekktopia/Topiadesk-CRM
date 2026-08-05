@@ -78,7 +78,7 @@ export function ApplyMacroDropdown({ caseId }: { caseId: string }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Apply &quot;{pendingMacro?.name}&quot;?</DialogTitle>
-            <DialogDescription>This is what running the macro against this case would change.</DialogDescription>
+            <DialogDescription>This is what running the macro against this ticket would change.</DialogDescription>
           </DialogHeader>
 
           {preview.isPending ? (

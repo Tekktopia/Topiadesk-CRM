@@ -80,6 +80,28 @@
     }
   ],
 
+  "identityProviders": [
+    {
+      "alias": "microsoft",
+      "displayName": "Microsoft",
+      "providerId": "microsoft",
+      "enabled": false,
+      "trustEmail": true,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "clientId": "${env.MICROSOFT_IDP_CLIENT_ID}",
+        "clientSecret": "${env.MICROSOFT_IDP_CLIENT_SECRET}",
+        "tenantId": "${env.MICROSOFT_IDP_TENANT_ID}",
+        "syncMode": "IMPORT",
+        "defaultScope": "openid profile email User.Read"
+      }
+    }
+  ],
+
   "users": [
     {
       "username": "service-account-topiadesk-api-admin",

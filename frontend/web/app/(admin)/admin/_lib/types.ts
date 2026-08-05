@@ -212,9 +212,14 @@ type RawAutomationRuleDto = Json200<'/crm/automation-rules', 'get'>[number];
 // per CreateAutomationRuleDto's own doc comment, which the generator can't
 // express — same "generated shape is too narrow" rationale as
 // SetOrgSettingBody above.
+// `steps` is the multi-step + approval-gate workflow engine field added
+// this session (see backend/api/src/modules/crm/dto/automation-rule.dto.ts) —
+// the generated schema snapshot predates it, same "generator gap" story as
+// conditions/actions above.
 export type AutomationRuleDto = Omit<RawAutomationRuleDto, 'conditions' | 'actions'> & {
   conditions: unknown;
   actions: unknown[];
+  steps?: unknown[] | null;
 };
 
 type RawCreateAutomationRuleBody = JsonBody<'/crm/automation-rules', 'post'>;
@@ -225,6 +230,7 @@ type RawCreateAutomationRuleBody = JsonBody<'/crm/automation-rules', 'post'>;
 export type CreateAutomationRuleBody = Omit<RawCreateAutomationRuleBody, 'conditions' | 'actions' | 'isActive'> & {
   conditions: unknown;
   actions: unknown[];
+  steps?: unknown[];
   isActive?: boolean;
 };
 
@@ -232,6 +238,7 @@ type RawUpdateAutomationRuleBody = JsonBody<'/crm/automation-rules/{id}', 'patch
 export type UpdateAutomationRuleBody = Omit<RawUpdateAutomationRuleBody, 'conditions' | 'actions' | 'isActive'> & {
   conditions?: unknown;
   actions?: unknown[];
+  steps?: unknown[];
   isActive?: boolean;
 };
 

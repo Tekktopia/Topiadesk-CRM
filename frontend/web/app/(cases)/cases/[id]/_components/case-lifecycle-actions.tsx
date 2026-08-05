@@ -19,7 +19,7 @@ import {
 } from '@topiadesk/ui';
 import { CASE_STATUS_TRANSITIONS, type Case, type CaseStatus } from '../../../_lib/types';
 import { caseStatusLabel } from '../../../_lib/constants';
-import { useChangeCaseStatus } from '../../../_lib/hooks';
+import { useChangeCaseStatus, useRequestCaseClosure } from '../../../_lib/hooks';
 
 /** Distinct labels for the PENDING_CUSTOMER/PENDING_CARRIER holds — see case-lifecycle.ts's doc comment: "different escalation paths, SlaClock pauses/resumes independently for each" — a real differentiator worth surfacing explicitly rather than a generic "Pending". */
 const TARGET_LABEL: Partial<Record<CaseStatus, string>> = {
@@ -38,17 +38,26 @@ const TARGET_LABEL: Partial<Record<CaseStatus, string>> = {
 export function CaseLifecycleActions({ kase }: { kase: Case }) {
   const nextStatuses = CASE_STATUS_TRANSITIONS[kase.status];
   const changeStatus = useChangeCaseStatus(kase.id);
+  const requestClosure = useRequestCaseClosure(kase.id);
   const [resolveDialogOpen, setResolveDialogOpen] = React.useState(false);
   const [reason, setReason] = React.useState('');
 
   if (nextStatuses.length === 0) {
-    return <span className="text-sm text-muted-foreground">No further transitions — this case is in a terminal state.</span>;
+    return <span className="text-sm text-muted-foreground">No further transitions — this ticket is in a terminal state.</span>;
   }
 
   function selectTarget(target: CaseStatus) {
     if (target === 'RESOLVED') {
       setReason('');
       setResolveDialogOpen(true);
+      return;
+    }
+    if (target === 'CLOSED' && kase.caseType === 'COMPLAINT') {
+      // Backend rejects a direct CLOSED transition for COMPLAINT cases —
+      // this goes through the approval gate instead (see the "Closure
+      // approval" card on case-detail-view.tsx for the pending/decided
+      // state and the compliance-officer decision buttons).
+      requestClosure.mutate({});
       return;
     }
     changeStatus.mutate({ status: target });
@@ -58,14 +67,16 @@ export function CaseLifecycleActions({ kase }: { kase: Case }) {
     <div className="flex items-center gap-2">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" disabled={changeStatus.isPending}>
+          <Button variant="outline" disabled={changeStatus.isPending || requestClosure.isPending}>
             Change status <ChevronDown className="h-4 w-4" aria-hidden />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {nextStatuses.map((target) => (
             <DropdownMenuItem key={target} onSelect={() => selectTarget(target)}>
-              {TARGET_LABEL[target] ?? `Mark as ${caseStatusLabel(target)}`}
+              {target === 'CLOSED' && kase.caseType === 'COMPLAINT'
+                ? 'Request closure approval'
+                : (TARGET_LABEL[target] ?? `Mark as ${caseStatusLabel(target)}`)}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -74,8 +85,8 @@ export function CaseLifecycleActions({ kase }: { kase: Case }) {
       <Dialog open={resolveDialogOpen} onOpenChange={setResolveDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Resolve case</DialogTitle>
-            <DialogDescription>Optionally record how this case was resolved.</DialogDescription>
+            <DialogTitle>Resolve ticket</DialogTitle>
+            <DialogDescription>Optionally record how this ticket was resolved.</DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5 py-2">
             <Label htmlFor="resolutionNotes">Resolution notes (optional)</Label>

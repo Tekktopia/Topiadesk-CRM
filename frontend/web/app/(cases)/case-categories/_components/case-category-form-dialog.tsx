@@ -102,13 +102,13 @@ export function CaseCategoryFormDialog({
             <Input id="case-category-code" value={code} onChange={(e) => setCode(e.target.value)} required placeholder="e.g. BILLING" />
           </div>
           <div className="space-y-1.5">
-            <Label>Restrict to case type</Label>
+            <Label>Restrict to ticket type</Label>
             <Select value={caseType || UNSET} onValueChange={(v) => setCaseType(v === UNSET ? '' : (v as CaseType))}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={UNSET}>Any case type</SelectItem>
+                <SelectItem value={UNSET}>Any ticket type</SelectItem>
                 {CASE_TYPES.map((t) => (
                   <SelectItem key={t} value={t}>
                     {caseTypeLabel(t)}

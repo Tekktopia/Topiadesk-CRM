@@ -124,6 +124,17 @@ enum ActivityDirection {
   INTERNAL
 }
 
+/// Delivery state of an OUTBOUND Case comment's customer-facing email — see
+/// backend/worker/src/jobs/case-outbound-email/send-case-comment-email.job.ts.
+/// Null on the row means "never eligible" (INTERNAL note, non-Case
+/// activity, inbound message), not "unknown".
+enum ActivityEmailDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED_NO_EMAIL
+}
+
 enum TaskStatus {
   OPEN
   IN_PROGRESS
@@ -257,6 +268,16 @@ enum ApprovalEntityType {
   USER_ROLE_CHANGE
   DOCUMENT_RETENTION_OVERRIDE
   KNOWLEDGE_ARTICLE_PUBLISH
+  /// A COMPLAINT-type Case moving to CLOSED — see
+  /// case-management/cases.controller.ts's request-closure/closure-decision
+  /// endpoints. Regulatory expectation: a customer complaint can't be
+  /// closed unilaterally by the agent who worked it.
+  CASE_CLOSURE
+  /// An AutomationRule's APPROVAL_GATE step — see AutomationRunState.
+  /// entityId points at the AutomationRunState.id (not the Case/Claim
+  /// directly), since a run can pause at an arbitrary step with arbitrary
+  /// in-flight context only the run row can express.
+  CASE_AUTOMATION_GATE
   OTHER
 }
 
@@ -354,6 +375,11 @@ model User {
   email             String         @unique
   fullName          String         @map("full_name")
   phone             String?
+  /// MinIO object key under the shared documents bucket (`avatars/{userId}/...`)
+  /// — never a public URL, since MinIO isn't internet-reachable (same
+  /// reasoning as DocumentVersion.storageKey). Streamed through
+  /// GET /identity/me/avatar, self-only in this pass.
+  avatarStorageKey  String?        @map("avatar_storage_key")
   departmentId      String?        @map("department_id") @db.Uuid
   department        Department?    @relation(fields: [departmentId], references: [id])
   branchId          String?        @map("branch_id") @db.Uuid
@@ -750,6 +776,7 @@ model Activity {
   channelDetail      String?           @map("channel_detail")
   externalThreadId   String?           @map("external_thread_id")
   externalMessageId  String?           @unique @map("external_message_id")
+  emailDeliveryStatus ActivityEmailDeliveryStatus? @map("email_delivery_status")
   aiSentiment        String?           @map("ai_sentiment")
   aiSentimentScore   Decimal?          @map("ai_sentiment_score") @db.Decimal(4, 3)
   aiAnalyzedAt       DateTime?         @map("ai_analyzed_at") @db.Timestamptz(6)
@@ -1043,6 +1070,8 @@ model Approval {
   decidedAt     DateTime?          @map("decided_at") @db.Timestamptz(6)
   createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  automationRunStates AutomationRunState[]
+
   @@index([entityType, entityId])
   @@map("approvals")
 }
@@ -1141,13 +1170,58 @@ model AutomationRule {
   triggerType AutomationTriggerType @map("trigger_type")
   conditions  Json
   actions     Json
+  /// Ordered multi-step sequence — additive, optional, and fully
+  /// independent of `actions` above. Null/empty means "use the existing
+  /// flat `actions` path" (backend/worker/src/automation/
+  /// automation-events.queue.ts's processEntityEvent branches on this).
+  /// Each element is `{type:'ACTION', actionType, params}` (identical
+  /// shape to one `actions` entry) or `{type:'APPROVAL_GATE', reason?}` —
+  /// see run-engine.ts for execution.
+  steps       Json?
   isActive    Boolean               @default(true) @map("is_active")
   createdById String                @map("created_by_id") @db.Uuid
   createdBy   User                  @relation("AutomationRuleCreatedBy", fields: [createdById], references: [id])
   createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  runStates AutomationRunState[]
+
   @@map("automation_rules")
+}
+
+enum AutomationRunStatus {
+  RUNNING
+  WAITING_APPROVAL
+  COMPLETED
+  FAILED
+}
+
+/// One row per in-progress-or-finished execution of an AutomationRule's
+/// `steps` sequence against one Case/Claim — the state a WAITING_APPROVAL
+/// run needs to resume from once its linked Approval is decided (see
+/// run-engine.ts). Only ever created for rules that have `steps` set; the
+/// existing flat `actions` path runs synchronously within one queue job
+/// and never creates one of these.
+model AutomationRunState {
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ruleId           String               @map("rule_id") @db.Uuid
+  rule             AutomationRule       @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  entityType       CaseManagementEntityType @map("entity_type")
+  entityId         String               @map("entity_id") @db.Uuid
+  status           AutomationRunStatus  @default(RUNNING)
+  currentStepIndex Int                  @default(0) @map("current_step_index")
+  context          Json?
+  approvalId       String?              @map("approval_id") @db.Uuid
+  approval         Approval?            @relation(fields: [approvalId], references: [id], onDelete: SetNull)
+  failureReason    String?              @map("failure_reason")
+  startedAt        DateTime             @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt      DateTime?            @map("completed_at") @db.Timestamptz(6)
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([ruleId])
+  @@index([entityType, entityId])
+  @@index([approvalId])
+  @@map("automation_run_states")
 }
 
 // =============================================================================

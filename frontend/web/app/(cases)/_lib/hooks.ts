@@ -13,6 +13,7 @@ import type {
   BusinessHoursCalendar,
   Case,
   CaseCategory,
+  CaseClosureApproval,
   CaseComment,
   CaseQuery,
   CaseQueueQuery,
@@ -34,6 +35,7 @@ import type {
   CreateMacroInput,
   CreateSlaPolicyInput,
   CreateSlaTargetInput,
+  DecideCaseClosureInput,
   LinkChildCaseInput,
   LookupOption,
   LossCauseCategory,
@@ -41,6 +43,7 @@ import type {
   MacroPreviewResponse,
   MergeCaseInput,
   ReopenClaimInput,
+  RequestCaseClosureInput,
   ResolvedPermission,
   SlaClock,
   SlaPolicy,
@@ -237,7 +240,7 @@ export function useCreateCase() {
     mutationFn: (input: CreateCaseInput) => apiFetch<Case>('/api/cases', { method: 'POST', body: JSON.stringify(input) }),
     onSuccess: (kase) => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
-      toast.success(`Case "${kase.caseNumber}" created`);
+      toast.success(`Ticket "${kase.caseNumber}" created`);
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -249,7 +252,7 @@ export function useUpdateCase(id: string) {
     mutationFn: (input: UpdateCaseInput) => apiFetch<Case>(`/api/cases/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
-      toast.success('Case updated');
+      toast.success('Ticket updated');
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -262,7 +265,7 @@ export function useSelfAssignCase() {
     mutationFn: (id: string) => apiFetch<Case>(`/api/cases/${id}/claim`, { method: 'POST' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
-      toast.success('Case assigned to you');
+      toast.success('Ticket assigned to you');
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -274,7 +277,42 @@ export function useChangeCaseStatus(id: string) {
     mutationFn: (input: ChangeCaseStatusInput) => apiFetch<Case>(`/api/cases/${id}/status`, { method: 'POST', body: JSON.stringify(input) }),
     onSuccess: (kase) => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
-      toast.success(`Case marked ${kase.status}`);
+      toast.success(`Ticket marked ${kase.status}`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+/** Non-COMPLAINT cases close immediately (returns the closed Case); COMPLAINT cases create a pending closure approval instead (the Case itself is unchanged — see useCaseClosureApproval). */
+export function useRequestCaseClosure(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RequestCaseClosureInput = {}) => apiFetch<Case>(`/api/cases/${id}/request-closure`, { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (kase) => {
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['cases', id, 'closure-approval'] });
+      toast.success(kase.status === 'CLOSED' ? 'Ticket closed' : 'Closure approval requested');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useCaseClosureApproval(id: string) {
+  return useQuery({
+    queryKey: ['cases', id, 'closure-approval'],
+    queryFn: () => apiFetch<CaseClosureApproval | null>(`/api/cases/${id}/closure-approval`),
+    enabled: Boolean(id),
+  });
+}
+
+export function useDecideCaseClosure(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: DecideCaseClosureInput) => apiFetch<Case>(`/api/cases/${id}/closure-decision`, { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (_kase, input) => {
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['cases', id, 'closure-approval'] });
+      toast.success(input.decision === 'APPROVED' ? 'Closure approved — ticket closed' : 'Closure rejected');
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -288,7 +326,7 @@ export function useBulkReassignCases() {
       settleAndReport(ids, (id) => apiFetch<Case>(`/api/cases/${id}`, { method: 'PATCH', body: JSON.stringify({ assignedToId }) })),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
-      reportBulkResult('case', 'Reassigned', result);
+      reportBulkResult('ticket','Reassigned', result);
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -302,7 +340,7 @@ export function useBulkCloseCases() {
       settleAndReport(ids, (id) => apiFetch<Case>(`/api/cases/${id}/status`, { method: 'POST', body: JSON.stringify({ status: 'CLOSED' }) })),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
-      reportBulkResult('case', 'Closed', result);
+      reportBulkResult('ticket','Closed', result);
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -314,7 +352,7 @@ export function useLinkChildCase(id: string) {
     mutationFn: (input: LinkChildCaseInput) => apiFetch<Case>(`/api/cases/${id}/link-child`, { method: 'POST', body: JSON.stringify(input) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
-      toast.success('Case linked as a child');
+      toast.success('Ticket linked as a child');
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -326,7 +364,7 @@ export function useMergeCase(id: string) {
     mutationFn: (input: MergeCaseInput) => apiFetch<Case>(`/api/cases/${id}/merge`, { method: 'POST', body: JSON.stringify(input) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
-      toast.success('Case merged');
+      toast.success('Ticket merged');
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -737,7 +775,7 @@ export function useTestAssignmentRule() {
 
 // ---------------------------------------------------------------------------
 // Case categories — full CRUD (app/(cases)/case-categories/**), also reused
-// read-only as a lookup feeding the categoryId select on the "New case"
+// read-only as a lookup feeding the categoryId select on the "New ticket"
 // dialog.
 // ---------------------------------------------------------------------------
 
@@ -755,7 +793,7 @@ export function useCreateCaseCategory() {
     mutationFn: (input: CreateCaseCategoryInput) => apiFetch<CaseCategory>('/api/case-categories', { method: 'POST', body: JSON.stringify(input) }),
     onSuccess: (category) => {
       queryClient.invalidateQueries({ queryKey: ['case-categories'] });
-      toast.success(`Case category "${category.name}" created`);
+      toast.success(`Ticket category "${category.name}" created`);
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -767,7 +805,7 @@ export function useUpdateCaseCategory(id: string) {
     mutationFn: (input: UpdateCaseCategoryInput) => apiFetch<CaseCategory>(`/api/case-categories/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['case-categories'] });
-      toast.success('Case category updated');
+      toast.success('Ticket category updated');
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -779,7 +817,7 @@ export function useDeleteCaseCategory() {
     mutationFn: (id: string) => apiFetch<{ deleted: boolean }>(`/api/case-categories/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['case-categories'] });
-      toast.success('Case category deleted');
+      toast.success('Ticket category deleted');
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -1063,7 +1101,7 @@ export function useTeams() {
   return { teamsById, teams, isLoading: query.isLoading };
 }
 
-/** id/name lookups for the "New claim"/"New case" dialogs' policyId + accountId selects — see app/api/policy-lookups/route.ts (extended by this batch to add `policies`). */
+/** id/name lookups for the "New claim"/"New ticket" dialogs' policyId + accountId selects — see app/api/policy-lookups/route.ts (extended by this batch to add `policies`). */
 export function usePolicyLookups() {
   const query = useQuery({
     queryKey: ['policy-lookups'],

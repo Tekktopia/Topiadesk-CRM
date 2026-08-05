@@ -19,9 +19,16 @@ export class CurrentUserResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() email!: string;
   @ApiProperty() fullName!: string;
+  @ApiProperty({ nullable: true }) phone!: string | null;
+  /** Whether GET /identity/me/avatar has an image to stream — never the
+   * storage key itself (internal MinIO layout detail, self-only endpoint
+   * either way). */
+  @ApiProperty() hasAvatar!: boolean;
   @ApiProperty({ enum: ['ONLINE', 'AWAY', 'OFFLINE'] }) presenceStatus!: 'ONLINE' | 'AWAY' | 'OFFLINE';
   @ApiProperty({ type: [String] }) roles!: string[];
   @ApiProperty({ nullable: true }) departmentId!: string | null;
+  @ApiProperty({ nullable: true }) departmentName!: string | null;
   @ApiProperty({ nullable: true }) branchId!: string | null;
+  @ApiProperty({ nullable: true }) branchName!: string | null;
   @ApiProperty({ type: [ResolvedPermissionDto] }) permissions!: ResolvedPermissionDto[];
 }

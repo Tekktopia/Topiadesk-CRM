@@ -12,6 +12,7 @@ import { KeycloakAdminService } from './keycloak-admin.service';
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports -- see comment on SummarizeRequestDto in ai-gateway.controller.ts
 import { ScimUserRequestDto, ScimPatchRequestDto, ScimGroupRequestDto } from './dto/scim.dto';
 import { rethrowAsHttpException } from './prisma-error.util';
+import { storeAvatarFromUrl } from './avatar-storage.util';
 
 const SCIM_USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const SCIM_GROUP_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Group';
@@ -210,6 +211,7 @@ export class ScimController {
     });
 
     const user = await getPrismaClient().user.findUniqueOrThrow({ where: { id: result.userId! } });
+    await this.syncAvatarBestEffort(user.id, dto);
     return buildScimUser(user);
   }
 
@@ -243,6 +245,7 @@ export class ScimController {
     });
 
     const user = await getPrismaClient().user.findUniqueOrThrow({ where: { id: result.userId! } });
+    await this.syncAvatarBestEffort(user.id, dto);
     return buildScimUser(user);
   }
 
@@ -255,6 +258,7 @@ export class ScimController {
     const [existingFirst, ...existingRest] = existing.fullName.split(' ');
     let firstName = existingFirst;
     let lastName = existingRest.join(' ');
+    let photoUrl: string | undefined;
 
     for (const op of dto.Operations) {
       const action = op.op.toLowerCase();
@@ -266,12 +270,14 @@ export class ScimController {
       else if ((path === 'username' || path === 'emails') && typeof value === 'string') email = value;
       else if (path === 'name.givenname' && typeof value === 'string') firstName = value;
       else if (path === 'name.familyname' && typeof value === 'string') lastName = value;
+      else if (path === 'photos') photoUrl = extractPrimaryPhotoUrl(value);
       else if (!path && value && typeof value === 'object') {
         // Path-less replace with a whole (partial) User object — some IdPs
         // (Azure AD included) send this shape rather than dotted paths.
         const obj = value as Record<string, unknown>;
         if (typeof obj.active === 'boolean') active = obj.active;
         if (typeof obj.userName === 'string') email = obj.userName;
+        if (obj.photos) photoUrl = extractPrimaryPhotoUrl(obj.photos) ?? photoUrl;
       }
     }
 
@@ -291,6 +297,11 @@ export class ScimController {
       enabled: active,
     });
     const user = await getPrismaClient().user.findUniqueOrThrow({ where: { id: result.userId! } });
+    if (photoUrl) {
+      await storeAvatarFromUrl(user.id, photoUrl).catch((err: unknown) => {
+        console.error(`[scim] avatar sync failed for user ${user.id}`, err);
+      });
+    }
     return buildScimUser(user);
   }
 
@@ -465,6 +476,19 @@ export class ScimController {
     }
   }
 
+  /** Best-effort — a broken/unreachable photo URL must never fail a
+   * user-provisioning request (see avatar-storage.util.ts's doc comment on
+   * storeAvatarFromUrl for why it throws rather than swallowing errors
+   * itself: this call site is where the "don't fail the request" decision
+   * actually belongs, not the shared util). */
+  private async syncAvatarBestEffort(userId: string, dto: ScimUserRequestDto): Promise<void> {
+    const photoUrl = extractPrimaryPhotoUrl(dto.photos);
+    if (!photoUrl) return;
+    await storeAvatarFromUrl(userId, photoUrl).catch((err: unknown) => {
+      console.error(`[scim] avatar sync failed for user ${userId}`, err);
+    });
+  }
+
   private async groupMappingStrategy(): Promise<GroupMappingStrategy> {
     const setting = await getPrismaClient().orgSetting.findUnique({ where: { key: GROUP_MAPPING_SETTING_KEY } });
     const value = setting?.value as { strategy?: string } | null;
@@ -520,6 +544,17 @@ function parseSimpleEqFilter(filter?: string): { attr: string; value: string } |
 function clampPositiveInt(raw: string | undefined, fallback: number): number {
   const parsed = raw !== undefined ? parseInt(raw, 10) : NaN;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/** Picks the `primary: true` entry if one exists, else the first — same
+ * "primary-or-first" convention primaryEmail() above uses for `emails`. */
+function extractPrimaryPhotoUrl(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const photos = value as Array<{ value?: unknown; primary?: unknown }>;
+  const primary = photos.find((p) => p.primary === true && typeof p.value === 'string');
+  if (primary) return primary.value as string;
+  const first = photos.find((p) => typeof p.value === 'string');
+  return first?.value as string | undefined;
 }
 
 function extractMemberIds(value: unknown): string[] {

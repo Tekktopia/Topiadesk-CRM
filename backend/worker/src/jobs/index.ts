@@ -10,7 +10,13 @@ import {
 import { createScheduledReportDispatchQueue, createScheduledReportDispatchWorker, scheduleScheduledReportDispatch } from './scheduled-reports/dispatch.job';
 import { createScheduledReportGenerateQueue, createScheduledReportGenerateWorker } from './scheduled-reports/generate-and-deliver.job';
 import { createSlaBreachScanQueue, createSlaBreachScanWorker, scheduleSlaBreachScan } from './sla-breach-scan/breach-scan.job';
+import {
+  createNotificationEmailDispatchQueue,
+  createNotificationEmailDispatchWorker,
+  scheduleNotificationEmailDispatch,
+} from './notification-dispatch/notification-email-dispatch.job';
 import { createAutomationEventsQueue, createAutomationEventsWorker } from '../automation/automation-events.queue';
+import { createAutomationRunResumeQueue, createAutomationRunResumeWorker } from '../automation/automation-run-resume.queue';
 import { createCampaignDispatchQueue, createCampaignDispatchWorker, scheduleCampaignDispatchPoll } from './campaigns/dispatch.job';
 import { createAbTestResolveQueue, createAbTestResolveWorker, scheduleAbTestResolve } from './campaigns/ab-test-resolve.job';
 import {
@@ -21,6 +27,7 @@ import {
   scheduleWebhookPoll,
 } from './webhooks/dispatch.job';
 import { createSurveyDispatchQueue, createSurveyDispatchWorker } from './surveys/send-case-survey-invite.job';
+import { createCaseOutboundEmailQueue, createCaseOutboundEmailWorker } from './case-outbound-email/send-case-comment-email.job';
 
 export interface RegisteredJobs {
   queues: Queue[];
@@ -54,11 +61,22 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
   const slaBreachScanWorker = createSlaBreachScanWorker(connection);
   await scheduleSlaBreachScan(slaBreachScanQueue);
 
+  const notificationEmailDispatchQueue = createNotificationEmailDispatchQueue(connection);
+  const notificationEmailDispatchWorker = createNotificationEmailDispatchWorker(connection);
+  await scheduleNotificationEmailDispatch(notificationEmailDispatchQueue);
+
   // Event-driven, not a repeatable schedule — no upsertJobScheduler call:
   // case/claim mutations in the API enqueue onto this queue directly (see
   // backend/api/src/modules/case-management/automation-events.util.ts).
   const automationEventsQueue = createAutomationEventsQueue(connection);
   const automationEventsWorker = createAutomationEventsWorker(connection);
+
+  // Event-driven, not a repeatable schedule — same reasoning as
+  // automationEventsQueue: the API enqueues directly when a human decides
+  // a WAITING_APPROVAL run's Approval (see case-management/
+  // automation-run-resume.util.ts).
+  const automationRunResumeQueue = createAutomationRunResumeQueue(connection);
+  const automationRunResumeWorker = createAutomationRunResumeWorker(connection);
 
   // campaign-dispatch must exist before ab-test-resolve is scheduled:
   // runAbTestResolve calls dispatchCampaign in-process (not via the queue,
@@ -89,6 +107,12 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
   const surveyDispatchQueue = createSurveyDispatchQueue(connection);
   const surveyDispatchWorker = createSurveyDispatchWorker(connection);
 
+  // Event-driven, not a repeatable schedule — same reasoning as
+  // surveyDispatchQueue above: the API enqueues directly when an OUTBOUND
+  // comment posts on a Case (see case-management/comments.service.ts).
+  const caseOutboundEmailQueue = createCaseOutboundEmailQueue(connection);
+  const caseOutboundEmailWorker = createCaseOutboundEmailWorker(connection);
+
   return {
     queues: [
       renewalScanQueue,
@@ -97,12 +121,15 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       scheduledReportGenerateQueue,
       scheduledReportDispatchQueue,
       slaBreachScanQueue,
+      notificationEmailDispatchQueue,
       automationEventsQueue,
       campaignDispatchQueue,
       abTestResolveQueue,
       webhookDispatchQueue,
       webhookPollQueue,
       surveyDispatchQueue,
+      caseOutboundEmailQueue,
+      automationRunResumeQueue,
     ],
     workers: [
       renewalScanWorker,
@@ -111,12 +138,15 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       scheduledReportGenerateWorker,
       scheduledReportDispatchWorker,
       slaBreachScanWorker,
+      notificationEmailDispatchWorker,
       automationEventsWorker,
       campaignDispatchWorker,
       abTestResolveWorker,
       webhookDispatchWorker,
       webhookPollWorker,
       surveyDispatchWorker,
+      caseOutboundEmailWorker,
+      automationRunResumeWorker,
     ],
   };
 }

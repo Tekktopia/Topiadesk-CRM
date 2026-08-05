@@ -60,8 +60,8 @@ export function SlaPoliciesListView() {
       },
       {
         id: 'caseType',
-        header: 'Case type',
-        meta: { label: 'Case type' },
+        header: 'Ticket type',
+        meta: { label: 'Ticket type' },
         accessorFn: (p) => (p.caseType ? humanize(p.caseType) : 'Any'),
         cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
       },
@@ -124,7 +124,7 @@ export function SlaPoliciesListView() {
     <div className="space-y-6">
       <PageHeader
         title="SLA Policies"
-        description="Response/resolution targets applied to claims and cases, with optional per-stage escalation."
+        description="Response/resolution targets applied to claims and tickets, with optional per-stage escalation."
         actions={
           canWrite ? (
             <Button onClick={() => setCreateOpen(true)}>
@@ -171,7 +171,7 @@ export function SlaPoliciesListView() {
         open={Boolean(deleting)}
         onOpenChange={(open) => !open && setDeleting(null)}
         title={`Delete "${deleting?.name}"?`}
-        description="This permanently removes the SLA policy and its targets. Claims/cases already using it keep their existing SlaClock rows."
+        description="This permanently removes the SLA policy and its targets. Claims/tickets already using it keep their existing SlaClock rows."
         confirmLabel="Delete policy"
         destructive
         isPending={deletePolicy.isPending}

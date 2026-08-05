@@ -63,7 +63,7 @@ const TYPE_LABEL: Record<string, string> = {
   TASK: 'Tasks',
   POLICY: 'Policies',
   CLAIM: 'Claims',
-  CASE: 'Cases',
+  CASE: 'Tickets',
   CAMPAIGN: 'Campaigns',
   KNOWLEDGE_ARTICLE: 'Knowledge base',
 };
@@ -136,13 +136,10 @@ export function CommandPalette() {
       >
         <Search className="h-4 w-4" aria-hidden />
         Search…
-        <kbd className="ml-auto rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-          ⌘K
-        </kbd>
       </Button>
 
       <CommandDialog open={open} onOpenChange={setOpen} shouldFilter={false}>
-        <CommandInput placeholder="Search accounts, policies, cases, claims…" value={query} onValueChange={setQuery} />
+        <CommandInput placeholder="Search accounts, policies, tickets, claims…" value={query} onValueChange={setQuery} />
         <CommandList>
           {trimmed.length < 2 ? (
             <CommandEmpty>Type at least 2 characters to search.</CommandEmpty>

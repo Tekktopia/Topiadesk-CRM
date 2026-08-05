@@ -131,9 +131,9 @@ export function CaseFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit case' : 'New case'}</DialogTitle>
+          <DialogTitle>{isEdit ? 'Edit ticket' : 'New ticket'}</DialogTitle>
           <DialogDescription>
-            {isEdit ? `Update case ${kase?.caseNumber}.` : 'Log an enquiry, service request, or complaint. Starts in NEW status.'}
+            {isEdit ? `Update ticket ${kase?.caseNumber}.` : 'Log an enquiry, service request, or complaint. Starts in NEW status.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -335,7 +335,7 @@ export function CaseFormDialog({
               </Button>
               <Button type="submit" disabled={isPending}>
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                {isEdit ? 'Save changes' : 'Create case'}
+                {isEdit ? 'Save changes' : 'Create ticket'}
               </Button>
             </DialogFooter>
           </form>

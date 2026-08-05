@@ -257,6 +257,26 @@ export interface ChangeCaseStatusInput {
   reason?: string;
 }
 
+/** Closing a COMPLAINT case requires a second, non-requester approver — see cases.controller.ts's request-closure/closure-decision endpoints. */
+export interface CaseClosureApproval {
+  id: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  requestedById: string;
+  approvedById: string | null;
+  reason: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+}
+
+export interface RequestCaseClosureInput {
+  reason?: string;
+}
+
+export interface DecideCaseClosureInput {
+  decision: 'APPROVED' | 'REJECTED';
+  reason?: string;
+}
+
 export interface LinkChildCaseInput {
   childCaseId: string;
 }
@@ -280,6 +300,8 @@ export interface CaseComment {
   occurredAt: string;
   createdById: string | null;
   createdBySystemJob: string | null;
+  /** Only set for OUTBOUND comments on a Case — see comment.dto.ts. */
+  emailDeliveryStatus?: 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED_NO_EMAIL' | null;
   createdAt: string;
 }
 

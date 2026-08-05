@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Badge, Card, CardContent, CardHeader, CardTitle, RecordHistory, Skeleton } from '@topiadesk/ui';
-import { CommentsSection } from '../../../_components/comments-section';
+import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton, UnifiedTimeline, type ActivityTimelineItem, type LogActivityFormValues } from '@topiadesk/ui';
 import { EmptyState } from '../../../_components/empty-state';
 import { PageHeader } from '../../../_components/page-header';
 import { SlaClockRow } from '../../../_components/sla-badge';
@@ -16,10 +15,12 @@ import {
   caseTypeLabel,
 } from '../../../_lib/constants';
 import { formatDateTime } from '../../../_lib/format';
-import { useCase, useCaseCategories, useCaseSlaClocks, useDirectoryUsers, usePolicyLookups } from '../../../_lib/hooks';
+import { useAddComment, useCase, useCaseCategories, useCaseSlaClocks, useComments, useDirectoryUsers, usePolicyLookups } from '../../../_lib/hooks';
+import type { CommentActivityDirection, CommentActivityType } from '../../../_lib/types';
 import { ApplyMacroDropdown } from './apply-macro-dropdown';
 import { CaseEditAction } from './case-edit-action';
 import { CaseLifecycleActions } from './case-lifecycle-actions';
+import { ClosureApprovalCard } from './closure-approval-card';
 import { LinkMergeActions } from './link-merge-actions';
 
 export function CaseDetailView({ caseId }: { caseId: string }) {
@@ -28,6 +29,29 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
   const { accounts, policies } = usePolicyLookups();
   const { data: categories } = useCaseCategories();
   const { firstResponse, resolution, hasAccess: hasSlaAccess } = useCaseSlaClocks(kase);
+  const { data: comments, isLoading: isCommentsLoading } = useComments('cases', caseId);
+  const addComment = useAddComment('cases', caseId);
+
+  const timelineItems: ActivityTimelineItem[] = (comments ?? []).map((c) => ({
+    id: c.id,
+    type: c.type as CommentActivityType,
+    direction: c.direction as CommentActivityDirection,
+    subject: c.subject,
+    body: c.body,
+    occurredAt: c.occurredAt,
+    authorName: c.createdById ? (usersById.get(c.createdById)?.fullName ?? null) : (c.createdBySystemJob ?? null),
+    emailDeliveryStatus: c.emailDeliveryStatus,
+  }));
+
+  async function handleLogActivity(values: LogActivityFormValues) {
+    await addComment.mutateAsync({
+      subject: values.subject,
+      body: values.body || undefined,
+      type: values.type,
+      direction: values.direction,
+      occurredAt: new Date(values.occurredAt).toISOString(),
+    });
+  }
 
   if (isLoading) {
     return (
@@ -39,7 +63,7 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
   }
 
   if (!kase) {
-    return <EmptyState title="Case not found" description="It may have been deleted." />;
+    return <EmptyState title="Ticket not found" description="It may have been deleted." />;
   }
 
   const pendingDescription = caseStatusPendingDescription(kase.status);
@@ -80,6 +104,8 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
         </div>
       ) : null}
 
+      {kase.caseType === 'COMPLAINT' ? <ClosureApprovalCard caseId={caseId} /> : null}
+
       {kase.slaPolicyId ? (
         <Card>
           <CardHeader>
@@ -104,7 +130,7 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Case details</CardTitle>
+          <CardTitle>Ticket details</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Subject" value={kase.subject} />
@@ -147,10 +173,18 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Comments</CardTitle>
+            <CardTitle>Timeline</CardTitle>
           </CardHeader>
           <CardContent>
-            <CommentsSection entity="cases" entityId={caseId} />
+            <UnifiedTimeline
+              entityType="cases"
+              entityId={caseId}
+              activityItems={timelineItems}
+              isActivityLoading={isCommentsLoading}
+              onLogActivity={handleLogActivity}
+              isLogging={addComment.isPending}
+              emptyMessage="No comments or history recorded yet."
+            />
           </CardContent>
         </Card>
 
@@ -163,15 +197,6 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <RecordHistory entityType="cases" entityId={caseId} />
-        </CardContent>
-      </Card>
     </div>
   );
 }

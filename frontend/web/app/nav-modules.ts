@@ -30,7 +30,7 @@ export const NAV_MODULES: NavModule[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, indexHref: '/', items: dashboardNav },
   { key: 'crm', label: 'CRM', icon: Briefcase, indexHref: '/accounts', items: crmNav },
   { key: 'policy', label: 'Policy', icon: FileClock, indexHref: '/policies', items: policyNav },
-  { key: 'cases', label: 'Cases', icon: LifeBuoy, indexHref: '/cases', items: casesNav },
+  { key: 'cases', label: 'Tickets', icon: LifeBuoy, indexHref: '/cases', items: casesNav },
   { key: 'knowledge', label: 'Knowledge', icon: BookOpen, indexHref: '/knowledge', items: knowledgeNav },
   { key: 'reports', label: 'Reports', icon: LayoutDashboard, indexHref: '/reports', items: reportsNav },
   { key: 'campaigns', label: 'Campaigns', icon: Megaphone, indexHref: '/campaigns', items: campaignsNav },

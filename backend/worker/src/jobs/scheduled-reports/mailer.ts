@@ -34,6 +34,10 @@ export interface SendMailParams {
   subject: string;
   text: string;
   attachment?: { filename: string; content: Buffer; contentType: string };
+  /** RFC 5322 threading headers — nodemailer supports these natively. Used by case-outbound-email so a real customer reply later re-threads via the existing inbound-email pipeline's own externalMessageId lookup. */
+  messageId?: string;
+  inReplyTo?: string;
+  references?: string;
 }
 
 export async function sendMail(params: SendMailParams): Promise<void> {
@@ -43,6 +47,9 @@ export async function sendMail(params: SendMailParams): Promise<void> {
     to: params.to,
     subject: params.subject,
     text: params.text,
+    messageId: params.messageId,
+    inReplyTo: params.inReplyTo,
+    references: params.references,
     attachments: params.attachment
       ? [{ filename: params.attachment.filename, content: params.attachment.content, contentType: params.attachment.contentType }]
       : undefined,

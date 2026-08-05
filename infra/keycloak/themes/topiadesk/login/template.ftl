@@ -170,7 +170,7 @@
       <h2 class="td-hero-headline">Run your book<br/>with <span>precision.</span></h2>
       <p class="td-hero-copy">
         Client 360, policy lifecycle, renewal alerts, and a tamper-evident
-        audit trail — the engagement layer built for how Scib Nigeria
+        audit trail — the engagement layer built for how TopiaDesk
         actually works.
       </p>
 

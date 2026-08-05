@@ -76,6 +76,8 @@ export interface ActivityTimelineItem {
   aiSentiment?: ActivityTimelineSentiment | null;
   /** Sentiment polarity, -1 (very negative) to 1 (very positive), alongside `aiSentiment`. */
   aiSentimentScore?: number | null;
+  /** Mirrors Activity.emailDeliveryStatus (schema.prisma) — only ever set for OUTBOUND Case comments. Omit/null for everything else, same "purely additive" convention as aiSentiment above. */
+  emailDeliveryStatus?: 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED_NO_EMAIL' | null;
 }
 
 export interface LogActivityFormValues {
@@ -137,6 +139,20 @@ const SENTIMENT_BADGE_VARIANT: Record<ActivityTimelineSentiment, 'success' | 'se
   NEGATIVE: 'destructive',
 };
 
+const EMAIL_DELIVERY_LABEL: Record<NonNullable<ActivityTimelineItem['emailDeliveryStatus']>, string> = {
+  PENDING: 'Sending…',
+  SENT: 'Emailed',
+  FAILED: 'Email failed',
+  SKIPPED_NO_EMAIL: 'No email on file',
+};
+
+const EMAIL_DELIVERY_BADGE_VARIANT: Record<NonNullable<ActivityTimelineItem['emailDeliveryStatus']>, 'success' | 'secondary' | 'destructive' | 'outline'> = {
+  PENDING: 'secondary',
+  SENT: 'success',
+  FAILED: 'destructive',
+  SKIPPED_NO_EMAIL: 'outline',
+};
+
 const dateTimeFormatter = new Intl.DateTimeFormat('en-NG', { dateStyle: 'medium', timeStyle: 'short' });
 
 function formatOccurredAt(value: string | Date): string {
@@ -162,14 +178,19 @@ const DEFAULT_FORM_VALUES: LogActivityFormValues = {
   outcome: '',
 };
 
-function ActivityTimeline({
-  items,
-  isLoading = false,
+/**
+ * The "log an activity" form, extracted so UnifiedTimeline (unified-timeline.tsx)
+ * can render the same composer above its merged Activity+Audit list without
+ * duplicating this markup — ActivityTimeline below is just this plus its own
+ * activity-only list.
+ */
+export function ActivityLogComposer({
   onLogActivity,
   isLogging = false,
-  emptyMessage = 'No activity logged yet.',
-  className,
-}: ActivityTimelineProps) {
+}: {
+  onLogActivity: (values: LogActivityFormValues) => void | Promise<void>;
+  isLogging?: boolean;
+}) {
   const {
     register,
     handleSubmit,
@@ -178,93 +199,133 @@ function ActivityTimeline({
   } = useForm<LogActivityFormValues>({ defaultValues: DEFAULT_FORM_VALUES });
 
   const submit = handleSubmit(async (values) => {
-    await onLogActivity?.({
-      ...values,
-      occurredAt: values.occurredAt || nowForDateTimeLocal(),
-    });
+    await onLogActivity(values);
     reset(DEFAULT_FORM_VALUES);
   });
 
   return (
+    <form onSubmit={submit} className="space-y-3 rounded-lg border border-border bg-card p-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="activity-type">Type</Label>
+          <select
+            id="activity-type"
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-brand-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            {...register('type', { required: true })}
+          >
+            {ACTIVITY_TIMELINE_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {TYPE_LABEL[type]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="activity-direction">Direction</Label>
+          <select
+            id="activity-direction"
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-brand-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            {...register('direction', { required: true })}
+          >
+            {ACTIVITY_TIMELINE_DIRECTIONS.map((direction) => (
+              <option key={direction} value={direction}>
+                {DIRECTION_LABEL[direction]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="activity-subject">Subject</Label>
+        <Input
+          id="activity-subject"
+          placeholder="e.g. Called to discuss renewal terms"
+          aria-invalid={Boolean(errors.subject)}
+          {...register('subject', { required: true, minLength: 1 })}
+        />
+        {errors.subject ? <p className="text-sm font-medium text-destructive">Subject is required.</p> : null}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="activity-body">Notes</Label>
+        <textarea
+          id="activity-body"
+          rows={2}
+          placeholder="Optional details…"
+          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-brand-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          {...register('body')}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="activity-occurred-at">When</Label>
+          <Input id="activity-occurred-at" type="datetime-local" {...register('occurredAt')} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="activity-duration">Duration (min)</Label>
+          <Input id="activity-duration" type="number" min={0} placeholder="—" {...register('durationMinutes')} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="activity-outcome">Outcome</Label>
+          <Input id="activity-outcome" placeholder="e.g. Left voicemail" {...register('outcome')} />
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <Button type="submit" size="sm" disabled={isLogging}>
+          {isLogging ? <Loader2 className="animate-spin" aria-hidden /> : null}
+          Log activity
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/** One activity row's markup, extracted so UnifiedTimeline can interleave it with RecordHistoryRow (record-history.tsx) inside one merged `<ol>` — must render as a bare `<li>` (no wrapping list) so it drops into either caller's list unchanged. */
+export function ActivityTimelineRow({ item }: { item: ActivityTimelineItem }) {
+  const Icon = TYPE_ICON[item.type];
+  return (
+    <li className="relative pb-6 last:pb-0">
+      <span className="absolute -left-[29px] flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" aria-hidden />
+      </span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-foreground">{item.subject}</span>
+        <Badge variant="outline">{TYPE_LABEL[item.type]}</Badge>
+        <Badge variant="secondary">{DIRECTION_LABEL[item.direction]}</Badge>
+        {item.aiSentiment ? (
+          <Badge variant={SENTIMENT_BADGE_VARIANT[item.aiSentiment]}>{SENTIMENT_LABEL[item.aiSentiment]}</Badge>
+        ) : null}
+        {item.emailDeliveryStatus ? (
+          <Badge variant={EMAIL_DELIVERY_BADGE_VARIANT[item.emailDeliveryStatus]}>
+            {EMAIL_DELIVERY_LABEL[item.emailDeliveryStatus]}
+          </Badge>
+        ) : null}
+      </div>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        {formatOccurredAt(item.occurredAt)}
+        {item.authorName ? ` · ${item.authorName}` : ''}
+        {item.durationMinutes ? ` · ${item.durationMinutes} min` : ''}
+      </p>
+      {item.body ? <p className="mt-1.5 text-sm text-foreground/90">{item.body}</p> : null}
+      {item.outcome ? <p className="mt-1 text-xs text-muted-foreground">Outcome: {item.outcome}</p> : null}
+    </li>
+  );
+}
+
+function ActivityTimeline({
+  items,
+  isLoading = false,
+  onLogActivity,
+  isLogging = false,
+  emptyMessage = 'No activity logged yet.',
+  className,
+}: ActivityTimelineProps) {
+  return (
     <div className={cn('space-y-6', className)}>
-      {onLogActivity ? (
-        <form onSubmit={submit} className="space-y-3 rounded-lg border border-border bg-card p-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="activity-type">Type</Label>
-              <select
-                id="activity-type"
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-brand-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                {...register('type', { required: true })}
-              >
-                {ACTIVITY_TIMELINE_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {TYPE_LABEL[type]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="activity-direction">Direction</Label>
-              <select
-                id="activity-direction"
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-brand-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                {...register('direction', { required: true })}
-              >
-                {ACTIVITY_TIMELINE_DIRECTIONS.map((direction) => (
-                  <option key={direction} value={direction}>
-                    {DIRECTION_LABEL[direction]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="activity-subject">Subject</Label>
-            <Input
-              id="activity-subject"
-              placeholder="e.g. Called to discuss renewal terms"
-              aria-invalid={Boolean(errors.subject)}
-              {...register('subject', { required: true, minLength: 1 })}
-            />
-            {errors.subject ? <p className="text-sm font-medium text-destructive">Subject is required.</p> : null}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="activity-body">Notes</Label>
-            <textarea
-              id="activity-body"
-              rows={2}
-              placeholder="Optional details…"
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-brand-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              {...register('body')}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="activity-occurred-at">When</Label>
-              <Input id="activity-occurred-at" type="datetime-local" {...register('occurredAt')} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="activity-duration">Duration (min)</Label>
-              <Input id="activity-duration" type="number" min={0} placeholder="—" {...register('durationMinutes')} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="activity-outcome">Outcome</Label>
-              <Input id="activity-outcome" placeholder="e.g. Left voicemail" {...register('outcome')} />
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button type="submit" size="sm" disabled={isLogging}>
-              {isLogging ? <Loader2 className="animate-spin" aria-hidden /> : null}
-              Log activity
-            </Button>
-          </div>
-        </form>
-      ) : null}
+      {onLogActivity ? <ActivityLogComposer onLogActivity={onLogActivity} isLogging={isLogging} /> : null}
 
       {isLoading ? (
         <div className="space-y-3">
@@ -277,33 +338,9 @@ function ActivityTimeline({
         </p>
       ) : (
         <ol className="relative space-y-0 border-l border-border pl-6">
-          {items.map((item) => {
-            const Icon = TYPE_ICON[item.type];
-            return (
-              <li key={item.id} className="relative pb-6 last:pb-0">
-                <span className="absolute -left-[29px] flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground">
-                  <Icon className="h-3.5 w-3.5" aria-hidden />
-                </span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">{item.subject}</span>
-                  <Badge variant="outline">{TYPE_LABEL[item.type]}</Badge>
-                  <Badge variant="secondary">{DIRECTION_LABEL[item.direction]}</Badge>
-                  {item.aiSentiment ? (
-                    <Badge variant={SENTIMENT_BADGE_VARIANT[item.aiSentiment]}>{SENTIMENT_LABEL[item.aiSentiment]}</Badge>
-                  ) : null}
-                </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {formatOccurredAt(item.occurredAt)}
-                  {item.authorName ? ` · ${item.authorName}` : ''}
-                  {item.durationMinutes ? ` · ${item.durationMinutes} min` : ''}
-                </p>
-                {item.body ? <p className="mt-1.5 text-sm text-foreground/90">{item.body}</p> : null}
-                {item.outcome ? (
-                  <p className="mt-1 text-xs text-muted-foreground">Outcome: {item.outcome}</p>
-                ) : null}
-              </li>
-            );
-          })}
+          {items.map((item) => (
+            <ActivityTimelineRow key={item.id} item={item} />
+          ))}
         </ol>
       )}
     </div>

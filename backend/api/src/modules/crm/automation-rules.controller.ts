@@ -57,6 +57,7 @@ export class AutomationRulesController {
         triggerType: dto.triggerType,
         conditions: dto.conditions as Prisma.InputJsonValue,
         actions: dto.actions as Prisma.InputJsonValue,
+        steps: dto.steps as Prisma.InputJsonValue | undefined,
         isActive: dto.isActive ?? true,
         createdById: user.id,
       },
@@ -77,6 +78,7 @@ export class AutomationRulesController {
         triggerType: dto.triggerType,
         conditions: dto.conditions as Prisma.InputJsonValue | undefined,
         actions: dto.actions as Prisma.InputJsonValue | undefined,
+        steps: dto.steps as Prisma.InputJsonValue | undefined,
         isActive: dto.isActive,
       },
     });

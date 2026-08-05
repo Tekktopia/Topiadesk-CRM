@@ -184,7 +184,7 @@ export function SlaPolicyFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Case type filter</Label>
+              <Label>Ticket type filter</Label>
               <Select value={caseType || UNSET} onValueChange={(v) => setCaseType(v === UNSET ? '' : v)} disabled={entityType !== 'CASE'}>
                 <SelectTrigger>
                   <SelectValue placeholder="Any" />

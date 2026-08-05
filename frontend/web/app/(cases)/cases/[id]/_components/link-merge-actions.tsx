@@ -53,10 +53,10 @@ export function LinkMergeActions({ caseId }: { caseId: string }) {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Link a child case</DialogTitle>
-            <DialogDescription>The selected case becomes a child of this one (PARENT_CHILD link).</DialogDescription>
+            <DialogTitle>Link a child ticket</DialogTitle>
+            <DialogDescription>The selected ticket becomes a child of this one (PARENT_CHILD link).</DialogDescription>
           </DialogHeader>
-          <CaseSelect value={otherCaseId} onValueChange={setOtherCaseId} candidates={candidates} placeholder="Select a case to link…" />
+          <CaseSelect value={otherCaseId} onValueChange={setOtherCaseId} candidates={candidates} placeholder="Select a ticket to link…" />
           <DialogFooter>
             <Button
               type="button"
@@ -78,13 +78,13 @@ export function LinkMergeActions({ caseId }: { caseId: string }) {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Merge into another case</DialogTitle>
+            <DialogTitle>Merge into another ticket</DialogTitle>
             <DialogDescription>
-              This case becomes a MERGED, non-destructive child of the target and is closed — its own children (if any) are
+              This ticket becomes a MERGED, non-destructive child of the target and is closed — its own children (if any) are
               reparented to the target first.
             </DialogDescription>
           </DialogHeader>
-          <CaseSelect value={otherCaseId} onValueChange={setOtherCaseId} candidates={candidates} placeholder="Select the surviving case…" />
+          <CaseSelect value={otherCaseId} onValueChange={setOtherCaseId} candidates={candidates} placeholder="Select the surviving ticket…" />
           <DialogFooter>
             <Button
               type="button"

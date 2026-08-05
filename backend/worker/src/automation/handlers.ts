@@ -126,38 +126,63 @@ registerActionHandler({
   },
 });
 
-/** SEND_NOTIFICATION — params: { title: string, body: string, recipientUserId?: string }. */
+/**
+ * SEND_NOTIFICATION — params: { title: string, body: string, recipientUserId?: string, recipientTeamId?: string, channel?: 'IN_APP' | 'EMAIL' }.
+ * `recipientTeamId` fans out one Notification per current TeamMember of
+ * that team (the workflow builder's "Notify a group" step) — takes
+ * priority over `recipientUserId` if both are somehow set. Safe to create
+ * Notification rows for arbitrary other users here: this handler only ever
+ * runs inside processEntityEvent's runWithRlsContext(SYSTEM_JOB_CONTEXT,
+ * ...) wrapper (automation-events.queue.ts), which bypasses
+ * notifications_rw's `recipient_user_id = app_current_user_id()` WITH
+ * CHECK the same way enqueueSurveyInvitesForResolvedCase/request-closure do.
+ * Keep in sync with the identical handler in
+ * backend/api/src/modules/case-management/automation/handlers.ts (see that
+ * file's comment on `channel` — EMAIL rows are picked up by
+ * notification-dispatch/notification-email-dispatch.job.ts, not sent here).
+ */
 registerActionHandler({
   actionType: 'SEND_NOTIFICATION',
   async execute(params, ctx) {
     const title = requireString(params, 'title');
     const body = requireString(params, 'body');
+    const channel = params.channel === 'EMAIL' ? 'EMAIL' : 'IN_APP';
     const prisma = getPrismaClient();
+    const relatedEntityType = ctx.entity.entityType;
+    const relatedEntityId = ctx.entity.entityType === 'CLAIM' ? ctx.entity.claimId : ctx.entity.caseId;
 
-    let recipientUserId = typeof params.recipientUserId === 'string' ? params.recipientUserId : undefined;
-    if (!recipientUserId) {
-      if (ctx.entity.entityType === 'CLAIM') {
-        const claim = await prisma.claim.findUnique({ where: { id: ctx.entity.claimId } });
-        recipientUserId = claim?.adjusterId ?? undefined;
-      } else {
-        const kase = await prisma.case.findUnique({ where: { id: ctx.entity.caseId } });
-        recipientUserId = kase?.assignedToId ?? undefined;
+    const recipientTeamId = typeof params.recipientTeamId === 'string' ? params.recipientTeamId : undefined;
+    let recipientUserIds: string[];
+    if (recipientTeamId) {
+      const members = await prisma.teamMember.findMany({ where: { teamId: recipientTeamId }, select: { userId: true } });
+      recipientUserIds = members.map((m) => m.userId);
+    } else {
+      let recipientUserId = typeof params.recipientUserId === 'string' ? params.recipientUserId : undefined;
+      if (!recipientUserId) {
+        if (ctx.entity.entityType === 'CLAIM') {
+          const claim = await prisma.claim.findUnique({ where: { id: ctx.entity.claimId } });
+          recipientUserId = claim?.adjusterId ?? undefined;
+        } else {
+          const kase = await prisma.case.findUnique({ where: { id: ctx.entity.caseId } });
+          recipientUserId = kase?.assignedToId ?? undefined;
+        }
       }
+      recipientUserIds = recipientUserId ? [recipientUserId] : [];
     }
-    if (!recipientUserId) return;
+    if (recipientUserIds.length === 0) return;
 
-    await prisma.notification.create({
-      data: {
+    await prisma.notification.createMany({
+      data: recipientUserIds.map((recipientUserId) => ({
         recipientUserId,
         type: 'CASE_MANAGEMENT_AUTOMATION',
         title,
         body,
-        relatedEntityType: ctx.entity.entityType,
-        relatedEntityId: ctx.entity.entityType === 'CLAIM' ? ctx.entity.claimId : ctx.entity.caseId,
-        channel: 'IN_APP',
+        relatedEntityType,
+        relatedEntityId,
+        channel,
         status: 'PENDING',
-        dedupeKey: `case-mgmt-automation:${ctx.entity.entityType}:${ctx.entity.entityType === 'CLAIM' ? ctx.entity.claimId : ctx.entity.caseId}:${randomUUID()}`,
-      },
+        dedupeKey: `case-mgmt-automation:${relatedEntityType}:${relatedEntityId}:${recipientUserId}:${randomUUID()}`,
+      })),
     });
   },
 });

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { getPrismaClient, type Activity } from '@topiadesk/db';
 import type { CreateCommentDto } from './dto/comment.dto';
 import { satisfyCaseFirstResponseClock } from './sla-clock.util';
+import { enqueueCaseCommentEmail } from './case-outbound-email.util';
 
 export interface CommentEntityRef {
   claimId?: string;
@@ -29,21 +30,27 @@ export class CommentsService {
    * An OUTBOUND comment on a Case is a real reply reaching the customer —
    * the first one satisfies the FIRST_RESPONSE SlaClock and stamps
    * Case.firstRespondedAt (once; a no-op on every comment after the first).
-   * INTERNAL notes never count as a response, by definition.
+   * INTERNAL notes never count as a response, by definition. It also
+   * actually emails the customer now (see case-outbound-email.util.ts) —
+   * emailDeliveryStatus starts PENDING here and is advanced by the worker
+   * job the enqueue below triggers.
    */
   async create(entity: CommentEntityRef, dto: CreateCommentDto, createdById: string): Promise<Activity> {
     const prisma = getPrismaClient();
     const occurredAt = dto.occurredAt ? new Date(dto.occurredAt) : new Date();
+    const direction = dto.direction ?? 'INTERNAL';
+    const isOutboundCaseEmail = Boolean(entity.caseId) && direction === 'OUTBOUND';
     const created = await prisma.activity.create({
       data: {
         claimId: entity.claimId,
         caseId: entity.caseId,
         type: dto.type ?? 'NOTE',
-        direction: dto.direction ?? 'INTERNAL',
+        direction,
         subject: dto.subject,
         body: dto.body,
         occurredAt,
         createdById,
+        emailDeliveryStatus: isOutboundCaseEmail ? 'PENDING' : undefined,
       },
     });
 
@@ -53,6 +60,10 @@ export class CommentsService {
         await prisma.case.update({ where: { id: entity.caseId }, data: { firstRespondedAt: occurredAt } });
         await satisfyCaseFirstResponseClock(entity.caseId, occurredAt);
       }
+    }
+
+    if (isOutboundCaseEmail) {
+      await enqueueCaseCommentEmail({ activityId: created.id, caseId: entity.caseId! }).catch(() => undefined);
     }
 
     return created;

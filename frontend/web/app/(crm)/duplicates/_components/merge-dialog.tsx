@@ -23,7 +23,7 @@ const REASSIGN_PREVIEW: Record<MergeEntityType, string[]> = {
     'Contacts, opportunities, activities, tasks, and policies move to the survivor',
     'Child accounts and lead-conversion links are repointed',
     'Account relationships are repointed (self/duplicate relationships dropped)',
-    'Blocked if any Case still references the record being merged away',
+    'Blocked if any Ticket still references the record being merged away',
   ],
   CONTACT: [
     'Activities move to the survivor',

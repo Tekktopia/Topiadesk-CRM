@@ -64,18 +64,18 @@ export function CasesListView() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Cases"
+        title="Tickets"
         description="Enquiries, service requests, and complaints."
         actions={
           <Button onClick={() => setCreateOpen(true)}>
-            <Plus aria-hidden /> New case
+            <Plus aria-hidden /> New ticket
           </Button>
         }
       />
 
       <Tabs defaultValue="all">
         <TabsList>
-          <TabsTrigger value="all">All cases</TabsTrigger>
+          <TabsTrigger value="all">All tickets</TabsTrigger>
           <TabsTrigger value="queue">Queue</TabsTrigger>
         </TabsList>
         <TabsContent value="all">
@@ -121,8 +121,8 @@ function AllCasesTab() {
       selectionColumn<Case>(),
       {
         accessorKey: 'caseNumber',
-        header: ({ column }) => <DataTableColumnHeader column={column} label="Case #" />,
-        meta: { label: 'Case #' },
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Ticket #" />,
+        meta: { label: 'Ticket #' },
         cell: ({ row }) => (
           <Link href={`/cases/${row.original.id}`} className="font-medium text-foreground hover:underline">
             {row.original.caseNumber}
@@ -182,7 +182,7 @@ function AllCasesTab() {
         cell: ({ row }) => (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Case actions">
+              <Button variant="ghost" size="icon" aria-label="Ticket actions">
                 <MoreHorizontal aria-hidden />
               </Button>
             </DropdownMenuTrigger>
@@ -275,8 +275,8 @@ function AllCasesTab() {
         isReassigning={bulkReassign.isPending}
         secondaryLabel="Close"
         secondaryIcon={CheckCircle2}
-        secondaryConfirmTitle={`Close ${selectedIds.length} case${selectedIds.length === 1 ? '' : 's'}?`}
-        secondaryConfirmDescription="Marks each selected case CLOSED. A case already CLOSED, or one only reachable from REOPENED, can't transition directly and will be reported as failed rather than skipped silently."
+        secondaryConfirmTitle={`Close ${selectedIds.length} ticket${selectedIds.length === 1 ? '' : 's'}?`}
+        secondaryConfirmDescription="Marks each selected ticket CLOSED. A ticket already CLOSED, or one only reachable from REOPENED, can't transition directly and will be reported as failed rather than skipped silently."
         onSecondaryAction={() => bulkClose.mutate(selectedIds, { onSuccess: () => setRowSelection({}) })}
         isSecondaryPending={bulkClose.isPending}
       />
@@ -290,7 +290,7 @@ function AllCasesTab() {
       {!isLoading && !isError && cases.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
-            <EmptyState title="No cases match these filters" description="Try clearing a filter, or create a new case." />
+            <EmptyState title="No tickets match these filters" description="Try clearing a filter, or create a new ticket." />
           </CardContent>
         </Card>
       ) : (
@@ -325,8 +325,8 @@ function QueueTab() {
     () => [
       {
         accessorKey: 'caseNumber',
-        header: ({ column }) => <DataTableColumnHeader column={column} label="Case #" />,
-        meta: { label: 'Case #' },
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Ticket #" />,
+        meta: { label: 'Ticket #' },
         cell: ({ row }) => (
           <Link href={`/cases/${row.original.id}`} className="font-medium text-foreground hover:underline">
             {row.original.caseNumber}
@@ -399,7 +399,7 @@ function QueueTab() {
       {!isLoading && !isError && cases.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
-            <EmptyState title="Queue is empty" description="Every active case is already assigned." />
+            <EmptyState title="Queue is empty" description="Every active ticket is already assigned." />
           </CardContent>
         </Card>
       ) : (

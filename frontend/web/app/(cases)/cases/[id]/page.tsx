@@ -1,7 +1,7 @@
 import { CaseDetailView } from './_components/case-detail-view';
 
 export const metadata = {
-  title: 'Case',
+  title: 'Ticket',
 };
 
 export default async function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {

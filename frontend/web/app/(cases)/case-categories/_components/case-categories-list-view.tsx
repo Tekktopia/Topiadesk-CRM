@@ -78,8 +78,8 @@ export function CaseCategoriesListView() {
       },
       {
         id: 'caseType',
-        header: 'Case type',
-        meta: { label: 'Case type' },
+        header: 'Ticket type',
+        meta: { label: 'Ticket type' },
         enableSorting: false,
         accessorFn: (row) => (row.category.caseType ? caseTypeLabel(row.category.caseType) : 'Any'),
         cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
@@ -113,8 +113,8 @@ export function CaseCategoriesListView() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Case Categories"
-        description="Categorizes enquiries, service requests, and complaints — optionally restricted to one case type. Nest a category by setting a parent."
+        title="Ticket Categories"
+        description="Categorizes enquiries, service requests, and complaints — optionally restricted to one ticket type. Nest a category by setting a parent."
         actions={
           canWrite ? (
             <Button onClick={() => setCreateOpen(true)}>
@@ -128,8 +128,8 @@ export function CaseCategoriesListView() {
         <Card>
           <CardContent className="pt-6">
             <EmptyState
-              title="No case categories yet"
-              description="Create one to categorize how cases get triaged."
+              title="No ticket categories yet"
+              description="Create one to categorize how tickets get triaged."
               action={
                 canWrite ? (
                   <Button variant="outline" onClick={() => setCreateOpen(true)}>
@@ -161,7 +161,7 @@ export function CaseCategoriesListView() {
         open={Boolean(deleting)}
         onOpenChange={(open) => !open && setDeleting(null)}
         title={`Delete "${deleting?.name}"?`}
-        description="This permanently removes the case category. This cannot be undone — deletion is blocked if any case still references it. Sub-categories are not moved automatically."
+        description="This permanently removes the ticket category. This cannot be undone — deletion is blocked if any ticket still references it. Sub-categories are not moved automatically."
         confirmLabel="Delete category"
         destructive
         isPending={deleteCategory.isPending}

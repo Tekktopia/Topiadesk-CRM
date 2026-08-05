@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { getPrismaClient, type CasePriority, type CaseStatus, type ClaimStatus } from '@topiadesk/db';
+import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, type CasePriority, type CaseStatus, type ClaimStatus } from '@topiadesk/db';
 import { registerActionHandler } from './action-handler';
 import { applyCaseStatusTransition, applyClaimStatusTransition } from '../status-transition.util';
 
@@ -89,43 +89,79 @@ registerActionHandler({
   },
 });
 
-/** SEND_NOTIFICATION — params: { title: string, body: string, recipientUserId?: string }. Defaults the recipient to the entity's current assignee when not given explicitly. */
+/**
+ * SEND_NOTIFICATION — params: { title: string, body: string, recipientUserId?: string, recipientTeamId?: string, channel?: 'IN_APP' | 'EMAIL' }.
+ * Defaults the recipient to the entity's current assignee when neither
+ * `recipientUserId` nor `recipientTeamId` is given, and the channel to
+ * 'IN_APP' (backward compatible — every rule authored before `channel`
+ * existed keeps behaving identically). `recipientTeamId` fans out one
+ * Notification per current TeamMember of that team (the workflow builder's
+ * "Notify a group" step) and takes priority if both are somehow set.
+ * `channel: 'EMAIL'` rows are picked up by
+ * backend/worker/src/jobs/notification-dispatch/notification-email-dispatch.job.ts,
+ * not sent from here directly (see that file's header comment for why —
+ * sending inline here would risk this request/transaction on an SMTP
+ * hiccup).
+ *
+ * Unlike every other handler in this file, this one's write must run under
+ * SYSTEM_JOB_CONTEXT: macros.service.ts calls executeActions under the
+ * ACTING USER's own interactive RLS context (no SYSTEM_JOB wrap at that
+ * call site, unlike the worker's processEntityEvent — see the identical
+ * handler in backend/worker/src/automation/handlers.ts), so a macro that
+ * notifies anyone other than the person applying it would otherwise trip
+ * notifications_rw's `recipient_user_id = app_current_user_id()` WITH
+ * CHECK. Same fix as CasesController.requestClosure's notify-every-
+ * compliance-officer loop.
+ */
 registerActionHandler({
   actionType: 'SEND_NOTIFICATION',
   async execute(params, ctx) {
     const title = requireString(params, 'title');
     const body = requireString(params, 'body');
+    const channel = params.channel === 'EMAIL' ? 'EMAIL' : 'IN_APP';
     const prisma = getPrismaClient();
+    const relatedEntityType = ctx.entity.entityType;
+    const relatedEntityId = ctx.entity.entityType === 'CLAIM' ? ctx.entity.claimId : ctx.entity.caseId;
 
-    let recipientUserId = typeof params.recipientUserId === 'string' ? params.recipientUserId : undefined;
-    if (!recipientUserId) {
-      if (ctx.entity.entityType === 'CLAIM') {
-        const claim = await prisma.claim.findUnique({ where: { id: ctx.entity.claimId } });
-        recipientUserId = claim?.adjusterId ?? undefined;
-      } else {
-        const kase = await prisma.case.findUnique({ where: { id: ctx.entity.caseId } });
-        recipientUserId = kase?.assignedToId ?? undefined;
+    const recipientTeamId = typeof params.recipientTeamId === 'string' ? params.recipientTeamId : undefined;
+    let recipientUserIds: string[];
+    if (recipientTeamId) {
+      const members = await prisma.teamMember.findMany({ where: { teamId: recipientTeamId }, select: { userId: true } });
+      recipientUserIds = members.map((m) => m.userId);
+    } else {
+      let recipientUserId = typeof params.recipientUserId === 'string' ? params.recipientUserId : undefined;
+      if (!recipientUserId) {
+        if (ctx.entity.entityType === 'CLAIM') {
+          const claim = await prisma.claim.findUnique({ where: { id: ctx.entity.claimId } });
+          recipientUserId = claim?.adjusterId ?? undefined;
+        } else {
+          const kase = await prisma.case.findUnique({ where: { id: ctx.entity.caseId } });
+          recipientUserId = kase?.assignedToId ?? undefined;
+        }
       }
+      recipientUserIds = recipientUserId ? [recipientUserId] : [];
     }
-    if (!recipientUserId) return; // nothing sensible to notify — silently a no-op, not a failure
+    if (recipientUserIds.length === 0) return; // nothing sensible to notify — silently a no-op, not a failure
 
-    await prisma.notification.create({
-      data: {
-        recipientUserId,
-        type: 'CASE_MANAGEMENT_AUTOMATION',
-        title,
-        body,
-        relatedEntityType: ctx.entity.entityType,
-        relatedEntityId: ctx.entity.entityType === 'CLAIM' ? ctx.entity.claimId : ctx.entity.caseId,
-        channel: 'IN_APP',
-        status: 'PENDING',
-        // Macro/automation-triggered notifications are one-off events, not a
-        // recurring poll like the renewal-alert scan — no natural
-        // idempotency key exists to dedupe against, so this generates a
-        // fresh one every time (dedupeKey's UNIQUE constraint still applies,
-        // it just never collides by construction).
-        dedupeKey: `case-mgmt-automation:${ctx.entity.entityType}:${ctx.entity.entityType === 'CLAIM' ? ctx.entity.claimId : ctx.entity.caseId}:${randomUUID()}`,
-      },
+    await runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+      await getPrismaClient().notification.createMany({
+        data: recipientUserIds.map((recipientUserId) => ({
+          recipientUserId,
+          type: 'CASE_MANAGEMENT_AUTOMATION',
+          title,
+          body,
+          relatedEntityType,
+          relatedEntityId,
+          channel,
+          status: 'PENDING',
+          // Macro/automation-triggered notifications are one-off events, not
+          // a recurring poll like the renewal-alert scan — no natural
+          // idempotency key exists to dedupe against, so this generates a
+          // fresh one every time (dedupeKey's UNIQUE constraint still
+          // applies, it just never collides by construction).
+          dedupeKey: `case-mgmt-automation:${relatedEntityType}:${relatedEntityId}:${recipientUserId}:${randomUUID()}`,
+        })),
+      });
     });
   },
 });

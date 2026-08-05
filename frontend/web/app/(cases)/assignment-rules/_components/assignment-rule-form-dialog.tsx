@@ -157,7 +157,7 @@ export function AssignmentRuleFormDialog({
       <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit assignment rule' : 'New assignment rule'}</DialogTitle>
-          <DialogDescription>Routes newly created claims/cases matching the conditions below to a candidate owner.</DialogDescription>
+          <DialogDescription>Routes newly created claims/tickets matching the conditions below to a candidate owner.</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={submit} className="space-y-4">
@@ -201,7 +201,7 @@ export function AssignmentRuleFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Condition: case type</Label>
+              <Label>Condition: ticket type</Label>
               <Select value={conditionCaseType || UNSET} onValueChange={(v) => setConditionCaseType(v === UNSET ? '' : v)} disabled={entityType !== 'CASE'}>
                 <SelectTrigger>
                   <SelectValue placeholder="Any" />

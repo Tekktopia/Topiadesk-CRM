@@ -104,7 +104,7 @@ export function AssignmentRulesListView() {
     <div className="space-y-6">
       <PageHeader
         title="Assignment Rules"
-        description="How new claims/cases route to an owner — round robin, load-based, or skill-based, evaluated highest priority first."
+        description="How new claims/tickets route to an owner — round robin, load-based, or skill-based, evaluated highest priority first."
         actions={
           canWrite ? (
             <Button onClick={() => setCreateOpen(true)}>
@@ -119,7 +119,7 @@ export function AssignmentRulesListView() {
           <CardContent className="pt-6">
             <EmptyState
               title="No assignment rules yet"
-              description="Create one to automate who new claims/cases get routed to."
+              description="Create one to automate who new claims/tickets get routed to."
               action={
                 canWrite ? (
                   <Button variant="outline" onClick={() => setCreateOpen(true)}>

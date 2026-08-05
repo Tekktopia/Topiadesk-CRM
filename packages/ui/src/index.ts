@@ -39,3 +39,4 @@ export * from './composite/stat-tile';
 export * from './composite/activity-timeline';
 export * from './composite/data-table';
 export * from './composite/record-history';
+export * from './composite/unified-timeline';

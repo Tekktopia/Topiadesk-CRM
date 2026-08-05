@@ -50,7 +50,20 @@ BEGIN
     'scim_api_tokens', 'webhook_subscriptions', 'webhook_deliveries',
     'integration_oauth_credentials',
     -- Phase 2 — customer loyalty
-    'loyalty_accounts', 'loyalty_transactions'
+    'loyalty_accounts', 'loyalty_transactions',
+    -- Phase 3 — workflow engine. Unlike automation_rules itself
+    -- (deliberately RLS-free — see automation-rules.controller.ts's header
+    -- comment, same "config tier" as carriers/pipelines), a run STATE row
+    -- holds per-Case/Claim execution progress, not flat org-wide config —
+    -- it needs the same visibility scoping as the entity it's running
+    -- against.
+    'automation_run_states',
+    -- Phase 4 — custom dashboards. Pre-existing gap, found alongside
+    -- building real user-owned CRUD on top of it: `saved_dashboards` had
+    -- zero RLS despite `ownerId`/`visibility` columns designed for exactly
+    -- this — harmless while only 4 ADMIN-seeded ORG rows existed behind
+    -- read-only routes, a real hole once users can create PRIVATE ones.
+    'saved_dashboards'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);

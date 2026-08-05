@@ -258,9 +258,11 @@ export class DocumentsService {
   }
 }
 
-function sanitizeFileName(name: string): string {
-  // Strip path separators and anything not safe in an S3 key — the
-  // original name is still preserved verbatim on the Document row for
-  // display; this only affects the storage key.
+// Exported for reuse by any other module that writes S3 keys off a
+// user-supplied filename (e.g. identity.controller.ts's avatar upload) —
+// strips path separators and anything not safe in an S3 key. The original
+// name is still preserved verbatim on the Document row for display; this
+// only affects the storage key.
+export function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-180);
 }

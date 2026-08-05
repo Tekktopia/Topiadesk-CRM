@@ -34,3 +34,52 @@ export interface RenewalRow {
   policyStatus: string;
   assignedToId: string | null;
 }
+
+// -- Custom dashboards (backend/api/src/modules/dashboards/saved-dashboards.controller.ts) --
+
+export type DashboardVisibility = 'PRIVATE' | 'DEPARTMENT' | 'ORG';
+
+export interface DashboardWidgetSpec {
+  id: string;
+  title: string;
+  reportKey: string;
+  filters?: Record<string, unknown>;
+  dimension?: string;
+}
+
+export interface SavedDashboard {
+  id: string;
+  name: string;
+  ownerId: string | null;
+  visibility: DashboardVisibility;
+  layoutConfig: unknown;
+  widgets: DashboardWidgetSpec[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSavedDashboardInput {
+  name: string;
+  visibility: DashboardVisibility;
+  widgets: DashboardWidgetSpec[];
+  layoutConfig: Record<string, unknown>;
+}
+
+export type UpdateSavedDashboardInput = Partial<CreateSavedDashboardInput>;
+
+/** Mirrors backend's RenderedDashboardResponseDto — one entry per widget, `result`/`error` mutually exclusive. */
+export interface RenderedDashboardWidget {
+  id: string;
+  title: string;
+  reportKey: string;
+  chartType: string;
+  result?: unknown;
+  error?: string;
+}
+
+export interface RenderedDashboard {
+  id: string;
+  name: string;
+  layoutConfig: Record<string, unknown>;
+  widgets: RenderedDashboardWidget[];
+}

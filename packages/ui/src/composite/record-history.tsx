@@ -82,7 +82,7 @@ export interface RecordHistoryProps {
   className?: string;
 }
 
-class RecordHistoryFetchError extends Error {
+export class RecordHistoryFetchError extends Error {
   status: number;
   constructor(status: number, message: string) {
     super(message);
@@ -207,8 +207,13 @@ function RawChangedFields({ value }: { value: unknown }) {
   );
 }
 
-function RecordHistory({ entityType, entityId, take = 50, className }: RecordHistoryProps) {
-  const query = useQuery({
+/**
+ * Data-fetching half of RecordHistory, extracted so UnifiedTimeline
+ * (unified-timeline.tsx) can pull the same audit rows into its merged
+ * Activity+Audit list without duplicating the query/error-shape logic.
+ */
+export function useRecordHistory(entityType: string, entityId: string, take = 50) {
+  return useQuery({
     queryKey: ['record-history', entityType, entityId, take],
     queryFn: () => fetchRecordHistory(entityType, entityId, take),
     enabled: Boolean(entityType && entityId),
@@ -218,6 +223,31 @@ function RecordHistory({ entityType, entityId, take = 50, className }: RecordHis
     retry: false,
     throwOnError: false,
   });
+}
+
+/** One audit-row's markup, extracted so UnifiedTimeline can interleave it with ActivityTimelineRow (activity-timeline.tsx) inside one merged `<ol>` — must render as a bare `<li>` (no wrapping list) so it drops into either caller's list unchanged. */
+export function RecordHistoryRow({ entry }: { entry: RecordHistoryEntry }) {
+  const Icon = ACTION_ICON[entry.action] ?? Pencil;
+  return (
+    <li className="relative pb-6 last:pb-0">
+      <span className="absolute -left-[29px] flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" aria-hidden />
+      </span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-foreground">{entry.actorUser?.fullName ?? entry.actorSystemJob ?? 'System'}</span>
+        <Badge variant={ACTION_BADGE_VARIANT[entry.action] ?? 'outline'}>{entry.action}</Badge>
+      </div>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        {formatTimestamp(entry.createdAt)}
+        {entry.actorUser?.email ? ` · ${entry.actorUser.email}` : ''}
+      </p>
+      <ChangedFieldsView changedFields={entry.changedFields} />
+    </li>
+  );
+}
+
+function RecordHistory({ entityType, entityId, take = 50, className }: RecordHistoryProps) {
+  const query = useRecordHistory(entityType, entityId, take);
 
   if (query.isLoading) {
     return (
@@ -257,27 +287,9 @@ function RecordHistory({ entityType, entityId, take = 50, className }: RecordHis
 
   return (
     <ol className={cn('relative space-y-0 border-l border-border pl-6', className)}>
-      {entries.map((entry) => {
-        const Icon = ACTION_ICON[entry.action] ?? Pencil;
-        return (
-          <li key={entry.id} className="relative pb-6 last:pb-0">
-            <span className="absolute -left-[29px] flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground">
-              <Icon className="h-3.5 w-3.5" aria-hidden />
-            </span>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-foreground">
-                {entry.actorUser?.fullName ?? entry.actorSystemJob ?? 'System'}
-              </span>
-              <Badge variant={ACTION_BADGE_VARIANT[entry.action] ?? 'outline'}>{entry.action}</Badge>
-            </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {formatTimestamp(entry.createdAt)}
-              {entry.actorUser?.email ? ` · ${entry.actorUser.email}` : ''}
-            </p>
-            <ChangedFieldsView changedFields={entry.changedFields} />
-          </li>
-        );
-      })}
+      {entries.map((entry) => (
+        <RecordHistoryRow key={entry.id} entry={entry} />
+      ))}
     </ol>
   );
 }

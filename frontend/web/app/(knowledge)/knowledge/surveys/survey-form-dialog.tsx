@@ -128,7 +128,7 @@ export function SurveyFormDialog({ target, open, onOpenChange }: { target: 'crea
               id="survey-question"
               value={questionText}
               onChange={(e) => setQuestionText(e.target.value)}
-              placeholder="e.g. How satisfied were you with how your case was handled?"
+              placeholder="e.g. How satisfied were you with how your ticket was handled?"
               required
               minLength={1}
               maxLength={500}

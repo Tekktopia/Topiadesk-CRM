@@ -91,7 +91,11 @@ BEGIN
     -- Phase 2 — customer loyalty. Both tables included: a points ledger is
     -- exactly the kind of record that must be reconstructable/auditable,
     -- same reasoning as survey_responses above.
-    'loyalty_accounts', 'loyalty_transactions'
+    'loyalty_accounts', 'loyalty_transactions',
+    -- Phase 3 — workflow engine. A run's status/step progression is a real
+    -- compliance-relevant record once it can pause on an approval gate,
+    -- same tier as approvals itself.
+    'automation_run_states'
   ]
   LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS %I_audit_trigger ON %I', t, t);

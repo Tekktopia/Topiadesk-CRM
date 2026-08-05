@@ -27,12 +27,21 @@ setup('authenticate as broker (ACCOUNT_HANDLER, password-only)', async ({ page }
   await page.context().storageState({ path: 'e2e/.auth/broker.json' });
 });
 
+// admin's credential was reset directly via the Keycloak Admin API (not
+// through this seed/newPassword flow) after Playwright's own repeated test
+// runs had — unintentionally — become the account's only path to sign in
+// (they'd silently taken over its password and TOTP secret). The account
+// now has no forced UPDATE_PASSWORD action left, only a fresh
+// CONFIGURE_TOTP (deliberately re-armed so a real admin enrolls their own
+// authenticator, not one only this test suite knows) — so `password` and
+// `newPassword` are the same value; loginViaKeycloak's retry-with-
+// newPassword path simply never triggers.
 setup('authenticate as admin (ADMIN, password + real TOTP enrollment)', async ({ page }) => {
   await loginViaKeycloak(page, {
     appUrl: APP_URL,
     username: 'admin',
-    password: 'ChangeMe!Admin1',
-    newPassword: 'Playwright!Admin1',
+    password: 'TopiaDesk#2026!',
+    newPassword: 'TopiaDesk#2026!',
   });
   await page.context().storageState({ path: 'e2e/.auth/admin.json' });
 });

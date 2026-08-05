@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
-import { BadRequestException, Body, ConflictException, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { getPrismaClient, Prisma, type Case } from '@topiadesk/db';
+import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, Prisma, type Case } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -26,9 +26,12 @@ import {
 import { AddWatcherDto, CaseWatcherResponseDto } from './dto/case-watcher.dto';
 import { CommentResponseDto, CreateCommentDto } from './dto/comment.dto';
 import { ApplyMacroResponseDto } from './dto/macro.dto';
+import { CaseClosureApprovalResponseDto, DecideCaseClosureDto, RequestCaseClosureDto } from './dto/case-closure.dto';
 import { applyCaseStatusTransition } from './status-transition.util';
+import { assertValidCaseTransition } from './case-lifecycle';
 import { ensureCaseSlaClocks } from './sla-clock.util';
 import { enqueueEntityEvent } from './automation-events.util';
+import { findMatchingAssignmentRule, resolveNextAssignee } from './assignment-resolver.util';
 
 function generateCaseNumber(): string {
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -162,9 +165,36 @@ export class CasesController {
     await ensureCaseSlaClocks(kase.id, dto.slaPolicyId ?? null, kase.caseType, kase.priority).catch((err: unknown) => {
       console.error(`[cases] failed to start SLA clocks for case ${kase.id}`, err);
     });
+
+    // Auto-assignment only kicks in when the caller left both fields unset —
+    // an explicit assignedToId/assignedTeamId on the request always wins.
+    // Never lets a resolver failure fail case creation itself: an
+    // unresolved case simply lands in the existing unassigned queue
+    // (GET /cases/queue), same resilience contract as ensureCaseSlaClocks
+    // above.
+    if (!dto.assignedToId && !dto.assignedTeamId) {
+      const rule = await findMatchingAssignmentRule('CASE', kase.caseType, kase.priority).catch((err: unknown) => {
+        console.error(`[cases] auto-assignment rule lookup failed for case ${kase.id}`, err);
+        return null;
+      });
+      if (rule) {
+        const resolution = await resolveNextAssignee(rule, true).catch((err: unknown) => {
+          console.error(`[cases] auto-assignment resolution failed for case ${kase.id}`, err);
+          return null;
+        });
+        if (resolution?.userId) {
+          await prisma.case.update({
+            where: { id: kase.id },
+            data: { assignedToId: resolution.userId, assignedTeamId: rule.candidatePoolTeamId },
+          });
+          await enqueueEntityEvent({ entityType: 'CASE', entityId: kase.id, eventType: 'ASSIGNED', occurredAt: new Date().toISOString() }).catch(() => undefined);
+        }
+      }
+    }
+
     await enqueueEntityEvent({ entityType: 'CASE', entityId: kase.id, eventType: 'CREATED', occurredAt: kase.createdAt.toISOString() }).catch(() => undefined);
 
-    // Re-fetch: ensureCaseSlaClocks may have written a resolved slaPolicyId onto the row.
+    // Re-fetch: ensureCaseSlaClocks/auto-assignment may have written fields onto the row.
     return prisma.case.findUniqueOrThrow({ where: { id: kase.id } });
   }
 
@@ -216,9 +246,128 @@ export class CasesController {
   @RequirePermission('case', 'write')
   @ApiOkResponse({ type: CaseResponseDto })
   async changeStatus(@Param('id') id: string, @Body() dto: ChangeCaseStatusDto): Promise<CaseResponseDto> {
+    if (dto.status === 'CLOSED') {
+      const existing = await getPrismaClient().case.findUnique({ where: { id }, select: { caseType: true } });
+      if (existing?.caseType === 'COMPLAINT') {
+        throw new BadRequestException('Closing a COMPLAINT case requires approval — use POST /cases/:id/request-closure');
+      }
+    }
     const kase = await applyCaseStatusTransition(id, dto.status, dto.reason);
     await enqueueEntityEvent({ entityType: 'CASE', entityId: id, eventType: 'STATUS_CHANGED', occurredAt: kase.updatedAt.toISOString() }).catch(() => undefined);
     return kase;
+  }
+
+  /**
+   * Non-COMPLAINT cases close directly, same as before. COMPLAINT cases
+   * instead create a CASE_CLOSURE Approval and notify every
+   * COMPLIANCE_OFFICER (in-app + email) — the case's own status is
+   * untouched until POST :id/closure-decision actually closes it. See the
+   * schema comment on ApprovalEntityType.CASE_CLOSURE.
+   */
+  @Post(':id/request-closure')
+  @RequirePermission('case', 'write')
+  @ApiOkResponse({ type: CaseResponseDto })
+  async requestClosure(@Param('id') id: string, @Body() dto: RequestCaseClosureDto, @CurrentUser() user: AuthenticatedUser): Promise<CaseResponseDto> {
+    const prisma = getPrismaClient();
+    const existing = await prisma.case.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Case not found');
+
+    if (existing.caseType !== 'COMPLAINT') {
+      const kase = await applyCaseStatusTransition(id, 'CLOSED', dto.reason);
+      await enqueueEntityEvent({ entityType: 'CASE', entityId: id, eventType: 'STATUS_CHANGED', occurredAt: kase.updatedAt.toISOString() }).catch(() => undefined);
+      return kase;
+    }
+
+    assertValidCaseTransition(existing.status, 'CLOSED');
+
+    const existingPending = await prisma.approval.findFirst({ where: { entityType: 'CASE_CLOSURE', entityId: id, status: 'PENDING' } });
+    if (existingPending) throw new ConflictException('A closure approval is already pending for this case');
+
+    await prisma.approval.create({ data: { entityType: 'CASE_CLOSURE', entityId: id, requestedById: user.id, status: 'PENDING', reason: dto.reason } });
+
+    // notifications_rw's WITH CHECK only allows a caller to create a
+    // Notification addressed to THEMSELVES (recipient_user_id =
+    // app_current_user_id()) — every other notification-creating path in
+    // this codebase runs under SYSTEM_JOB_CONTEXT for exactly this reason
+    // (sla-breach-scan, the SEND_NOTIFICATION automation handler). This is
+    // the first *interactive* request handler that needs to notify OTHER
+    // users as a side effect, so it needs the same escape hatch — same
+    // fix, same reasoning, as enqueueSurveyInvitesForResolvedCase's
+    // SYSTEM_JOB_CONTEXT wrap (survey-dispatch-queue.ts).
+    const complianceOfficers = await prisma.user.findMany({
+      where: { status: 'ACTIVE', roles: { some: { role: { name: 'COMPLIANCE_OFFICER' } } } },
+    });
+    await runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+      for (const officer of complianceOfficers) {
+        for (const channel of ['IN_APP', 'EMAIL'] as const) {
+          await prisma.notification
+            .create({
+              data: {
+                recipientUserId: officer.id,
+                type: 'CASE_CLOSURE_APPROVAL_REQUESTED',
+                title: `Closure approval needed: ${existing.caseNumber}`,
+                body: `${user.fullName} requested closure approval for complaint case ${existing.caseNumber} — ${existing.subject}.`,
+                relatedEntityType: 'CASE',
+                relatedEntityId: id,
+                channel,
+                status: 'PENDING',
+                dedupeKey: `case-closure-approval:${id}:${officer.id}:${channel}`,
+              },
+            })
+            .catch((err: unknown) => {
+              if (!isUniqueConstraintViolation(err)) throw err;
+            });
+        }
+      }
+    });
+
+    await enqueueEntityEvent({ entityType: 'CASE', entityId: id, eventType: 'CLOSURE_REQUESTED', occurredAt: new Date().toISOString() }).catch(() => undefined);
+    return existing;
+  }
+
+  /**
+   * Decides a pending CASE_CLOSURE approval — mirrors
+   * KnowledgeArticlesService.decideApproval() exactly (segregation of
+   * duties, then apply the entity-specific effect inline).
+   */
+  @Post(':id/closure-decision')
+  @RequirePermission('approval', 'write')
+  @ApiOkResponse({ type: CaseResponseDto })
+  async decideClosure(@Param('id') id: string, @Body() dto: DecideCaseClosureDto, @CurrentUser() user: AuthenticatedUser): Promise<CaseResponseDto> {
+    const prisma = getPrismaClient();
+    const existing = await prisma.case.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Case not found');
+
+    const approval = await prisma.approval.findFirst({ where: { entityType: 'CASE_CLOSURE', entityId: id, status: 'PENDING' } });
+    if (!approval) throw new NotFoundException('No pending closure approval for this case');
+    // Segregation of duties — the approvals_requester_ne_approver DB CHECK
+    // would also reject this, but a clear 403 here beats a raw constraint
+    // violation surfacing as a 500 (same reasoning as the KnowledgeArticle
+    // publish-decision endpoint this mirrors).
+    if (approval.requestedById === user.id) {
+      throw new ForbiddenException('Cannot decide your own closure request');
+    }
+
+    if (dto.decision === 'APPROVED') {
+      await prisma.approval.update({ where: { id: approval.id }, data: { status: 'APPROVED', approvedById: user.id, decidedAt: new Date(), reason: dto.reason } });
+      const kase = await applyCaseStatusTransition(id, 'CLOSED', dto.reason);
+      await enqueueEntityEvent({ entityType: 'CASE', entityId: id, eventType: 'CLOSURE_APPROVED', occurredAt: kase.updatedAt.toISOString() }).catch(() => undefined);
+      return kase;
+    }
+
+    await prisma.approval.update({ where: { id: approval.id }, data: { status: 'REJECTED', approvedById: user.id, decidedAt: new Date(), reason: dto.reason } });
+    await enqueueEntityEvent({ entityType: 'CASE', entityId: id, eventType: 'CLOSURE_REJECTED', occurredAt: new Date().toISOString() }).catch(() => undefined);
+    return existing;
+  }
+
+  @Get(':id/closure-approval')
+  @RequirePermission('case', 'read')
+  @ApiOkResponse({ type: CaseClosureApprovalResponseDto })
+  async getClosureApproval(@Param('id') id: string): Promise<CaseClosureApprovalResponseDto | null> {
+    return getPrismaClient().approval.findFirst({
+      where: { entityType: 'CASE_CLOSURE', entityId: id },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   @Post(':id/link-child')

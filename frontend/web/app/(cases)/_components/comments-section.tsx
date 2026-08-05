@@ -26,6 +26,7 @@ export function CommentsSection({ entity, entityId }: { entity: 'claims' | 'case
     body: c.body,
     occurredAt: c.occurredAt,
     authorName: c.createdById ? (usersById.get(c.createdById)?.fullName ?? null) : (c.createdBySystemJob ?? null),
+    emailDeliveryStatus: c.emailDeliveryStatus,
   }));
 
   async function handleLogActivity(values: LogActivityFormValues) {

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Briefcase, TrendingUp, CalendarClock, Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, StatTile, Skeleton } from '@topiadesk/ui';
 import { formatNaira } from '@/app/(policy)/lib/format';
+import { CustomDashboardSection } from './custom-dashboard-section';
 import { PipelineFunnelChart } from './pipeline-funnel-chart';
 import { RenewalTimeline } from './renewal-timeline';
 import type { PipelineFunnelResponse, RenewalRow } from './types';
@@ -46,7 +47,7 @@ export function DashboardView() {
   const kpis = kpisQuery.data;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">TopiaDesk CRM</h1>
         <p className="text-sm text-muted-foreground">Operational overview — Corporate &amp; Retail Broking, Lagos HQ.</p>
@@ -117,6 +118,8 @@ export function DashboardView() {
           </CardContent>
         </Card>
       </div>
+
+      <CustomDashboardSection />
     </div>
   );
 }

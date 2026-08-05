@@ -11,8 +11,8 @@ export default function WidgetDemoPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Live Chat Widget</h1>
         <p className="text-sm text-muted-foreground">
           This is the omnichannel live-chat entry point — a website visitor with no TopiaDesk account can start a
-          conversation here, which creates a real Case behind the scenes. Try it below: send a message, then open the
-          Case it created under Cases and reply from there — your reply will show up in the widget on the next poll.
+          conversation here, which creates a real Ticket behind the scenes. Try it below: send a message, then open the
+          Ticket it created under Tickets and reply from there — your reply will show up in the widget on the next poll.
         </p>
       </div>
       <LiveChatWidgetDemo />

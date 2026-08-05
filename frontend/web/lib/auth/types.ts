@@ -10,10 +10,15 @@ export interface AuthenticatedUser {
   id: string;
   email: string;
   fullName: string;
+  phone: string | null;
+  /** Whether /api/auth/avatar has an image to stream — see identity.controller.ts's getMyAvatar. */
+  hasAvatar: boolean;
   presenceStatus: 'ONLINE' | 'AWAY' | 'OFFLINE';
   roles: string[];
   departmentId: string | null;
+  departmentName: string | null;
   branchId: string | null;
+  branchName: string | null;
 }
 
 /** The real session contents — access/refresh/ID tokens plus their expiry.

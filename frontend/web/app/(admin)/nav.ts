@@ -2,6 +2,7 @@ import {
   Bell,
   Building2,
   Clock,
+  GitBranch,
   KeyRound,
   MapPin,
   Network,
@@ -39,6 +40,7 @@ export const adminNav: NavItem[] = [
   { label: 'SCIM Tokens', href: '/admin/scim-tokens', icon: KeyRound, section: 'Security', adminOnly: true },
   { label: 'Audit Log', href: '/admin/audit-log', icon: ScrollText, section: 'Security', adminOnly: true },
 
+  { label: 'Workflows', href: '/admin/workflows', icon: GitBranch, section: 'Workflow', adminOnly: true },
   { label: 'Triggers', href: '/admin/triggers', icon: Zap, section: 'Workflow', adminOnly: true },
   { label: 'Automations', href: '/admin/automations', icon: Clock, section: 'Workflow', adminOnly: true },
 

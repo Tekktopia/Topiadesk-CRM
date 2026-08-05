@@ -29,5 +29,7 @@ export class CommentResponseDto {
   @ApiProperty() occurredAt!: Date;
   @ApiProperty({ nullable: true }) createdById!: string | null;
   @ApiProperty({ nullable: true }) createdBySystemJob!: string | null;
+  @ApiPropertyOptional({ nullable: true, description: 'Only set for OUTBOUND comments on a Case — whether the customer-facing email actually sent.' })
+  emailDeliveryStatus?: string | null;
   @ApiProperty() createdAt!: Date;
 }

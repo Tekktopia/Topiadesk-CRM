@@ -5,6 +5,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { Skeleton } from '@topiadesk/ui';
+import { AccountMenu } from './account-menu';
 import { activeNavModule, NAV_MODULES, isNavItemActive } from './nav-modules';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import type { NavItem } from '@/lib/nav-types';
@@ -45,7 +47,7 @@ function groupBySection(items: NavItem[]) {
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { user } = useCurrentUser();
+  const { user, isLoading } = useCurrentUser();
   const canAdmin = canSeeAdminOnly(user?.roles);
 
   const visibleModules = useMemo(() => NAV_MODULES.filter((m) => !m.adminOnly || canAdmin), [canAdmin]);
@@ -78,7 +80,8 @@ export function AppSidebar() {
 
   return (
     <div className="hidden md:flex">
-      {/* Icon rail — one module per icon, active module highlighted. */}
+      {/* Icon rail — one module per icon, active module highlighted, the
+          current user's account menu pinned to the bottom (mt-auto). */}
       <nav aria-label="Modules" className="flex w-16 shrink-0 flex-col items-center gap-1 bg-primary py-3">
         <Link href="/" className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg" aria-label="TopiaDesk home">
           <Image src="/logo-mark.png" alt="" width={24} height={24} className="shrink-0" />
@@ -101,6 +104,10 @@ export function AppSidebar() {
             </Link>
           );
         })}
+
+        <div className="mt-auto pt-2">
+          {isLoading ? <Skeleton className="h-9 w-9 rounded-full bg-primary-foreground/10" /> : user ? <AccountMenu user={user} side="right" /> : null}
+        </div>
       </nav>
 
       {/* Expandable panel — the active module's own sections/items only. */}

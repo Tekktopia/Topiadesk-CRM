@@ -33,7 +33,7 @@ async function assertNoBlockingReferences(kind: 'account' | 'contact', loserId: 
     const caseCount = await prisma.case.count({ where: { accountId: loserId } });
     if (caseCount > 0) {
       throw new BadRequestException(
-        `Cannot merge: ${caseCount} case(s) still reference the loser account. Reassign or resolve them first — case_management.cases.account_id cascades on delete.`,
+        `Cannot merge: ${caseCount} ticket(s) still reference the loser account. Reassign or resolve them first — case_management.cases.account_id cascades on delete.`,
       );
     }
   } else {
