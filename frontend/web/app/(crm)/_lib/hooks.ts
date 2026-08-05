@@ -36,6 +36,8 @@ import type {
   DuplicateGroup,
   Lead,
   LeadQuery,
+  LoyaltyAccount,
+  LoyaltyTransaction,
   MarketSubmission,
   MergeResponse,
   Opportunity,
@@ -901,4 +903,81 @@ export function useBulkDeleteOpportunities() {
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
+}
+
+// --- Phase 2: Customer Loyalty ---
+
+/** Returns null (not an error) when the account isn't enrolled yet — the account-detail Loyalty tab uses that to show an "Enroll" prompt instead of an error state. */
+export function useLoyaltyAccountByAccountId(accountId: string) {
+  return useQuery({
+    queryKey: ['crm', 'loyalty-account', 'by-account', accountId],
+    queryFn: () => apiFetch<LoyaltyAccount | null>(`/api/loyalty-accounts/by-account/${accountId}`),
+    enabled: Boolean(accountId),
+  });
+}
+
+export function useLoyaltyAccounts(search?: string) {
+  return useQuery({
+    queryKey: ['crm', 'loyalty-accounts', search ?? ''],
+    queryFn: () => apiFetch<LoyaltyAccount[]>(`/api/loyalty-accounts${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  });
+}
+
+export function useLoyaltyTransactions(loyaltyAccountId: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'loyalty-transactions', loyaltyAccountId],
+    queryFn: () => apiFetch<LoyaltyTransaction[]>(`/api/loyalty-accounts/${loyaltyAccountId}/transactions`),
+    enabled: Boolean(loyaltyAccountId),
+  });
+}
+
+export function useEnrollLoyaltyAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (accountId: string) => apiFetch<LoyaltyAccount>('/api/loyalty-accounts', { method: 'POST', body: JSON.stringify({ accountId }) }),
+    onSuccess: (loyaltyAccount) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'loyalty-account', 'by-account', loyaltyAccount.accountId] });
+      queryClient.invalidateQueries({ queryKey: ['crm', 'loyalty-accounts'] });
+      toast.success('Enrolled in the loyalty program');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+interface PostPointsInput {
+  loyaltyAccountId: string;
+  accountId: string;
+  points: number;
+  reason: string;
+  relatedPolicyId?: string;
+}
+
+function useLoyaltyLedgerMutation(action: 'earn' | 'redeem' | 'adjust', successVerb: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ loyaltyAccountId, points, reason, relatedPolicyId }: PostPointsInput) =>
+      apiFetch<LoyaltyTransaction>(`/api/loyalty-accounts/${loyaltyAccountId}/${action}`, {
+        method: 'POST',
+        body: JSON.stringify(action === 'earn' ? { points, reason, relatedPolicyId } : { points, reason }),
+      }),
+    onSuccess: (_txn, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'loyalty-account', 'by-account', vars.accountId] });
+      queryClient.invalidateQueries({ queryKey: ['crm', 'loyalty-transactions', vars.loyaltyAccountId] });
+      queryClient.invalidateQueries({ queryKey: ['crm', 'loyalty-accounts'] });
+      toast.success(`Points ${successVerb}`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useEarnPoints() {
+  return useLoyaltyLedgerMutation('earn', 'earned');
+}
+
+export function useRedeemPoints() {
+  return useLoyaltyLedgerMutation('redeem', 'redeemed');
+}
+
+export function useAdjustPoints() {
+  return useLoyaltyLedgerMutation('adjust', 'adjusted');
 }

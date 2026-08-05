@@ -48,7 +48,9 @@ BEGIN
     'campaigns', 'campaign_variants', 'campaign_recipients', 'campaign_suppressions',
     -- Phase 2 — admin & integrations
     'scim_api_tokens', 'webhook_subscriptions', 'webhook_deliveries',
-    'integration_oauth_credentials'
+    'integration_oauth_credentials',
+    -- Phase 2 — customer loyalty
+    'loyalty_accounts', 'loyalty_transactions'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);

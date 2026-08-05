@@ -90,6 +90,10 @@ async function main() {
     // segment regardless of this grant (see audience_segments_rw), so no
     // OWN-scope grant is needed for that specific case.
     'campaign',
+    // Phase 2 Customer Loyalty — gates loyalty_accounts_rw/
+    // loyalty_transactions_rw's WITH CHECK (both join through the enrolled
+    // Account, same OWN/DEPARTMENT/BRANCH/ALL tiering as 'account' itself).
+    'loyalty',
   ] as const;
   const actions = ['read', 'write'] as const;
   const scopes = ['OWN', 'DEPARTMENT', 'BRANCH', 'ALL'] as const;
@@ -128,7 +132,7 @@ async function main() {
     'Department head — sees and manages all records owned within their department',
     true,
     [
-      ...['account', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document', 'claim', 'case', 'macro'].flatMap((r) => actions.map((a) => [r, a, 'DEPARTMENT'] as [string, string, (typeof scopes)[number]])),
+      ...['account', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document', 'claim', 'case', 'macro', 'loyalty'].flatMap((r) => actions.map((a) => [r, a, 'DEPARTMENT'] as [string, string, (typeof scopes)[number]])),
       // AI copilot (summarize/reply-draft) is a front-line productivity tool,
       // not an admin-only feature — see backend/api/src/modules/ai-gateway/.
       ['ai_usage', 'write', 'DEPARTMENT'],
@@ -166,7 +170,7 @@ async function main() {
       // macros_rw's WITH CHECK already self-scopes on created_by_id, OWN
       // here is just what lets PermissionGuard's coarse per-endpoint check
       // pass at all.
-      ...['account', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document', 'claim', 'case', 'macro'].flatMap((r) => actions.map((a) => [r, a, 'OWN'] as [string, string, (typeof scopes)[number]])),
+      ...['account', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document', 'claim', 'case', 'macro', 'loyalty'].flatMap((r) => actions.map((a) => [r, a, 'OWN'] as [string, string, (typeof scopes)[number]])),
       ['ai_usage', 'write', 'OWN'],
       // knowledge_category/knowledge_article: OWN scope satisfies
       // `knowledge_categories_write`'s WITH CHECK (any non-null scope) and
@@ -238,6 +242,12 @@ async function main() {
     // compliance relevance) — matches this role's other read-heavy
     // oversight grants; sending remains a MANAGER-tier action.
     ['campaign', 'read', 'ALL'],
+    // loyalty:write (ALL), not just read — required for the same reason
+    // policy:write/knowledge_article:write (ALL) are above: deciding a
+    // LOYALTY_REDEMPTION Approval both needs to see the account's ledger
+    // and to apply the decision's effect (posting the confirmed REDEEM
+    // LoyaltyTransaction) via a write this role doesn't otherwise own.
+    ['loyalty', 'read', 'ALL'], ['loyalty', 'write', 'ALL'],
   ]);
 
   console.log('[seed] demo users');

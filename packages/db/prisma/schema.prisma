@@ -405,6 +405,7 @@ model User {
   knowledgeArticleFeedback         KnowledgeArticleFeedback[] @relation("KnowledgeArticleFeedbackUser")
   createdSurveys                   Survey[]                   @relation("SurveyCreatedBy")
   ratedSurveyResponses             SurveyResponse[]           @relation("SurveyResponseAgent")
+  loyaltyTransactionsCreated       LoyaltyTransaction[]       @relation("LoyaltyTransactionCreatedBy")
 
   // --- Phase 2: CRM enhancements ---
   ownedSavedViews SavedView[]  @relation("SavedViewOwner")
@@ -545,6 +546,7 @@ model Account {
   tasks            Task[]
   cases            Case[]
   surveyResponses  SurveyResponse[]
+  loyaltyAccount   LoyaltyAccount?
 
   @@index([status])
   @@map("accounts")
@@ -817,13 +819,14 @@ model Policy {
   createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  versions        PolicyVersion[]  @relation("PolicyVersions")
-  premiums        Premium[]
-  renewalSchedule RenewalSchedule?
-  activities      Activity[]
-  tasks           Task[]
-  claims          Claim[]
-  cases           Case[]
+  versions            PolicyVersion[]  @relation("PolicyVersions")
+  premiums            Premium[]
+  renewalSchedule     RenewalSchedule?
+  activities          Activity[]
+  tasks               Task[]
+  claims              Claim[]
+  cases               Case[]
+  loyaltyTransactions LoyaltyTransaction[]
 
   @@index([expiryDate])
   @@map("policies")
@@ -2347,4 +2350,71 @@ model IntegrationOAuthCredential {
 
   @@unique([connectorId, provider])
   @@map("integration_oauth_credentials")
+}
+
+// =============================================================================
+// Phase 2 — Customer Loyalty (docs/roadmap-phase2-3.md)
+// =============================================================================
+
+enum LoyaltyTransactionType {
+  EARN
+  REDEEM
+  /// Manual correction (e.g. a goodwill grant, or fixing a mis-posted
+  /// EARN/REDEEM) — always requires createdById, never SYSTEM_JOB.
+  ADJUST
+  /// Points expiring on a schedule (not built in this phase — the type
+  /// exists now so a future expiry job needs no schema change, same
+  /// reasoning as AutomationRule's action-handler-registry pattern).
+  EXPIRE
+}
+
+/// One row per Account enrolled in the loyalty program. Deliberately has NO
+/// stored points-balance column — the balance is always SUM(points) over
+/// this account's LoyaltyTransaction rows (see loyalty-ledger.util.ts),
+/// computed at read time. A stored/denormalized balance would need to be
+/// kept in lockstep with every transaction insert, and — per
+/// packages/db/src/client.ts's header comment — this codebase's RLS
+/// wrapper does NOT make `prisma.$transaction(cb)` safe to call directly
+/// from application code (it bypasses the set_config step entirely), so a
+/// naive "insert transaction, then update balance" as two separate calls
+/// would have a real double-spend race window under concurrent redemptions.
+/// Computing the balance avoids the problem by construction: there is
+/// nothing to keep in sync.
+model LoyaltyAccount {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId  String   @unique @map("account_id") @db.Uuid
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tier       String   @default("STANDARD")
+  enrolledAt DateTime @default(now()) @map("enrolled_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  transactions LoyaltyTransaction[]
+
+  @@map("loyalty_accounts")
+}
+
+/// Append-only ledger — points are never edited or deleted in place, only
+/// ever offset by a new row (an ADJUST for a correction, same principle as
+/// PolicyVersion's own append-only history). `points` is signed: positive
+/// for EARN/some ADJUSTs, negative for REDEEM/EXPIRE/other ADJUSTs.
+model LoyaltyTransaction {
+  id               String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  loyaltyAccountId String                 @map("loyalty_account_id") @db.Uuid
+  loyaltyAccount   LoyaltyAccount         @relation(fields: [loyaltyAccountId], references: [id], onDelete: Cascade)
+  type             LoyaltyTransactionType
+  points           Int
+  reason           String
+  /// The bind/renewal that earned these points, if applicable — optional,
+  /// since REDEEM/ADJUST/EXPIRE aren't tied to a specific policy.
+  relatedPolicyId  String?                @map("related_policy_id") @db.Uuid
+  relatedPolicy    Policy?                @relation(fields: [relatedPolicyId], references: [id])
+  /// Null only for SYSTEM_JOB-originated rows (e.g. a future automated
+  /// EXPIRE job) — every human-initiated EARN/REDEEM/ADJUST always has one.
+  createdById      String?                @map("created_by_id") @db.Uuid
+  createdBy        User?                  @relation("LoyaltyTransactionCreatedBy", fields: [createdById], references: [id])
+  createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([loyaltyAccountId, createdAt])
+  @@map("loyalty_transactions")
 }

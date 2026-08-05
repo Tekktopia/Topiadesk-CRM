@@ -23,6 +23,7 @@ import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SearchModule } from './modules/search/search.module';
 import { OmnichannelModule } from './modules/omnichannel/omnichannel.module';
+import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { OmnichannelModule } from './modules/omnichannel/omnichannel.module';
     ReportsModule,
     SearchModule,
     OmnichannelModule,
+    LoyaltyModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

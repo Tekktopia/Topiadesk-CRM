@@ -606,3 +606,29 @@ DROP POLICY IF EXISTS integration_oauth_credentials_rw ON integration_oauth_cred
 CREATE POLICY integration_oauth_credentials_rw ON integration_oauth_credentials FOR ALL
   USING (app_max_scope('integration', 'read') = 'ALL' OR app_current_role() = 'SYSTEM_JOB')
   WITH CHECK (app_current_role() = 'SYSTEM_JOB' OR app_max_scope('integration', 'write') = 'ALL');
+
+-- =============================================================================
+-- Phase 2 — Customer loyalty. Both tables scope through the enrolled
+-- Account's owner_id, same join pattern claims_rw uses through
+-- policies->accounts — a broker sees/manages loyalty for accounts they own,
+-- a department head sees their department's, ADMIN/SYSTEM_JOB see all.
+-- =============================================================================
+
+DROP POLICY IF EXISTS loyalty_accounts_rw ON loyalty_accounts;
+CREATE POLICY loyalty_accounts_rw ON loyalty_accounts FOR ALL
+  USING (
+    EXISTS (SELECT 1 FROM accounts a WHERE a.id = account_id AND app_can_access_owner('loyalty', 'read', a.owner_id))
+    OR app_current_role() = 'SYSTEM_JOB'
+  )
+  WITH CHECK (app_max_scope('loyalty', 'write') IS NOT NULL OR app_current_role() = 'SYSTEM_JOB');
+
+DROP POLICY IF EXISTS loyalty_transactions_rw ON loyalty_transactions;
+CREATE POLICY loyalty_transactions_rw ON loyalty_transactions FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM loyalty_accounts la JOIN accounts a ON a.id = la.account_id
+      WHERE la.id = loyalty_account_id AND app_can_access_owner('loyalty', 'read', a.owner_id)
+    )
+    OR app_current_role() = 'SYSTEM_JOB'
+  )
+  WITH CHECK (app_max_scope('loyalty', 'write') IS NOT NULL OR app_current_role() = 'SYSTEM_JOB');

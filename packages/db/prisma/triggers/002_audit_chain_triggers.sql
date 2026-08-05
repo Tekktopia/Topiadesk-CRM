@@ -87,7 +87,11 @@ BEGIN
     'campaigns', 'campaign_variants',
     -- Phase 2 — admin & integrations. webhook_deliveries excluded
     -- (operational log, same tier as integration_logs).
-    'scim_api_tokens', 'webhook_subscriptions', 'integration_oauth_credentials'
+    'scim_api_tokens', 'webhook_subscriptions', 'integration_oauth_credentials',
+    -- Phase 2 — customer loyalty. Both tables included: a points ledger is
+    -- exactly the kind of record that must be reconstructable/auditable,
+    -- same reasoning as survey_responses above.
+    'loyalty_accounts', 'loyalty_transactions'
   ]
   LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS %I_audit_trigger ON %I', t, t);

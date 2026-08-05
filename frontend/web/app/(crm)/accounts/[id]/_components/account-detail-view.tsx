@@ -74,6 +74,7 @@ import type { Contact } from '../../../_lib/types';
 import { AccountFormDialog } from '../../_components/account-form-dialog';
 import { ContactFormDialog } from '../../_components/contact-form-dialog';
 import { AiInsightPanel } from './ai-insight-panel';
+import { LoyaltyTab } from './loyalty-tab';
 
 export function AccountDetailView({ accountId }: { accountId: string }) {
   const router = useRouter();
@@ -148,6 +149,7 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
           <TabsTrigger value="opportunities">Opportunities</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
           <TabsTrigger value="ai-insights" className="gap-1.5">
             <Sparkles className="h-3.5 w-3.5" aria-hidden /> AI Insights
           </TabsTrigger>
@@ -187,6 +189,10 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
 
         <TabsContent value="activity">
           <ActivityTab accountId={accountId} />
+        </TabsContent>
+
+        <TabsContent value="loyalty">
+          <LoyaltyTab accountId={accountId} />
         </TabsContent>
 
         <TabsContent value="ai-insights">

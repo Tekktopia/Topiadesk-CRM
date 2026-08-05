@@ -510,3 +510,26 @@ export interface BulkAssignInput {
 export interface BulkDeleteInput {
   ids: string[];
 }
+
+export interface LoyaltyAccount {
+  id: string;
+  accountId: string;
+  accountName?: string;
+  tier: string;
+  pointsBalance: number;
+  enrolledAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LoyaltyTransaction {
+  id: string;
+  loyaltyAccountId: string;
+  type: 'EARN' | 'REDEEM' | 'ADJUST' | 'EXPIRE';
+  points: number;
+  reason: string;
+  relatedPolicyId: string | null;
+  createdById: string | null;
+  createdByName?: string | null;
+  createdAt: string;
+}

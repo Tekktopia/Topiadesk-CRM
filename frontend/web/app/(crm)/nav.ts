@@ -1,4 +1,4 @@
-import { Briefcase, Building2, CheckSquare, ListPlus, Target, TrendingUp, Users } from 'lucide-react';
+import { Award, Briefcase, Building2, CheckSquare, ListPlus, Target, TrendingUp, Users } from 'lucide-react';
 import type { NavItem } from '@/lib/nav-types';
 
 /**
@@ -15,4 +15,5 @@ export const crmNav: NavItem[] = [
   { label: 'Tasks', href: '/tasks', icon: CheckSquare, section: 'CRM' },
   { label: 'Custom Fields', href: '/custom-fields', icon: ListPlus, section: 'CRM' },
   { label: 'Sales Quotas', href: '/sales-quotas', icon: TrendingUp, section: 'CRM' },
+  { label: 'Loyalty', href: '/loyalty', icon: Award, section: 'CRM' },
 ];
