@@ -2,17 +2,60 @@
    Loaded after keycloak.v2's own css/styles.css (see theme.properties) so
    these rules win the cascade without needing to override any .ftl. */
 
+/* Plus Jakarta Sans, self-hosted (not linked from Google's CDN — a login
+   page shouldn't depend on a third-party origin being reachable to render
+   correctly). One variable-font file covers weights 500–700; Google Fonts'
+   own CSS2 API serves the exact same physical file for each of those
+   weights (confirmed by fetching it directly), so three @font-face blocks
+   pinned to distinct weights — matching what Google's own stylesheet
+   generates — is the correct, most broadly-compatible way to reference it,
+   rather than a single `font-weight: 500 700` range declaration. */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fonts/plus-jakarta-sans-variable.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/plus-jakarta-sans-variable.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/plus-jakarta-sans-variable.woff2") format("woff2");
+}
+
 :root {
   --td-bg: #080d16;
   --td-bg-deep: #04070d;
-  --td-panel: rgba(13, 19, 29, 0.82);
-  --td-panel-border: rgba(255, 255, 255, 0.09);
-  --td-orange: #f5901e;
-  --td-blue: #147bc6;
-  --td-ink: #eef2f7;
-  --td-ink-muted: #97a3b6;
-  --td-input-bg: rgba(255, 255, 255, 0.06);
-  --td-input-border: rgba(255, 255, 255, 0.14);
+
+  /* Glass card — a cool, near-neutral tint rather than the near-opaque
+     panel this replaces. Lower alpha + heavier blur is what actually
+     reads as "glass" instead of "solid card with a soft edge". */
+  --td-glass: rgba(22, 29, 42, 0.38);
+  --td-glass-border: rgba(255, 255, 255, 0.16);
+  --td-glass-highlight: rgba(255, 255, 255, 0.55);
+
+  /* Single accent — the previous orange+blue duo is retired from every
+     piece of UI chrome (title, focus ring, button, links). The ambient
+     wave canvas keeps both brand hues; it's atmosphere, not UI. */
+  --td-accent: #4f8cff;
+  --td-accent-strong: #2f6fee;
+  --td-accent-soft: rgba(79, 140, 255, 0.16);
+
+  --td-ink: #f3f5f9;
+  --td-ink-muted: #94a1b8;
+  --td-input-bg: rgba(255, 255, 255, 0.05);
+  --td-input-border: rgba(255, 255, 255, 0.12);
+
+  --td-font: "Plus Jakarta Sans", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 html,
@@ -39,12 +82,13 @@ body#keycloak-bg {
   z-index: 1;
   background: transparent !important;
   min-height: 100vh;
+  font-family: var(--td-font);
 }
 
 .pf-v5-c-login__container {
   position: relative;
   z-index: 1;
-  grid-template-columns: 21rem !important;
+  grid-template-columns: 26rem !important;
 }
 
 /* ---------- Header / brand mark ----------
@@ -54,7 +98,7 @@ body#keycloak-bg {
    unfinished; nesting it inside is what makes this read as one composed
    card instead of two stacked pieces. */
 #kc-header {
-  margin: 0 0 0.7rem;
+  margin: 0 0 1.1rem;
   border: none !important;
   box-shadow: none !important;
   background: transparent !important;
@@ -63,103 +107,125 @@ body#keycloak-bg {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.55rem;
   color: var(--td-ink-muted) !important;
-  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-weight: 700;
-  font-size: 0.65rem;
-  letter-spacing: 0.09em;
+  font-family: var(--td-font);
+  font-weight: 600;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   text-align: center;
 }
 #kc-header-wrapper::before {
   content: "";
   display: block;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   background-image: url("../img/logo-mark.png");
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
-  filter: drop-shadow(0 0 10px rgba(245, 144, 30, 0.28)) drop-shadow(0 0 10px rgba(20, 123, 198, 0.2));
+  filter: drop-shadow(0 0 12px rgba(79, 140, 255, 0.25));
 }
 
-/* ---------- Card ---------- */
+/* ---------- Card: the actual "glass" ----------
+   Three layers make the glass read as glass rather than a tinted solid:
+   1. a heavily-blurred, saturated backdrop-filter so the wave animation
+      genuinely shows through and colors it,
+   2. a hairline border that's brighter at the top than the sides (light
+      catching the upper edge of a pane), built via a mask'd gradient
+      rather than a flat border color,
+   3. a very thin, very bright inset line right at the top edge — the
+      single most legible "this is glass, not plastic" cue. */
 .pf-v5-c-login__main {
-  background: var(--td-panel);
-  border: 1px solid var(--td-panel-border);
-  border-radius: 12px;
-  padding: 1.1rem 1.1rem 0.9rem;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  background: var(--td-glass);
+  border: 1px solid var(--td-glass-border);
+  border-radius: 20px;
+  padding: 2.35rem 2.25rem 1.85rem;
+  box-shadow:
+    0 30px 70px rgba(0, 0, 0, 0.5),
+    0 1px 0 var(--td-glass-highlight) inset;
+  backdrop-filter: blur(34px) saturate(1.65);
+  -webkit-backdrop-filter: blur(34px) saturate(1.65);
   position: relative;
   overflow: hidden;
 }
 .pf-v5-c-login__main::before {
   content: "";
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--td-orange), var(--td-blue));
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.02) 40%, rgba(255, 255, 255, 0.06) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 .pf-v5-c-login__main-header {
   text-align: center;
-  margin-bottom: 0.7rem;
+  margin-bottom: 1.35rem;
   border-top: none !important;
   padding-top: 0 !important;
 }
 
 .pf-v5-c-title,
 #kc-page-title {
+  font-family: var(--td-font);
   color: var(--td-ink) !important;
   font-weight: 600 !important;
-  font-size: 1rem !important;
+  font-size: 1.28rem !important;
+  letter-spacing: -0.015em;
   line-height: 1.3 !important;
 }
 
 .pf-v5-c-form__group {
-  margin-bottom: 0.4rem;
+  margin-bottom: 1rem;
 }
 
 .pf-v5-c-form-control {
-  padding-top: 0.28rem !important;
-  padding-bottom: 0.28rem !important;
-  font-size: 0.8rem !important;
+  padding: 0.62rem 0.8rem !important;
+  font-size: 0.88rem !important;
+  font-family: var(--td-font);
   min-height: 0 !important;
+  border-radius: 10px !important;
 }
 
 .pf-v5-c-form__label {
-  padding-bottom: 0.05rem !important;
+  padding-bottom: 0.3rem !important;
 }
 
 .pf-v5-c-form__label-text {
-  font-size: 0.68rem !important;
+  font-family: var(--td-font);
+  font-weight: 500 !important;
+  font-size: 0.74rem !important;
+  letter-spacing: 0.01em;
 }
 
 .pf-v5-c-form__actions {
-  padding-top: 0.5rem !important;
+  padding-top: 0.9rem !important;
   padding-bottom: 0 !important;
   margin: 0 !important;
 }
 
 .pf-v5-c-button.pf-m-primary,
 .pf-v5-c-button.pf-m-secondary {
-  padding-top: 0.45rem !important;
-  padding-bottom: 0.45rem !important;
-  font-size: 0.88rem !important;
+  font-family: var(--td-font);
+  padding-top: 0.62rem !important;
+  padding-bottom: 0.62rem !important;
+  font-size: 0.9rem !important;
+  border-radius: 10px !important;
   margin: 0 !important;
 }
 
 .pf-v5-c-login__main-body a {
-  font-size: 0.78rem !important;
+  font-family: var(--td-font);
+  font-size: 0.8rem !important;
 }
 
 .pf-v5-c-login__main-footer {
-  margin-top: 0.2rem !important;
+  margin-top: 0.35rem !important;
   padding-top: 0 !important;
 }
 
@@ -170,37 +236,61 @@ label {
   color: var(--td-ink-muted) !important;
 }
 
-/* ---------- Inputs ---------- */
+/* ---------- Inputs: also glass, just quieter than the card ----------
+   The visible border/background lives on the .pf-v5-c-form-control
+   *wrapper* (a <span>), not the bare, unstyled <input> nested inside it —
+   PatternFly v5's text-input-group pattern. Focus lands on the inner
+   <input>, which the wrapper never receives on its own, so the wrapper
+   can only be reached here via :focus-within; the actual native outline
+   that needs suppressing lives on the <input> itself. */
 .pf-v5-c-form-control,
 input.pf-v5-c-form-control {
   background: var(--td-input-bg) !important;
   border: 1px solid var(--td-input-border) !important;
   color: var(--td-ink) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.pf-v5-c-form-control input,
+.pf-v5-c-form-control textarea {
+  outline: none !important;
 }
 .pf-v5-c-form-control::placeholder {
   color: var(--td-ink-muted) !important;
-  opacity: 0.7;
+  opacity: 0.65;
 }
-.pf-v5-c-form-control:focus {
-  border-color: var(--td-blue) !important;
-  box-shadow: 0 0 0 1px var(--td-blue) !important;
+.pf-v5-c-form-control:hover {
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+.pf-v5-c-form-control:focus-within {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: var(--td-accent) !important;
+  box-shadow: 0 0 0 3px var(--td-accent-soft) !important;
 }
 
-/* ---------- Buttons ---------- */
+/* ---------- Buttons: one solid accent, no gradient ---------- */
 .pf-v5-c-button.pf-m-primary {
-  background: linear-gradient(90deg, var(--td-orange), var(--td-blue)) !important;
+  background: var(--td-accent-strong) !important;
   border: none !important;
   font-weight: 600;
-  transition: filter 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 8px 20px -6px rgba(47, 111, 238, 0.55);
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 .pf-v5-c-button.pf-m-primary:hover {
-  filter: brightness(1.08);
+  background: var(--td-accent) !important;
+  box-shadow: 0 10px 26px -6px rgba(47, 111, 238, 0.65);
   transform: translateY(-1px);
 }
+.pf-v5-c-button.pf-m-primary:active {
+  transform: translateY(0);
+}
 .pf-v5-c-button.pf-m-secondary {
-  background: transparent !important;
+  background: rgba(255, 255, 255, 0.04) !important;
   border: 1px solid var(--td-input-border) !important;
   color: var(--td-ink) !important;
+}
+.pf-v5-c-button.pf-m-secondary:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
 }
 .pf-v5-c-button.pf-m-control {
   background: var(--td-input-bg) !important;
@@ -214,15 +304,17 @@ input.pf-v5-c-form-control {
 
 a,
 a:visited {
-  color: #7cb8ea;
+  color: var(--td-accent);
 }
 a:hover {
-  color: #a6d2fb;
+  color: #82adff;
 }
 
 .pf-v5-c-alert.pf-m-danger {
-  background: rgba(217, 83, 79, 0.14) !important;
-  border-color: rgba(217, 83, 79, 0.4) !important;
+  background: rgba(217, 83, 79, 0.12) !important;
+  border-color: rgba(217, 83, 79, 0.35) !important;
+  border-radius: 10px;
+  font-family: var(--td-font);
 }
 
 @media (prefers-reduced-motion: reduce) {
