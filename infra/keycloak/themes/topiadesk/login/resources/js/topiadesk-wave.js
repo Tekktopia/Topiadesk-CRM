@@ -5,9 +5,17 @@ function initTopiaDeskWave() {
     return;
   }
 
-  var canvas = document.createElement("canvas");
-  canvas.id = "topiadesk-wave-canvas";
-  document.body.insertBefore(canvas, document.body.firstChild);
+  // The <canvas> is authored directly in template.ftl now (inside .td-hero,
+  // the left panel) rather than created here and appended to <body> — the
+  // two-panel layout needs it scoped to one half of the screen, not fixed
+  // full-viewport behind the whole page. If the hero panel is hidden
+  // (narrow-viewport responsive fallback, see topiadesk.css), there's
+  // nothing to animate.
+  var canvas = document.getElementById("topiadesk-wave-canvas");
+  var hero = document.querySelector(".td-hero");
+  if (!canvas || !hero || hero.offsetParent === null) {
+    return;
+  }
   var ctx = canvas.getContext("2d");
 
   var ORANGE = [245, 144, 30];
@@ -36,8 +44,9 @@ function initTopiaDeskWave() {
   }
 
   function resize() {
-    width = window.innerWidth;
-    height = window.innerHeight;
+    var rect = hero.getBoundingClientRect();
+    width = rect.width;
+    height = rect.height;
     canvas.width = width * dpr;
     canvas.height = height * dpr;
     canvas.style.width = width + "px";

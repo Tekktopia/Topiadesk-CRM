@@ -1,15 +1,9 @@
 /* TopiaDesk CRM — branded Keycloak login theme.
    Loaded after keycloak.v2's own css/styles.css (see theme.properties) so
-   these rules win the cascade without needing to override any .ftl. */
+   these rules win the cascade without needing to override any .ftl (except
+   template.ftl itself, which adds the .td-shell/.td-hero markup this file
+   styles — see that file's header comment). */
 
-/* Plus Jakarta Sans, self-hosted (not linked from Google's CDN — a login
-   page shouldn't depend on a third-party origin being reachable to render
-   correctly). One variable-font file covers weights 500–700; Google Fonts'
-   own CSS2 API serves the exact same physical file for each of those
-   weights (confirmed by fetching it directly), so three @font-face blocks
-   pinned to distinct weights — matching what Google's own stylesheet
-   generates — is the correct, most broadly-compatible way to reference it,
-   rather than a single `font-weight: 500 700` range declaration. */
 @font-face {
   font-family: "Plus Jakarta Sans";
   font-style: normal;
@@ -33,43 +27,59 @@
 }
 
 :root {
-  --td-bg: #080d16;
-  --td-bg-deep: #04070d;
-
-  /* Glass card — a cool, near-neutral tint rather than the near-opaque
-     panel this replaces. Lower alpha + heavier blur is what actually
-     reads as "glass" instead of "solid card with a soft edge". */
-  --td-glass: rgba(22, 29, 42, 0.38);
-  --td-glass-border: rgba(255, 255, 255, 0.16);
-  --td-glass-highlight: rgba(255, 255, 255, 0.55);
-
-  /* Single accent — the previous orange+blue duo is retired from every
-     piece of UI chrome (title, focus ring, button, links). The ambient
-     wave canvas keeps both brand hues; it's atmosphere, not UI. */
   --td-accent: #4f8cff;
   --td-accent-strong: #2f6fee;
-  --td-accent-soft: rgba(79, 140, 255, 0.16);
+  --td-accent-soft: rgba(79, 140, 255, 0.14);
 
-  --td-ink: #f3f5f9;
-  --td-ink-muted: #94a1b8;
-  --td-input-bg: rgba(255, 255, 255, 0.05);
-  --td-input-border: rgba(255, 255, 255, 0.12);
+  /* Hero (left) panel — dark, same family as the previous single-card
+     background, now scoped to one half of the screen. */
+  --td-hero-bg: #070b13;
+  --td-hero-ink: #f3f5f9;
+  --td-hero-ink-muted: #8d99b0;
+
+  /* Form (right) panel — light, per the reference. Off-white rather than
+     pure white so the white card still reads as a distinct surface. */
+  --td-panel-bg: #f5f6f8;
+  --td-card-bg: #ffffff;
+  --td-card-border: #e6e8ec;
+  --td-ink: #171a21;
+  --td-ink-muted: #6b7280;
+  --td-input-bg: #f7f8fa;
+  --td-input-border: #e2e5ea;
 
   --td-font: "Plus Jakarta Sans", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 html,
 body#keycloak-bg {
-  background: var(--td-bg) !important;
+  background: var(--td-panel-bg) !important;
   background-image: none !important;
   min-height: 100vh;
 }
 
-/* The animated <canvas> injected by topiadesk-wave.js sits fixed behind
-   everything; the rest of this file just makes the existing PatternFly
-   login card read correctly floating on top of it. */
+/* =============================================================================
+   Shell: hero (left, dark, animated) + form panel (right, light)
+   ============================================================================= */
+.td-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  min-height: 100vh;
+  font-family: var(--td-font);
+}
+
+.td-hero {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse 120% 90% at 20% 0%, #101827 0%, var(--td-hero-bg) 60%);
+  color: var(--td-hero-ink);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 3rem 3.25rem;
+}
+
 #topiadesk-wave-canvas {
-  position: fixed;
+  position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -77,28 +87,182 @@ body#keycloak-bg {
   pointer-events: none;
 }
 
-.pf-v5-c-login {
+.td-hero-inner {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  gap: 2.5rem;
+}
+
+.td-hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.td-hero-brand-mark {
+  width: 34px;
+  height: 34px;
+  filter: drop-shadow(0 0 12px rgba(79, 140, 255, 0.3));
+}
+.td-hero-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.td-hero-brand-name {
+  font-weight: 700;
+  font-size: 0.98rem;
+  letter-spacing: -0.01em;
+}
+.td-hero-brand-tag {
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--td-hero-ink-muted);
+}
+
+.td-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: fit-content;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(79, 140, 255, 0.12);
+  border: 1px solid rgba(79, 140, 255, 0.25);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #bcd2ff;
+  margin-bottom: 1.1rem;
+}
+.td-hero-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #5ee6a8;
+  box-shadow: 0 0 8px rgba(94, 230, 168, 0.8);
+}
+
+.td-hero-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--td-hero-ink-muted);
+  margin: 0 0 0.6rem;
+}
+
+.td-hero-headline {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  margin: 0 0 1rem;
+}
+.td-hero-headline span {
+  color: var(--td-accent);
+}
+
+.td-hero-copy {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--td-hero-ink-muted);
+  max-width: 30rem;
+  margin: 0 0 1.75rem;
+}
+
+.td-hero-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.td-hero-features li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #dbe1ea;
+}
+.td-hero-feature-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: rgba(79, 140, 255, 0.12);
+  border: 1px solid rgba(79, 140, 255, 0.2);
+  color: var(--td-accent);
+  flex-shrink: 0;
+}
+.td-hero-feature-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.td-hero-stats {
+  display: flex;
+  gap: 2.25rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.td-hero-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.td-hero-stats strong {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.td-hero-stats span {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--td-hero-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* =============================================================================
+   Form panel (right, light)
+   ============================================================================= */
+.td-form-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 2rem;
+  background: var(--td-panel-bg);
+}
+
+.pf-v5-c-login {
   background: transparent !important;
-  min-height: 100vh;
+  min-height: 0;
   font-family: var(--td-font);
 }
 
 .pf-v5-c-login__container {
-  position: relative;
-  z-index: 1;
-  grid-template-columns: 26rem !important;
+  grid-template-columns: 23.5rem !important;
 }
 
-/* ---------- Header / brand mark ----------
-   topiadesk-wave.js moves #kc-header to be the first child of
-   .pf-v5-c-login__main at runtime — Keycloak's template renders it as a
-   sibling *before* <main>, but a logo floating outside the card reads as
-   unfinished; nesting it inside is what makes this read as one composed
-   card instead of two stacked pieces. */
+/* The original single-page brand header — kept as a small mark+label
+   centered above the card title, distinct from the hero panel's own brand
+   block (the two panels are different surfaces, so this isn't
+   duplication — it's the same pattern the reference image itself uses:
+   one brand mark on the hero side, one directly on the card). */
 #kc-header {
-  margin: 0 0 1.1rem;
+  margin: 0 0 0.9rem;
   border: none !important;
   box-shadow: none !important;
   background: transparent !important;
@@ -107,65 +271,49 @@ body#keycloak-bg {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.4rem;
   color: var(--td-ink-muted) !important;
   font-family: var(--td-font);
   font-weight: 600;
-  font-size: 0.68rem;
-  letter-spacing: 0.14em;
+  font-size: 0.64rem;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
   text-align: center;
 }
 #kc-header-wrapper::before {
   content: "";
   display: block;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   background-image: url("../img/logo-mark.png");
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
-  filter: drop-shadow(0 0 12px rgba(79, 140, 255, 0.25));
 }
 
-/* ---------- Card: the actual "glass" ----------
-   Three layers make the glass read as glass rather than a tinted solid:
-   1. a heavily-blurred, saturated backdrop-filter so the wave animation
-      genuinely shows through and colors it,
-   2. a hairline border that's brighter at the top than the sides (light
-      catching the upper edge of a pane), built via a mask'd gradient
-      rather than a flat border color,
-   3. a very thin, very bright inset line right at the top edge — the
-      single most legible "this is glass, not plastic" cue. */
+/* ---------- Card: clean, light, a thin single-hue accent bar ---------- */
 .pf-v5-c-login__main {
-  background: var(--td-glass);
-  border: 1px solid var(--td-glass-border);
-  border-radius: 20px;
-  padding: 2.35rem 2.25rem 1.85rem;
-  box-shadow:
-    0 30px 70px rgba(0, 0, 0, 0.5),
-    0 1px 0 var(--td-glass-highlight) inset;
-  backdrop-filter: blur(34px) saturate(1.65);
-  -webkit-backdrop-filter: blur(34px) saturate(1.65);
+  background: var(--td-card-bg);
+  border: 1px solid var(--td-card-border);
+  border-radius: 18px;
+  padding: 2rem 2rem 1.6rem;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 20px 40px -12px rgba(16, 24, 40, 0.14);
   position: relative;
   overflow: hidden;
 }
 .pf-v5-c-login__main::before {
   content: "";
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.02) 40%, rgba(255, 255, 255, 0.06) 100%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--td-accent-strong), var(--td-accent) 70%, #bcd2ff);
 }
 
 .pf-v5-c-login__main-header {
   text-align: center;
-  margin-bottom: 1.35rem;
+  margin-bottom: 1.1rem;
   border-top: none !important;
   padding-top: 0 !important;
 }
@@ -174,48 +322,38 @@ body#keycloak-bg {
 #kc-page-title {
   font-family: var(--td-font);
   color: var(--td-ink) !important;
-  font-weight: 600 !important;
-  font-size: 1.28rem !important;
-  letter-spacing: -0.015em;
+  font-weight: 700 !important;
+  font-size: 1.32rem !important;
+  letter-spacing: -0.02em;
   line-height: 1.3 !important;
 }
 
-.pf-v5-c-form__group {
-  margin-bottom: 1rem;
+.pf-v5-c-login__main-body > .subtitle,
+#kc-page-title + .pf-v5-c-login__main-subtitle,
+.pf-v5-c-login__main-header .pf-v5-u-color-200 {
+  color: var(--td-ink-muted) !important;
 }
 
-.pf-v5-c-form-control {
-  padding: 0.62rem 0.8rem !important;
-  font-size: 0.88rem !important;
-  font-family: var(--td-font);
-  min-height: 0 !important;
-  border-radius: 10px !important;
+.pf-v5-c-form__group {
+  margin-bottom: 0.85rem;
 }
 
 .pf-v5-c-form__label {
-  padding-bottom: 0.3rem !important;
+  padding-bottom: 0.28rem !important;
 }
 
 .pf-v5-c-form__label-text {
   font-family: var(--td-font);
-  font-weight: 500 !important;
-  font-size: 0.74rem !important;
-  letter-spacing: 0.01em;
+  font-weight: 600 !important;
+  font-size: 0.68rem !important;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--td-ink-muted) !important;
 }
 
 .pf-v5-c-form__actions {
-  padding-top: 0.9rem !important;
+  padding-top: 0.6rem !important;
   padding-bottom: 0 !important;
-  margin: 0 !important;
-}
-
-.pf-v5-c-button.pf-m-primary,
-.pf-v5-c-button.pf-m-secondary {
-  font-family: var(--td-font);
-  padding-top: 0.62rem !important;
-  padding-bottom: 0.62rem !important;
-  font-size: 0.9rem !important;
-  border-radius: 10px !important;
   margin: 0 !important;
 }
 
@@ -225,7 +363,7 @@ body#keycloak-bg {
 }
 
 .pf-v5-c-login__main-footer {
-  margin-top: 0.35rem !important;
+  margin-top: 0.2rem !important;
   padding-top: 0 !important;
 }
 
@@ -236,67 +374,112 @@ label {
   color: var(--td-ink-muted) !important;
 }
 
-/* ---------- Inputs: also glass, just quieter than the card ----------
-   The visible border/background lives on the .pf-v5-c-form-control
-   *wrapper* (a <span>), not the bare, unstyled <input> nested inside it —
-   PatternFly v5's text-input-group pattern. Focus lands on the inner
-   <input>, which the wrapper never receives on its own, so the wrapper
-   can only be reached here via :focus-within; the actual native outline
-   that needs suppressing lives on the <input> itself. */
-.pf-v5-c-form-control,
-input.pf-v5-c-form-control {
+/* ---------- Inputs: short, wide, light, with a leading icon ----------
+   .pf-v5-c-form-control is a wrapper <span> around a bare, class-less
+   <input> (PatternFly v5's text-input-group pattern) — focus lands on the
+   inner <input>, which the wrapper never receives on its own, so hover/
+   focus styling on the wrapper needs :focus-within, not :focus. The
+   leading icon is a wrapper-level ::before (CSS can't reach into the
+   .ftl to add a real <svg>), positioned absolutely and offset by padding
+   added to the wrapper itself so it never overlaps typed text. */
+.pf-v5-c-form-control {
+  position: relative;
   background: var(--td-input-bg) !important;
   border: 1px solid var(--td-input-border) !important;
+  border-radius: 10px !important;
   color: var(--td-ink) !important;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  padding-left: 2.5rem !important;
 }
 .pf-v5-c-form-control input,
 .pf-v5-c-form-control textarea {
   outline: none !important;
+  height: 2.6rem;
+  padding: 0 0.85rem 0 0 !important;
+  font-size: 0.9rem !important;
+  font-family: var(--td-font);
+  min-height: 0 !important;
+  background: transparent !important;
 }
-.pf-v5-c-form-control::placeholder {
-  color: var(--td-ink-muted) !important;
-  opacity: 0.65;
+.pf-v5-c-form-control::before {
+  content: "";
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.pf-v5-c-form-control:has(#username)::before,
+.pf-v5-c-form-control:has(#kc-attempted-username)::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8'/%3E%3C/svg%3E");
+}
+.pf-v5-c-form-control:has(#password)::before,
+.pf-v5-c-form-control:has(#password-confirm)::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='11' width='16' height='9' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E");
+}
+/* The password field's show/hide toggle sits in its own sibling
+   .pf-m-control button, not inside this wrapper — no icon-vs-toggle
+   collision to handle. */
+.pf-v5-c-form-control::placeholder,
+.pf-v5-c-form-control input::placeholder {
+  color: #a3a9b3 !important;
+  opacity: 1;
 }
 .pf-v5-c-form-control:hover {
-  background: rgba(255, 255, 255, 0.07) !important;
+  background: #f0f1f4 !important;
 }
 .pf-v5-c-form-control:focus-within {
-  background: rgba(255, 255, 255, 0.08) !important;
+  background: #ffffff !important;
   border-color: var(--td-accent) !important;
   box-shadow: 0 0 0 3px var(--td-accent-soft) !important;
 }
 
-/* ---------- Buttons: one solid accent, no gradient ---------- */
+/* ---------- Buttons ---------- */
+.pf-v5-c-button.pf-m-primary,
+.pf-v5-c-button.pf-m-secondary {
+  font-family: var(--td-font);
+  height: 2.75rem;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  font-size: 0.92rem !important;
+  border-radius: 10px !important;
+  margin: 0 !important;
+}
 .pf-v5-c-button.pf-m-primary {
-  background: var(--td-accent-strong) !important;
+  background: linear-gradient(135deg, var(--td-accent-strong), var(--td-accent)) !important;
   border: none !important;
   font-weight: 600;
-  box-shadow: 0 8px 20px -6px rgba(47, 111, 238, 0.55);
-  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 8px 20px -6px rgba(47, 111, 238, 0.45);
+  transition: box-shadow 0.15s ease, transform 0.15s ease, filter 0.15s ease;
 }
 .pf-v5-c-button.pf-m-primary:hover {
-  background: var(--td-accent) !important;
-  box-shadow: 0 10px 26px -6px rgba(47, 111, 238, 0.65);
+  filter: brightness(1.06);
+  box-shadow: 0 10px 26px -6px rgba(47, 111, 238, 0.55);
   transform: translateY(-1px);
 }
 .pf-v5-c-button.pf-m-primary:active {
   transform: translateY(0);
 }
 .pf-v5-c-button.pf-m-secondary {
-  background: rgba(255, 255, 255, 0.04) !important;
+  background: #ffffff !important;
   border: 1px solid var(--td-input-border) !important;
   color: var(--td-ink) !important;
 }
 .pf-v5-c-button.pf-m-secondary:hover {
-  background: rgba(255, 255, 255, 0.08) !important;
+  background: var(--td-input-bg) !important;
 }
 .pf-v5-c-button.pf-m-control {
   background: var(--td-input-bg) !important;
   border: 1px solid var(--td-input-border) !important;
   border-left: none !important;
   color: var(--td-ink-muted) !important;
+  border-radius: 0 10px 10px 0 !important;
 }
 .pf-v5-c-button.pf-m-control:hover {
   color: var(--td-ink) !important;
@@ -307,22 +490,74 @@ a:visited {
   color: var(--td-accent);
 }
 a:hover {
-  color: #82adff;
+  color: var(--td-accent-strong);
 }
 
 .pf-v5-c-alert.pf-m-danger {
-  background: rgba(217, 83, 79, 0.12) !important;
-  border-color: rgba(217, 83, 79, 0.35) !important;
+  background: rgba(217, 83, 79, 0.08) !important;
+  border-color: rgba(217, 83, 79, 0.3) !important;
   border-radius: 10px;
   font-family: var(--td-font);
+}
+
+/* ---------- Trust badges + footer, below the card ---------- */
+.td-trust-badges {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+  width: 23.5rem;
+  max-width: 100%;
+}
+.td-trust-badges span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--td-ink-muted);
+}
+.td-trust-badges svg {
+  width: 13px;
+  height: 13px;
+  color: #22a06b;
+}
+.td-form-footer {
+  margin-top: 1rem;
+  text-align: center;
+}
+.td-form-footer p {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #9aa0ab;
+}
+
+/* =============================================================================
+   Responsive: below ~960px the two-column layout stops making sense —
+   collapse to the form panel alone, full width, hero hidden rather than
+   stacked (stacking would push the actual sign-in form below a screen's
+   worth of marketing copy on a phone, which is worse than just not
+   showing it).
+   ============================================================================= */
+@media (max-width: 960px) {
+  .td-shell {
+    display: block;
+  }
+  .td-hero {
+    display: none;
+  }
+  .td-form-panel {
+    min-height: 100vh;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   #topiadesk-wave-canvas {
     display: none;
   }
-  html,
-  body#keycloak-bg {
-    background: radial-gradient(ellipse at 30% 20%, #0d1a2b 0%, var(--td-bg-deep) 65%) !important;
+  .td-hero {
+    background: radial-gradient(ellipse 120% 90% at 20% 0%, #101827 0%, var(--td-hero-bg) 65%) !important;
   }
 }
