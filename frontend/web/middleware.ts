@@ -52,6 +52,13 @@ import { getWebEnv } from '@/lib/env';
  * public-knowledge.controller.ts — a route with no session/token gate of
  * its own, since a CUSTOMER-visibility PUBLISHED article isn't
  * per-recipient-secret the way an unsubscribe link or survey response is.
+ *
+ * `/portal/**` and `/api/portal/**` are excluded the same way — the
+ * customer self-service portal (app/(portal)/portal/**), reached by an
+ * external Contact with no `td_session` cookie at all. It has its own,
+ * completely separate auth model (a `portal_session` cookie, checked by
+ * each protected page itself via `lib/portal-auth/session.ts`, not by this
+ * middleware) — see app/(portal)/portal/layout.tsx's header comment.
  */
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
@@ -94,10 +101,12 @@ export const config = {
      *   stays behind the normal auth gate)
      * - /kb/* (public knowledge base portal) — anonymous, no cookie or
      *   token involved; see the header comment above
+     * - /portal/* and /api/portal/* (customer self-service portal) — its
+     *   own portal_session cookie, checked at the page level, not here
      * - Next internals (_next/static, _next/image)
      * - common static file extensions
      * - favicon.ico
      */
-    '/((?!api/auth|survey-respond|api/surveys/responses|api/public|kb|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).*)',
+    '/((?!api/auth|survey-respond|api/surveys/responses|api/public|kb|portal|api/portal|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).*)',
   ],
 };

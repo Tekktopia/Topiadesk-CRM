@@ -246,9 +246,20 @@ CREATE POLICY renewal_schedules_rw ON renewal_schedules FOR ALL
 -- requires an explicit 'document'/'write' grant.
 -- =============================================================================
 
+-- Phase 6: SELECT policies below also carry an `OR app_current_role() =
+-- 'SYSTEM_JOB'` carve-out, matching the pattern every other table's policy
+-- in this file already uses (activities_rw, approvals, notifications, ...).
+-- Without it, the portal module's documents endpoints (portal.controller.ts,
+-- running under SYSTEM_JOB_CONTEXT — see that file's header comment) got
+-- zero rows back with no error: app_current_user_id() is NULL under that
+-- context (userId: '' in rls-context.ts), so the original
+-- app_current_user_id() IS NOT NULL check silently failed closed. Caught
+-- via live testing (a document correctly linked to an account came back as
+-- an empty list). Write policies are untouched — the portal never writes
+-- documents, only reads.
 DROP POLICY IF EXISTS documents_select ON documents;
 CREATE POLICY documents_select ON documents FOR SELECT
-  USING (app_current_user_id() IS NOT NULL);
+  USING (app_current_user_id() IS NOT NULL OR app_current_role() = 'SYSTEM_JOB');
 
 DROP POLICY IF EXISTS documents_write ON documents;
 CREATE POLICY documents_write ON documents FOR ALL
@@ -257,7 +268,7 @@ CREATE POLICY documents_write ON documents FOR ALL
 
 DROP POLICY IF EXISTS document_versions_select ON document_versions;
 CREATE POLICY document_versions_select ON document_versions FOR SELECT
-  USING (app_current_user_id() IS NOT NULL);
+  USING (app_current_user_id() IS NOT NULL OR app_current_role() = 'SYSTEM_JOB');
 
 DROP POLICY IF EXISTS document_versions_write ON document_versions;
 CREATE POLICY document_versions_write ON document_versions FOR INSERT
@@ -265,7 +276,7 @@ CREATE POLICY document_versions_write ON document_versions FOR INSERT
 
 DROP POLICY IF EXISTS document_links_rw ON document_links;
 CREATE POLICY document_links_rw ON document_links FOR ALL
-  USING (app_current_user_id() IS NOT NULL)
+  USING (app_current_user_id() IS NOT NULL OR app_current_role() = 'SYSTEM_JOB')
   WITH CHECK (app_current_user_id() IS NOT NULL AND app_max_scope('document', 'write') IS NOT NULL);
 
 -- =============================================================================
@@ -314,6 +325,19 @@ DROP POLICY IF EXISTS approval_threshold_rules_rw ON approval_threshold_rules;
 CREATE POLICY approval_threshold_rules_rw ON approval_threshold_rules FOR ALL
   USING (app_current_user_id() IS NOT NULL)
   WITH CHECK (app_current_role() = 'SYSTEM_JOB' OR app_max_scope('approval', 'write') = 'ALL');
+
+-- Portal auth plumbing — SYSTEM_JOB only (the portal module's own access
+-- pattern), no internal-staff role has any legitimate reason to browse
+-- login tokens or sessions belonging to a Contact.
+DROP POLICY IF EXISTS portal_login_tokens_rw ON portal_login_tokens;
+CREATE POLICY portal_login_tokens_rw ON portal_login_tokens FOR ALL
+  USING (app_current_role() = 'SYSTEM_JOB')
+  WITH CHECK (app_current_role() = 'SYSTEM_JOB');
+
+DROP POLICY IF EXISTS portal_sessions_rw ON portal_sessions;
+CREATE POLICY portal_sessions_rw ON portal_sessions FOR ALL
+  USING (app_current_role() = 'SYSTEM_JOB')
+  WITH CHECK (app_current_role() = 'SYSTEM_JOB');
 
 -- =============================================================================
 -- notifications — strictly per-recipient.

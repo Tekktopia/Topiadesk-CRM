@@ -25,6 +25,9 @@ import { SearchModule } from './modules/search/search.module';
 import { OmnichannelModule } from './modules/omnichannel/omnichannel.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { IpWhitelistGuard } from './modules/identity/ip-whitelist.guard';
+import { PortalModule } from './modules/portal/portal.module';
+import { PortalContextMiddleware } from './modules/portal/portal-context.middleware';
+import { PortalController } from './modules/portal/portal.controller';
 
 @Module({
   imports: [
@@ -60,6 +63,7 @@ import { IpWhitelistGuard } from './modules/identity/ip-whitelist.guard';
     SearchModule,
     OmnichannelModule,
     LoyaltyModule,
+    PortalModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
@@ -133,7 +137,23 @@ export class AppModule implements NestModule {
         { path: 'public/knowledge/articles', method: RequestMethod.GET },
         { path: 'public/knowledge/articles/:slug', method: RequestMethod.GET },
         { path: 'public/knowledge/categories', method: RequestMethod.GET },
+        // Customer portal — external Contacts, never a Keycloak bearer
+        // token. PortalContextMiddleware (registered below) is this
+        // surface's own equivalent, applied to portal/* except portal/auth/*
+        // (no session exists yet when requesting/consuming a login link).
+        { path: 'portal/(.*)', method: RequestMethod.ALL },
       )
       .forRoutes('*');
+
+    // Targets the PortalController class directly rather than a
+    // 'portal/(.*)' string pattern — empirically, forRoutes() with that
+    // regex-style string silently matched nothing in this NestJS version
+    // (unlike RlsContextMiddleware's .exclude() above, where the identical
+    // pattern does work — exclude() and forRoutes() apparently don't share
+    // matching behavior here), caught via live testing: every /portal/*
+    // data endpoint 500'd with req.portalContext unset. PortalAuthController
+    // (request-link/consume/logout) is a separate controller class never
+    // targeted by this call, so no .exclude() is needed either.
+    consumer.apply(PortalContextMiddleware).forRoutes(PortalController);
   }
 }

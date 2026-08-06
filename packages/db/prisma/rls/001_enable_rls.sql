@@ -69,7 +69,15 @@ BEGIN
     -- way account_relationships/contacts already do.
     'account_sla_overrides', 'sites',
     -- Phase 5 — multi-level policy-version approval chains.
-    'approval_chains', 'approval_threshold_rules'
+    'approval_chains', 'approval_threshold_rules',
+    -- Phase 6 — customer portal auth plumbing. Not touched by the portal
+    -- itself (which runs under SYSTEM_JOB_CONTEXT, bypassing RLS, with
+    -- manual contactId/accountId filters as the real boundary — see
+    -- portal.module.ts's header comment) — this RLS is purely defense in
+    -- depth against a regular internal-staff session ever browsing another
+    -- contact's login tokens/sessions, which no legitimate app feature
+    -- needs.
+    'portal_login_tokens', 'portal_sessions'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);

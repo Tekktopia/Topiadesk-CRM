@@ -32,13 +32,23 @@ BEGIN
 
   -- Phase 2: lets a background worker be the "author" of an inbound
   -- webhook-ingested Activity (see activities_rw in 002_policies.sql) —
-  -- same one-of pair shape as AuditLog's actor columns.
+  -- same one-of pair shape as AuditLog's actor columns. Widened in Phase 6
+  -- to a three-way exactly-one-of (num_nonnulls, same function
+  -- contacts_exactly_one_parent above already uses) so a customer-portal
+  -- Contact can also be the author (createdByContactId) — caught via live
+  -- testing: the original 2-column XOR rejected every portal case reply
+  -- with a "violates check constraint" 500, since neither of the original
+  -- two columns is set when a Contact is the actor. Unconditionally
+  -- dropped first because the old 2-column definition would otherwise
+  -- survive forever under this same constraint name (the IF NOT EXISTS
+  -- guard only stops a first-time add, not a redefinition).
+  ALTER TABLE activities DROP CONSTRAINT IF EXISTS activities_actor_xor;
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'activities_actor_xor'
   ) THEN
     ALTER TABLE activities
       ADD CONSTRAINT activities_actor_xor
-      CHECK ((created_by_id IS NOT NULL) <> (created_by_system_job IS NOT NULL));
+      CHECK (num_nonnulls(created_by_id, created_by_system_job, created_by_contact_id) = 1);
   END IF;
 
   -- Phase 2: Claim/Case share cross-cutting tables via a Contact-style

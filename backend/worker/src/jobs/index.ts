@@ -28,6 +28,7 @@ import {
 } from './webhooks/dispatch.job';
 import { createSurveyDispatchQueue, createSurveyDispatchWorker } from './surveys/send-case-survey-invite.job';
 import { createCaseOutboundEmailQueue, createCaseOutboundEmailWorker } from './case-outbound-email/send-case-comment-email.job';
+import { createPortalLoginQueue, createPortalLoginWorker } from './portal/send-portal-login-link.job';
 
 export interface RegisteredJobs {
   queues: Queue[];
@@ -113,6 +114,13 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
   const caseOutboundEmailQueue = createCaseOutboundEmailQueue(connection);
   const caseOutboundEmailWorker = createCaseOutboundEmailWorker(connection);
 
+  // Event-driven, not a repeatable schedule — same reasoning as
+  // surveyDispatchQueue above: the API enqueues directly when a portal
+  // Contact requests a magic-link sign-in (see
+  // portal/portal-login-queue.ts).
+  const portalLoginQueue = createPortalLoginQueue(connection);
+  const portalLoginWorker = createPortalLoginWorker(connection);
+
   return {
     queues: [
       renewalScanQueue,
@@ -130,6 +138,7 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       surveyDispatchQueue,
       caseOutboundEmailQueue,
       automationRunResumeQueue,
+      portalLoginQueue,
     ],
     workers: [
       renewalScanWorker,
@@ -147,6 +156,7 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       surveyDispatchWorker,
       caseOutboundEmailWorker,
       automationRunResumeWorker,
+      portalLoginWorker,
     ],
   };
 }

@@ -622,8 +622,48 @@ model Contact {
   cases                Case[]
   campaignRecipients   CampaignRecipient[]
   campaignSuppressions CampaignSuppression[]
+  createdActivities    Activity[]            @relation("ActivityCreatedByContact")
+  portalLoginTokens    PortalLoginToken[]
+  portalSessions       PortalSession[]
 
   @@map("contacts")
+}
+
+/// Passwordless magic-link login for the customer portal (Batch 6) —
+/// short-lived (~15 min), single-use. Contacts have no password of their
+/// own; this + PortalSession are the entire external-identity auth surface,
+/// deliberately separate from Keycloak/internal `User` sessions. Mirrors
+/// SurveyResponse.respondToken's proven shape: a per-row secret compared
+/// with a constant-time equality check, not a shared/guessable value.
+model PortalLoginToken {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contactId   String    @map("contact_id") @db.Uuid
+  contact     Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt  DateTime? @map("consumed_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([contactId])
+  @@map("portal_login_tokens")
+}
+
+/// The portal's own session — a `portal_session` cookie, entirely separate
+/// from `td_session` (internal Keycloak-backed sessions). Revocable (unlike
+/// a bare stateless JWT) by deleting the row, matching this codebase's
+/// existing preference for durable, auditable session state over stateless
+/// tricks.
+model PortalSession {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contactId  String   @map("contact_id") @db.Uuid
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique @map("token_hash")
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(6)
+  lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([contactId])
+  @@map("portal_sessions")
 }
 
 /// A corporate account's separate physical branch/location — e.g. a client
@@ -806,6 +846,12 @@ model Activity {
   createdById        String?           @map("created_by_id") @db.Uuid
   createdBy          User?             @relation("ActivityCreatedBy", fields: [createdById], references: [id])
   createdBySystemJob String?           @map("created_by_system_job")
+  /// Set instead of createdById when a portal Contact (not internal staff)
+  /// authored this — a customer-portal case reply. Distinct from the
+  /// existing `contactId` above, which records which contact an activity
+  /// is ABOUT (e.g. a logged call), not who wrote it.
+  createdByContactId String?           @map("created_by_contact_id") @db.Uuid
+  createdByContact   Contact?          @relation("ActivityCreatedByContact", fields: [createdByContactId], references: [id])
   channelDetail      String?           @map("channel_detail")
   externalThreadId   String?           @map("external_thread_id")
   externalMessageId  String?           @unique @map("external_message_id")

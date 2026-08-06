@@ -13,8 +13,10 @@ import { AppSidebar } from './app-sidebar';
  * create, notifications — none of which make sense (and shouldn't be
  * exposed) to a customer looking up a policy FAQ or submitting a survey
  * response. Keep this list in sync with middleware.ts's `config.matcher`.
+ * `/portal` has its own minimal shell (app/(portal)/portal/layout.tsx), not
+ * this one or the internal sidebar.
  */
-const PUBLIC_PATH_PREFIXES = ['/survey-respond', '/kb'];
+const PUBLIC_PATH_PREFIXES = ['/survey-respond', '/kb', '/portal'];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
