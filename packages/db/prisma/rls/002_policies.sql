@@ -115,6 +115,27 @@ CREATE POLICY contacts_rw ON contacts FOR ALL
     OR EXISTS (SELECT 1 FROM accounts a WHERE a.id = account_id AND app_can_access_owner('account', 'write', a.owner_id))
   );
 
+-- Same shape as account_relationships_rw above — a child-of-account config
+-- row, visible/writable exactly when the parent account is.
+DROP POLICY IF EXISTS account_sla_overrides_rw ON account_sla_overrides;
+CREATE POLICY account_sla_overrides_rw ON account_sla_overrides FOR ALL
+  USING (
+    EXISTS (SELECT 1 FROM accounts a WHERE a.id = account_id AND app_can_access_owner('account', 'read', a.owner_id))
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM accounts a WHERE a.id = account_id AND app_can_access_owner('account', 'write', a.owner_id))
+  );
+
+-- Sites (an account's branches/locations) — same child-of-account shape again.
+DROP POLICY IF EXISTS sites_rw ON sites;
+CREATE POLICY sites_rw ON sites FOR ALL
+  USING (
+    EXISTS (SELECT 1 FROM accounts a WHERE a.id = account_id AND app_can_access_owner('account', 'read', a.owner_id))
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM accounts a WHERE a.id = account_id AND app_can_access_owner('account', 'write', a.owner_id))
+  );
+
 -- =============================================================================
 -- leads / opportunities / opportunity_market_submissions
 -- =============================================================================

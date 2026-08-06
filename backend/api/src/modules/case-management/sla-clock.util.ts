@@ -36,13 +36,29 @@ async function loadCalendar(businessHoursCalendarId: string | null): Promise<{ c
  * same convention as AssignmentRule.priority) breaks the tie explicitly,
  * so multi-policy-match behavior is a pickable admin decision, not
  * whichever row `findMany` happens to return first.
+ *
+ * `accountId`, when given, is checked FIRST against AccountSlaOverride — an
+ * exact (accountId, entityType) match short-circuits the whole specificity
+ * scoring below, the same "explicit beats resolved" precedence
+ * `ensureCaseSlaClocks`/`ensureClaimSlaClocks`'s own `explicitSlaPolicyId`
+ * already has one level up. An override pointing at an inactive policy is
+ * treated as no override (falls through to normal resolution) rather than
+ * silently applying a policy an admin has since deactivated.
  */
 export async function resolveSlaPolicy(
   entityType: CaseManagementEntityType,
   caseType: CaseType | null,
   priority: CasePriority,
+  accountId?: string | null,
 ): Promise<SlaPolicy | null> {
   const prisma = getPrismaClient();
+  if (accountId) {
+    const override = await prisma.accountSlaOverride.findUnique({
+      where: { accountId_entityType: { accountId, entityType } },
+      include: { slaPolicy: true },
+    });
+    if (override?.slaPolicy.isActive) return override.slaPolicy;
+  }
   const candidates = await prisma.slaPolicy.findMany({ where: { entityType, isActive: true } });
   let best: { policy: SlaPolicy; score: number } | null = null;
   for (const candidate of candidates) {
@@ -70,11 +86,11 @@ export async function startCaseClocks(caseId: string, policy: SlaPolicy, started
 }
 
 /** Case creation entry point: resolves a policy if none was given explicitly, persists it, and starts its clocks. No-ops silently if no policy matches — SLA tracking is additive, not a hard requirement to create a Case. */
-export async function ensureCaseSlaClocks(caseId: string, explicitSlaPolicyId: string | null, caseType: CaseType, priority: CasePriority): Promise<void> {
+export async function ensureCaseSlaClocks(caseId: string, explicitSlaPolicyId: string | null, caseType: CaseType, priority: CasePriority, accountId?: string | null): Promise<void> {
   const prisma = getPrismaClient();
   const policy = explicitSlaPolicyId
     ? await prisma.slaPolicy.findUnique({ where: { id: explicitSlaPolicyId } })
-    : await resolveSlaPolicy('CASE', caseType, priority);
+    : await resolveSlaPolicy('CASE', caseType, priority, accountId);
   if (!policy || !policy.isActive) return;
   if (!explicitSlaPolicyId) {
     await prisma.case.update({ where: { id: caseId }, data: { slaPolicyId: policy.id } });
@@ -96,11 +112,11 @@ export async function startClaimStageClock(claimId: string, policy: SlaPolicy, f
 }
 
 /** Claim creation entry point — mirrors ensureCaseSlaClocks, starting the stage clock for Claim's initial NOTIFIED status. */
-export async function ensureClaimSlaClocks(claimId: string, explicitSlaPolicyId: string | null, priority: CasePriority, initialStatus: string): Promise<void> {
+export async function ensureClaimSlaClocks(claimId: string, explicitSlaPolicyId: string | null, priority: CasePriority, initialStatus: string, accountId?: string | null): Promise<void> {
   const prisma = getPrismaClient();
   const policy = explicitSlaPolicyId
     ? await prisma.slaPolicy.findUnique({ where: { id: explicitSlaPolicyId } })
-    : await resolveSlaPolicy('CLAIM', null, priority);
+    : await resolveSlaPolicy('CLAIM', null, priority, accountId);
   if (!policy || !policy.isActive) return;
   if (!explicitSlaPolicyId) {
     await prisma.claim.update({ where: { id: claimId }, data: { slaPolicyId: policy.id } });

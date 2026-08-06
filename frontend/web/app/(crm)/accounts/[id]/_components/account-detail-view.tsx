@@ -6,15 +6,19 @@ import { useRouter } from 'next/navigation';
 import {
   Activity as ActivityIcon,
   Briefcase,
+  CalendarClock,
   CheckSquare,
   MoreHorizontal,
   Network,
   Pencil,
   Plus,
+  Receipt,
   Sparkles,
   ShieldCheck,
   Trash2,
+  Trophy,
   Users,
+  Wallet,
 } from 'lucide-react';
 import {
   ActivityTimeline,
@@ -22,6 +26,7 @@ import {
   Button,
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
   DropdownMenu,
@@ -29,6 +34,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   RecordHistory,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Skeleton,
   StatTile,
   Table,
@@ -58,8 +68,13 @@ import {
   taskStatusVariant,
 } from '../../../_lib/constants';
 import { formatCurrency, formatDate, fullName } from '../../../_lib/format';
+import { renewalStatusVariant } from '@/app/(policy)/lib/format';
+import { useCan, useSlaPolicies } from '@/app/(cases)/_lib/hooks';
+import type { SlaPolicy } from '@/app/(cases)/_lib/types';
 import {
   useAccount,
+  useAccountRenewals,
+  useAccountSlaOverrides,
   useAllPipelineStages,
   useContacts,
   useCreateActivity,
@@ -68,7 +83,9 @@ import {
   useDeleteContact,
   useDirectoryUsers,
   useOpportunities,
+  useRemoveAccountSlaOverride,
   useTasksForEntity,
+  useUpsertAccountSlaOverride,
 } from '../../../_lib/hooks';
 import type { Contact } from '../../../_lib/types';
 import { AccountFormDialog } from '../../_components/account-form-dialog';
@@ -142,12 +159,25 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
         <StatTile label="Relationships" value={account.counts.relationships} icon={<Network />} />
       </div>
 
+      {/* Roll-up sums, kept in a separate row from the counts above — different
+          units (money, not row counts) warrant a visual break, not a 10-tile
+          single grid. `null` (no policies/premiums/won opportunities) renders
+          via formatCurrency's own "—" fallback rather than a fake $0. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatTile label="Total sum insured" value={formatCurrency(account.financials.totalSumInsured)} icon={<Wallet />} />
+        <StatTile label="Outstanding premium" value={formatCurrency(account.financials.totalOutstandingPremium)} icon={<Receipt />} />
+        <StatTile label="Won opportunity value" value={formatCurrency(account.financials.wonOpportunityValue)} icon={<Trophy />} />
+      </div>
+
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="contacts">Contacts</TabsTrigger>
           <TabsTrigger value="opportunities">Opportunities</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
+          <TabsTrigger value="renewals" className="gap-1.5">
+            <CalendarClock className="h-3.5 w-3.5" aria-hidden /> Renewals
+          </TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
           <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
           <TabsTrigger value="ai-insights" className="gap-1.5">
@@ -156,7 +186,7 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview">
+        <TabsContent value="overview" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Profile</CardTitle>
@@ -173,6 +203,8 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
               <Field label="Last updated" value={formatDate(account.updatedAt)} />
             </CardContent>
           </Card>
+
+          <SlaOverridesCard accountId={accountId} />
         </TabsContent>
 
         <TabsContent value="contacts">
@@ -185,6 +217,10 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
 
         <TabsContent value="tasks">
           <TasksTab accountId={accountId} />
+        </TabsContent>
+
+        <TabsContent value="renewals">
+          <RenewalsTab accountId={accountId} />
         </TabsContent>
 
         <TabsContent value="activity">
@@ -417,6 +453,153 @@ function TasksTab({ accountId }: { accountId: string }) {
                     <Badge variant={taskPriorityVariant(task.priority)}>{taskPriorityLabel(task.priority)}</Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{formatDate(task.dueDate)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const NO_OVERRIDE = '__default';
+
+/**
+ * Pins this account to a specific SLA policy per entity type, instead of
+ * the usual caseType/priority-based resolution — resolveSlaPolicy()
+ * (backend sla-clock.util.ts) checks AccountSlaOverride first. Visible to
+ * anyone who can view the account (same as sla-policies-list-view.tsx,
+ * which never checks 'read' either — the session's own `permissions` list
+ * only ever carries 'write' grants, per useCan's header comment, so a
+ * 'read' check here would always evaluate false and hide the card for
+ * everyone); the two Selects are disabled (not hidden) without write, so a
+ * read-only viewer can still see what's configured.
+ */
+function SlaOverridesCard({ accountId }: { accountId: string }) {
+  const canWrite = useCan('sla_config', 'write');
+  const { data: overrides } = useAccountSlaOverrides(accountId);
+  const { data: casePolicies } = useSlaPolicies('CASE');
+  const { data: claimPolicies } = useSlaPolicies('CLAIM');
+  const upsert = useUpsertAccountSlaOverride(accountId);
+  const remove = useRemoveAccountSlaOverride(accountId);
+
+  const caseOverride = overrides?.find((o) => o.entityType === 'CASE');
+  const claimOverride = overrides?.find((o) => o.entityType === 'CLAIM');
+
+  function handleChange(entityType: 'CASE' | 'CLAIM', value: string) {
+    if (value === NO_OVERRIDE) {
+      remove.mutate(entityType);
+    } else {
+      upsert.mutate({ entityType, slaPolicyId: value });
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>SLA overrides</CardTitle>
+        <CardDescription>
+          Pin this account to a specific SLA policy instead of the one normally resolved by ticket type/priority — e.g. a faster tier for a VIP client.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <SlaOverrideSelect
+          label="Ticket SLA policy"
+          value={caseOverride?.slaPolicyId ?? NO_OVERRIDE}
+          policies={casePolicies ?? []}
+          disabled={!canWrite}
+          onChange={(value) => handleChange('CASE', value)}
+        />
+        <SlaOverrideSelect
+          label="Claim SLA policy"
+          value={claimOverride?.slaPolicyId ?? NO_OVERRIDE}
+          policies={claimPolicies ?? []}
+          disabled={!canWrite}
+          onChange={(value) => handleChange('CLAIM', value)}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+function SlaOverrideSelect({
+  label,
+  value,
+  policies,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  policies: SlaPolicy[];
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <Select value={value} onValueChange={onChange} disabled={disabled}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={NO_OVERRIDE}>Default (resolved automatically)</SelectItem>
+          {policies.map((p) => (
+            <SelectItem key={p.id} value={p.id}>
+              {p.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function RenewalsTab({ accountId }: { accountId: string }) {
+  const { data, isLoading } = useAccountRenewals(accountId);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Renewals</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-32 w-full" />
+        ) : !data || data.length === 0 ? (
+          <EmptyState title="No policies yet" description="Every policy on this account, with its renewal status, will show up here." />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Policy</TableHead>
+                <TableHead>Policy status</TableHead>
+                <TableHead>Expiry</TableHead>
+                <TableHead>Renewal status</TableHead>
+                <TableHead>Renewal due</TableHead>
+                <TableHead>Next alert</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((row) => (
+                <TableRow key={row.policyId}>
+                  <TableCell className="font-medium text-foreground">
+                    <Link href={`/policies/${row.policyId}`} className="hover:underline">
+                      {row.policyNumber}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{row.policyStatus}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(row.expiryDate)}</TableCell>
+                  <TableCell>
+                    {row.renewalStatus ? (
+                      <Badge variant={renewalStatusVariant(row.renewalStatus)}>{row.renewalStatus.replace(/_/g, ' ')}</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">No schedule</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(row.renewalDueDate)}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(row.nextAlertDueAt)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

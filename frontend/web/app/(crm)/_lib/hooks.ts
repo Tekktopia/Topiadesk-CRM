@@ -7,6 +7,8 @@ import type {
   Account,
   AccountDetail,
   AccountQuery,
+  AccountRenewalRow,
+  AccountSlaOverride,
   Activity,
   ActivityQuery,
   BulkActionResponse,
@@ -84,6 +86,48 @@ export function useAccount(id: string | undefined, options?: Partial<UseQueryOpt
     queryFn: () => apiFetch<AccountDetail>(`/api/crm/accounts/${id}`),
     enabled: Boolean(id),
     ...options,
+  });
+}
+
+export function useAccountRenewals(id: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'accounts', id, 'renewals'],
+    queryFn: () => apiFetch<AccountRenewalRow[]>(`/api/crm/accounts/${id}/renewals`),
+    enabled: Boolean(id),
+  });
+}
+
+export function useAccountSlaOverrides(id: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'accounts', id, 'sla-overrides'],
+    queryFn: () => apiFetch<AccountSlaOverride[]>(`/api/crm/accounts/${id}/sla-overrides`),
+    enabled: Boolean(id),
+  });
+}
+
+export function useUpsertAccountSlaOverride(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { entityType: 'CASE' | 'CLAIM'; slaPolicyId: string }) =>
+      apiFetch<AccountSlaOverride>(`/api/crm/accounts/${accountId}/sla-overrides`, { method: 'PUT', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      toast.success('SLA override saved');
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts', accountId, 'sla-overrides'] });
+    },
+    onError: (err: unknown) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useRemoveAccountSlaOverride(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entityType: 'CASE' | 'CLAIM') =>
+      apiFetch<void>(`/api/crm/accounts/${accountId}/sla-overrides/${entityType}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      toast.success('SLA override removed');
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts', accountId, 'sla-overrides'] });
+    },
+    onError: (err: unknown) => toast.error(errorMessage(err)),
   });
 }
 

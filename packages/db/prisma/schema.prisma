@@ -573,6 +573,8 @@ model Account {
   cases            Case[]
   surveyResponses  SurveyResponse[]
   loyaltyAccount   LoyaltyAccount?
+  slaOverrides     AccountSlaOverride[]
+  sites            Site[]
 
   @@index([status])
   @@map("accounts")
@@ -601,6 +603,12 @@ model Contact {
   account      Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
   carrierId    String?  @map("carrier_id") @db.Uuid
   carrier      Carrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  /// Optional — which of the account's Sites (branches) this contact
+  /// belongs to, for a corporate client with multiple locations. Not
+  /// required: most accounts have zero Sites and every Contact is simply
+  /// account-wide.
+  siteId       String?  @map("site_id") @db.Uuid
+  site         Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
   firstName    String   @map("first_name")
   lastName     String   @map("last_name")
   email        String?
@@ -616,6 +624,31 @@ model Contact {
   campaignSuppressions CampaignSuppression[]
 
   @@map("contacts")
+}
+
+/// A corporate account's separate physical branch/location — e.g. a client
+/// with offices in Lagos and Abuja needing distinct on-site contacts.
+/// Deliberately NOT linked from Policy (see the Batch plan's scoping note:
+/// site-level policy scoping would ripple into policy creation/versioning/
+/// premium calc — a real future extension, not built here).
+model Site {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId    String   @map("account_id") @db.Uuid
+  account      Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  name         String
+  addressLine1 String?  @map("address_line1")
+  addressLine2 String?  @map("address_line2")
+  city         String?
+  state        String?
+  country      String?  @default("NG")
+  postalCode   String?  @map("postal_code")
+  isPrimary    Boolean  @default(false) @map("is_primary")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  contacts Contact[]
+
+  @@map("sites")
 }
 
 model Carrier {
@@ -1577,6 +1610,7 @@ model SlaPolicy {
   targets SlaTarget[]
   cases   Case[]
   claims  Claim[]
+  accountOverrides AccountSlaOverride[]
 
   @@map("sla_policies")
 }
@@ -1598,6 +1632,26 @@ model SlaTarget {
   clocks SlaClock[]
 
   @@map("sla_targets")
+}
+
+/// Account-level SLA override — resolveSlaPolicy() (sla-clock.util.ts)
+/// checks this table FIRST, before its normal caseType/priority
+/// specificity scoring, when an accountId is available at case/claim
+/// creation. One row per (account, CASE|CLAIM) rather than a single FK on
+/// Account: a VIP client's tickets and their claims may need independent
+/// override policies.
+model AccountSlaOverride {
+  id          String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId   String                   @map("account_id") @db.Uuid
+  account     Account                  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  entityType  CaseManagementEntityType @map("entity_type")
+  slaPolicyId String                   @map("sla_policy_id") @db.Uuid
+  slaPolicy   SlaPolicy                @relation(fields: [slaPolicyId], references: [id])
+  createdAt   DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([accountId, entityType])
+  @@map("account_sla_overrides")
 }
 
 /// Runtime instance, one per (ticket, active target). dueAt is the durable

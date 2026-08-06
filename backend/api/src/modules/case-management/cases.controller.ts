@@ -227,7 +227,7 @@ export class CasesController {
     }
     const kase = created!;
 
-    await ensureCaseSlaClocks(kase.id, dto.slaPolicyId ?? null, kase.caseType, kase.priority).catch((err: unknown) => {
+    await ensureCaseSlaClocks(kase.id, dto.slaPolicyId ?? null, kase.caseType, kase.priority, kase.accountId).catch((err: unknown) => {
       console.error(`[cases] failed to start SLA clocks for case ${kase.id}`, err);
     });
 

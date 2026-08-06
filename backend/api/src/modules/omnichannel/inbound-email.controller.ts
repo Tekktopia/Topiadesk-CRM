@@ -80,7 +80,7 @@ export class InboundEmailController {
         },
       });
 
-      await ensureCaseSlaClocks(kase.id, null, kase.caseType, kase.priority).catch((err: unknown) => {
+      await ensureCaseSlaClocks(kase.id, null, kase.caseType, kase.priority, kase.accountId).catch((err: unknown) => {
         console.error(`[omnichannel] failed to start SLA clocks for case ${kase.id}`, err);
       });
       await enqueueEntityEvent({ entityType: 'CASE', entityId: kase.id, eventType: 'CREATED', occurredAt: kase.createdAt.toISOString() }).catch(() => undefined);

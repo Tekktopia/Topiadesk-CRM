@@ -63,9 +63,36 @@ export interface AccountCounts {
   relationships: number;
 }
 
+export interface AccountFinancials {
+  totalSumInsured: string | null;
+  totalGrossPremium: string | null;
+  totalOutstandingPremium: string | null;
+  wonOpportunityValue: string | null;
+}
+
 export interface AccountDetail extends Account {
   contacts: ContactSummary[];
   counts: AccountCounts;
+  financials: AccountFinancials;
+}
+
+export interface AccountSlaOverride {
+  id: string;
+  accountId: string;
+  entityType: 'CASE' | 'CLAIM';
+  slaPolicyId: string;
+  slaPolicyName: string;
+}
+
+export interface AccountRenewalRow {
+  policyId: string;
+  policyNumber: string;
+  policyStatus: string;
+  expiryDate: string;
+  renewalStatus: string | null;
+  renewalDueDate: string | null;
+  nextAlertDueAt: string | null;
+  assignedToId: string | null;
 }
 
 export type AccountQuery = NonNullable<Paths['/crm/accounts']['get']['parameters']['query']>;

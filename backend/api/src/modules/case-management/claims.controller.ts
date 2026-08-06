@@ -177,8 +177,11 @@ export class ClaimsController {
     // SLA clock creation and the automation-event enqueue are both additive
     // side effects of a claim that already exists — neither failing should
     // fail the create itself, so both are best-effort/logged, not awaited
-    // inside the same failure path as the write above.
-    await ensureClaimSlaClocks(claim.id, dto.slaPolicyId ?? null, claim.priority, claim.status).catch((err: unknown) => {
+    // inside the same failure path as the write above. Claim has no direct
+    // accountId (only reachable via Policy) — one cheap indexed lookup for
+    // the account-level SLA override check in ensureClaimSlaClocks.
+    const claimPolicy = await prisma.policy.findUnique({ where: { id: dto.policyId }, select: { accountId: true } });
+    await ensureClaimSlaClocks(claim.id, dto.slaPolicyId ?? null, claim.priority, claim.status, claimPolicy?.accountId).catch((err: unknown) => {
       console.error(`[claims] failed to start SLA clocks for claim ${claim.id}`, err);
     });
     await enqueueEntityEvent({ entityType: 'CLAIM', entityId: claim.id, eventType: 'CREATED', occurredAt: claim.createdAt.toISOString() }).catch(() => undefined);

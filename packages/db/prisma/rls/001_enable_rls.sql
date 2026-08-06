@@ -63,7 +63,11 @@ BEGIN
     -- zero RLS despite `ownerId`/`visibility` columns designed for exactly
     -- this — harmless while only 4 ADMIN-seeded ORG rows existed behind
     -- read-only routes, a real hole once users can create PRIVATE ones.
-    'saved_dashboards'
+    'saved_dashboards',
+    -- Phase 5 — account-level overrides/extensions, all child-of-account
+    -- tables inheriting the parent account's owner-based scoping the same
+    -- way account_relationships/contacts already do.
+    'account_sla_overrides', 'sites'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
