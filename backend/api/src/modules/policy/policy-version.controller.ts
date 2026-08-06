@@ -13,6 +13,7 @@ import { PolicyVersionResponseDto } from './dto/policy-version-response.dto';
 import {
   assertValidPolicyTransition,
   isApprovalGated,
+  resolveApprovalThreshold,
   VERSION_TYPE_APPROVAL_ENTITY_TYPE,
   VERSION_TYPE_STATUS_EFFECT,
 } from './policy-lifecycle';
@@ -21,6 +22,7 @@ function toVersionDto(
   version: PolicyVersion,
   approvalStatus: ApprovalStatus | null,
   applied: boolean,
+  chainProgress?: { approvedCount: number; requiredApprovals: number },
 ): PolicyVersionResponseDto {
   return {
     ...version,
@@ -28,6 +30,8 @@ function toVersionDto(
     sumInsuredAtVersion: decimalToString(version.sumInsuredAtVersion),
     approvalStatus,
     applied,
+    approvedCount: chainProgress?.approvedCount,
+    requiredApprovals: chainProgress?.requiredApprovals,
   };
 }
 
@@ -107,13 +111,24 @@ export class PolicyVersionController {
     });
 
     if (isApprovalGated(dto.versionType)) {
+      const entityType = VERSION_TYPE_APPROVAL_ENTITY_TYPE[dto.versionType]!;
+      // Threshold-routed multi-level chain vs. the plain single-approval
+      // path — resolved off whichever amount this version actually carries
+      // (premiumImpact for endorsements, sumInsuredAtVersion for
+      // cancellations tend to be the more common one set per type, but
+      // either can be present; premiumImpact wins if both are).
+      const amount = dto.premiumImpact != null ? Number(dto.premiumImpact) : dto.sumInsuredAtVersion != null ? Number(dto.sumInsuredAtVersion) : null;
+      const requiredApprovals = await resolveApprovalThreshold(dto.versionType, amount);
+
+      if (requiredApprovals > 1) {
+        await prisma.approvalChain.create({
+          data: { entityType, entityId: version.id, requiredApprovals, status: 'PENDING' },
+        });
+        return toVersionDto(version, 'PENDING', false, { approvedCount: 0, requiredApprovals });
+      }
+
       await prisma.approval.create({
-        data: {
-          entityType: VERSION_TYPE_APPROVAL_ENTITY_TYPE[dto.versionType]!,
-          entityId: version.id,
-          requestedById: user.id,
-          status: 'PENDING',
-        },
+        data: { entityType, entityId: version.id, requestedById: user.id, status: 'PENDING' },
       });
       return toVersionDto(version, 'PENDING', false);
     }
@@ -151,8 +166,17 @@ export class PolicyVersionController {
     }
 
     const entityType = VERSION_TYPE_APPROVAL_ENTITY_TYPE[version.versionType]!;
+
+    // Multi-level chain (requiredApprovals > 1 at creation time) vs. the
+    // plain single-Approval path — mutually exclusive per version, decided
+    // once at creation and never after (see create()).
+    const chain = await prisma.approvalChain.findFirst({ where: { entityType, entityId: versionId, status: 'PENDING' } });
+    if (chain) {
+      return this.decideChainedApproval(policyId, version, chain.id, chain.requiredApprovals, dto, user);
+    }
+
     const approval = await prisma.approval.findFirst({
-      where: { entityType, entityId: versionId, status: 'PENDING' },
+      where: { entityType, entityId: versionId, status: 'PENDING', chainId: null },
     });
     if (!approval) throw new NotFoundException('No pending approval for this version');
 
@@ -194,6 +218,84 @@ export class PolicyVersionController {
     return toVersionDto(version, 'REJECTED', false);
   }
 
+  /**
+   * Each decision on a chain appends its OWN Approval row (chainId set)
+   * rather than mutating a single shared row — that's what lets N different
+   * approvers each leave an independent, attributable decision. The chain
+   * itself (not any one row) is the source of truth for whether the version
+   * applies: REJECTED the instant any one approver rejects; APPROVED only
+   * once `requiredApprovals` distinct APPROVED rows exist.
+   */
+  private async decideChainedApproval(
+    policyId: string,
+    version: PolicyVersion,
+    chainId: string,
+    requiredApprovals: number,
+    dto: DecideApprovalDto,
+    user: AuthenticatedUser,
+  ): Promise<PolicyVersionResponseDto> {
+    const prisma = getPrismaClient();
+    // version.createdById is the actual requester here — a chained version
+    // never gets its own upfront Approval row the way a single-approval one
+    // does (see create()), so this is the segregation-of-duties check's
+    // equivalent for the chain path.
+    if (version.createdById === user.id) {
+      throw new ForbiddenException('Cannot decide your own approval request');
+    }
+    const alreadyDecided = await prisma.approval.findFirst({ where: { chainId, approvedById: user.id } });
+    if (alreadyDecided) {
+      throw new ForbiddenException('You have already decided on this approval chain');
+    }
+
+    const entityType = VERSION_TYPE_APPROVAL_ENTITY_TYPE[version.versionType]!;
+
+    if (dto.decision === 'REJECTED') {
+      await prisma.approval.create({
+        data: {
+          entityType,
+          entityId: version.id,
+          requestedById: version.createdById,
+          approvedById: user.id,
+          status: 'REJECTED',
+          decidedAt: new Date(),
+          reason: dto.reason,
+          chainId,
+        },
+      });
+      await prisma.approvalChain.update({ where: { id: chainId }, data: { status: 'REJECTED' } });
+      return toVersionDto(version, 'REJECTED', false, { approvedCount: 0, requiredApprovals });
+    }
+
+    const policy = await prisma.policy.findUniqueOrThrow({ where: { id: policyId } });
+    const targetStatus = VERSION_TYPE_STATUS_EFFECT[version.versionType];
+    assertValidPolicyTransition(policy.status, targetStatus);
+
+    await prisma.approval.create({
+      data: {
+        entityType,
+        entityId: version.id,
+        requestedById: version.createdById,
+        approvedById: user.id,
+        status: 'APPROVED',
+        decidedAt: new Date(),
+        reason: dto.reason,
+        chainId,
+      },
+    });
+    const approvedCount = await prisma.approval.count({ where: { chainId, status: 'APPROVED' } });
+
+    if (approvedCount < requiredApprovals) {
+      return toVersionDto(version, 'PENDING', false, { approvedCount, requiredApprovals });
+    }
+
+    await prisma.approvalChain.update({ where: { id: chainId }, data: { status: 'APPROVED' } });
+    await prisma.policy.update({
+      where: { id: policyId },
+      data: { currentVersionId: version.id, status: targetStatus, sumInsured: version.sumInsuredAtVersion ?? undefined },
+    });
+    return toVersionDto(version, 'APPROVED', true, { approvedCount, requiredApprovals });
+  }
+
   private async assertPolicyVisible(policyId: string): Promise<void> {
     const policy = await getPrismaClient().policy.findUnique({ where: { id: policyId }, select: { id: true } });
     if (!policy) throw new NotFoundException('Policy not found');
@@ -201,8 +303,17 @@ export class PolicyVersionController {
 
   private async withApprovalStatus(version: PolicyVersion): Promise<PolicyVersionResponseDto> {
     if (!isApprovalGated(version.versionType)) return toVersionDto(version, null, true);
-    const approval = await getPrismaClient().approval.findFirst({
-      where: { entityType: VERSION_TYPE_APPROVAL_ENTITY_TYPE[version.versionType]!, entityId: version.id },
+    const prisma = getPrismaClient();
+    const entityType = VERSION_TYPE_APPROVAL_ENTITY_TYPE[version.versionType]!;
+
+    const chain = await prisma.approvalChain.findFirst({ where: { entityType, entityId: version.id } });
+    if (chain) {
+      const approvedCount = await prisma.approval.count({ where: { chainId: chain.id, status: 'APPROVED' } });
+      return toVersionDto(version, chain.status, chain.status === 'APPROVED', { approvedCount, requiredApprovals: chain.requiredApprovals });
+    }
+
+    const approval = await prisma.approval.findFirst({
+      where: { entityType, entityId: version.id },
       orderBy: { createdAt: 'desc' },
     });
     return toVersionDto(version, approval?.status ?? null, approval?.status === 'APPROVED');

@@ -92,11 +92,18 @@ export function VersionHistory({ policyId, onChanged }: { policyId: string; onCh
                 <TableCell className="text-right tabular-nums">{v.sumInsuredAtVersion ? formatNaira(v.sumInsuredAtVersion) : '—'}</TableCell>
                 <TableCell className="text-muted-foreground">{userNameById.get(v.createdById) ?? '—'}</TableCell>
                 <TableCell>
-                  {v.approvalStatus ? (
-                    <Badge variant={approvalStatusVariant(v.approvalStatus)}>{v.approvalStatus}</Badge>
-                  ) : (
-                    <Badge variant="secondary">Applied</Badge>
-                  )}
+                  <div className="flex flex-col gap-0.5">
+                    {v.approvalStatus ? (
+                      <Badge variant={approvalStatusVariant(v.approvalStatus)}>{v.approvalStatus}</Badge>
+                    ) : (
+                      <Badge variant="secondary">Applied</Badge>
+                    )}
+                    {v.requiredApprovals && v.requiredApprovals > 1 ? (
+                      <span className="text-[11px] text-muted-foreground">
+                        {v.approvedCount ?? 0} of {v.requiredApprovals} approvals
+                      </span>
+                    ) : null}
+                  </div>
                 </TableCell>
                 <TableCell>
                   {isPending ? (
@@ -188,8 +195,15 @@ function DecideDialog({
         <DialogHeader>
           <DialogTitle>Decide: {version?.versionType.toLowerCase()}</DialogTitle>
           <DialogDescription>
-            Requested by {requesterName ?? 'another user'} for {formatDate(version?.effectiveDate ?? null)}. Approving applies the
-            change to the policy immediately; rejecting leaves the policy unchanged.
+            Requested by {requesterName ?? 'another user'} for {formatDate(version?.effectiveDate ?? null)}.{' '}
+            {version?.requiredApprovals && version.requiredApprovals > 1 ? (
+              <>
+                This change needs {version.requiredApprovals} approvals ({version.approvedCount ?? 0} so far) — approving adds your
+                decision; the policy only updates once enough approvals land. Rejecting stops the whole chain immediately.
+              </>
+            ) : (
+              <>Approving applies the change to the policy immediately; rejecting leaves the policy unchanged.</>
+            )}
           </DialogDescription>
         </DialogHeader>
 

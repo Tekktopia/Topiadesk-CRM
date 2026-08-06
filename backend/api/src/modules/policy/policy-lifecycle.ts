@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import type { ApprovalEntityType, PolicyStatus, PolicyVersionType } from '@topiadesk/db';
+import { getPrismaClient, type ApprovalEntityType, type PolicyStatus, type PolicyVersionType } from '@topiadesk/db';
 
 /**
  * QUOTED -> BOUND -> ISSUED -> ENDORSED/CANCELLED/LAPSED/RENEWED, per the
@@ -63,4 +63,28 @@ export const VERSION_TYPE_APPROVAL_ENTITY_TYPE: Partial<Record<PolicyVersionType
 
 export function isApprovalGated(versionType: PolicyVersionType): boolean {
   return APPROVAL_GATED_VERSION_TYPES.has(versionType);
+}
+
+/**
+ * How many distinct approvals a gated PolicyVersion needs, per
+ * ApprovalThresholdRule — same most-specific-wins resolution as
+ * resolveSlaPolicy() (case-management/sla-clock.util.ts): the smallest
+ * configured `minAmount` the actual amount still clears wins (a rule with
+ * `minAmount` null is the catch-all default). Zero rules configured for
+ * this versionType (the common case today) means `requiredApprovals` is
+ * always 1 — byte-for-byte the pre-existing single-approver behavior.
+ */
+export async function resolveApprovalThreshold(versionType: PolicyVersionType, amount: number | null): Promise<number> {
+  const rules = await getPrismaClient().approvalThresholdRule.findMany({ where: { versionType } });
+  if (rules.length === 0) return 1;
+
+  let best: { minAmount: number | null; requiredApprovals: number } | null = null;
+  for (const rule of rules) {
+    const minAmount = rule.minAmount ? Number(rule.minAmount) : null;
+    if (minAmount !== null && (amount === null || amount < minAmount)) continue;
+    if (!best || (minAmount !== null && (best.minAmount === null || minAmount > best.minAmount))) {
+      best = { minAmount, requiredApprovals: rule.requiredApprovals };
+    }
+  }
+  return best?.requiredApprovals ?? 1;
 }

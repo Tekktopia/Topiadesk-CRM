@@ -31,10 +31,18 @@ export type UpdatePolicyDto = ApiPaths['/policies/{id}']['patch']['requestBody']
 
 type PolicyVersionDtoRaw =
   ApiPaths['/policies/{policyId}/versions']['get']['responses'][200]['content']['application/json'][number];
+// `approvedCount`/`requiredApprovals` (Batch 5's multi-level approval
+// chains) aren't in the generated schema yet — same manual-patch
+// convention as this file's header comment. Present only when this
+// version's approval is a multi-level ApprovalChain (requiredApprovals > 1
+// resolved at creation), see policy-lifecycle.ts's resolveApprovalThreshold.
 export type PolicyVersionDto = FixNullable<
   PolicyVersionDtoRaw,
   'changeDescription' | 'premiumImpact' | 'sumInsuredAtVersion' | 'approvalStatus'
->;
+> & {
+  approvedCount?: number;
+  requiredApprovals?: number;
+};
 export type CreatePolicyVersionDto =
   ApiPaths['/policies/{policyId}/versions']['post']['requestBody']['content']['application/json'];
 export type DecideApprovalDto =
@@ -83,6 +91,27 @@ export interface UserOption {
   fullName: string;
   email: string;
 }
+
+/** Not in the generated schema — a brand-new endpoint (Batch 5's approval
+ * chains), hand-written like LookupOption/UserOption above rather than
+ * derived from ApiPaths. `PolicyVersionType` is declared further down this
+ * file (derived from POLICY_VERSION_TYPES). */
+export interface ApprovalThresholdRule {
+  id: string;
+  versionType: PolicyVersionType;
+  minAmount: string | null;
+  requiredApprovals: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateApprovalThresholdRuleInput {
+  versionType: PolicyVersionType;
+  minAmount?: string;
+  requiredApprovals: number;
+}
+
+export type UpdateApprovalThresholdRuleInput = Partial<CreateApprovalThresholdRuleInput>;
 
 export const POLICY_STATUSES = ['QUOTED', 'BOUND', 'ISSUED', 'ENDORSED', 'CANCELLED', 'LAPSED', 'RENEWED'] as const;
 export type PolicyStatus = (typeof POLICY_STATUSES)[number];

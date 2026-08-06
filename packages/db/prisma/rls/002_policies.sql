@@ -282,6 +282,39 @@ CREATE POLICY approvals_rw ON approvals FOR ALL
   )
   WITH CHECK (requested_by_id = app_current_user_id() OR app_max_scope('approval', 'write') = 'ALL');
 
+-- ApprovalChain has no requester/approver column of its own (only its
+-- linked Approval rows do), and no sensitive fields at all — just
+-- entityType/entityId/requiredApprovals/status. Readable by any
+-- authenticated user deliberately, NOT gated on approval:read: a plain
+-- broker with only policy:write routinely creates the ENDORSEMENT/
+-- CANCELLATION version that spawns this chain (policy-version.controller.ts's
+-- create()) and needs to see its own submission's progress
+-- (list()/findOne() -> withApprovalStatus()) — gating chain visibility
+-- behind approval:read (an ADMIN/COMPLIANCE_OFFICER-only grant) would make
+-- every requester's own pending version look silently "applied" the moment
+-- RLS filters the chain row out from under them. The real access boundary
+-- already happened one layer up, at PolicyVersionController's own
+-- @RequirePermission('policy','read'/'write') gate. WITH CHECK is equally
+-- open for the same "Nest guard is the real creation gate" reason.
+DROP POLICY IF EXISTS approval_chains_rw ON approval_chains;
+CREATE POLICY approval_chains_rw ON approval_chains FOR ALL
+  USING (app_current_user_id() IS NOT NULL)
+  WITH CHECK (app_current_user_id() IS NOT NULL);
+
+-- Same reasoning as approval_chains_rw above: resolveApprovalThreshold()
+-- (policy-lifecycle.ts) runs inside a plain broker's policy:write request
+-- and must see every configured rule to resolve correctly — restricting
+-- read to approval:read (ADMIN/COMPLIANCE_OFFICER only, unlike sla_config
+-- which IS broadly granted) silently starved the resolver down to "zero
+-- rules visible" for exactly the population that triggers it, always
+-- resolving to the 1-approval default regardless of what was configured.
+-- Write stays admin/compliance-only — only the resolver's READ path was
+-- ever supposed to be broad.
+DROP POLICY IF EXISTS approval_threshold_rules_rw ON approval_threshold_rules;
+CREATE POLICY approval_threshold_rules_rw ON approval_threshold_rules FOR ALL
+  USING (app_current_user_id() IS NOT NULL)
+  WITH CHECK (app_current_role() = 'SYSTEM_JOB' OR app_max_scope('approval', 'write') = 'ALL');
+
 -- =============================================================================
 -- notifications — strictly per-recipient.
 -- =============================================================================

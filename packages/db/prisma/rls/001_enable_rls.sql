@@ -67,7 +67,9 @@ BEGIN
     -- Phase 5 — account-level overrides/extensions, all child-of-account
     -- tables inheriting the parent account's owner-based scoping the same
     -- way account_relationships/contacts already do.
-    'account_sla_overrides', 'sites'
+    'account_sla_overrides', 'sites',
+    -- Phase 5 — multi-level policy-version approval chains.
+    'approval_chains', 'approval_threshold_rules'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);

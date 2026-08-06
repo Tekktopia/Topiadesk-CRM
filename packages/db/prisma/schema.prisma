@@ -1102,11 +1102,62 @@ model Approval {
   reason        String?
   decidedAt     DateTime?          @map("decided_at") @db.Timestamptz(6)
   createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// Nullable, additive: when null (every pre-existing domain — CASE_CLOSURE,
+  /// KNOWLEDGE_ARTICLE_PUBLISH, CASE_AUTOMATION_GATE, and the common case of
+  /// POLICY_ENDORSEMENT/CANCELLATION below any configured threshold),
+  /// behavior is byte-for-byte identical to before this field existed — one
+  /// Approval row IS the whole decision. When set, multiple Approval rows
+  /// (one per approver's decision) share a chain; the chain — not any single
+  /// row — is the source of truth for whether the gated action applies. See
+  /// policy-version.controller.ts's decideApproval().
+  chainId       String?            @map("chain_id") @db.Uuid
+  chain         ApprovalChain?     @relation(fields: [chainId], references: [id], onDelete: Cascade)
 
   automationRunStates AutomationRunState[]
 
   @@index([entityType, entityId])
   @@map("approvals")
+}
+
+/// Multi-level approval — currently only created for POLICY_ENDORSEMENT/
+/// CANCELLATION versions whose premiumImpact/sumInsuredAtVersion crosses an
+/// ApprovalThresholdRule. requiredApprovals distinct APPROVED decisions
+/// (see the Approval rows linked via chainId) satisfy the chain; any single
+/// REJECTED decision rejects it immediately. Deliberately NOT wired into
+/// CASE_CLOSURE/KNOWLEDGE_ARTICLE_PUBLISH/CASE_AUTOMATION_GATE — none of
+/// those domains has a real dollar amount to threshold against, and forcing
+/// one would be unmotivated complexity for zero benefit.
+model ApprovalChain {
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType        ApprovalEntityType @map("entity_type")
+  entityId          String         @map("entity_id") @db.Uuid
+  requiredApprovals Int            @map("required_approvals")
+  status            ApprovalStatus @default(PENDING)
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  approvals Approval[]
+
+  @@index([entityType, entityId])
+  @@map("approval_chains")
+}
+
+/// Admin-configurable "if this PolicyVersion's premiumImpact/sumInsured
+/// exceeds $X, require N approvals instead of 1" — resolved the same
+/// most-specific-wins way resolveSlaPolicy() picks an SlaPolicy: the
+/// smallest configured minAmount that the actual amount still clears wins;
+/// a rule with minAmount null is the catch-all default. Zero rules
+/// configured for a versionType means requiredApprovals is always 1 —
+/// today's pre-existing single-approver behavior, unchanged.
+model ApprovalThresholdRule {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  versionType       PolicyVersionType @map("version_type")
+  minAmount         Decimal?          @map("min_amount") @db.Decimal(18, 2)
+  requiredApprovals Int               @default(1) @map("required_approvals")
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("approval_threshold_rules")
 }
 
 // =============================================================================
