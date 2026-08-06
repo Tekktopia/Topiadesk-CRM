@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   Activity as ActivityIcon,
   Briefcase,
+  Building2,
   CalendarClock,
   CheckSquare,
   MoreHorizontal,
@@ -60,6 +61,8 @@ import { PageHeader } from '../../../_components/page-header';
 import {
   accountStatusLabel,
   accountStatusVariant,
+  relationshipTypeLabel,
+  relationshipTypeVariant,
   riskRatingLabel,
   riskRatingVariant,
   taskPriorityLabel,
@@ -73,6 +76,7 @@ import { useCan, useSlaPolicies } from '@/app/(cases)/_lib/hooks';
 import type { SlaPolicy } from '@/app/(cases)/_lib/types';
 import {
   useAccount,
+  useAccountRelationships,
   useAccountRenewals,
   useAccountSlaOverrides,
   useAllPipelineStages,
@@ -80,16 +84,22 @@ import {
   useCreateActivity,
   useActivities,
   useDeleteAccount,
+  useDeleteAccountRelationship,
   useDeleteContact,
+  useDeleteSite,
   useDirectoryUsers,
   useOpportunities,
   useRemoveAccountSlaOverride,
+  useSites,
   useTasksForEntity,
   useUpsertAccountSlaOverride,
 } from '../../../_lib/hooks';
-import type { Contact } from '../../../_lib/types';
+import type { AccountDetail, AccountRelationship, Contact, Site } from '../../../_lib/types';
 import { AccountFormDialog } from '../../_components/account-form-dialog';
+import { AccountRelationshipFormDialog } from '../../_components/account-relationship-form-dialog';
 import { ContactFormDialog } from '../../_components/contact-form-dialog';
+import { SiteFormDialog } from '../../_components/site-form-dialog';
+import { AccountRelationshipGraph } from './account-relationship-graph';
 import { AiInsightPanel } from './ai-insight-panel';
 import { LoyaltyTab } from './loyalty-tab';
 
@@ -173,6 +183,12 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="contacts">Contacts</TabsTrigger>
+          <TabsTrigger value="sites" className="gap-1.5">
+            <Building2 className="h-3.5 w-3.5" aria-hidden /> Sites
+          </TabsTrigger>
+          <TabsTrigger value="relationships" className="gap-1.5">
+            <Network className="h-3.5 w-3.5" aria-hidden /> Relationships
+          </TabsTrigger>
           <TabsTrigger value="opportunities">Opportunities</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
           <TabsTrigger value="renewals" className="gap-1.5">
@@ -209,6 +225,14 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
 
         <TabsContent value="contacts">
           <ContactsTab accountId={accountId} />
+        </TabsContent>
+
+        <TabsContent value="sites">
+          <SitesTab accountId={accountId} />
+        </TabsContent>
+
+        <TabsContent value="relationships">
+          <RelationshipsTab account={account} />
         </TabsContent>
 
         <TabsContent value="opportunities">
@@ -359,6 +383,194 @@ function ContactsTab({ accountId }: { accountId: string }) {
         }}
       />
     </Card>
+  );
+}
+
+function SitesTab({ accountId }: { accountId: string }) {
+  const { data, isLoading } = useSites(accountId);
+  const deleteSite = useDeleteSite(accountId);
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [editing, setEditing] = React.useState<Site | null>(null);
+  const [deleting, setDeleting] = React.useState<Site | null>(null);
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardTitle>Sites</CardTitle>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>
+          <Plus aria-hidden /> Add site
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-32 w-full" />
+        ) : !data || data.length === 0 ? (
+          <EmptyState title="No sites yet" description="Add a branch or location for corporate clients with more than one address." />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Address</TableHead>
+                <TableHead>City</TableHead>
+                <TableHead>State</TableHead>
+                <TableHead />
+                <TableHead className="w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((site) => (
+                <TableRow key={site.id}>
+                  <TableCell className="font-medium text-foreground">{site.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{site.addressLine1 ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">{site.city ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">{site.state ?? '—'}</TableCell>
+                  <TableCell>{site.isPrimary ? <Badge variant="secondary">Primary</Badge> : null}</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" aria-label="Site actions">
+                          <MoreHorizontal aria-hidden />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => setEditing(site)}>Edit</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleting(site)}>
+                          <Trash2 aria-hidden /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      <SiteFormDialog open={createOpen} onOpenChange={setCreateOpen} accountId={accountId} />
+      {editing ? (
+        <SiteFormDialog open={Boolean(editing)} onOpenChange={(open) => !open && setEditing(null)} accountId={accountId} site={editing} />
+      ) : null}
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        title={`Remove "${deleting?.name}"?`}
+        confirmLabel="Remove site"
+        destructive
+        isPending={deleteSite.isPending}
+        onConfirm={() => {
+          if (!deleting) return;
+          deleteSite.mutate(deleting.id, { onSuccess: () => setDeleting(null) });
+        }}
+      />
+    </Card>
+  );
+}
+
+function RelationshipsTab({ account }: { account: AccountDetail }) {
+  const { data, isLoading } = useAccountRelationships(account.id);
+  const deleteRelationship = useDeleteAccountRelationship(account.id);
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [editing, setEditing] = React.useState<AccountRelationship | null>(null);
+  const [deleting, setDeleting] = React.useState<AccountRelationship | null>(null);
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Hierarchy &amp; relationships</CardTitle>
+          <CardDescription>The account&apos;s parent/subsidiary structure and lateral links to other accounts, at a glance.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AccountRelationshipGraph account={account} relationships={data ?? []} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle>Relationships</CardTitle>
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus aria-hidden /> Add relationship
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : !data || data.length === 0 ? (
+            <EmptyState title="No relationships yet" description="Link this account to a referral source, competitor, joint venture, or other related account." />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Related account</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Notes</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.map((rel) => {
+                  const isA = rel.accountAId === account.id;
+                  const otherId = isA ? rel.accountBId : rel.accountAId;
+                  const otherName = isA ? rel.accountBName : rel.accountAName;
+                  return (
+                    <TableRow key={rel.id}>
+                      <TableCell className="font-medium text-foreground">
+                        <Link href={`/accounts/${otherId}`} className="hover:underline">
+                          {otherName}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={relationshipTypeVariant(rel.relationshipType)}>{relationshipTypeLabel(rel.relationshipType)}</Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{rel.notes ?? '—'}</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" aria-label="Relationship actions">
+                              <MoreHorizontal aria-hidden />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => setEditing(rel)}>Edit</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleting(rel)}>
+                              <Trash2 aria-hidden /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <AccountRelationshipFormDialog open={createOpen} onOpenChange={setCreateOpen} accountId={account.id} />
+      {editing ? (
+        <AccountRelationshipFormDialog
+          open={Boolean(editing)}
+          onOpenChange={(open) => !open && setEditing(null)}
+          accountId={account.id}
+          relationship={editing}
+        />
+      ) : null}
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        title="Remove this relationship?"
+        confirmLabel="Remove relationship"
+        destructive
+        isPending={deleteRelationship.isPending}
+        onConfirm={() => {
+          if (!deleting) return;
+          deleteRelationship.mutate(deleting.id, { onSuccess: () => setDeleting(null) });
+        }}
+      />
+    </div>
   );
 }
 

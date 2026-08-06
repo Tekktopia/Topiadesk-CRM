@@ -70,10 +70,17 @@ export interface AccountFinancials {
   wonOpportunityValue: string | null;
 }
 
+export interface AccountRef {
+  id: string;
+  name: string;
+}
+
 export interface AccountDetail extends Account {
   contacts: ContactSummary[];
   counts: AccountCounts;
   financials: AccountFinancials;
+  parentAccount: AccountRef | null;
+  subAccounts: AccountRef[];
 }
 
 export interface AccountSlaOverride {
@@ -83,6 +90,27 @@ export interface AccountSlaOverride {
   slaPolicyId: string;
   slaPolicyName: string;
 }
+
+export type AccountRelationshipType = 'REFERRAL_SOURCE' | 'COMPETITOR' | 'JOINT_VENTURE' | 'PARENT_SUBSIDIARY' | 'OTHER';
+
+export interface AccountRelationship {
+  id: string;
+  accountAId: string;
+  accountAName: string;
+  accountBId: string;
+  accountBName: string;
+  relationshipType: AccountRelationshipType;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface CreateAccountRelationshipInput {
+  relatedAccountId: string;
+  relationshipType: AccountRelationshipType;
+  notes?: string;
+}
+
+export type UpdateAccountRelationshipInput = Partial<CreateAccountRelationshipInput>;
 
 export interface AccountRenewalRow {
   policyId: string;
@@ -115,6 +143,7 @@ export interface Contact {
   id: string;
   accountId: string | null;
   carrierId: string | null;
+  siteId: string | null;
   firstName: string;
   lastName: string;
   email: string | null;
@@ -127,13 +156,45 @@ export interface Contact {
 }
 
 export type ContactQuery = NonNullable<Paths['/crm/contacts']['get']['parameters']['query']>;
-// See CreateAccountInput's comment — ApiPaths hasn't been regenerated for Phase 2's customFields.
+// See CreateAccountInput's comment — ApiPaths hasn't been regenerated for Phase 2's customFields/siteId.
 export type CreateContactInput = Paths['/crm/contacts']['post']['requestBody']['content']['application/json'] & {
   customFields?: Record<string, unknown>;
+  siteId?: string;
 };
 export type UpdateContactInput = Paths['/crm/contacts/{id}']['patch']['requestBody']['content']['application/json'] & {
   customFields?: Record<string, unknown>;
+  siteId?: string;
 };
+
+// -- Sites ------------------------------------------------------------------
+
+export interface Site {
+  id: string;
+  accountId: string;
+  name: string;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  postalCode: string | null;
+  isPrimary: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSiteInput {
+  name: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  isPrimary?: boolean;
+}
+
+export type UpdateSiteInput = Partial<CreateSiteInput>;
 
 // -- Carriers ---------------------------------------------------------------
 

@@ -7,6 +7,10 @@ export class CreateContactDto {
   // instead of surfacing the raw Postgres constraint violation.
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() accountId?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() carrierId?: string;
+  @ApiProperty({ required: false, description: 'Which of the account\'s Sites (branches) this contact belongs to, if any' })
+  @IsOptional()
+  @IsUUID()
+  siteId?: string;
   @ApiProperty() @IsString() @MinLength(1) firstName!: string;
   @ApiProperty() @IsString() @MinLength(1) lastName!: string;
   @ApiProperty({ required: false }) @IsOptional() @IsEmail() email?: string;
@@ -29,6 +33,7 @@ export class ContactResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty({ nullable: true }) accountId!: string | null;
   @ApiProperty({ nullable: true }) carrierId!: string | null;
+  @ApiProperty({ nullable: true }) siteId!: string | null;
   @ApiProperty() firstName!: string;
   @ApiProperty() lastName!: string;
   @ApiProperty({ nullable: true }) email!: string | null;

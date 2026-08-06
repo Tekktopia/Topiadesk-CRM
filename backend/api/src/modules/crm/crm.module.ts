@@ -11,6 +11,7 @@ import { CustomFieldDefinitionsController } from './custom-field-definitions.con
 import { SavedViewsController } from './saved-views.controller';
 import { SalesQuotasController } from './sales-quotas.controller';
 import { AutomationRulesController } from './automation-rules.controller';
+import { SitesController } from './sites.controller';
 
 @Module({
   controllers: [
@@ -29,6 +30,7 @@ import { AutomationRulesController } from './automation-rules.controller';
     SavedViewsController,
     SalesQuotasController,
     AutomationRulesController,
+    SitesController,
   ],
 })
 export class CrmModule {}

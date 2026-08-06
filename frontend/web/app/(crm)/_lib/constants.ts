@@ -104,6 +104,24 @@ export function riskRatingVariant(rating: string | null): BadgeVariant {
   }
 }
 
+export function relationshipTypeLabel(type: string): string {
+  return humanize(type);
+}
+export function relationshipTypeVariant(type: string): BadgeVariant {
+  switch (type) {
+    case 'PARENT_SUBSIDIARY':
+      return 'secondary';
+    case 'COMPETITOR':
+      return 'destructive';
+    case 'JOINT_VENTURE':
+      return 'success';
+    case 'REFERRAL_SOURCE':
+      return 'outline';
+    default:
+      return 'outline';
+  }
+}
+
 export function leadStatusLabel(status: string): string {
   return humanize(status);
 }

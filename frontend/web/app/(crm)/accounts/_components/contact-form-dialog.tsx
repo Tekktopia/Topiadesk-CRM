@@ -20,11 +20,18 @@ import {
   FormLabel,
   FormMessage,
   Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   toast,
 } from '@topiadesk/ui';
 import { CustomFieldsSection, validateCustomFieldValues, type CustomFieldValues } from '../../_components/custom-fields-section';
-import { useCreateContact, useCustomFieldDefinitions, useUpdateContact } from '../../_lib/hooks';
+import { useCreateContact, useCustomFieldDefinitions, useSites, useUpdateContact } from '../../_lib/hooks';
 import type { Contact } from '../../_lib/types';
+
+const NO_SITE = '__none';
 
 const contactFormSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -33,6 +40,7 @@ const contactFormSchema = z.object({
   phone: z.string(),
   title: z.string(),
   isPrimary: z.boolean(),
+  siteId: z.string(),
 });
 
 type ContactFormValues = z.infer<typeof contactFormSchema>;
@@ -45,6 +53,7 @@ function defaultsFor(contact?: Contact): ContactFormValues {
     phone: contact?.phone ?? '',
     title: contact?.title ?? '',
     isPrimary: contact?.isPrimary ?? false,
+    siteId: contact?.siteId ?? NO_SITE,
   };
 }
 
@@ -69,6 +78,7 @@ export function ContactFormDialog({
   });
 
   const { data: customFieldDefinitions } = useCustomFieldDefinitions('CONTACT');
+  const { data: sites } = useSites(accountId);
   const [customFields, setCustomFields] = React.useState<CustomFieldValues>(contact?.customFields ?? {});
   React.useEffect(() => {
     setCustomFields(contact?.customFields ?? {});
@@ -92,6 +102,7 @@ export function ContactFormDialog({
       phone: values.phone || undefined,
       title: values.title || undefined,
       isPrimary: values.isPrimary,
+      siteId: values.siteId === NO_SITE ? undefined : values.siteId,
       customFields: hasActiveCustomFields ? customFields : undefined,
     };
     if (isEdit && contact) {
@@ -180,6 +191,33 @@ export function ContactFormDialog({
                 </FormItem>
               )}
             />
+            {accountId && sites && sites.length > 0 ? (
+              <FormField
+                control={form.control}
+                name="siteId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Site</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={NO_SITE}>No specific site</SelectItem>
+                        {sites.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : null}
             <FormField
               control={form.control}
               name="isPrimary"

@@ -80,6 +80,8 @@ export class AccountsController {
         contacts: {
           select: { id: true, firstName: true, lastName: true, email: true, phone: true, title: true, isPrimary: true },
         },
+        parentAccount: { select: { id: true, name: true } },
+        subAccounts: { select: { id: true, name: true } },
         _count: { select: { opportunities: true, tasks: true, policies: true, activities: true, relationshipsAsA: true, relationshipsAsB: true } },
       },
     });
@@ -299,10 +301,12 @@ export class AccountsController {
   @RequirePermission('account', 'read')
   @ApiOkResponse({ type: [AccountRelationshipResponseDto] })
   async listRelationships(@Param('id') id: string): Promise<AccountRelationshipResponseDto[]> {
-    return getPrismaClient().accountRelationship.findMany({
+    const rows = await getPrismaClient().accountRelationship.findMany({
       where: { OR: [{ accountAId: id }, { accountBId: id }] },
+      include: { accountA: { select: { name: true } }, accountB: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
     });
+    return rows.map(({ accountA, accountB, ...rest }) => ({ ...rest, accountAName: accountA.name, accountBName: accountB.name }));
   }
 
   @Post(':id/relationships')
@@ -313,9 +317,12 @@ export class AccountsController {
     @Body() dto: CreateAccountRelationshipDto,
   ): Promise<AccountRelationshipResponseDto> {
     if (dto.relatedAccountId === id) throw new BadRequestException('An account cannot have a relationship with itself');
-    return getPrismaClient().accountRelationship.create({
+    const row = await getPrismaClient().accountRelationship.create({
       data: { accountAId: id, accountBId: dto.relatedAccountId, relationshipType: dto.relationshipType, notes: dto.notes },
+      include: { accountA: { select: { name: true } }, accountB: { select: { name: true } } },
     });
+    const { accountA, accountB, ...rest } = row;
+    return { ...rest, accountAName: accountA.name, accountBName: accountB.name };
   }
 }
 
@@ -331,14 +338,17 @@ export class AccountRelationshipsController {
     const prisma = getPrismaClient();
     const existing = await prisma.accountRelationship.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('AccountRelationship not found');
-    return prisma.accountRelationship.update({
+    const row = await prisma.accountRelationship.update({
       where: { id },
       data: {
         relationshipType: dto.relationshipType,
         notes: dto.notes,
         accountBId: dto.relatedAccountId,
       },
+      include: { accountA: { select: { name: true } }, accountB: { select: { name: true } } },
     });
+    const { accountA, accountB, ...rest } = row;
+    return { ...rest, accountAName: accountA.name, accountBName: accountB.name };
   }
 
   @Delete(':id')

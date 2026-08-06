@@ -26,6 +26,11 @@ class ContactSummaryDto {
   @ApiProperty() isPrimary!: boolean;
 }
 
+class AccountRefDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() name!: string;
+}
+
 class AccountCountsDto {
   @ApiProperty() contacts!: number;
   @ApiProperty() opportunities!: number;
@@ -55,6 +60,12 @@ export class AccountDetailResponseDto extends AccountResponseDto {
   @ApiProperty({ type: [ContactSummaryDto] }) contacts!: ContactSummaryDto[];
   @ApiProperty({ type: AccountCountsDto }) counts!: AccountCountsDto;
   @ApiProperty({ type: AccountFinancialsDto }) financials!: AccountFinancialsDto;
+  // id+name only — full hierarchy detail is its own resource
+  // (GET .../relationships) the same way version history/renewal schedule
+  // already stay out of this response's shape (see the comment on the old
+  // findOne() this endpoint superseded).
+  @ApiProperty({ type: AccountRefDto, nullable: true }) parentAccount!: { id: string; name: string } | null;
+  @ApiProperty({ type: [AccountRefDto] }) subAccounts!: { id: string; name: string }[];
 }
 
 /** GET /crm/accounts/:id/renewals — every policy on the account joined with its RenewalSchedule (if any), for the account-level renewal overview. */

@@ -16,7 +16,9 @@ export class UpdateAccountRelationshipDto extends PartialType(CreateAccountRelat
 export class AccountRelationshipResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() accountAId!: string;
+  @ApiProperty() accountAName!: string;
   @ApiProperty() accountBId!: string;
+  @ApiProperty() accountBName!: string;
   @ApiProperty() relationshipType!: string;
   @ApiProperty({ nullable: true }) notes!: string | null;
   @ApiProperty() createdAt!: Date;

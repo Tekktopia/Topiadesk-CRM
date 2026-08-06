@@ -7,6 +7,7 @@ import type {
   Account,
   AccountDetail,
   AccountQuery,
+  AccountRelationship,
   AccountRenewalRow,
   AccountSlaOverride,
   Activity,
@@ -22,6 +23,7 @@ import type {
   ConvertLeadInput,
   ConvertLeadResponse,
   CreateAccountInput,
+  CreateAccountRelationshipInput,
   CreateActivityInput,
   CreateCarrierInput,
   CreateContactInput,
@@ -31,6 +33,7 @@ import type {
   CreateOpportunityInput,
   CreateSalesQuotaInput,
   CreateSavedViewInput,
+  CreateSiteInput,
   CreateTaskInput,
   CustomFieldDefinition,
   CustomFieldEntityType,
@@ -51,9 +54,11 @@ import type {
   SalesQuota,
   SavedView,
   SavedViewEntityType,
+  Site,
   Task,
   TaskQuery,
   UpdateAccountInput,
+  UpdateAccountRelationshipInput,
   UpdateCarrierInput,
   UpdateContactInput,
   UpdateCustomFieldDefinitionInput,
@@ -62,6 +67,7 @@ import type {
   UpdateOpportunityStageInput,
   UpdateSalesQuotaInput,
   UpdateSavedViewInput,
+  UpdateSiteInput,
   UpdateTaskInput,
 } from './types';
 
@@ -178,6 +184,61 @@ export function useAccountsLookup() {
 }
 
 // ---------------------------------------------------------------------------
+// Account relationships — lateral (non-hierarchy) links between accounts,
+// e.g. referral source, competitor, joint venture. account.parentAccountId/
+// subAccounts (already on AccountDetail) is the separate direct-hierarchy
+// FK, not this table.
+// ---------------------------------------------------------------------------
+
+export function useAccountRelationships(accountId: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'accounts', accountId, 'relationships'],
+    queryFn: () => apiFetch<AccountRelationship[]>(`/api/crm/accounts/${accountId}/relationships`),
+    enabled: Boolean(accountId),
+  });
+}
+
+export function useCreateAccountRelationship(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateAccountRelationshipInput) =>
+      apiFetch<AccountRelationship>(`/api/crm/accounts/${accountId}/relationships`, { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts', accountId, 'relationships'] });
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts', accountId] });
+      toast.success('Relationship added');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useUpdateAccountRelationship(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateAccountRelationshipInput }) =>
+      apiFetch<AccountRelationship>(`/api/crm/account-relationships/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts', accountId, 'relationships'] });
+      toast.success('Relationship updated');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useDeleteAccountRelationship(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<{ deleted: boolean }>(`/api/crm/account-relationships/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts', accountId, 'relationships'] });
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts', accountId] });
+      toast.success('Relationship removed');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Contacts
 // ---------------------------------------------------------------------------
 
@@ -225,6 +286,56 @@ export function useDeleteContact(accountId?: string) {
       queryClient.invalidateQueries({ queryKey: ['crm', 'contacts'] });
       if (accountId) queryClient.invalidateQueries({ queryKey: ['crm', 'accounts', accountId] });
       toast.success('Contact removed');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Sites — an account's branches/locations, nested under crm/accounts/:id/sites
+// ---------------------------------------------------------------------------
+
+export function useSites(accountId: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'accounts', accountId, 'sites'],
+    queryFn: () => apiFetch<Site[]>(`/api/crm/accounts/${accountId}/sites`),
+    enabled: Boolean(accountId),
+  });
+}
+
+export function useCreateSite(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateSiteInput) =>
+      apiFetch<Site>(`/api/crm/accounts/${accountId}/sites`, { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts', accountId, 'sites'] });
+      toast.success('Site added');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useUpdateSite(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateSiteInput }) =>
+      apiFetch<Site>(`/api/crm/accounts/${accountId}/sites/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts', accountId, 'sites'] });
+      toast.success('Site updated');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useDeleteSite(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<{ deleted: boolean }>(`/api/crm/accounts/${accountId}/sites/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts', accountId, 'sites'] });
+      toast.success('Site removed');
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
