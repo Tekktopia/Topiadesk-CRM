@@ -45,6 +45,19 @@ enum CarrierType {
   BOTH
 }
 
+/// Was a free-text string (seeded data only ever used "ACTIVE", kept as a
+/// label here so the migration is a straight cast, no data remap needed) —
+/// no filtering/reporting by panel state and no consistent badge on the
+/// carriers list. A carrier moves through a real onboarding lifecycle
+/// (being evaluated -> actively placing business with -> put on hold -> no
+/// longer used), which this now models explicitly.
+enum CarrierPanelStatus {
+  PROSPECTIVE
+  ACTIVE
+  SUSPENDED
+  TERMINATED
+}
+
 enum PermissionScope {
   OWN
   DEPARTMENT
@@ -192,6 +205,7 @@ enum DocumentEntityType {
   TASK
   CLAIM
   CASE
+  CARRIER
 }
 
 enum RetentionAction {
@@ -695,10 +709,10 @@ model Carrier {
   id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name            String
   carrierType     CarrierType @map("carrier_type")
-  amBestRating    String?     @map("am_best_rating")
-  linesOfBusiness String[]    @map("lines_of_business")
-  panelStatus     String?     @map("panel_status")
-  treatyType      String?     @map("treaty_type")
+  amBestRating    String?             @map("am_best_rating")
+  linesOfBusiness String[]            @map("lines_of_business")
+  panelStatus     CarrierPanelStatus? @map("panel_status")
+  treatyType      String?             @map("treaty_type")
   commissionTerms String?     @map("commission_terms")
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)

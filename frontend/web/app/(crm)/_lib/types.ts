@@ -198,13 +198,15 @@ export type UpdateSiteInput = Partial<CreateSiteInput>;
 
 // -- Carriers ---------------------------------------------------------------
 
+export type CarrierPanelStatus = 'PROSPECTIVE' | 'ACTIVE' | 'SUSPENDED' | 'TERMINATED';
+
 export interface Carrier {
   id: string;
   name: string;
   carrierType: 'INSURER' | 'REINSURER' | 'BOTH';
   amBestRating: string | null;
   linesOfBusiness: string[];
-  panelStatus: string | null;
+  panelStatus: CarrierPanelStatus | null;
   treatyType: string | null;
   commissionTerms: string | null;
   createdAt: string;
@@ -212,6 +214,41 @@ export interface Carrier {
 
 export type CreateCarrierInput = Paths['/crm/carriers']['post']['requestBody']['content']['application/json'];
 export type UpdateCarrierInput = Paths['/crm/carriers/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** GET /crm/carriers/:id/policies */
+export interface CarrierPolicyRow {
+  id: string;
+  policyNumber: string;
+  accountId: string;
+  accountName: string;
+  lineOfBusiness: string;
+  status: string;
+  sumInsured: string | null;
+  currency: string;
+  expiryDate: string;
+}
+
+/** GET /crm/carriers/:id/market-submissions */
+export interface CarrierMarketSubmissionRow {
+  id: string;
+  opportunityId: string;
+  opportunityName: string;
+  quotedPremium: string | null;
+  status: 'SUBMITTED' | 'DECLINED' | 'QUOTED' | 'BOUND';
+  submittedAt: string;
+  respondedAt: string | null;
+}
+
+/** GET /crm/carriers/:id/scorecard */
+export interface CarrierScorecard {
+  totalSubmissions: number;
+  totalBound: number;
+  bindRatio: number | null;
+  avgResponseDays: number | null;
+  totalGrossPremium: string | null;
+  totalSettledClaims: string | null;
+  lossRatio: number | null;
+}
 
 // -- Leads ------------------------------------------------------------------
 

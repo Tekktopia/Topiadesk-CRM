@@ -756,6 +756,54 @@ export interface paths {
         patch: operations["AccountsController_update"];
         trace?: never;
     };
+    "/crm/accounts/{id}/renewals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AccountsController_listRenewals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/accounts/{id}/sla-overrides": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AccountsController_listSlaOverrides"];
+        put: operations["AccountsController_upsertSlaOverride"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/accounts/{id}/sla-overrides/{entityType}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["AccountsController_removeSlaOverride"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/crm/accounts/bulk/assign": {
         parameters: {
             query?: never;
@@ -994,6 +1042,54 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["CarriersController_update"];
+        trace?: never;
+    };
+    "/crm/carriers/{id}/policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CarriersController_listPolicies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/carriers/{id}/market-submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CarriersController_listMarketSubmissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/carriers/{id}/scorecard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CarriersController_getScorecard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/crm/leads": {
@@ -1620,6 +1716,70 @@ export interface paths {
         patch: operations["AutomationRulesController_update"];
         trace?: never;
     };
+    "/crm/accounts/{accountId}/sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SitesController_list"];
+        put?: never;
+        post: operations["SitesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/accounts/{accountId}/sites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["SitesController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["SitesController_update"];
+        trace?: never;
+    };
+    "/policies/approval-threshold-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ApprovalThresholdRulesController_list"];
+        put?: never;
+        post: operations["ApprovalThresholdRulesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/policies/approval-threshold-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ApprovalThresholdRulesController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["ApprovalThresholdRulesController_update"];
+        trace?: never;
+    };
     "/policies": {
         parameters: {
             query?: never;
@@ -1630,6 +1790,38 @@ export interface paths {
         get: operations["PolicyController_list"];
         put?: never;
         post: operations["PolicyController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/policies/bulk/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PolicyController_bulkAssign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/policies/bulk/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PolicyController_bulkUpdate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1732,6 +1924,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/premiums/bulk/mark-paid": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PremiumController_bulkMarkPaid"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/premiums/{id}": {
         parameters: {
             query?: never;
@@ -1806,6 +2014,38 @@ export interface paths {
         get: operations["DocumentsController_list"];
         put?: never;
         post: operations["DocumentsController_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documents/bulk/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DocumentsController_bulkArchive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documents/bulk/categorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DocumentsController_bulkCategorize"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2420,6 +2660,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/claims/bulk/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ClaimsController_bulkAssign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/claims/bulk/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ClaimsController_bulkUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/claims/{id}": {
         parameters: {
             query?: never;
@@ -2574,6 +2846,38 @@ export interface paths {
         get: operations["CasesController_count"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/bulk/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CasesController_bulkAssign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/bulk/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CasesController_bulkUpdate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4260,6 +4564,182 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portal/auth/request-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PortalAuthController_requestLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/auth/consume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PortalAuthController_consume"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PortalAuthController_logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PortalController_getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PortalController_listPolicies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/policies/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PortalController_getPolicy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PortalController_listCases"];
+        put?: never;
+        post: operations["PortalController_createCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/cases/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PortalController_getCase"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/cases/{id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PortalController_listCaseComments"];
+        put?: never;
+        post: operations["PortalController_addCaseComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PortalController_listDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portal/documents/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PortalController_downloadDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4643,6 +5123,16 @@ export interface components {
             activities: number;
             relationships: number;
         };
+        AccountFinancialsDto: {
+            totalSumInsured: Record<string, never> | null;
+            totalGrossPremium: Record<string, never> | null;
+            totalOutstandingPremium: Record<string, never> | null;
+            wonOpportunityValue: Record<string, never> | null;
+        };
+        AccountRefDto: {
+            id: string;
+            name: string;
+        };
         AccountDetailResponseDto: {
             id: string;
             name: string;
@@ -4663,6 +5153,33 @@ export interface components {
             updatedAt: string;
             contacts: components["schemas"]["ContactSummaryDto"][];
             counts: components["schemas"]["AccountCountsDto"];
+            financials: components["schemas"]["AccountFinancialsDto"];
+            parentAccount: components["schemas"]["AccountRefDto"] | null;
+            subAccounts: components["schemas"]["AccountRefDto"][];
+        };
+        AccountRenewalRowDto: {
+            policyId: string;
+            policyNumber: string;
+            policyStatus: string;
+            /** Format: date-time */
+            expiryDate: string;
+            renewalStatus: Record<string, never> | null;
+            renewalDueDate: Record<string, never> | null;
+            nextAlertDueAt: Record<string, never> | null;
+            assignedToId: Record<string, never> | null;
+        };
+        AccountSlaOverrideResponseDto: {
+            id: string;
+            accountId: string;
+            /** @enum {string} */
+            entityType: "CLAIM" | "CASE";
+            slaPolicyId: string;
+            slaPolicyName: string;
+        };
+        UpsertAccountSlaOverrideDto: {
+            /** @enum {string} */
+            entityType: "CLAIM" | "CASE";
+            slaPolicyId: string;
         };
         CreateAccountDto: {
             name: string;
@@ -4744,7 +5261,9 @@ export interface components {
         AccountRelationshipResponseDto: {
             id: string;
             accountAId: string;
+            accountAName: string;
             accountBId: string;
+            accountBName: string;
             relationshipType: string;
             notes: Record<string, never> | null;
             /** Format: date-time */
@@ -4768,6 +5287,7 @@ export interface components {
             id: string;
             accountId: Record<string, never> | null;
             carrierId: Record<string, never> | null;
+            siteId: Record<string, never> | null;
             firstName: string;
             lastName: string;
             email: Record<string, never> | null;
@@ -4783,6 +5303,8 @@ export interface components {
         CreateContactDto: {
             accountId?: string;
             carrierId?: string;
+            /** @description Which of the account's Sites (branches) this contact belongs to, if any */
+            siteId?: string;
             firstName: string;
             lastName: string;
             email?: string;
@@ -4797,6 +5319,8 @@ export interface components {
         UpdateContactDto: {
             accountId?: string;
             carrierId?: string;
+            /** @description Which of the account's Sites (branches) this contact belongs to, if any */
+            siteId?: string;
             firstName?: string;
             lastName?: string;
             email?: string;
@@ -4826,11 +5350,43 @@ export interface components {
             carrierType: string;
             amBestRating: Record<string, never> | null;
             linesOfBusiness: string[];
-            panelStatus: Record<string, never> | null;
+            /** @enum {string|null} */
+            panelStatus: "PROSPECTIVE" | "ACTIVE" | "SUSPENDED" | "TERMINATED" | null;
             treatyType: Record<string, never> | null;
             commissionTerms: Record<string, never> | null;
             /** Format: date-time */
             createdAt: string;
+        };
+        CarrierPolicyRowDto: {
+            id: string;
+            policyNumber: string;
+            accountId: string;
+            accountName: string;
+            lineOfBusiness: string;
+            status: string;
+            sumInsured: Record<string, never> | null;
+            currency: string;
+            /** Format: date-time */
+            expiryDate: string;
+        };
+        CarrierMarketSubmissionRowDto: {
+            id: string;
+            opportunityId: string;
+            opportunityName: string;
+            quotedPremium: Record<string, never> | null;
+            status: string;
+            /** Format: date-time */
+            submittedAt: string;
+            respondedAt: Record<string, never> | null;
+        };
+        CarrierScorecardDto: {
+            totalSubmissions: number;
+            totalBound: number;
+            bindRatio: Record<string, never> | null;
+            avgResponseDays: Record<string, never> | null;
+            totalGrossPremium: Record<string, never> | null;
+            totalSettledClaims: Record<string, never> | null;
+            lossRatio: Record<string, never> | null;
         };
         CreateCarrierDto: {
             name: string;
@@ -4838,7 +5394,8 @@ export interface components {
             carrierType: "INSURER" | "REINSURER" | "BOTH";
             amBestRating?: string;
             linesOfBusiness?: string[];
-            panelStatus?: string;
+            /** @enum {string} */
+            panelStatus?: "PROSPECTIVE" | "ACTIVE" | "SUSPENDED" | "TERMINATED";
             treatyType?: string;
             commissionTerms?: string;
         };
@@ -4848,7 +5405,8 @@ export interface components {
             carrierType?: "INSURER" | "REINSURER" | "BOTH";
             amBestRating?: string;
             linesOfBusiness?: string[];
-            panelStatus?: string;
+            /** @enum {string} */
+            panelStatus?: "PROSPECTIVE" | "ACTIVE" | "SUSPENDED" | "TERMINATED";
             treatyType?: string;
             commissionTerms?: string;
         };
@@ -5465,6 +6023,70 @@ export interface components {
             /** @default true */
             isActive: boolean;
         };
+        SiteResponseDto: {
+            id: string;
+            accountId: string;
+            name: string;
+            addressLine1: Record<string, never> | null;
+            addressLine2: Record<string, never> | null;
+            city: Record<string, never> | null;
+            state: Record<string, never> | null;
+            country: Record<string, never> | null;
+            postalCode: Record<string, never> | null;
+            isPrimary: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateSiteDto: {
+            name: string;
+            addressLine1?: string;
+            addressLine2?: string;
+            city?: string;
+            state?: string;
+            country?: string;
+            postalCode?: string;
+            /** @default false */
+            isPrimary: boolean;
+        };
+        UpdateSiteDto: {
+            name?: string;
+            addressLine1?: string;
+            addressLine2?: string;
+            city?: string;
+            state?: string;
+            country?: string;
+            postalCode?: string;
+            /** @default false */
+            isPrimary: boolean;
+        };
+        ApprovalThresholdRuleResponseDto: {
+            id: string;
+            versionType: string;
+            minAmount: Record<string, never> | null;
+            requiredApprovals: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateApprovalThresholdRuleDto: {
+            /** @enum {string} */
+            versionType: "ISSUANCE" | "ENDORSEMENT" | "RENEWAL" | "CANCELLATION" | "REINSTATEMENT";
+            /** @description Omit for a catch-all rule (no minimum amount). */
+            minAmount?: string;
+            /** @default 1 */
+            requiredApprovals: number;
+        };
+        UpdateApprovalThresholdRuleDto: {
+            /** @enum {string} */
+            versionType?: "ISSUANCE" | "ENDORSEMENT" | "RENEWAL" | "CANCELLATION" | "REINSTATEMENT";
+            /** @description Omit for a catch-all rule (no minimum amount). */
+            minAmount?: string;
+            /** @default 1 */
+            requiredApprovals: number;
+        };
         PolicyResponseDto: {
             id: string;
             policyNumber: string;
@@ -5484,6 +6106,15 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        BulkAssignPoliciesDto: {
+            ids: string[];
+            brokerOfRecordId: string;
+        };
+        BulkUpdatePoliciesDto: {
+            ids: string[];
+            /** @enum {string} */
+            status: "QUOTED" | "BOUND" | "ISSUED" | "ENDORSED" | "CANCELLED" | "LAPSED" | "RENEWED";
         };
         CreatePolicyDto: {
             policyNumber: string;
@@ -5521,6 +6152,8 @@ export interface components {
             createdAt: string;
             approvalStatus?: Record<string, never>;
             applied?: boolean;
+            approvedCount?: number;
+            requiredApprovals?: number;
         };
         CreatePolicyVersionDto: {
             /** @enum {string} */
@@ -5577,6 +6210,9 @@ export interface components {
             agingBucket: string;
             /** Format: date-time */
             refreshedAt: string;
+        };
+        BulkMarkPremiumsPaidDto: {
+            ids: string[];
         };
         UpdatePremiumDto: {
             grossPremium?: string;
@@ -5662,6 +6298,13 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        BulkArchiveDocumentsDto: {
+            ids: string[];
+        };
+        BulkCategorizeDocumentsDto: {
+            ids: string[];
+            categoryId: string;
+        };
         UploadDocumentDto: {
             categoryId?: string;
         };
@@ -5672,7 +6315,7 @@ export interface components {
             id: string;
             documentId: string;
             /** @enum {string} */
-            entityType: "ACCOUNT" | "CONTACT" | "POLICY" | "OPPORTUNITY" | "LEAD" | "TASK" | "CLAIM" | "CASE";
+            entityType: "ACCOUNT" | "CONTACT" | "POLICY" | "OPPORTUNITY" | "LEAD" | "TASK" | "CLAIM" | "CASE" | "CARRIER";
             entityId: string;
             linkedById: string;
             /** Format: date-time */
@@ -5680,7 +6323,7 @@ export interface components {
         };
         CreateDocumentLinkDto: {
             /** @enum {string} */
-            entityType: "ACCOUNT" | "CONTACT" | "POLICY" | "OPPORTUNITY" | "LEAD" | "TASK" | "CLAIM" | "CASE";
+            entityType: "ACCOUNT" | "CONTACT" | "POLICY" | "OPPORTUNITY" | "LEAD" | "TASK" | "CLAIM" | "CASE" | "CARRIER";
             entityId: string;
         };
         ConnectorResponseDto: {
@@ -5825,6 +6468,12 @@ export interface components {
             pipelineValue: string;
             renewalsDueNext90Days: number;
             activeClients: number;
+            /** @description Opportunities with pipelineStage.isWon and actualCloseDate in the current calendar month */
+            wonThisMonthCount: number;
+            /** @description Sum of amount for wonThisMonthCount */
+            wonThisMonthValue: string;
+            /** @description won / (won + lost) among all opportunities with a non-null actualCloseDate, all-time. Null when there are none yet. */
+            winRate: Record<string, never> | null;
         };
         SalesForecastGroupDto: {
             key: string;
@@ -5976,6 +6625,15 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        BulkAssignClaimsDto: {
+            ids: string[];
+            adjusterId: string;
+        };
+        BulkUpdateClaimsDto: {
+            ids: string[];
+            /** @enum {string} */
+            status: "NOTIFIED" | "UNDER_REVIEW" | "ADJUSTED" | "SETTLED" | "REPUDIATED" | "REOPENED" | "WITHDRAWN";
+        };
         ClaimStatusHistoryResponseDto: {
             id: string;
             claimId: string;
@@ -6112,6 +6770,15 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        BulkAssignCasesDto: {
+            ids: string[];
+            assignedToId: string;
+        };
+        BulkUpdateCasesDto: {
+            ids: string[];
+            /** @enum {string} */
+            status: "NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED";
         };
         CreateCaseDto: {
             /** @enum {string} */
@@ -7293,6 +7960,69 @@ export interface components {
             /** @description Signed — positive to grant, negative to claw back */
             points: number;
             reason: string;
+        };
+        RequestPortalLoginLinkDto: {
+            email: string;
+        };
+        ConsumePortalLoginTokenDto: {
+            token: string;
+        };
+        PortalSessionResponseDto: {
+            sessionToken: string;
+            contactName: string;
+            accountName: string;
+        };
+        PortalMeDto: {
+            contactName: string;
+            accountName: string;
+        };
+        PortalPolicyDto: {
+            id: string;
+            policyNumber: string;
+            lineOfBusiness: string;
+            status: string;
+            sumInsured: Record<string, never> | null;
+            currency: string;
+            /** Format: date-time */
+            inceptionDate: string;
+            /** Format: date-time */
+            expiryDate: string;
+        };
+        PortalCaseDto: {
+            id: string;
+            caseNumber: string;
+            caseType: string;
+            subject: string;
+            description?: Record<string, never> | null;
+            status: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreatePortalCaseDto: {
+            /** @enum {string} */
+            caseType: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
+            subject: string;
+            description?: string;
+        };
+        PortalCaseCommentDto: {
+            id: string;
+            subject: string;
+            body?: Record<string, never> | null;
+            direction: string;
+            authorLabel: string;
+            /** Format: date-time */
+            occurredAt: string;
+        };
+        CreatePortalCaseCommentDto: {
+            body: string;
+        };
+        PortalDocumentDto: {
+            id: string;
+            fileName: string;
+            mimeType: string;
+            sizeBytes: number;
+            /** Format: date-time */
+            createdAt: string;
         };
     };
     responses: never;
@@ -9221,6 +9951,93 @@ export interface operations {
             };
         };
     };
+    AccountsController_listRenewals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountRenewalRowDto"][];
+                };
+            };
+        };
+    };
+    AccountsController_listSlaOverrides: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountSlaOverrideResponseDto"][];
+                };
+            };
+        };
+    };
+    AccountsController_upsertSlaOverride: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertAccountSlaOverrideDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountSlaOverrideResponseDto"];
+                };
+            };
+        };
+    };
+    AccountsController_removeSlaOverride: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                entityType: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AccountsController_bulkAssign: {
         parameters: {
             query?: never;
@@ -9736,6 +10553,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CarrierResponseDto"];
+                };
+            };
+        };
+    };
+    CarriersController_listPolicies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierPolicyRowDto"][];
+                };
+            };
+        };
+    };
+    CarriersController_listMarketSubmissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierMarketSubmissionRowDto"][];
+                };
+            };
+        };
+    };
+    CarriersController_getScorecard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierScorecardDto"];
                 };
             };
         };
@@ -11235,11 +12115,190 @@ export interface operations {
             };
         };
     };
+    SitesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteResponseDto"][];
+                };
+            };
+        };
+    };
+    SitesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSiteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteResponseDto"];
+                };
+            };
+        };
+    };
+    SitesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SitesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSiteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteResponseDto"];
+                };
+            };
+        };
+    };
+    ApprovalThresholdRulesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalThresholdRuleResponseDto"][];
+                };
+            };
+        };
+    };
+    ApprovalThresholdRulesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateApprovalThresholdRuleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalThresholdRuleResponseDto"];
+                };
+            };
+        };
+    };
+    ApprovalThresholdRulesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ApprovalThresholdRulesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateApprovalThresholdRuleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalThresholdRuleResponseDto"];
+                };
+            };
+        };
+    };
     PolicyController_list: {
         parameters: {
             query: {
                 status: string;
                 accountId: string;
+                q: string;
             };
             header?: never;
             path?: never;
@@ -11276,6 +12335,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PolicyResponseDto"];
+                };
+            };
+        };
+    };
+    PolicyController_bulkAssign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkAssignPoliciesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    PolicyController_bulkUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUpdatePoliciesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
                 };
             };
         };
@@ -11471,6 +12576,7 @@ export interface operations {
             query: {
                 policyId: string;
                 bucket: string;
+                search: string;
             };
             header?: never;
             path?: never;
@@ -11484,6 +12590,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PremiumAgingRowDto"][];
+                };
+            };
+        };
+    };
+    PremiumController_bulkMarkPaid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkMarkPremiumsPaidDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
                 };
             };
         };
@@ -11647,6 +12776,7 @@ export interface operations {
         parameters: {
             query: {
                 categoryId: string;
+                search: string;
             };
             header?: never;
             path?: never;
@@ -11683,6 +12813,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentResponseDto"];
+                };
+            };
+        };
+    };
+    DocumentsController_bulkArchive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkArchiveDocumentsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    DocumentsController_bulkCategorize: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkCategorizeDocumentsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
                 };
             };
         };
@@ -12664,6 +13840,52 @@ export interface operations {
             };
         };
     };
+    ClaimsController_bulkAssign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkAssignClaimsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    ClaimsController_bulkUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUpdateClaimsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
     ClaimsController_getOne: {
         parameters: {
             query?: never;
@@ -13056,6 +14278,52 @@ export interface operations {
                     "application/json": {
                         total?: number;
                     };
+                };
+            };
+        };
+    };
+    CasesController_bulkAssign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkAssignCasesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_bulkUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUpdateCasesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkActionResponseDto"];
                 };
             };
         };
@@ -16481,6 +17749,277 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["LoyaltyTransactionResponseDto"];
                 };
+            };
+        };
+    };
+    PortalAuthController_requestLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestPortalLoginLinkDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    PortalAuthController_consume: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsumePortalLoginTokenDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalSessionResponseDto"];
+                };
+            };
+        };
+    };
+    PortalAuthController_logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PortalController_getMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalMeDto"];
+                };
+            };
+        };
+    };
+    PortalController_listPolicies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalPolicyDto"][];
+                };
+            };
+        };
+    };
+    PortalController_getPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalPolicyDto"];
+                };
+            };
+        };
+    };
+    PortalController_listCases: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalCaseDto"][];
+                };
+            };
+        };
+    };
+    PortalController_createCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePortalCaseDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalCaseDto"];
+                };
+            };
+        };
+    };
+    PortalController_getCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalCaseDto"];
+                };
+            };
+        };
+    };
+    PortalController_listCaseComments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalCaseCommentDto"][];
+                };
+            };
+        };
+    };
+    PortalController_addCaseComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePortalCaseCommentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalCaseCommentDto"];
+                };
+            };
+        };
+    };
+    PortalController_listDocuments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalDocumentDto"][];
+                };
+            };
+        };
+    };
+    PortalController_downloadDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

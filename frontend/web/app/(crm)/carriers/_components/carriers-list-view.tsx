@@ -20,7 +20,7 @@ import {
 import { ConfirmDialog } from '../../_components/confirm-dialog';
 import { EmptyState } from '../../_components/empty-state';
 import { PageHeader } from '../../_components/page-header';
-import { carrierTypeLabel } from '../../_lib/constants';
+import { carrierPanelStatusLabel, carrierPanelStatusVariant, carrierTypeLabel } from '../../_lib/constants';
 import { useCarriers, useDeleteCarrier } from '../../_lib/hooks';
 import type { Carrier } from '../../_lib/types';
 import { CarrierFormDialog } from './carrier-form-dialog';
@@ -79,7 +79,12 @@ export function CarriersListView() {
         accessorKey: 'panelStatus',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Panel status" />,
         meta: { label: 'Panel status' },
-        cell: ({ row }) => <span className="text-muted-foreground">{row.original.panelStatus ?? '—'}</span>,
+        cell: ({ row }) =>
+          row.original.panelStatus ? (
+            <Badge variant={carrierPanelStatusVariant(row.original.panelStatus)}>{carrierPanelStatusLabel(row.original.panelStatus)}</Badge>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
       },
       {
         id: 'actions',

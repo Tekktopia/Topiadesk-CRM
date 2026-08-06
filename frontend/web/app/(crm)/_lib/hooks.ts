@@ -16,6 +16,9 @@ import type {
   BulkAssignInput,
   BulkDeleteInput,
   Carrier,
+  CarrierMarketSubmissionRow,
+  CarrierPolicyRow,
+  CarrierScorecard,
   CheckAccountDuplicatesQuery,
   CheckContactOrLeadDuplicatesQuery,
   Contact,
@@ -395,6 +398,30 @@ export function useDeleteCarrier() {
       toast.success('Carrier deleted');
     },
     onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useCarrierPolicies(id: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'carriers', id, 'policies'],
+    queryFn: () => apiFetch<CarrierPolicyRow[]>(`/api/crm/carriers/${id}/policies`),
+    enabled: Boolean(id),
+  });
+}
+
+export function useCarrierMarketSubmissions(id: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'carriers', id, 'market-submissions'],
+    queryFn: () => apiFetch<CarrierMarketSubmissionRow[]>(`/api/crm/carriers/${id}/market-submissions`),
+    enabled: Boolean(id),
+  });
+}
+
+export function useCarrierScorecard(id: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'carriers', id, 'scorecard'],
+    queryFn: () => apiFetch<CarrierScorecard>(`/api/crm/carriers/${id}/scorecard`),
+    enabled: Boolean(id),
   });
 }
 

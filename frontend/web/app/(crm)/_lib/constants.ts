@@ -19,6 +19,9 @@ export type RiskRating = (typeof RISK_RATINGS)[number];
 export const CARRIER_TYPES = ['INSURER', 'REINSURER', 'BOTH'] as const;
 export type CarrierType = (typeof CARRIER_TYPES)[number];
 
+export const CARRIER_PANEL_STATUSES = ['PROSPECTIVE', 'ACTIVE', 'SUSPENDED', 'TERMINATED'] as const;
+export type CarrierPanelStatus = (typeof CARRIER_PANEL_STATUSES)[number];
+
 export const LEAD_SOURCES = ['WEB', 'EMAIL', 'REFERRAL', 'PARTNER', 'SOCIAL', 'PHONE', 'EVENT', 'OTHER'] as const;
 export type LeadSource = (typeof LEAD_SOURCES)[number];
 
@@ -202,6 +205,24 @@ export function activityTypeLabel(type: string): string {
 
 export function carrierTypeLabel(type: string): string {
   return humanize(type);
+}
+
+export function carrierPanelStatusLabel(status: string | null): string {
+  return status ? humanize(status) : 'Not set';
+}
+export function carrierPanelStatusVariant(status: string | null): BadgeVariant {
+  switch (status) {
+    case 'PROSPECTIVE':
+      return 'secondary';
+    case 'ACTIVE':
+      return 'success';
+    case 'SUSPENDED':
+      return 'warning';
+    case 'TERMINATED':
+      return 'destructive';
+    default:
+      return 'outline';
+  }
 }
 
 export { humanize };

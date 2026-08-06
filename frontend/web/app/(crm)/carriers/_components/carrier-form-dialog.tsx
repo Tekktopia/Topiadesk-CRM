@@ -26,16 +26,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@topiadesk/ui';
-import { CARRIER_TYPES, carrierTypeLabel } from '../../_lib/constants';
+import { CARRIER_PANEL_STATUSES, CARRIER_TYPES, carrierPanelStatusLabel, carrierTypeLabel } from '../../_lib/constants';
 import { useCreateCarrier, useUpdateCarrier } from '../../_lib/hooks';
 import type { Carrier } from '../../_lib/types';
+
+const UNSET_PANEL_STATUS = '__unset';
 
 const carrierFormSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   carrierType: z.enum(CARRIER_TYPES),
   amBestRating: z.string(),
   linesOfBusiness: z.string(),
-  panelStatus: z.string(),
+  panelStatus: z.union([z.enum(CARRIER_PANEL_STATUSES), z.literal(UNSET_PANEL_STATUS)]),
   treatyType: z.string(),
   commissionTerms: z.string(),
 });
@@ -48,7 +50,7 @@ function defaultsFor(carrier?: Carrier): CarrierFormValues {
     carrierType: carrier?.carrierType ?? 'INSURER',
     amBestRating: carrier?.amBestRating ?? '',
     linesOfBusiness: carrier?.linesOfBusiness.join(', ') ?? '',
-    panelStatus: carrier?.panelStatus ?? '',
+    panelStatus: carrier?.panelStatus ?? UNSET_PANEL_STATUS,
     treatyType: carrier?.treatyType ?? '',
     commissionTerms: carrier?.commissionTerms ?? '',
   };
@@ -81,7 +83,7 @@ export function CarrierFormDialog({
       linesOfBusiness: values.linesOfBusiness
         ? values.linesOfBusiness.split(',').map((s) => s.trim()).filter(Boolean)
         : undefined,
-      panelStatus: values.panelStatus || undefined,
+      panelStatus: values.panelStatus === UNSET_PANEL_STATUS ? undefined : values.panelStatus,
       treatyType: values.treatyType || undefined,
       commissionTerms: values.commissionTerms || undefined,
     };
@@ -162,9 +164,21 @@ export function CarrierFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Panel status</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. ACTIVE" {...field} />
-                    </FormControl>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={UNSET_PANEL_STATUS}>Not set</SelectItem>
+                        {CARRIER_PANEL_STATUSES.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {carrierPanelStatusLabel(status)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -94,6 +94,13 @@ async function main() {
     // loyalty_transactions_rw's WITH CHECK (both join through the enrolled
     // Account, same OWN/DEPARTMENT/BRANCH/ALL tiering as 'account' itself).
     'loyalty',
+    // Carriers/enterprise pass — carriers.controller.ts used to reuse
+    // 'account' write for lack of its own resource (see that controller's
+    // header comment, now stale). carriers has no RLS (open supply-side
+    // reference data, like case_categories above), so scope tier here is
+    // only meaningful to PermissionGuard's coarse "does a grant exist at
+    // all" check, not row-level filtering.
+    'carrier',
   ] as const;
   const actions = ['read', 'write'] as const;
   const scopes = ['OWN', 'DEPARTMENT', 'BRANCH', 'ALL'] as const;
@@ -155,6 +162,10 @@ async function main() {
       // ALL scope here isn't a scoping leak: campaigns_rw itself has no
       // narrower tier to grant (see the 'campaign' resource comment above).
       ['campaign', 'read', 'ALL'], ['campaign', 'write', 'ALL'],
+      // Carrier panel management (onboarding a new market, updating panel
+      // status/commission terms) is a department-head-level action, same
+      // tier as this role's other supply-side-adjacent grants.
+      ['carrier', 'write', 'DEPARTMENT'],
     ],
   );
   const accountHandlerRole = await grantRole(
@@ -192,6 +203,12 @@ async function main() {
       // 'sla_config' has no write grant here — creating/editing this
       // config stays admin-only.
       ['sla_config', 'read', 'ALL'],
+      // Preserves pre-existing behavior: brokers already have 'account':
+      // write:OWN, which is what let them create/edit carriers before this
+      // resource existed (carriers.controller.ts's stale reuse of
+      // 'account'). A front-line broker routinely needs to add a new
+      // market they've started placing business with.
+      ['carrier', 'write', 'OWN'],
     ],
   );
   const complianceRole = await grantRole('COMPLIANCE_OFFICER', 'Audit, approvals, and regulatory oversight', true, [
@@ -203,7 +220,7 @@ async function main() {
     // run. See backend/api/src/modules/policy/policy-version.controller.ts's
     // /decision endpoint.
     ['policy', 'write', 'ALL'],
-    ['audit_log', 'read', 'ALL'], ['ai_usage', 'read', 'ALL'], ['document', 'read', 'ALL'],
+    ['audit_log', 'read', 'ALL'], ['ai_usage', 'read', 'ALL'], ['document', 'read', 'ALL'], ['carrier', 'read', 'ALL'],
     // Read-only user/role directory visibility for oversight — not write,
     // consistent with this role's other grants being read-heavy.
     ['identity', 'read', 'ALL'],
