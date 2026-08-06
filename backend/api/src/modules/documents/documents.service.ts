@@ -142,9 +142,12 @@ export class DocumentsService {
     return document;
   }
 
-  async list(categoryId?: string): Promise<DocumentWithCurrentVersion[]> {
+  async list(categoryId?: string, search?: string): Promise<DocumentWithCurrentVersion[]> {
     return getPrismaClient().document.findMany({
-      where: categoryId ? { categoryId } : undefined,
+      where: {
+        ...(categoryId ? { categoryId } : {}),
+        ...(search ? { fileName: { contains: search, mode: 'insensitive' } } : {}),
+      },
       include: { currentVersion: true },
       orderBy: { createdAt: 'desc' },
       take: 100,

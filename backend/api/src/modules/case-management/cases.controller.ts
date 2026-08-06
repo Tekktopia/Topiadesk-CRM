@@ -14,6 +14,8 @@ import { WatchersService } from './watchers.service';
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { MacrosService } from './macros.service';
 import {
+  BulkAssignCasesDto,
+  BulkUpdateCasesDto,
   CaseQueryDto,
   CaseQueueQueryDto,
   CaseResponseDto,
@@ -26,12 +28,15 @@ import {
 import { AddWatcherDto, CaseWatcherResponseDto } from './dto/case-watcher.dto';
 import { CommentResponseDto, CreateCommentDto } from './dto/comment.dto';
 import { ApplyMacroResponseDto } from './dto/macro.dto';
+import { BulkActionResponseDto } from './dto/bulk-action.dto';
 import { CaseClosureApprovalResponseDto, DecideCaseClosureDto, RequestCaseClosureDto } from './dto/case-closure.dto';
 import { applyCaseStatusTransition } from './status-transition.util';
 import { assertValidCaseTransition } from './case-lifecycle';
 import { ensureCaseSlaClocks } from './sla-clock.util';
 import { enqueueEntityEvent } from './automation-events.util';
 import { findMatchingAssignmentRule, resolveNextAssignee } from './assignment-resolver.util';
+import { buildCaseOrderBy, buildCaseWhere } from './case-query.util';
+import { diffBulkIds } from './bulk-actions';
 
 function generateCaseNumber(): string {
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -66,20 +71,80 @@ export class CasesController {
   @Get()
   @RequirePermission('case', 'read')
   @ApiOkResponse({ type: [CaseResponseDto] })
-  async list(@Query() query: CaseQueryDto): Promise<CaseResponseDto[]> {
+  async list(@Query() query: CaseQueryDto, @CurrentUser() user: AuthenticatedUser): Promise<CaseResponseDto[]> {
+    const where = await buildCaseWhere(query, user.id);
     return getPrismaClient().case.findMany({
-      where: {
-        status: query.status,
-        priority: query.priority,
-        caseType: query.caseType,
-        assignedToId: query.assignedToId,
-        assignedTeamId: query.assignedTeamId,
-        accountId: query.accountId,
-        categoryId: query.categoryId,
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
+      where,
+      orderBy: buildCaseOrderBy(query),
+      skip: query.skip,
+      take: query.take ?? 100,
     });
+  }
+
+  /** Same filter-building as list() (see case-query.util.ts's header comment) — kept as a separate endpoint rather than a `{total, rows}` wrapper around list() specifically so GET /cases's existing Case[] response shape never changes for callers that already rely on it. */
+  @Get('count')
+  @RequirePermission('case', 'read')
+  @ApiOkResponse({ schema: { type: 'object', properties: { total: { type: 'number' } } } })
+  async count(@Query() query: CaseQueryDto, @CurrentUser() user: AuthenticatedUser): Promise<{ total: number }> {
+    const where = await buildCaseWhere(query, user.id);
+    const total = await getPrismaClient().case.count({ where });
+    return { total };
+  }
+
+  /**
+   * Real bulk endpoints — previously the ticket workspace fanned out one
+   * PATCH/POST per selected row client-side (see (cases)/_lib/hooks.ts's
+   * settleAndReport, kept as the pattern's own header comment explained:
+   * "no bulk/* endpoint exists"). This is that endpoint. RLS-invisible ids
+   * land in `skipped` via diffBulkIds, same contract as CRM's bulk
+   * endpoints (crm/bulk-actions.ts).
+   */
+  @Post('bulk/assign')
+  @RequirePermission('case', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkAssign(@Body() dto: BulkAssignCasesDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.case.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((c) => c.id));
+    if (matched.length > 0) {
+      await prisma.case.updateMany({ where: { id: { in: matched } }, data: { assignedToId: dto.assignedToId } });
+      await Promise.all(
+        matched.map((id) =>
+          enqueueEntityEvent({ entityType: 'CASE', entityId: id, eventType: 'ASSIGNED', occurredAt: new Date().toISOString() }).catch(() => undefined),
+        ),
+      );
+    }
+    return { requested: dto.ids, updated: matched, skipped };
+  }
+
+  /**
+   * Unlike CRM's bulk/update (a raw updateMany over generic fields), each
+   * row here goes through applyCaseStatusTransition individually — status
+   * has a real state machine (case-lifecycle.ts) a batch update must not
+   * bypass. A row whose current status can't reach `dto.status` fails for
+   * that row alone and is reported in `skipped`, never silently applied or
+   * left to abort the whole batch.
+   */
+  @Post('bulk/update')
+  @RequirePermission('case', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkUpdate(@Body() dto: BulkUpdateCasesDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.case.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched: visibleIds, skipped: invisible } = diffBulkIds(dto.ids, visible.map((c) => c.id));
+
+    const updated: string[] = [];
+    const failed: string[] = [];
+    for (const id of visibleIds) {
+      try {
+        const kase = await applyCaseStatusTransition(id, dto.status);
+        updated.push(id);
+        await enqueueEntityEvent({ entityType: 'CASE', entityId: id, eventType: 'STATUS_CHANGED', occurredAt: kase.updatedAt.toISOString() }).catch(() => undefined);
+      } catch {
+        failed.push(id);
+      }
+    }
+    return { requested: dto.ids, updated, skipped: [...invisible, ...failed] };
   }
 
   // 'mine'/'queue' must precede ':id' — Nest matches literal segments in

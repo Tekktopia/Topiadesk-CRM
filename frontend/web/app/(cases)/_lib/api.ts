@@ -43,11 +43,15 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
-/** Builds a `?a=1&b=2` query string, dropping undefined/null/empty values. */
-export function buildQuery(params: Record<string, string | number | boolean | undefined | null>): string {
+/** Builds a `?a=1&b=2` query string, dropping undefined/null/empty values. Array values are appended once per entry (`?a=1&a=2`), matching how CaseQueryDto's array params (assignedToIds, statuses, ...) parse a repeated key. */
+export function buildQuery(params: Record<string, string | number | boolean | string[] | undefined | null>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null || value === '') continue;
+    if (Array.isArray(value)) {
+      for (const item of value) search.append(key, item);
+      continue;
+    }
     search.set(key, String(value));
   }
   const qs = search.toString();

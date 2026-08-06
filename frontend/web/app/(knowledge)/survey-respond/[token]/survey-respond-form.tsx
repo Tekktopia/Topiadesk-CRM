@@ -30,7 +30,7 @@ export function SurveyRespondForm({ responseId, respondToken }: { responseId: st
 
   if (submitMutation.isSuccess) {
     return (
-      <div className="w-full rounded-xl border border-border bg-card p-8 text-center shadow-brand-sm">
+      <div className="w-full rounded-none border border-border bg-card p-8 text-center shadow-brand-sm">
         <CheckCircle2 className="mx-auto h-10 w-10 text-success" aria-hidden />
         <h1 className="mt-3 text-lg font-semibold text-foreground">Thank you for your feedback</h1>
         <p className="mt-1 text-sm text-muted-foreground">Your response has been recorded.</p>
@@ -43,7 +43,7 @@ export function SurveyRespondForm({ responseId, respondToken }: { responseId: st
 
   if (alreadySubmitted) {
     return (
-      <div className="w-full rounded-xl border border-border bg-card p-8 text-center shadow-brand-sm">
+      <div className="w-full rounded-none border border-border bg-card p-8 text-center shadow-brand-sm">
         <CheckCircle2 className="mx-auto h-10 w-10 text-success" aria-hidden />
         <h1 className="mt-3 text-lg font-semibold text-foreground">You&apos;ve already responded</h1>
         <p className="mt-1 text-sm text-muted-foreground">This feedback link has already been used — thank you again for your response.</p>
@@ -53,7 +53,7 @@ export function SurveyRespondForm({ responseId, respondToken }: { responseId: st
 
   if (notFound) {
     return (
-      <div className="w-full rounded-xl border border-border bg-card p-8 text-center shadow-brand-sm">
+      <div className="w-full rounded-none border border-border bg-card p-8 text-center shadow-brand-sm">
         <h1 className="text-lg font-semibold text-foreground">This link is no longer valid</h1>
         <p className="mt-1 text-sm text-muted-foreground">Please contact us if you believe this is a mistake.</p>
       </div>
@@ -61,7 +61,7 @@ export function SurveyRespondForm({ responseId, respondToken }: { responseId: st
   }
 
   return (
-    <form className="w-full space-y-5 rounded-xl border border-border bg-card p-8 shadow-brand-sm" onSubmit={handleSubmit}>
+    <form className="w-full space-y-5 rounded-none border border-border bg-card p-8 shadow-brand-sm" onSubmit={handleSubmit}>
       <div>
         <h1 className="text-lg font-semibold text-foreground">Share your feedback</h1>
         <p className="mt-1 text-sm text-muted-foreground">We&apos;d love to hear how we did. This only takes a moment.</p>

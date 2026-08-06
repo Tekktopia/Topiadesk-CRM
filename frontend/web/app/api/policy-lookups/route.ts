@@ -16,6 +16,11 @@ interface PolicyRow {
   id: string;
   policyNumber: string;
 }
+interface ContactRow {
+  id: string;
+  firstName: string;
+  lastName: string;
+}
 
 /**
  * GET /api/policy-lookups — id/name lookups for the Policies filter bar
@@ -32,24 +37,30 @@ interface PolicyRow {
  * — extended rather than duplicated per that module's build brief, additive
  * only so every existing `accounts`/`carriers` consumer is unaffected.
  */
-export async function GET(): Promise<NextResponse<{ accounts: LookupOption[]; carriers: LookupOption[]; policies: LookupOption[] }>> {
+export async function GET(): Promise<NextResponse<{ accounts: LookupOption[]; carriers: LookupOption[]; policies: LookupOption[]; contacts: LookupOption[] }>> {
   try {
-    const [accountsRes, carriersRes, policiesRes] = await Promise.all([
+    const [accountsRes, carriersRes, policiesRes, contactsRes] = await Promise.all([
       fetchApi('/crm/accounts?take=200'),
       fetchApi('/crm/carriers'),
       fetchApi('/policies'),
+      fetchApi('/crm/contacts'),
     ]);
     const accounts: LookupOption[] = accountsRes.ok ? ((await accountsRes.json()) as AccountRow[]).map((a) => ({ id: a.id, name: a.name })) : [];
     const carriers: LookupOption[] = carriersRes.ok ? ((await carriersRes.json()) as CarrierRow[]).map((c) => ({ id: c.id, name: c.name })) : [];
     const policies: LookupOption[] = policiesRes.ok
       ? ((await policiesRes.json()) as PolicyRow[]).map((p) => ({ id: p.id, name: p.policyNumber }))
       : [];
-    return NextResponse.json({ accounts, carriers, policies });
+    // Ticket workspace's card requester line (contact/account name) — same
+    // "extend rather than duplicate" precedent as `policies` above.
+    const contacts: LookupOption[] = contactsRes.ok
+      ? ((await contactsRes.json()) as ContactRow[]).map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}`.trim() }))
+      : [];
+    return NextResponse.json({ accounts, carriers, policies, contacts });
   } catch (err) {
     if (err instanceof ApiUnauthenticatedError) {
-      return NextResponse.json({ accounts: [], carriers: [], policies: [] }, { status: 401 });
+      return NextResponse.json({ accounts: [], carriers: [], policies: [], contacts: [] }, { status: 401 });
     }
     console.error('[policy-lookups] failed', err);
-    return NextResponse.json({ accounts: [], carriers: [], policies: [] }, { status: 200 });
+    return NextResponse.json({ accounts: [], carriers: [], policies: [], contacts: [] }, { status: 200 });
   }
 }

@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 /**
  * GET /api/policies — same-origin proxy for GET /policies (see
  * backend/api/src/modules/policy/policy.controller.ts). Forwards the
- * `status`/`accountId` filters the list page's filter bar sets; the
+ * `status`/`accountId`/`q` filters the list page's filter bar sets; the
  * upstream endpoint already caps at 100 rows ordered by expiryDate asc.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -15,8 +15,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const qs = new URLSearchParams();
   const status = searchParams.get('status');
   const accountId = searchParams.get('accountId');
+  const q = searchParams.get('q');
   if (status) qs.set('status', status);
   if (accountId) qs.set('accountId', accountId);
+  if (q) qs.set('q', q);
   const query = qs.toString();
   return proxyJson(`/policies${query ? `?${query}` : ''}`);
 }

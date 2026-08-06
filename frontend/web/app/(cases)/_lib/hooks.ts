@@ -69,22 +69,16 @@ function errorMessage(err: unknown): string {
 
 type EntityKind = 'claims' | 'cases';
 
-/**
- * No bulk/* endpoint exists on cases.controller.ts/claims.controller.ts
- * (unlike accounts/leads/opportunities.controller.ts's bulk/assign +
- * bulk/delete) and neither entity is deletable at all — so a "bulk" action
- * here fans out one request per selected row via Promise.allSettled and
- * tallies successes/failures for the caller to toast, instead of a single
- * round-trip. Backend is out of scope for this batch (see this batch's own
- * brief), so this fan-out is the pragmatic frontend-only equivalent.
- */
-async function settleAndReport(ids: string[], run: (id: string) => Promise<unknown>): Promise<{ succeeded: number; failed: number }> {
-  const results = await Promise.allSettled(ids.map(run));
-  const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-  return { succeeded, failed: results.length - succeeded };
+/** Response shape shared by every real bulk/* endpoint (cases.controller.ts, claims.controller.ts) — mirrors BulkActionResponseDto. */
+interface BulkActionResult {
+  requested: string[];
+  updated: string[];
+  skipped: string[];
 }
 
-function reportBulkResult(entityLabel: string, verb: string, { succeeded, failed }: { succeeded: number; failed: number }): void {
+function reportBulkResult(entityLabel: string, verb: string, { updated, skipped }: BulkActionResult): void {
+  const succeeded = updated.length;
+  const failed = skipped.length;
   if (failed === 0) {
     toast.success(`${verb} ${succeeded} ${entityLabel}${succeeded === 1 ? '' : 's'}`);
   } else if (succeeded === 0) {
@@ -172,12 +166,12 @@ export function useReopenClaim(id: string) {
   });
 }
 
-/** Fans out one PATCH /claims/:id per selected row (see settleAndReport's header comment — no bulk/* endpoint exists). */
+/** POST /api/claims/bulk/assign — real bulk endpoint (ClaimsController.bulkAssign), replacing the old per-row PATCH fan-out. */
 export function useBulkReassignClaims() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ ids, adjusterId }: { ids: string[]; adjusterId: string }) =>
-      settleAndReport(ids, (id) => apiFetch<Claim>(`/api/claims/${id}`, { method: 'PATCH', body: JSON.stringify({ adjusterId }) })),
+      apiFetch<BulkActionResult>('/api/claims/bulk/assign', { method: 'POST', body: JSON.stringify({ ids, adjusterId }) }),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['claims'] });
       reportBulkResult('claim', 'Reassigned', result);
@@ -193,13 +187,15 @@ export function useBulkReassignClaims() {
  * amount/reason context a bulk action can't safely supply per-row, so this
  * is deliberately "withdraw", not a generic "close". Rows already in a
  * terminal status (SETTLED/REPUDIATED/WITHDRAWN itself) fail server-side
- * (invalid transition) and are reported, not silently skipped.
+ * (invalid transition, ClaimsController.bulkUpdate runs each row through
+ * applyClaimStatusTransition individually) and land in `skipped`, not
+ * silently applied or dropped.
  */
 export function useBulkWithdrawClaims() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (ids: string[]) =>
-      settleAndReport(ids, (id) => apiFetch<Claim>(`/api/claims/${id}/status`, { method: 'POST', body: JSON.stringify({ status: 'WITHDRAWN' }) })),
+      apiFetch<BulkActionResult>('/api/claims/bulk/update', { method: 'POST', body: JSON.stringify({ ids, status: 'WITHDRAWN' }) }),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['claims'] });
       reportBulkResult('claim', 'Withdrew', result);
@@ -216,6 +212,14 @@ export function useCases(query: CaseQuery = {}) {
   return useQuery({
     queryKey: ['cases', query],
     queryFn: () => apiFetch<Case[]>(`/api/cases${buildQuery(query)}`),
+  });
+}
+
+/** Powers the ticket workspace's "a–b of N" pager — GET /cases/count runs the exact same filter-building logic as GET /cases (see case-query.util.ts) so the two can never disagree. */
+export function useCasesCount(query: CaseQuery = {}) {
+  return useQuery({
+    queryKey: ['cases', 'count', query],
+    queryFn: () => apiFetch<{ total: number }>(`/api/cases/count${buildQuery(query)}`),
   });
 }
 
@@ -318,12 +322,12 @@ export function useDecideCaseClosure(id: string) {
   });
 }
 
-/** Fans out one PATCH /cases/:id per selected row (see settleAndReport's header comment — no bulk/* endpoint exists). */
+/** POST /api/cases/bulk/assign — real bulk endpoint (CasesController.bulkAssign), replacing the old per-row PATCH fan-out. */
 export function useBulkReassignCases() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ ids, assignedToId }: { ids: string[]; assignedToId: string }) =>
-      settleAndReport(ids, (id) => apiFetch<Case>(`/api/cases/${id}`, { method: 'PATCH', body: JSON.stringify({ assignedToId }) })),
+      apiFetch<BulkActionResult>('/api/cases/bulk/assign', { method: 'POST', body: JSON.stringify({ ids, assignedToId }) }),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       reportBulkResult('ticket','Reassigned', result);
@@ -332,12 +336,12 @@ export function useBulkReassignCases() {
   });
 }
 
-/** Bulk close: CASE_STATUS_TRANSITIONS allows CLOSED from NEW/OPEN/PENDING_CUSTOMER/PENDING_CARRIER/RESOLVED — rows already CLOSED/REOPENED fail server-side (invalid transition) and are reported, not silently skipped. */
+/** Bulk close: CASE_STATUS_TRANSITIONS allows CLOSED from NEW/OPEN/PENDING_CUSTOMER/PENDING_CARRIER/RESOLVED — CasesController.bulkUpdate runs each row through applyCaseStatusTransition individually, so rows already CLOSED/REOPENED fail server-side (invalid transition) and land in `skipped`, not silently applied or dropped. */
 export function useBulkCloseCases() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (ids: string[]) =>
-      settleAndReport(ids, (id) => apiFetch<Case>(`/api/cases/${id}/status`, { method: 'POST', body: JSON.stringify({ status: 'CLOSED' }) })),
+      apiFetch<BulkActionResult>('/api/cases/bulk/update', { method: 'POST', body: JSON.stringify({ ids, status: 'CLOSED' }) }),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       reportBulkResult('ticket','Closed', result);
@@ -1105,12 +1109,13 @@ export function useTeams() {
 export function usePolicyLookups() {
   const query = useQuery({
     queryKey: ['policy-lookups'],
-    queryFn: () => apiFetch<{ accounts: LookupOption[]; carriers: LookupOption[]; policies: LookupOption[] }>('/api/policy-lookups'),
+    queryFn: () => apiFetch<{ accounts: LookupOption[]; carriers: LookupOption[]; policies: LookupOption[]; contacts: LookupOption[] }>('/api/policy-lookups'),
     staleTime: 60_000,
   });
   return {
     accounts: query.data?.accounts ?? [],
     policies: query.data?.policies ?? [],
+    contacts: query.data?.contacts ?? [],
     isLoading: query.isLoading,
   };
 }

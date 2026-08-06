@@ -17,6 +17,8 @@ import { WatchersService } from './watchers.service';
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { MacrosService } from './macros.service';
 import {
+  BulkAssignClaimsDto,
+  BulkUpdateClaimsDto,
   ChangeClaimStatusDto,
   ClaimQueryDto,
   ClaimResponseDto,
@@ -28,9 +30,11 @@ import {
 import { AddWatcherDto, CaseWatcherResponseDto } from './dto/case-watcher.dto';
 import { CommentResponseDto, CreateCommentDto } from './dto/comment.dto';
 import { ApplyMacroResponseDto } from './dto/macro.dto';
+import { BulkActionResponseDto } from './dto/bulk-action.dto';
 import { applyClaimStatusTransition } from './status-transition.util';
 import { ensureClaimSlaClocks } from './sla-clock.util';
 import { enqueueEntityEvent } from './automation-events.util';
+import { diffBulkIds } from './bulk-actions';
 
 function toClaimDto(claim: Claim): ClaimResponseDto {
   return { ...claim, reserveAmount: decimalToString(claim.reserveAmount), settledAmount: decimalToString(claim.settledAmount) };
@@ -86,6 +90,48 @@ export class ClaimsController {
       orderBy: { createdAt: 'desc' },
     });
     return claims.map(toClaimDto);
+  }
+
+  /** Real bulk endpoints — see cases.controller.ts's bulkAssign/bulkUpdate header comment for the full rationale (same "no bulk/* endpoint exists, client fanned out N requests" gap, same fix, mirrored here). */
+  @Post('bulk/assign')
+  @RequirePermission('claim', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkAssign(@Body() dto: BulkAssignClaimsDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.claim.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((c) => c.id));
+    if (matched.length > 0) {
+      await prisma.claim.updateMany({ where: { id: { in: matched } }, data: { adjusterId: dto.adjusterId } });
+      await Promise.all(
+        matched.map((id) =>
+          enqueueEntityEvent({ entityType: 'CLAIM', entityId: id, eventType: 'UPDATED', occurredAt: new Date().toISOString() }).catch(() => undefined),
+        ),
+      );
+    }
+    return { requested: dto.ids, updated: matched, skipped };
+  }
+
+  /** Each row goes through applyClaimStatusTransition individually (claim-lifecycle.ts's real state machine) — same reasoning as cases.controller.ts's bulkUpdate. */
+  @Post('bulk/update')
+  @RequirePermission('claim', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkUpdate(@Body() dto: BulkUpdateClaimsDto, @CurrentUser() user: AuthenticatedUser): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.claim.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched: visibleIds, skipped: invisible } = diffBulkIds(dto.ids, visible.map((c) => c.id));
+
+    const updated: string[] = [];
+    const failed: string[] = [];
+    for (const id of visibleIds) {
+      try {
+        const claim = await applyClaimStatusTransition(id, dto.status, user.id);
+        updated.push(id);
+        await enqueueEntityEvent({ entityType: 'CLAIM', entityId: id, eventType: 'STATUS_CHANGED', occurredAt: claim.updatedAt.toISOString() }).catch(() => undefined);
+      } catch {
+        failed.push(id);
+      }
+    }
+    return { requested: dto.ids, updated, skipped: [...invisible, ...failed] };
   }
 
   @Get(':id')

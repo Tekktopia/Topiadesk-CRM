@@ -92,10 +92,10 @@ export function ReportLineChart({ result, shape }: { result: ReportResult; shape
                 type="button"
                 tabIndex={0}
                 aria-label={`${p.label}: ${formatReportValue(measureColumn.format, p.value)}`}
-                className="absolute flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-ring"
+                className="absolute flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-none focus:outline-none focus:ring-2 focus:ring-ring"
                 style={{ left: `${p.xPct}%`, top: `${p.yPct}%` }}
               >
-                <span className="h-2 w-2 rounded-full bg-primary ring-2 ring-card" aria-hidden />
+                <span className="h-2 w-2 rounded-none bg-primary ring-2 ring-card" aria-hidden />
               </button>
             </TooltipTrigger>
             <TooltipContent side="top">

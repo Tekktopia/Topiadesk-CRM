@@ -73,7 +73,7 @@ export function KbListView() {
       {articlesQuery.isLoading ? (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-xl" />
+            <Skeleton key={i} className="h-24 w-full rounded-none" />
           ))}
         </div>
       ) : articlesQuery.isError ? (

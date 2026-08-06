@@ -1,12 +1,13 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Briefcase, TrendingUp, CalendarClock, Users } from 'lucide-react';
+import { Briefcase, CalendarClock, Percent, Trophy, TrendingUp, Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, StatTile, Skeleton } from '@topiadesk/ui';
 import { formatNaira } from '@/app/(policy)/lib/format';
 import { CustomDashboardSection } from './custom-dashboard-section';
 import { PipelineFunnelChart } from './pipeline-funnel-chart';
 import { RenewalTimeline } from './renewal-timeline';
+import { SalesForecastPanel } from './sales-forecast-panel';
 import type { PipelineFunnelResponse, RenewalRow } from './types';
 
 interface OperationalKpis {
@@ -14,6 +15,9 @@ interface OperationalKpis {
   pipelineValue: string;
   renewalsDueNext90Days: number;
   activeClients: number;
+  wonThisMonthCount: number;
+  wonThisMonthValue: string;
+  winRate: number | null;
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -53,11 +57,11 @@ export function DashboardView() {
         <p className="text-sm text-muted-foreground">Operational overview — Corporate &amp; Retail Broking, Lagos HQ.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {kpisQuery.isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[104px] w-full rounded-lg" />)
+          Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-[104px] w-full rounded-lg" />)
         ) : kpisQuery.isError || !kpis ? (
-          <Card className="sm:col-span-2 lg:col-span-4">
+          <Card className="sm:col-span-2 lg:col-span-3 xl:col-span-6">
             <CardContent className="py-6 text-sm text-destructive">Couldn&apos;t load operational KPIs.</CardContent>
           </Card>
         ) : (
@@ -81,6 +85,18 @@ export function DashboardView() {
               description="across all policies"
             />
             <StatTile label="Active clients" value={kpis.activeClients} icon={<Users />} description="accounts on CLIENT status" />
+            <StatTile
+              label="Won this month"
+              value={kpis.wonThisMonthCount}
+              icon={<Trophy />}
+              description={formatNaira(kpis.wonThisMonthValue)}
+            />
+            <StatTile
+              label="Win rate"
+              value={kpis.winRate === null ? '—' : `${Math.round(kpis.winRate * 100)}%`}
+              icon={<Percent />}
+              description="won vs. decided, all-time"
+            />
           </>
         )}
       </div>
@@ -118,6 +134,16 @@ export function DashboardView() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Sales forecast</CardTitle>
+          <CardDescription>Weighted pipeline for the current period, by owner, stage, or line of business.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SalesForecastPanel />
+        </CardContent>
+      </Card>
 
       <CustomDashboardSection />
     </div>

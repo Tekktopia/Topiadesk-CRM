@@ -3,9 +3,10 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, UserCog, XCircle } from 'lucide-react';
 import {
   Badge,
+  Button,
   type ColumnDef,
   DataTable,
   DataTableColumnHeader,
@@ -16,15 +17,40 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  selectionColumn,
+  toast,
 } from '@topiadesk/ui';
 import { formatDate, formatNaira, policyStatusVariant } from '@/app/(policy)/lib/format';
 import { POLICY_STATUSES, type LookupOption, type PolicyDto } from '@/app/(policy)/lib/types';
+import { useDebouncedValue } from '@/app/(policy)/lib/use-debounced-value';
+import { ConfirmDialog } from '../_components/confirm-dialog';
+import { SelectionToolbar } from '../_components/selection-toolbar';
 import { CreatePolicyDialog } from './create-policy-dialog';
+import { ReassignBrokerDialog } from './reassign-broker-dialog';
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`${url} failed: ${res.status}`);
   return res.json() as Promise<T>;
+}
+
+interface BulkActionResult {
+  requested: string[];
+  updated: string[];
+  skipped: string[];
+}
+
+async function postBulk(url: string, body: unknown): Promise<BulkActionResult> {
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) });
+  const parsed = (await res.json().catch(() => null)) as (BulkActionResult & { message?: string }) | null;
+  if (!res.ok) throw new Error(parsed?.message ?? `${url} failed: ${res.status}`);
+  if (!parsed) throw new Error(`${url} returned no body`);
+  return parsed;
+}
+
+function reportBulkResult(verb: string, { updated, skipped }: BulkActionResult): void {
+  if (updated.length > 0) toast.success(`${verb} ${updated.length} ${updated.length === 1 ? 'policy' : 'policies'}.`);
+  if (skipped.length > 0) toast.error(`${skipped.length} ${skipped.length === 1 ? 'policy was' : 'policies were'} skipped (outside scope or an invalid status transition).`);
 }
 
 const ALL = 'ALL';
@@ -34,17 +60,15 @@ export function PoliciesView() {
   const [status, setStatus] = React.useState<string>(ALL);
   const [accountId, setAccountId] = React.useState<string>(ALL);
   const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 20 });
-  // Workaround for a bug in @topiadesk/ui's DataTable: unlike `sorting`/
-  // `columnVisibility`, its internal `useReactTable` state has no fallback
-  // for an omitted `rowSelection` (see data-table.tsx's `state:` block) —
-  // passing neither `rowSelection` nor `onRowSelectionChange` (this page has
-  // no bulk actions, so there's nothing to wire up) leaves TanStack's
-  // rowSelection state literally `undefined`, and `row.getIsSelected()`
-  // (called unconditionally per row for the `data-state` attribute) throws
-  // trying to index into it. A stable empty object sidesteps the crash
-  // without adding any selection UI (no selectionColumn in `columns`).
-  const [rowSelection] = React.useState<RowSelectionState>({});
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+  const [reassignOpen, setReassignOpen] = React.useState(false);
+  const [cancelOpen, setCancelOpen] = React.useState(false);
+  const [reassigning, setReassigning] = React.useState(false);
+  const [cancelling, setCancelling] = React.useState(false);
+
+  const selectedIds = React.useMemo(() => Object.keys(rowSelection).filter((id) => rowSelection[id]), [rowSelection]);
 
   /** Filter/search changes invalidate the current page — stay on page 1. */
   function resetToFirstPage() {
@@ -57,12 +81,18 @@ export function PoliciesView() {
     staleTime: 5 * 60_000,
   });
 
+  // Server-side search on policyNumber (PolicyController.list's `q` param) —
+  // replaces the old client-only filter now that a real search endpoint
+  // exists; deliberately policy-number-only (not client name too, which
+  // would need a join this endpoint doesn't do) — see the search input's
+  // placeholder below.
   const policiesQuery = useQuery({
-    queryKey: ['policies', status, accountId],
+    queryKey: ['policies', status, accountId, debouncedSearch],
     queryFn: () => {
       const qs = new URLSearchParams();
       if (status !== ALL) qs.set('status', status);
       if (accountId !== ALL) qs.set('accountId', accountId);
+      if (debouncedSearch) qs.set('q', debouncedSearch);
       const query = qs.toString();
       return fetchJson<PolicyDto[]>(`/api/policies${query ? `?${query}` : ''}`);
     },
@@ -77,22 +107,39 @@ export function PoliciesView() {
     [lookupsQuery.data],
   );
 
-  // Client-side filter over the already-fetched (status/account-scoped, <=100
-  // row) list — no server-side search endpoint exists, and adding one is out
-  // of scope here; this just narrows what's already in hand by policy number
-  // or client name.
-  const visiblePolicies = React.useMemo(() => {
-    const rows = policiesQuery.data ?? [];
-    const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((policy) => {
-      const accountName = accountNameById.get(policy.accountId) ?? '';
-      return policy.policyNumber.toLowerCase().includes(q) || accountName.toLowerCase().includes(q);
-    });
-  }, [policiesQuery.data, search, accountNameById]);
+  const visiblePolicies = policiesQuery.data ?? [];
+
+  async function reassignBroker(brokerOfRecordId: string) {
+    setReassigning(true);
+    try {
+      const result = await postBulk('/api/policies/bulk/assign', { ids: selectedIds, brokerOfRecordId });
+      reportBulkResult('Reassigned', result);
+      setRowSelection({});
+      void queryClient.invalidateQueries({ queryKey: ['policies'] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to reassign broker of record');
+    } finally {
+      setReassigning(false);
+    }
+  }
+
+  async function cancelSelected() {
+    setCancelling(true);
+    try {
+      const result = await postBulk('/api/policies/bulk/update', { ids: selectedIds, status: 'CANCELLED' });
+      reportBulkResult('Cancelled', result);
+      setRowSelection({});
+      void queryClient.invalidateQueries({ queryKey: ['policies'] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to cancel policies');
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   const columns = React.useMemo<ColumnDef<PolicyDto>[]>(
     () => [
+      selectionColumn<PolicyDto>(),
       {
         accessorKey: 'policyNumber',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Policy" />,
@@ -168,7 +215,7 @@ export function PoliciesView() {
 
       <div className="flex flex-wrap items-center gap-3">
         <Input
-          placeholder="Search policy number or client…"
+          placeholder="Search policy number…"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -218,6 +265,15 @@ export function PoliciesView() {
         </Select>
       </div>
 
+      <SelectionToolbar selectedCount={selectedIds.length} onClearSelection={() => setRowSelection({})}>
+        <Button type="button" variant="outline" size="sm" onClick={() => setReassignOpen(true)}>
+          <UserCog className="h-4 w-4" aria-hidden /> Reassign broker
+        </Button>
+        <Button type="button" variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => setCancelOpen(true)}>
+          <XCircle className="h-4 w-4" aria-hidden /> Cancel
+        </Button>
+      </SelectionToolbar>
+
       <DataTable<PolicyDto, unknown>
         columns={columns}
         data={visiblePolicies}
@@ -226,6 +282,7 @@ export function PoliciesView() {
         isError={policiesQuery.isError}
         errorState={<span className="text-sm text-destructive">Couldn&apos;t load policies.</span>}
         rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
         pagination={pagination}
         onPaginationChange={setPagination}
         emptyState={
@@ -235,6 +292,29 @@ export function PoliciesView() {
           </div>
         }
         enableColumnVisibility
+      />
+
+      <ReassignBrokerDialog
+        open={reassignOpen}
+        onOpenChange={setReassignOpen}
+        isPending={reassigning}
+        onConfirm={(brokerOfRecordId) => {
+          setReassignOpen(false);
+          void reassignBroker(brokerOfRecordId);
+        }}
+      />
+      <ConfirmDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        title={`Cancel ${selectedIds.length} ${selectedIds.length === 1 ? 'policy' : 'policies'}?`}
+        description="Policies already CANCELLED, or LAPSED, can't reach CANCELLED and will be reported as skipped rather than changed."
+        confirmLabel="Cancel policies"
+        destructive
+        isPending={cancelling}
+        onConfirm={() => {
+          setCancelOpen(false);
+          void cancelSelected();
+        }}
       />
     </div>
   );

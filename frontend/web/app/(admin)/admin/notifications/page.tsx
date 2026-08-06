@@ -36,7 +36,7 @@ export default function NotificationsPage() {
         cell: ({ row }) => (
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
-              {!row.original.readAt ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden /> : null}
+              {!row.original.readAt ? <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-primary" aria-hidden /> : null}
               <span className="text-sm font-medium text-foreground">{row.original.title}</span>
               <Badge variant="outline" className="text-[10px]">
                 {row.original.type}

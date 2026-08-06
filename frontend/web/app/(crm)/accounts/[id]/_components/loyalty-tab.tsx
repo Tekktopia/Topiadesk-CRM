@@ -91,13 +91,13 @@ export function LoyaltyTab({ accountId }: { accountId: string }) {
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
         <StatTile label="Points balance" value={loyaltyAccount.pointsBalance.toLocaleString()} icon={<Award />} />
-        <div className="flex items-center gap-2 rounded-xl border border-border p-4">
+        <div className="flex items-center gap-2 rounded-none border border-border p-4">
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tier</span>
           <Badge variant="secondary" className="ml-auto">
             {loyaltyAccount.tier}
           </Badge>
         </div>
-        <div className="flex items-center gap-2 rounded-xl border border-border p-4">
+        <div className="flex items-center gap-2 rounded-none border border-border p-4">
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Enrolled</span>
           <span className="ml-auto text-sm text-foreground">{formatDate(loyaltyAccount.enrolledAt)}</span>
         </div>

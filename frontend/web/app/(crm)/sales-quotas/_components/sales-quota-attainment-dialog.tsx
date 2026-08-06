@@ -33,7 +33,7 @@ export function SalesQuotaAttainmentDialog({
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="h-3 w-full overflow-hidden rounded-full bg-secondary">
+            <div className="h-3 w-full overflow-hidden rounded-none bg-secondary">
               <div
                 className={isOver ? 'h-full bg-success' : 'h-full bg-primary'}
                 style={{ width: `${pct}%` }}

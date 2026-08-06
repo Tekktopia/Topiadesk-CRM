@@ -32,6 +32,8 @@ import { DocumentCategoryResponseDto } from './dto/document-category-response.dt
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { UploadDocumentDto, UploadDocumentVersionDto } from './dto/upload-document.dto';
 import { DocumentResponseDto } from './dto/document-response.dto';
+import { BulkActionResponseDto, BulkArchiveDocumentsDto, BulkCategorizeDocumentsDto } from './dto/bulk-action.dto';
+import { diffBulkIds } from './bulk-actions';
 // NOT type-only imports: both DTO classes are used as @Body() parameter
 // types below — NestJS's ValidationPipe needs the real class reference at
 // runtime (see the comment in ai-gateway/dto/summarize-request.dto.ts).
@@ -71,9 +73,40 @@ export class DocumentsController {
 
   @Get()
   @ApiOkResponse({ type: [DocumentResponseDto] })
-  async list(@Query('categoryId') categoryId?: string): Promise<DocumentResponseDto[]> {
-    const documents = await this.documents.list(categoryId);
+  async list(@Query('categoryId') categoryId?: string, @Query('search') search?: string): Promise<DocumentResponseDto[]> {
+    const documents = await this.documents.list(categoryId, search);
     return documents.map(toDocumentResponseDto);
+  }
+
+  // Bulk endpoints — must precede ':id' for the same declaration-order
+  // reason as 'categories'/'retention/due-for-review' above. No bulk/delete:
+  // Document has no single-row delete endpoint either (isArchived is the
+  // soft-delete mechanism throughout this module — see the schema comment
+  // on Document.isArchived), so bulk/archive is the real equivalent.
+  @Post('bulk/archive')
+  @RequirePermission('document', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkArchive(@Body() dto: BulkArchiveDocumentsDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.document.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((d) => d.id));
+    if (matched.length > 0) {
+      await prisma.document.updateMany({ where: { id: { in: matched } }, data: { isArchived: true } });
+    }
+    return { requested: dto.ids, updated: matched, skipped };
+  }
+
+  @Post('bulk/categorize')
+  @RequirePermission('document', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkCategorize(@Body() dto: BulkCategorizeDocumentsDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.document.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((d) => d.id));
+    if (matched.length > 0) {
+      await prisma.document.updateMany({ where: { id: { in: matched } }, data: { categoryId: dto.categoryId } });
+    }
+    return { requested: dto.ids, updated: matched, skipped };
   }
 
   @Post()

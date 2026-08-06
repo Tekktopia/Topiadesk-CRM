@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsDateString, IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { ArrayMinSize, IsArray, IsDateString, IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 import { CasePriority, ClaimStatus } from '@topiadesk/db';
 
 export class CreateClaimDto {
@@ -99,4 +99,15 @@ export class ClaimStatusHistoryResponseDto {
   @ApiProperty({ nullable: true }) changedById!: string | null;
   @ApiProperty({ nullable: true }) reason!: string | null;
   @ApiProperty() createdAt!: Date;
+}
+
+/** Claims have no delete endpoint at all — bulk actions are assign (adjuster) + status-update only, same shape/reasoning as BulkAssignCasesDto/BulkUpdateCasesDto in case.dto.ts. */
+export class BulkAssignClaimsDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @IsUUID(undefined, { each: true }) ids!: string[];
+  @ApiProperty() @IsUUID() adjusterId!: string;
+}
+
+export class BulkUpdateClaimsDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @IsUUID(undefined, { each: true }) ids!: string[];
+  @ApiProperty({ enum: ClaimStatus }) @IsEnum(ClaimStatus) status!: ClaimStatus;
 }

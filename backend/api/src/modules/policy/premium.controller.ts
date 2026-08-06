@@ -6,8 +6,10 @@ import { RequirePermission } from '../../common/auth/require-permission.decorato
 import { CreatePremiumDto } from './dto/create-premium.dto';
 import { UpdatePremiumDto } from './dto/update-premium.dto';
 import { PremiumAgingRowDto, PremiumResponseDto } from './dto/premium-response.dto';
+import { BulkActionResponseDto, BulkMarkPremiumsPaidDto } from './dto/bulk-action.dto';
 import { queryRawWithRlsContext } from './rls-raw-query.util';
 import { decimalToString } from './decimal.util';
+import { diffBulkIds } from './bulk-actions';
 
 function toPremiumDto(premium: Premium): PremiumResponseDto {
   return {
@@ -104,18 +106,51 @@ export class PremiumController {
   @Get('aging')
   @RequirePermission('policy', 'read')
   @ApiOkResponse({ type: [PremiumAgingRowDto] })
-  async aging(@Query('policyId') policyId?: string, @Query('bucket') bucket?: string): Promise<PremiumAgingRowDto[]> {
+  async aging(
+    @Query('policyId') policyId?: string,
+    @Query('bucket') bucket?: string,
+    @Query('search') search?: string,
+  ): Promise<PremiumAgingRowDto[]> {
     const policyFilter = policyId ?? null;
     const bucketFilter = bucket ?? null;
+    // The view has no policy_number column of its own (it's a plain SELECT
+    // over the materialized premium_aging_summary — see
+    // rls/004_reporting_views.sql) so search matches by subquery against
+    // policies rather than a join; policies_rw's own RLS still governs that
+    // subquery, so this can't be used to probe policy numbers outside scope.
+    const searchFilter = search ? `%${search}%` : null;
     const rows = await queryRawWithRlsContext<RawAgingRow[]>`
       SELECT premium_id, policy_id, gross_premium, paid_amount, outstanding_amount, due_date, status, days_overdue, aging_bucket, refreshed_at
       FROM premium_aging_summary_scoped
       WHERE (${policyFilter}::uuid IS NULL OR policy_id = ${policyFilter}::uuid)
         AND (${bucketFilter}::text IS NULL OR aging_bucket = ${bucketFilter}::text)
+        AND (${searchFilter}::text IS NULL OR policy_id IN (SELECT id FROM policies WHERE policy_number ILIKE ${searchFilter}::text))
       ORDER BY days_overdue DESC
       LIMIT 200
     `;
     return rows.map(toAgingDto);
+  }
+
+  // Batches the same fields RecordPaymentDialog already sets one row at a
+  // time (paidAmount/paidDate/status) — for reconciling a bank statement
+  // against several premiums at once as fully paid. Per-row loop, not
+  // updateMany: paidAmount = grossPremium differs by row.
+  @Post('bulk/mark-paid')
+  @RequirePermission('policy', 'write')
+  @ApiOkResponse({ type: BulkActionResponseDto })
+  async bulkMarkPaid(@Body() dto: BulkMarkPremiumsPaidDto): Promise<BulkActionResponseDto> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.premium.findMany({ where: { id: { in: dto.ids } }, select: { id: true, grossPremium: true } });
+    const { matched, skipped } = diffBulkIds(dto.ids, visible.map((p) => p.id));
+    const visibleById = new Map(visible.map((p) => [p.id, p]));
+    const updated: string[] = [];
+    for (const id of matched) {
+      const premium = visibleById.get(id);
+      if (!premium) continue;
+      await prisma.premium.update({ where: { id }, data: { paidAmount: premium.grossPremium, paidDate: new Date(), status: 'PAID' } });
+      updated.push(id);
+    }
+    return { requested: dto.ids, updated, skipped };
   }
 
   @Get(':id')

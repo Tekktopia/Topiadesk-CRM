@@ -26,6 +26,7 @@ import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { AccountMenu } from './account-menu';
 import { activeNavItem, activeNavModule } from './nav-modules';
 import { CommandPalette } from './command-palette';
+import { KeyboardShortcutsDialog } from './keyboard-shortcuts-dialog';
 
 function Breadcrumb() {
   const pathname = usePathname();
@@ -123,7 +124,7 @@ function NotificationBell() {
         <Button variant="ghost" size="icon" className="relative" aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}>
           <Bell className="h-4 w-4" aria-hidden />
           {unreadCount > 0 ? (
-            <Badge variant="destructive" className="absolute -right-1 -top-1 h-4 min-w-4 justify-center rounded-full px-1 text-[10px] leading-none">
+            <Badge variant="destructive" className="absolute -right-1 -top-1 h-4 min-w-4 justify-center rounded-none px-1 text-[10px] leading-none">
               {unreadCount > 9 ? '9+' : unreadCount}
             </Badge>
           ) : null}
@@ -196,12 +197,13 @@ export function AppHeader() {
   const { user, isLoading } = useCurrentUser();
 
   return (
-    <header className="flex h-16 items-center justify-between gap-4 border-b border-border bg-background/95 px-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <header className="flex h-11 items-center justify-between gap-4 bg-background/95 px-4 shadow-[0_2px_6px_-1px_hsl(var(--foreground)/0.08)] backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <Breadcrumb />
 
       <div className="hidden max-w-md flex-1 md:block">
         <CommandPalette />
       </div>
+      <KeyboardShortcutsDialog />
 
       <div className="flex items-center gap-1">
         {user ? <QuickCreateMenu /> : null}
@@ -219,7 +221,7 @@ export function AppHeader() {
         </Button>
 
         {isLoading ? (
-          <Skeleton className="h-9 w-9 rounded-full" />
+          <Skeleton className="h-7 w-7 rounded-none" />
         ) : user ? (
           <AccountMenu user={user} trigger="chip" />
         ) : (

@@ -13,6 +13,7 @@ export class CreateTaskDto {
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() policyId?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() opportunityId?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() leadId?: string;
+  @ApiProperty({ required: false, description: 'Links this task to a Case — powers the ticket detail page\'s "Tasks" related-list' }) @IsOptional() @IsUUID() caseId?: string;
 }
 
 export class UpdateTaskDto extends PartialType(CreateTaskDto) {}
@@ -22,6 +23,7 @@ export class TaskQueryDto {
   @ApiProperty({ enum: TaskStatus, required: false }) @IsOptional() @IsEnum(TaskStatus) status?: TaskStatus;
   @ApiProperty({ required: false }) @IsOptional() @IsDateString() dueBefore?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsDateString() dueAfter?: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsUUID() caseId?: string;
 }
 
 export class TaskResponseDto {
@@ -36,6 +38,7 @@ export class TaskResponseDto {
   @ApiProperty({ nullable: true }) policyId!: string | null;
   @ApiProperty({ nullable: true }) opportunityId!: string | null;
   @ApiProperty({ nullable: true }) leadId!: string | null;
+  @ApiProperty({ nullable: true }) caseId!: string | null;
   @ApiProperty({ nullable: true }) completedAt!: Date | null;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;

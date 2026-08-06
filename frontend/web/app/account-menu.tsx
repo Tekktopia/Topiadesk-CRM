@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Circle, LogOut, User as UserIcon } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { Circle, Keyboard, LogOut, Monitor, Moon, Palette, Settings, Sun } from 'lucide-react';
 import {
   Avatar,
   AvatarFallback,
@@ -13,9 +14,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@topiadesk/ui';
+import { openKeyboardShortcuts } from './keyboard-shortcuts-dialog';
 
 interface HeaderUser {
   fullName: string;
@@ -115,17 +123,18 @@ export function AccountMenu({
 }) {
   const setPresence = useSetPresence();
   const presence = PRESENCE_OPTIONS.find((o) => o.value === user.presenceStatus) ?? PRESENCE_OPTIONS[2];
+  const { theme, setTheme } = useTheme();
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         {trigger === 'chip' ? (
-          <Button variant="ghost" className="h-9 gap-2 rounded-full pl-1.5 pr-3" aria-label="Account menu">
+          <Button variant="ghost" className="h-9 gap-2 rounded-none pl-1.5 pr-3" aria-label="Account menu">
             <AccountAvatar user={user} className="h-7 w-7 text-xs" />
             <span className="max-w-[140px] truncate text-sm font-medium text-foreground">{user.fullName}</span>
           </Button>
         ) : (
-          <Button variant="ghost" size="icon" className="rounded-full" aria-label="Account menu">
+          <Button variant="ghost" size="icon" className="rounded-none" aria-label="Account menu">
             <AccountAvatar user={user} className="h-9 w-9" />
           </Button>
         )}
@@ -177,12 +186,41 @@ export function AccountMenu({
         <DropdownMenuSeparator className="mx-0 my-0" />
 
         <div className="p-1">
+          <DropdownMenuItem onSelect={() => openKeyboardShortcuts()} className="cursor-pointer gap-2">
+            <Keyboard className="h-4 w-4" aria-hidden />
+            Keyboard shortcuts
+            <DropdownMenuShortcut>?</DropdownMenuShortcut>
+          </DropdownMenuItem>
+
           <DropdownMenuItem asChild>
             <Link href="/profile" className="flex w-full cursor-pointer items-center gap-2">
-              <UserIcon className="h-4 w-4" aria-hidden />
-              My profile
+              <Settings className="h-4 w-4" aria-hidden />
+              Profile settings
             </Link>
           </DropdownMenuItem>
+
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="gap-2">
+              <Palette className="h-4 w-4" aria-hidden />
+              Theme
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuRadioGroup value={theme ?? 'system'} onValueChange={setTheme}>
+                <DropdownMenuRadioItem value="light" className="gap-2">
+                  <Sun className="h-3.5 w-3.5" aria-hidden />
+                  Light
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="dark" className="gap-2">
+                  <Moon className="h-3.5 w-3.5" aria-hidden />
+                  Dark
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="system" className="gap-2">
+                  <Monitor className="h-3.5 w-3.5" aria-hidden />
+                  System
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
         </div>
 
         <DropdownMenuSeparator className="mx-0 my-0" />
@@ -191,7 +229,7 @@ export function AccountMenu({
           <DropdownMenuItem asChild>
             <a href="/api/auth/logout" className="flex w-full cursor-pointer items-center gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive">
               <LogOut className="h-4 w-4" aria-hidden />
-              Log out
+              Sign out
             </a>
           </DropdownMenuItem>
         </div>

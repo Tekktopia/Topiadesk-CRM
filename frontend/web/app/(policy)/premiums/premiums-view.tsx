@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { CheckCircle2 } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -14,6 +15,7 @@ import {
   type ColumnDef,
   DataTable,
   DataTableColumnHeader,
+  Input,
   type RowSelectionState,
   Select,
   SelectContent,
@@ -21,9 +23,14 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
+  selectionColumn,
+  toast,
 } from '@topiadesk/ui';
 import { AGING_BUCKET_ORDER, agingBucketLabel, formatDate, formatNaira, premiumStatusVariant } from '@/app/(policy)/lib/format';
 import type { PolicyDto, PremiumAgingRowDto } from '@/app/(policy)/lib/types';
+import { useDebouncedValue } from '@/app/(policy)/lib/use-debounced-value';
+import { ConfirmDialog } from '../_components/confirm-dialog';
+import { SelectionToolbar } from '../_components/selection-toolbar';
 import { AgingChart, type AgingBucketSummary } from './aging-chart';
 import { RecordPaymentDialog } from './record-payment-dialog';
 
@@ -31,6 +38,20 @@ async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`${url} failed: ${res.status}`);
   return res.json() as Promise<T>;
+}
+
+interface BulkActionResult {
+  requested: string[];
+  updated: string[];
+  skipped: string[];
+}
+
+async function postBulk(url: string, body: unknown): Promise<BulkActionResult> {
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) });
+  const parsed = (await res.json().catch(() => null)) as (BulkActionResult & { message?: string }) | null;
+  if (!res.ok) throw new Error(parsed?.message ?? `${url} failed: ${res.status}`);
+  if (!parsed) throw new Error(`${url} returned no body`);
+  return parsed;
 }
 
 const ALL = 'ALL';
@@ -46,24 +67,48 @@ const ALL = 'ALL';
 export function PremiumsView() {
   const queryClient = useQueryClient();
   const [bucket, setBucket] = React.useState(ALL);
+  const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [recording, setRecording] = React.useState<PremiumAgingRowDto | null>(null);
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 20 });
-  // Workaround for a bug in @topiadesk/ui's DataTable — see the matching
-  // comment in policies-view.tsx: omitting `rowSelection` entirely (this
-  // page has no bulk actions) crashes row rendering because the component's
-  // internal state has no fallback for it. A stable empty object avoids
-  // that without adding any selection UI.
-  const [rowSelection] = React.useState<RowSelectionState>({});
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+  const [markPaidOpen, setMarkPaidOpen] = React.useState(false);
+  const [markingPaid, setMarkingPaid] = React.useState(false);
 
+  const selectedIds = React.useMemo(() => Object.keys(rowSelection).filter((id) => rowSelection[id]), [rowSelection]);
+
+  // Search matches by policy number (subquery against `policies`, since the
+  // aging view has no policy_number column of its own — see
+  // PremiumController.aging's comment).
   const agingQuery = useQuery({
-    queryKey: ['premiums-aging'],
-    queryFn: () => fetchJson<PremiumAgingRowDto[]>('/api/premiums/aging'),
+    queryKey: ['premiums-aging', debouncedSearch],
+    queryFn: () => {
+      const qs = new URLSearchParams();
+      if (debouncedSearch) qs.set('search', debouncedSearch);
+      const query = qs.toString();
+      return fetchJson<PremiumAgingRowDto[]>(`/api/premiums/aging${query ? `?${query}` : ''}`);
+    },
   });
   const policiesQuery = useQuery({
     queryKey: ['policies-lookup'],
     queryFn: () => fetchJson<PolicyDto[]>('/api/policies'),
     staleTime: 5 * 60_000,
   });
+
+  async function markSelectedPaid() {
+    setMarkingPaid(true);
+    try {
+      const result = await postBulk('/api/premiums/bulk/mark-paid', { ids: selectedIds });
+      if (result.updated.length > 0) toast.success(`Marked ${result.updated.length} ${result.updated.length === 1 ? 'premium' : 'premiums'} as paid.`);
+      if (result.skipped.length > 0) toast.error(`${result.skipped.length} ${result.skipped.length === 1 ? 'premium was' : 'premiums were'} skipped (outside scope).`);
+      setRowSelection({});
+      void queryClient.invalidateQueries({ queryKey: ['premiums-aging'] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to mark premiums as paid');
+    } finally {
+      setMarkingPaid(false);
+    }
+  }
 
   const policyNumberById = React.useMemo(
     () => new Map((policiesQuery.data ?? []).map((p) => [p.id, p.policyNumber])),
@@ -91,6 +136,7 @@ export function PremiumsView() {
 
   const columns = React.useMemo<ColumnDef<PremiumAgingRowDto>[]>(
     () => [
+      selectionColumn<PremiumAgingRowDto>(),
       {
         id: 'policy',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Policy" />,
@@ -190,6 +236,15 @@ export function PremiumsView() {
       </Card>
 
       <div className="flex flex-wrap items-center gap-3">
+        <Input
+          placeholder="Search policy number…"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPagination((p) => ({ ...p, pageIndex: 0 }));
+          }}
+          className="w-64"
+        />
         <Select
           value={bucket}
           onValueChange={(value) => {
@@ -211,6 +266,12 @@ export function PremiumsView() {
         </Select>
       </div>
 
+      <SelectionToolbar selectedCount={selectedIds.length} onClearSelection={() => setRowSelection({})}>
+        <Button type="button" variant="outline" size="sm" onClick={() => setMarkPaidOpen(true)}>
+          <CheckCircle2 className="h-4 w-4" aria-hidden /> Mark as paid
+        </Button>
+      </SelectionToolbar>
+
       <DataTable<PremiumAgingRowDto, unknown>
         columns={columns}
         data={visibleRows}
@@ -219,6 +280,7 @@ export function PremiumsView() {
         isError={agingQuery.isError}
         errorState={<span className="text-sm text-destructive">Couldn&apos;t load premium aging.</span>}
         rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
         pagination={pagination}
         onPaginationChange={setPagination}
         emptyState={<span className="text-sm text-muted-foreground">Nothing outstanding in this bucket.</span>}
@@ -229,6 +291,18 @@ export function PremiumsView() {
         premium={recording ? { id: recording.premiumId, dueDate: recording.dueDate, status: recording.status, grossPremium: recording.grossPremium, paidAmount: recording.paidAmount } : null}
         onOpenChange={(open) => !open && setRecording(null)}
         onSaved={() => void queryClient.invalidateQueries({ queryKey: ['premiums-aging'] })}
+      />
+      <ConfirmDialog
+        open={markPaidOpen}
+        onOpenChange={setMarkPaidOpen}
+        title={`Mark ${selectedIds.length} ${selectedIds.length === 1 ? 'premium' : 'premiums'} as paid?`}
+        description="Sets the paid amount to the full gross premium and the paid date to today — for reconciling a batch against a bank statement. Use Record payment on a single row for a partial amount."
+        confirmLabel="Mark as paid"
+        isPending={markingPaid}
+        onConfirm={() => {
+          setMarkPaidOpen(false);
+          void markSelectedPaid();
+        }}
       />
     </div>
   );

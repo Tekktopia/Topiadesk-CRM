@@ -576,7 +576,7 @@ function StepEditor({
     <li className="rounded-lg border border-border p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium text-secondary-foreground">{index + 1}</span>
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-none bg-secondary text-xs font-medium text-secondary-foreground">{index + 1}</span>
           <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
           <span className="text-sm font-medium text-foreground">{meta.label}</span>
         </div>

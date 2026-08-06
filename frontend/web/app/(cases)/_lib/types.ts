@@ -194,6 +194,8 @@ export interface Case {
   policyId: string | null;
   assignedToId: string | null;
   assignedTeamId: string | null;
+  /** The requester/filer — distinct from assignedToId. Null for system/omnichannel-originated cases. */
+  createdById: string | null;
   slaPolicyId: string | null;
   parentCaseId: string | null;
   linkType: CaseLinkType | null;
@@ -207,7 +209,13 @@ export interface Case {
   updatedAt: string;
 }
 
-/** `type`, not `interface` — see ClaimQuery's comment above on buildQuery's implicit-index-signature requirement. */
+export const DATE_RANGE_PRESETS = ['TODAY', 'YESTERDAY', 'THIS_WEEK', 'THIS_MONTH'] as const;
+export type DateRangePreset = (typeof DATE_RANGE_PRESETS)[number];
+
+export const RESOLUTION_DUE_BY_PRESETS = ['OVERDUE', 'DUE_TODAY', 'DUE_THIS_WEEK'] as const;
+export type ResolutionDueByPreset = (typeof RESOLUTION_DUE_BY_PRESETS)[number];
+
+/** `type`, not `interface` — see ClaimQuery's comment above on buildQuery's implicit-index-signature requirement. Mirrors CaseQueryDto (backend/api/src/modules/case-management/dto/case.dto.ts) 1:1 — the ticket workspace's saved views + filters panel resolve into this shape. */
 export type CaseQuery = {
   status?: CaseStatus;
   priority?: CasePriority;
@@ -216,6 +224,26 @@ export type CaseQuery = {
   assignedTeamId?: string;
   accountId?: string;
   categoryId?: string;
+  parentCaseId?: string;
+  assignedToIds?: string[];
+  assignedTeamIds?: string[];
+  statuses?: CaseStatus[];
+  excludeStatuses?: CaseStatus[];
+  priorities?: CasePriority[];
+  myTeams?: boolean;
+  raisedByUserId?: string;
+  watchingUserId?: string;
+  newOrMine?: boolean;
+  undeliveredOnly?: boolean;
+  resolutionDueBy?: ResolutionDueByPreset;
+  createdPreset?: DateRangePreset;
+  closedPreset?: DateRangePreset;
+  resolvedPreset?: DateRangePreset;
+  search?: string;
+  skip?: number;
+  take?: number;
+  sortBy?: 'createdAt' | 'priority' | 'status';
+  sortDir?: 'asc' | 'desc';
 };
 
 /** `type`, not `interface` — see ClaimQuery's comment above. */

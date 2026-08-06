@@ -10,15 +10,17 @@ export const runtime = 'nodejs';
  * `premium_aging_summary_scoped` RLS-safe view (see
  * packages/db/prisma/rls/004_reporting_views.sql), bucketed into
  * CURRENT/1_30/31_60/61_90/90_PLUS server-side. Forwards the optional
- * `policyId`/`bucket` filters.
+ * `policyId`/`bucket`/`search` (policy number) filters.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
   const qs = new URLSearchParams();
   const policyId = searchParams.get('policyId');
   const bucket = searchParams.get('bucket');
+  const search = searchParams.get('search');
   if (policyId) qs.set('policyId', policyId);
   if (bucket) qs.set('bucket', bucket);
+  if (search) qs.set('search', search);
   const query = qs.toString();
   return proxyJson(`/premiums/aging${query ? `?${query}` : ''}`);
 }

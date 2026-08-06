@@ -31,6 +31,7 @@ export class TasksController {
         assigneeId: query.assigneeId,
         status: query.status,
         dueDate: dueDateFilter(query.dueBefore, query.dueAfter),
+        caseId: query.caseId,
       },
       orderBy: { dueDate: 'asc' },
     });
@@ -77,6 +78,7 @@ export class TasksController {
         policyId: dto.policyId,
         opportunityId: dto.opportunityId,
         leadId: dto.leadId,
+        caseId: dto.caseId,
         completedAt: dto.status === 'COMPLETED' ? new Date() : undefined,
       },
     });
@@ -110,6 +112,7 @@ export class TasksController {
         policyId: dto.policyId,
         opportunityId: dto.opportunityId,
         leadId: dto.leadId,
+        caseId: dto.caseId,
         completedAt,
       },
     });

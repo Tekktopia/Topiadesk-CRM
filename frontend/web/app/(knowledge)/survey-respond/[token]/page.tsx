@@ -42,7 +42,7 @@ export default async function SurveyRespondPage({ params }: { params: Promise<{ 
 
 function InvalidLink() {
   return (
-    <div className="w-full rounded-xl border border-border bg-card p-8 text-center shadow-brand-sm">
+    <div className="w-full rounded-none border border-border bg-card p-8 text-center shadow-brand-sm">
       <h1 className="text-lg font-semibold text-foreground">This feedback link looks incomplete</h1>
       <p className="mt-2 text-sm text-muted-foreground">
         Please use the full link from the original email or message — it may have been cut off when copied.

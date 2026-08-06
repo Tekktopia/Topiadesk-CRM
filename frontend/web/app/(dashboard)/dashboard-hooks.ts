@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@topiadesk/ui';
-import type { CreateSavedDashboardInput, RenderedDashboard, SavedDashboard, UpdateSavedDashboardInput } from './types';
+import type { CreateSavedDashboardInput, RenderedDashboard, SalesForecastResponse, SavedDashboard, UpdateSavedDashboardInput } from './types';
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { credentials: 'same-origin', ...init });
@@ -18,6 +18,14 @@ export function useMyDashboards() {
   return useQuery({
     queryKey: ['saved-dashboards'],
     queryFn: () => fetchJson<SavedDashboard[]>('/api/saved-dashboards'),
+    staleTime: 30_000,
+  });
+}
+
+export function useSalesForecast(period: 'month' | 'quarter', groupBy: 'owner' | 'stage' | 'lineOfBusiness') {
+  return useQuery({
+    queryKey: ['dashboard', 'sales-forecast', period, groupBy],
+    queryFn: () => fetchJson<SalesForecastResponse>(`/api/dashboard/sales-forecast?period=${period}&groupBy=${groupBy}`),
     staleTime: 30_000,
   });
 }

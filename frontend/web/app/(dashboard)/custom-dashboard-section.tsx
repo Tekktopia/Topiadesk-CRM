@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, LayoutGrid, Loader2, Pencil, Plus, RotateCcw, Save, X } from 'lucide-react';
-import { Button, Card, CardContent, Input, Skeleton } from '@topiadesk/ui';
+import { Button, Card, CardContent, Input, Skeleton, Tabs, TabsList, TabsTrigger } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { AddWidgetDialog } from './add-widget-dialog';
 import { DashboardWidgetTile } from './dashboard-widget-tile';
@@ -46,7 +46,21 @@ export function CustomDashboardSection() {
   const activeDashboard = myDashboard ?? defaultDashboard;
   const isCustomized = Boolean(myDashboard);
 
-  const renderQuery = useRenderSavedDashboard(activeDashboard?.id);
+  // Every ORG-visibility dashboard the caller can see (useMyDashboards()
+  // already fetches these — previously computed then discarded except for
+  // the one role-matched default). Exposed as a "browse other views" tab
+  // row alongside "My Dashboard" — read-only: Customize/Save/Reset only
+  // ever act on the caller's own PRIVATE dashboard, never these shared
+  // ORG rows, so switching tabs can't accidentally mutate shared data.
+  const orgDashboards = useMemo(
+    () => (dashboardsQuery.data ?? []).filter((d) => d.visibility === 'ORG').sort((a, b) => a.name.localeCompare(b.name)),
+    [dashboardsQuery.data],
+  );
+  const [selectedTab, setSelectedTab] = useState('mine');
+  const viewedDashboard = selectedTab === 'mine' ? activeDashboard : orgDashboards.find((d) => d.id === selectedTab);
+  const viewingMine = selectedTab === 'mine';
+
+  const renderQuery = useRenderSavedDashboard(viewedDashboard?.id);
   const createMutation = useCreateSavedDashboard();
   const updateMutation = useUpdateSavedDashboard(myDashboard?.id);
   const deleteMutation = useDeleteSavedDashboard();
@@ -107,13 +121,24 @@ export function CustomDashboardSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <LayoutGrid className="h-4 w-4 text-muted-foreground" aria-hidden />
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <LayoutGrid className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
           {editing ? (
             <Input value={draftName} onChange={(e) => setDraftName(e.target.value)} className="h-8 w-56" />
+          ) : orgDashboards.length > 0 ? (
+            <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+              <TabsList>
+                <TabsTrigger value="mine">{isCustomized ? (myDashboard?.name ?? 'My Dashboard') : 'My Dashboard'}</TabsTrigger>
+                {orgDashboards.map((d) => (
+                  <TabsTrigger key={d.id} value={d.id}>
+                    {d.name}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
           ) : (
-            <h2 className="text-base font-semibold text-foreground">{isCustomized ? (activeDashboard?.name ?? 'My Dashboard') : (activeDashboard?.name ?? 'Dashboard')}</h2>
+            <h2 className="text-base font-semibold text-foreground">{viewedDashboard?.name ?? 'Dashboard'}</h2>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -130,7 +155,7 @@ export function CustomDashboardSection() {
                 Save
               </Button>
             </>
-          ) : (
+          ) : viewingMine ? (
             <>
               {isCustomized ? (
                 <Button variant="outline" size="sm" onClick={handleResetToDefault} disabled={deleteMutation.isPending} className="gap-1.5">
@@ -141,7 +166,7 @@ export function CustomDashboardSection() {
                 <Pencil className="h-3.5 w-3.5" aria-hidden /> Customize
               </Button>
             </>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -180,7 +205,8 @@ export function CustomDashboardSection() {
           </ol>
         )
       ) : renderQuery.isLoading ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          <Skeleton className="h-64 w-full" />
           <Skeleton className="h-64 w-full" />
           <Skeleton className="h-64 w-full" />
         </div>
@@ -189,11 +215,13 @@ export function CustomDashboardSection() {
           <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
             <LayoutGrid className="h-8 w-8 text-muted-foreground" aria-hidden />
             <p className="text-sm font-medium text-foreground">No widgets yet</p>
-            <p className="max-w-md text-sm text-muted-foreground">Customize your dashboard to add report widgets.</p>
+            <p className="max-w-md text-sm text-muted-foreground">
+              {viewingMine ? 'Customize your dashboard to add report widgets.' : 'This dashboard has no widgets yet.'}
+            </p>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
           {(renderQuery.data?.widgets ?? []).map((w) => (
             <DashboardWidgetTile key={w.id} widget={w} />
           ))}

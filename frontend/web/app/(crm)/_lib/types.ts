@@ -273,6 +273,7 @@ export interface Task {
   policyId: string | null;
   opportunityId: string | null;
   leadId: string | null;
+  caseId: string | null;
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;

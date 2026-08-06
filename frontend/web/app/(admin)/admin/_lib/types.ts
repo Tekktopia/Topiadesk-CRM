@@ -213,10 +213,15 @@ type RawAutomationRuleDto = Json200<'/crm/automation-rules', 'get'>[number];
 // express — same "generated shape is too narrow" rationale as
 // SetOrgSettingBody above.
 // `steps` is the multi-step + approval-gate workflow engine field added
-// this session (see backend/api/src/modules/crm/dto/automation-rule.dto.ts) —
-// the generated schema snapshot predates it, same "generator gap" story as
-// conditions/actions above.
-export type AutomationRuleDto = Omit<RawAutomationRuleDto, 'conditions' | 'actions'> & {
+// this session (see backend/api/src/modules/crm/dto/automation-rule.dto.ts).
+// The generated schema now DOES include it (regenerated since), but still
+// too narrow the same way conditions/actions are (a `{ [key: string]:
+// unknown }[] & unknown[]` intersection from the DTO's `additionalProperties:
+// true` array shape) — `steps` stays in the Omit list below so the override
+// replaces it instead of intersecting with it (an intersection would force
+// every caller to satisfy both the raw AND the override shape at once,
+// which an empty `[]` or a plain `unknown[]` literal can't).
+export type AutomationRuleDto = Omit<RawAutomationRuleDto, 'conditions' | 'actions' | 'steps'> & {
   conditions: unknown;
   actions: unknown[];
   steps?: unknown[] | null;
@@ -227,7 +232,7 @@ type RawCreateAutomationRuleBody = JsonBody<'/crm/automation-rules', 'post'>;
 // on the backend DTO (CreateAutomationRuleDto) but the generator still
 // emits it as required — patched optional here like the other gaps noted
 // at the top of this file.
-export type CreateAutomationRuleBody = Omit<RawCreateAutomationRuleBody, 'conditions' | 'actions' | 'isActive'> & {
+export type CreateAutomationRuleBody = Omit<RawCreateAutomationRuleBody, 'conditions' | 'actions' | 'steps' | 'isActive'> & {
   conditions: unknown;
   actions: unknown[];
   steps?: unknown[];
@@ -235,7 +240,7 @@ export type CreateAutomationRuleBody = Omit<RawCreateAutomationRuleBody, 'condit
 };
 
 type RawUpdateAutomationRuleBody = JsonBody<'/crm/automation-rules/{id}', 'patch'>;
-export type UpdateAutomationRuleBody = Omit<RawUpdateAutomationRuleBody, 'conditions' | 'actions' | 'isActive'> & {
+export type UpdateAutomationRuleBody = Omit<RawUpdateAutomationRuleBody, 'conditions' | 'actions' | 'steps' | 'isActive'> & {
   conditions?: unknown;
   actions?: unknown[];
   steps?: unknown[];

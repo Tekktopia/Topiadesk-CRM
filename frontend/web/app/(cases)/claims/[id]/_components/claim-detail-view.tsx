@@ -143,7 +143,7 @@ function StatusHistoryCard({ claimId }: { claimId: string }) {
           <ol className="relative space-y-0 border-l border-border pl-6">
             {data.map((entry) => (
               <li key={entry.id} className="relative pb-5 last:pb-0">
-                <span className="absolute -left-[25px] h-3 w-3 rounded-full border-2 border-background bg-primary" />
+                <span className="absolute -left-[25px] h-3 w-3 rounded-none border-2 border-background bg-primary" />
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   {entry.fromStatus ? <span className="text-muted-foreground">{humanize(entry.fromStatus)} →</span> : null}
                   <span className="font-medium text-foreground">{humanize(entry.toStatus)}</span>

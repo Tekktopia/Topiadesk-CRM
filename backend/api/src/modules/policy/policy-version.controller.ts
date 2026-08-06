@@ -6,6 +6,7 @@ import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
+import { enqueueSurveyInvitesForPolicyVersion } from '../case-management/survey-dispatch-queue';
 import { CreatePolicyVersionDto } from './dto/create-policy-version.dto';
 import { DecideApprovalDto } from './dto/decide-approval.dto';
 import { PolicyVersionResponseDto } from './dto/policy-version-response.dto';
@@ -125,6 +126,11 @@ export class PolicyVersionController {
         sumInsured: dto.sumInsuredAtVersion ?? undefined,
       },
     });
+
+    if (dto.versionType === 'ISSUANCE' || dto.versionType === 'RENEWAL') {
+      await enqueueSurveyInvitesForPolicyVersion(version.id, dto.versionType === 'ISSUANCE' ? 'POLICY_ISSUED' : 'POLICY_RENEWED');
+    }
+
     return toVersionDto(version, null, true);
   }
 

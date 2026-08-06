@@ -25,23 +25,37 @@ export class DashboardsController {
     const prisma = getPrismaClient();
     const in90Days = new Date();
     in90Days.setDate(in90Days.getDate() + 90);
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
 
-    const [openOpportunities, renewalsDueNext90Days, activeClients] = await Promise.all([
+    const [openOpportunities, renewalsDueNext90Days, activeClients, wonThisMonth, wonAllTime, lostAllTime] = await Promise.all([
       prisma.opportunity.findMany({
         where: { pipelineStage: { isWon: false, isLost: false } },
         select: { amount: true },
       }),
       prisma.renewalSchedule.count({ where: { renewalDueDate: { lte: in90Days } } }),
       prisma.account.count({ where: { status: 'CLIENT' } }),
+      prisma.opportunity.findMany({
+        where: { pipelineStage: { isWon: true }, actualCloseDate: { gte: monthStart, lte: monthEnd } },
+        select: { amount: true },
+      }),
+      prisma.opportunity.count({ where: { pipelineStage: { isWon: true }, actualCloseDate: { not: null } } }),
+      prisma.opportunity.count({ where: { pipelineStage: { isLost: true }, actualCloseDate: { not: null } } }),
     ]);
 
     const pipelineValue = openOpportunities.reduce((sum: number, o: { amount: unknown }) => sum + Number(o.amount), 0);
+    const wonThisMonthValue = wonThisMonth.reduce((sum: number, o: { amount: unknown }) => sum + Number(o.amount), 0);
+    const decidedAllTime = wonAllTime + lostAllTime;
 
     return {
       openOpportunities: openOpportunities.length,
       pipelineValue: pipelineValue.toFixed(2),
       renewalsDueNext90Days,
       activeClients,
+      wonThisMonthCount: wonThisMonth.length,
+      wonThisMonthValue: wonThisMonthValue.toFixed(2),
+      winRate: decidedAllTime > 0 ? wonAllTime / decidedAllTime : null,
     };
   }
 

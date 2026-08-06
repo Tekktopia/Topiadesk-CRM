@@ -373,26 +373,30 @@ export function useAllPipelineStages() {
 
 /**
  * backend/api's TasksController.list() only filters by assigneeId/status/
- * dueBefore/dueAfter (see backend/api/src/modules/crm/tasks.controller.ts)
- * — there is no accountId/opportunityId/leadId/policyId query param even
- * though the Task model carries those FKs, so an account/lead/opportunity
- * detail page's "related tasks" can't be filtered server-side. Fetches the
- * full (RLS-scoped) task list and filters client-side instead — fine at
- * this module's seeded-demo scale; a real backend gap worth closing later.
+ * dueBefore/dueAfter/caseId (see backend/api/src/modules/crm/tasks.controller.ts)
+ * — there is still no accountId/opportunityId/leadId/policyId query param
+ * even though the Task model carries those FKs, so an account/lead/
+ * opportunity detail page's "related tasks" still can't be filtered
+ * server-side. Those four stay client-filtered over the full (RLS-scoped)
+ * task list — fine at this module's seeded-demo scale. `caseId` closed
+ * this gap for the ticket detail page specifically (a real backend param
+ * now exists), so it's passed straight through to useTasks() instead.
  */
 export function useTasksForEntity(filter: {
   accountId?: string;
   opportunityId?: string;
   leadId?: string;
   policyId?: string;
+  caseId?: string;
 }) {
-  const query = useTasks({});
+  const query = useTasks(filter.caseId ? { caseId: filter.caseId } : {});
   const data = (query.data ?? []).filter(
     (task) =>
       (!filter.accountId || task.accountId === filter.accountId) &&
       (!filter.opportunityId || task.opportunityId === filter.opportunityId) &&
       (!filter.leadId || task.leadId === filter.leadId) &&
-      (!filter.policyId || task.policyId === filter.policyId),
+      (!filter.policyId || task.policyId === filter.policyId) &&
+      (!filter.caseId || task.caseId === filter.caseId),
   );
   return { data, isLoading: query.isLoading };
 }

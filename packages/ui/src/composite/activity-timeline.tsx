@@ -204,7 +204,7 @@ export function ActivityLogComposer({
   });
 
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-lg border border-border bg-card p-4">
+    <form onSubmit={submit} className="space-y-3 rounded-lg bg-card p-4 shadow-brand-sm">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="activity-type">Type</Label>
@@ -288,7 +288,7 @@ export function ActivityTimelineRow({ item }: { item: ActivityTimelineItem }) {
   const Icon = TYPE_ICON[item.type];
   return (
     <li className="relative pb-6 last:pb-0">
-      <span className="absolute -left-[29px] flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground">
+      <span className="absolute -left-[29px] flex h-6 w-6 items-center justify-center rounded-none border border-border bg-background text-muted-foreground">
         <Icon className="h-3.5 w-3.5" aria-hidden />
       </span>
       <div className="flex flex-wrap items-center gap-2">

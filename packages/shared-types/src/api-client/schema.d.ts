@@ -49,6 +49,38 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        patch: operations["IdentityController_updateMyProfile"];
+        trace?: never;
+    };
+    "/identity/me/presence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["IdentityController_updateMyPresence"];
+        trace?: never;
+    };
+    "/identity/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["IdentityController_getMyAvatar"];
+        put?: never;
+        post: operations["IdentityController_uploadMyAvatar"];
+        delete: operations["IdentityController_deleteMyAvatar"];
+        options?: never;
+        head?: never;
         patch?: never;
         trace?: never;
     };
@@ -110,6 +142,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["UsersController_reactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/identity/users/{id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UsersController_suspend"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2260,6 +2308,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboards/case-kpis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CaseKpisController_getCaseKpis"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-dashboards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SavedDashboardsController_list"];
+        put?: never;
+        post: operations["SavedDashboardsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-dashboards/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SavedDashboardsController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["SavedDashboardsController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["SavedDashboardsController_update"];
+        trace?: never;
+    };
+    "/saved-dashboards/{id}/render": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SavedDashboardsController_render"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/audit-log": {
         parameters: {
             query?: never;
@@ -2372,6 +2484,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/claims/{id}/apply-macro/{macroId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ClaimsController_applyMacro"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/claims/{id}/comments": {
         parameters: {
             query?: never;
@@ -2430,6 +2558,22 @@ export interface paths {
         get: operations["CasesController_list"];
         put?: never;
         post: operations["CasesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CasesController_count"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2510,6 +2654,54 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["CasesController_changeStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{id}/request-closure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CasesController_requestClosure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{id}/closure-decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CasesController_decideClosure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{id}/closure-approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CasesController_getClosureApproval"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2964,6 +3156,54 @@ export interface paths {
         patch: operations["LossCauseCategoriesController_update"];
         trace?: never;
     };
+    "/automation-run-states": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AutomationRunStatesController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automation-run-states/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AutomationRunStatesController_getOne"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automation-run-states/{id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AutomationRunStatesController_decide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/knowledge/categories": {
         parameters: {
             query?: never;
@@ -3132,6 +3372,54 @@ export interface paths {
             cookie?: never;
         };
         get: operations["KnowledgeArticlesController_analytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/knowledge/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicKnowledgeController_listCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/knowledge/articles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicKnowledgeController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/knowledge/articles/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicKnowledgeController_findBySlug"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3492,6 +3780,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaign-suppressions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CampaignSuppressionsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/campaigns/webhooks/email/events": {
         parameters: {
             query?: never;
@@ -3684,17 +3988,311 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/custom-reports/entities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomReportController_listEntities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/custom-reports/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomReportController_listFields"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/custom-reports/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CustomReportController_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SearchController_search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/live-chat/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LiveChatController_startSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/live-chat/sessions/{caseId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LiveChatController_listMessages"];
+        put?: never;
+        post: operations["LiveChatController_postMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/webhooks/inbound-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InboundEmailController_receive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/webhooks/whatsapp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InboundMessagingController_receiveWhatsapp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/webhooks/sms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InboundMessagingController_receiveSms"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoyaltyAccountsController_list"];
+        put?: never;
+        post: operations["LoyaltyAccountsController_enroll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty-accounts/by-account/{accountId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoyaltyAccountsController_findByAccount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty-accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoyaltyAccountsController_findOne"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty-accounts/{id}/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoyaltyAccountsController_transactions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty-accounts/{id}/tier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["LoyaltyAccountsController_updateTier"];
+        trace?: never;
+    };
+    "/loyalty-accounts/{id}/earn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoyaltyAccountsController_earn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty-accounts/{id}/redeem": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoyaltyAccountsController_redeem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty-accounts/{id}/adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LoyaltyAccountsController_adjust"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ResolvedPermissionDto: {
+            resource: string;
+            /** @enum {string} */
+            action: "read" | "write";
+            /** @enum {string} */
+            scope: "OWN" | "DEPARTMENT" | "BRANCH" | "ALL";
+        };
         CurrentUserResponseDto: {
             id: string;
             email: string;
             fullName: string;
+            phone: Record<string, never> | null;
+            hasAvatar: boolean;
+            /** @enum {string} */
+            presenceStatus: "ONLINE" | "AWAY" | "OFFLINE";
             roles: string[];
             departmentId: Record<string, never> | null;
+            departmentName: Record<string, never> | null;
             branchId: Record<string, never> | null;
+            branchName: Record<string, never> | null;
+            permissions: components["schemas"]["ResolvedPermissionDto"][];
+        };
+        UpdateMyProfileDto: {
+            fullName?: string;
+            phone?: Record<string, never> | null;
+        };
+        UpdateMyPresenceDto: {
+            /** @enum {string} */
+            presenceStatus: "ONLINE" | "AWAY" | "OFFLINE";
         };
         UserRoleSummaryDto: {
             id: string;
@@ -3934,6 +4532,11 @@ export interface components {
             value: string;
             primary?: boolean;
         };
+        ScimPhotoDto: {
+            value: string;
+            type?: string;
+            primary?: boolean;
+        };
         ScimUserRequestDto: {
             schemas?: string[];
             /** @description Treated as this user's email — TopiaDesk keys users by email, not a separate username */
@@ -3942,6 +4545,8 @@ export interface components {
             emails?: components["schemas"]["ScimEmailDto"][];
             /** @default true */
             active: boolean;
+            /** @description Profile photo reference URL(s) — the primary (or first) one is fetched and stored as the avatar. Not every IdP sends this (see avatar-storage.util.ts). */
+            photos?: components["schemas"]["ScimPhotoDto"][];
             /** @description Maps to departments.code — same custom-attribute convention as the Keycloak sync webhook */
             departmentCode?: string;
             /** @description Maps to branches.code */
@@ -4561,6 +5166,7 @@ export interface components {
             policyId: Record<string, never> | null;
             opportunityId: Record<string, never> | null;
             leadId: Record<string, never> | null;
+            caseId: Record<string, never> | null;
             completedAt: Record<string, never> | null;
             /** Format: date-time */
             createdAt: string;
@@ -4581,6 +5187,8 @@ export interface components {
             policyId?: string;
             opportunityId?: string;
             leadId?: string;
+            /** @description Links this task to a Case — powers the ticket detail page's "Tasks" related-list */
+            caseId?: string;
         };
         UpdateTaskDto: {
             title?: string;
@@ -4596,6 +5204,8 @@ export interface components {
             policyId?: string;
             opportunityId?: string;
             leadId?: string;
+            /** @description Links this task to a Case — powers the ticket detail page's "Tasks" related-list */
+            caseId?: string;
         };
         BulkAssignTasksDto: {
             ids: string[];
@@ -4807,6 +5417,9 @@ export interface components {
             actions: {
                 [key: string]: unknown;
             }[];
+            steps?: {
+                [key: string]: unknown;
+            }[] | null;
             isActive: boolean;
             createdById: string;
             /** Format: date-time */
@@ -4826,6 +5439,10 @@ export interface components {
             actions: {
                 [key: string]: unknown;
             }[];
+            /** @description Ordered multi-step sequence — additive, independent of `actions` above. Present + non-empty means "run through the multi-step engine instead of `actions`" (ENTITY_EVENT only; ignored for SCHEDULE-triggered rules and Macro apply). Each entry is either { type: "ACTION", actionType: string, params?: Record<string, unknown> } (same shape as one `actions` entry) or { type: "APPROVAL_GATE", reason?: string } — see backend/worker/src/automation/run-engine.ts. */
+            steps?: {
+                [key: string]: unknown;
+            }[];
             /** @default true */
             isActive: boolean;
         };
@@ -4839,6 +5456,10 @@ export interface components {
             };
             /** @description ActionSpec[] = [{ actionType: string, params: Record<string, unknown> }]. Currently registered: CREATE_TASK — params: { title: string, description?: string, dueInDays?: number (default 3), assigneeId?: string (defaults to the renewal's assignee/broker-of-record) }. */
             actions?: {
+                [key: string]: unknown;
+            }[];
+            /** @description Ordered multi-step sequence — additive, independent of `actions` above. Present + non-empty means "run through the multi-step engine instead of `actions`" (ENTITY_EVENT only; ignored for SCHEDULE-triggered rules and Macro apply). Each entry is either { type: "ACTION", actionType: string, params?: Record<string, unknown> } (same shape as one `actions` entry) or { type: "APPROVAL_GATE", reason?: string } — see backend/worker/src/automation/run-engine.ts. */
+            steps?: {
                 [key: string]: unknown;
             }[];
             /** @default true */
@@ -5239,6 +5860,70 @@ export interface components {
             layoutConfig: Record<string, never>;
             widgets: components["schemas"]["RenderedDashboardWidgetDto"][];
         };
+        CaseStatusCountDto: {
+            status: string;
+            count: number;
+        };
+        CaseVolumeTrendPointDto: {
+            date: string;
+            count: number;
+        };
+        AgentWorkloadDto: {
+            userId: string;
+            userName: string;
+            openCaseCount: number;
+        };
+        CaseKpiResponseDto: {
+            days: number;
+            avgFirstResponseHours?: Record<string, never> | null;
+            avgResolutionHours?: Record<string, never> | null;
+            slaBreachRatePercent?: Record<string, never> | null;
+            openCaseCountByStatus: components["schemas"]["CaseStatusCountDto"][];
+            caseVolumeTrend: components["schemas"]["CaseVolumeTrendPointDto"][];
+            agentWorkload: components["schemas"]["AgentWorkloadDto"][];
+        };
+        SavedDashboardResponseDto: {
+            id: string;
+            name: string;
+            ownerId?: Record<string, never> | null;
+            /** @enum {string} */
+            visibility: "PRIVATE" | "DEPARTMENT" | "ORG";
+            layoutConfig: {
+                [key: string]: unknown;
+            };
+            widgets: {
+                [key: string]: unknown;
+            }[];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateSavedDashboardDto: {
+            name: string;
+            /**
+             * @default PRIVATE
+             * @enum {string}
+             */
+            visibility: "PRIVATE" | "DEPARTMENT" | "ORG";
+            widgets: {
+                [key: string]: unknown;
+            }[];
+            layoutConfig: {
+                [key: string]: unknown;
+            };
+        };
+        UpdateSavedDashboardDto: {
+            name?: string;
+            /** @enum {string} */
+            visibility?: "PRIVATE" | "DEPARTMENT" | "ORG";
+            widgets?: {
+                [key: string]: unknown;
+            }[];
+            layoutConfig?: {
+                [key: string]: unknown;
+            };
+        };
         AuditLogActorDto: {
             id: string;
             fullName: string;
@@ -5346,6 +6031,14 @@ export interface components {
             /** @description Why this settled/repudiated claim is being reopened */
             reason: string;
         };
+        ApplyMacroResponseDto: {
+            macroId: string;
+            entityType: string;
+            entityId: string;
+            results: {
+                [key: string]: unknown;
+            }[];
+        };
         CommentResponseDto: {
             id: string;
             claimId: Record<string, never> | null;
@@ -5358,6 +6051,8 @@ export interface components {
             occurredAt: string;
             createdById: Record<string, never> | null;
             createdBySystemJob: Record<string, never> | null;
+            /** @description Only set for OUTBOUND comments on a Case — whether the customer-facing email actually sent. */
+            emailDeliveryStatus?: Record<string, never> | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -5402,6 +6097,8 @@ export interface components {
             policyId: Record<string, never> | null;
             assignedToId: Record<string, never> | null;
             assignedTeamId: Record<string, never> | null;
+            /** @description The requester/filer — distinct from assignedToId. Null for system/omnichannel-originated cases. */
+            createdById: Record<string, never> | null;
             slaPolicyId: Record<string, never> | null;
             parentCaseId: Record<string, never> | null;
             linkType: Record<string, never> | null;
@@ -5455,20 +6152,30 @@ export interface components {
             /** @description Stored as resolutionNotes when status is RESOLVED */
             reason?: string;
         };
+        RequestCaseClosureDto: {
+            reason?: string;
+        };
+        DecideCaseClosureDto: {
+            /** @enum {string} */
+            decision: "APPROVED" | "REJECTED";
+            reason?: string;
+        };
+        CaseClosureApprovalResponseDto: {
+            id: string;
+            status: string;
+            requestedById: string;
+            approvedById?: Record<string, never> | null;
+            reason?: Record<string, never> | null;
+            decidedAt?: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
         LinkChildCaseDto: {
             childCaseId: string;
         };
         MergeCaseDto: {
             /** @description The case that survives — the case in the URL becomes its (non-destructive) MERGED child */
             targetCaseId: string;
-        };
-        ApplyMacroResponseDto: {
-            macroId: string;
-            entityType: string;
-            entityId: string;
-            results: {
-                [key: string]: unknown;
-            }[];
         };
         SlaTargetResponseDto: {
             id: string;
@@ -5489,6 +6196,7 @@ export interface components {
             priority: Record<string, never> | null;
             businessHoursCalendarId: Record<string, never> | null;
             isActive: boolean;
+            rank: number;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -5547,6 +6255,11 @@ export interface components {
             businessHoursCalendarId?: string;
             /** @default true */
             isActive: boolean;
+            /**
+             * @description Tiebreak rank when two policies match a case equally specifically — higher wins.
+             * @default 0
+             */
+            rank: number;
             /** @description Optional initial targets, created alongside the policy */
             targets?: components["schemas"]["CreateSlaTargetDto"][];
         };
@@ -5558,6 +6271,8 @@ export interface components {
             priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
             businessHoursCalendarId?: string;
             isActive?: boolean;
+            /** @description Tiebreak rank when two policies match a case equally specifically — higher wins. */
+            rank?: number;
         };
         UpdateSlaTargetDto: {
             /** @enum {string} */
@@ -5626,6 +6341,7 @@ export interface components {
             id: string;
             name: string;
             description: Record<string, never> | null;
+            category: Record<string, never> | null;
             entityType: Record<string, never> | null;
             actions: components["schemas"]["ActionSpecDto"][];
             isActive: boolean;
@@ -5639,6 +6355,8 @@ export interface components {
         CreateMacroDto: {
             name: string;
             description?: string;
+            /** @description Free-text grouping label, e.g. "Renewals", "Escalations" — purely organizational */
+            category?: string;
             /** @enum {string} */
             entityType?: "CLAIM" | "CASE";
             actions: components["schemas"]["ActionSpecDto"][];
@@ -5648,6 +6366,7 @@ export interface components {
         UpdateMacroDto: {
             name?: string;
             description?: string;
+            category?: string;
             /** @enum {string} */
             entityType?: "CLAIM" | "CASE";
             actions?: components["schemas"]["ActionSpecDto"][];
@@ -5747,6 +6466,7 @@ export interface components {
             name: string;
             code: string;
             caseType: Record<string, never> | null;
+            parentId: Record<string, never> | null;
         };
         CreateCaseCategoryDto: {
             name: string;
@@ -5756,6 +6476,8 @@ export interface components {
              * @enum {string}
              */
             caseType?: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
+            /** @description Parent category id, for a nested hierarchy — omit/null for a top-level category. Must not be the category itself or one of its own descendants (cycle check is client-side; see case-categories-list-view.tsx / case-category-form-dialog.tsx). The controller rejects self-parenting. */
+            parentId?: Record<string, never> | null;
         };
         UpdateCaseCategoryDto: {
             name?: string;
@@ -5765,19 +6487,46 @@ export interface components {
              * @enum {string}
              */
             caseType?: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
+            /** @description Parent category id, for a nested hierarchy — omit/null for a top-level category. Must not be the category itself or one of its own descendants (cycle check is client-side; see case-categories-list-view.tsx / case-category-form-dialog.tsx). The controller rejects self-parenting. */
+            parentId?: Record<string, never> | null;
         };
         LossCauseCategoryResponseDto: {
             id: string;
             name: string;
             code: string;
+            parentId: Record<string, never> | null;
         };
         CreateLossCauseCategoryDto: {
             name: string;
             code: string;
+            /** @description Parent category id, for a nested hierarchy — omit/null for a top-level category. Must not be the category itself or one of its own descendants (cycle check is client-side; see loss-cause-categories-list-view.tsx / loss-cause-category-form-dialog.tsx). The controller rejects self-parenting. */
+            parentId?: Record<string, never> | null;
         };
         UpdateLossCauseCategoryDto: {
             name?: string;
             code?: string;
+            /** @description Parent category id, for a nested hierarchy — omit/null for a top-level category. Must not be the category itself or one of its own descendants (cycle check is client-side; see loss-cause-categories-list-view.tsx / loss-cause-category-form-dialog.tsx). The controller rejects self-parenting. */
+            parentId?: Record<string, never> | null;
+        };
+        AutomationRunStateResponseDto: {
+            id: string;
+            ruleId: string;
+            ruleName?: string;
+            /** @enum {string} */
+            entityType: "CASE" | "CLAIM";
+            entityId: string;
+            /** @enum {string} */
+            status: "RUNNING" | "WAITING_APPROVAL" | "COMPLETED" | "FAILED";
+            currentStepIndex: number;
+            approvalId?: Record<string, never> | null;
+            failureReason?: Record<string, never> | null;
+            /** Format: date-time */
+            startedAt: string;
+            completedAt?: Record<string, never> | null;
+        };
+        DecideAutomationRunDto: {
+            /** @enum {string} */
+            decision: "APPROVED" | "REJECTED";
         };
         KnowledgeCategoryResponseDto: {
             id: string;
@@ -5885,6 +6634,35 @@ export interface components {
             notHelpfulCount: number;
             /** @description helpfulCount / (helpfulCount + notHelpfulCount), null if no votes yet */
             helpfulRatio?: Record<string, never> | null;
+        };
+        PublicKnowledgeCategoryDto: {
+            id: string;
+            name: string;
+            code: string;
+        };
+        PublicKnowledgeArticleListItemDto: {
+            id: string;
+            slug: string;
+            title: string;
+            categoryId?: Record<string, never> | null;
+            categoryName?: Record<string, never> | null;
+            viewCount: number;
+            helpfulCount: number;
+            publishedAt?: Record<string, never> | null;
+        };
+        PublicKnowledgeArticleDetailDto: {
+            id: string;
+            slug: string;
+            title: string;
+            categoryId?: Record<string, never> | null;
+            categoryName?: Record<string, never> | null;
+            viewCount: number;
+            helpfulCount: number;
+            publishedAt?: Record<string, never> | null;
+            /** @description The article's current published version body */
+            bodyMarkdown: string;
+            /** Format: date-time */
+            updatedAt: string;
         };
         SurveyDto: {
             id: string;
@@ -6208,6 +6986,16 @@ export interface components {
             abTestDecidedAt: string;
             remainingRecipientsEnqueued: number;
         };
+        CampaignSuppressionResponseDto: {
+            id: string;
+            contactId: Record<string, never> | null;
+            emailOrPhone: string;
+            /** @enum {string} */
+            channel: "EMAIL" | "SMS" | "WHATSAPP";
+            reason: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
         CampaignWebhookEventDto: {
             /** @description The provider-assigned message id set on CampaignRecipient.externalMessageId at send time */
             externalMessageId: string;
@@ -6370,6 +7158,141 @@ export interface components {
         ScheduledReportRunDownloadResponseDto: {
             downloadUrl: string;
             expiresInSeconds: number;
+        };
+        CustomReportFieldDto: {
+            key: string;
+            label: string;
+            type: string;
+            filterable: boolean;
+            groupable: boolean;
+        };
+        CustomReportEntityDto: {
+            entity: string;
+            label: string;
+            fields: components["schemas"]["CustomReportFieldDto"][];
+        };
+        CustomReportFilterDto: {
+            field: string;
+            /** @enum {string} */
+            operator: "eq" | "neq" | "gt" | "lt" | "gte" | "lte" | "contains" | "in";
+            value: Record<string, never>;
+        };
+        RunCustomReportDto: {
+            /** @description Must be a key in CUSTOM_REPORT_REGISTRY */
+            entity: string;
+            fields: string[];
+            filters?: components["schemas"]["CustomReportFilterDto"][];
+            groupBy?: string[];
+            /** @default 50 */
+            take: number;
+            /** @default 0 */
+            skip: number;
+        };
+        CustomReportResultDto: {
+            rows: Record<string, never>[];
+            totalCount: number;
+        };
+        SearchResultDto: {
+            id: string;
+            /** @enum {string} */
+            type: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY" | "CARRIER" | "TASK" | "POLICY" | "CLAIM" | "CASE" | "CAMPAIGN" | "KNOWLEDGE_ARTICLE";
+            title: string;
+            subtitle: Record<string, never> | null;
+            href: string;
+        };
+        SearchResponseDto: {
+            results: components["schemas"]["SearchResultDto"][];
+        };
+        StartLiveChatSessionDto: {
+            name: string;
+            email: string;
+            initialMessage: string;
+        };
+        LiveChatSessionResponseDto: {
+            caseId: string;
+            sessionToken: string;
+        };
+        PostLiveChatMessageDto: {
+            message: string;
+            /** @description Must match the sessionToken returned by session start */
+            sessionToken?: string;
+        };
+        LiveChatMessageDto: {
+            id: string;
+            direction: string;
+            body: Record<string, never>;
+            /** Format: date-time */
+            occurredAt: string;
+            /** @description true if this message came from an agent, false if from the visitor */
+            fromAgent: boolean;
+        };
+        InboundEmailWebhookDto: {
+            from: string;
+            to: string;
+            subject: string;
+            text: string;
+            messageId: string;
+            inReplyTo?: string;
+        };
+        InboundWebhookResponseDto: {
+            status: string;
+            caseId: Record<string, never>;
+        };
+        InboundMessagingWebhookDto: {
+            From: string;
+            Body: string;
+            MessageSid: string;
+        };
+        LoyaltyAccountResponseDto: {
+            id: string;
+            accountId: string;
+            accountName?: string;
+            tier: string;
+            /** @description SUM(points) over every posted transaction — see the schema comment on why this is never a stored column */
+            pointsBalance: number;
+            /** Format: date-time */
+            enrolledAt: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        LoyaltyTransactionResponseDto: {
+            id: string;
+            loyaltyAccountId: string;
+            type: string;
+            points: number;
+            reason: string;
+            relatedPolicyId?: Record<string, never> | null;
+            createdById?: Record<string, never> | null;
+            createdByName?: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        EnrollLoyaltyAccountDto: {
+            accountId: string;
+            /** @description Defaults to STANDARD */
+            tier?: string;
+        };
+        UpdateLoyaltyTierDto: {
+            tier: string;
+        };
+        EarnPointsDto: {
+            /** @description Always positive — validated server-side */
+            points: number;
+            reason: string;
+            /** @description The bind/renewal that earned these points */
+            relatedPolicyId?: string;
+        };
+        RedeemPointsDto: {
+            /** @description A positive number — the amount to redeem; posted as a negative ledger entry */
+            points: number;
+            reason: string;
+        };
+        AdjustPointsDto: {
+            /** @description Signed — positive to grant, negative to claw back */
+            points: number;
+            reason: string;
         };
     };
     responses: never;
@@ -6635,6 +7558,107 @@ export interface operations {
             };
         };
     };
+    IdentityController_updateMyProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMyProfileDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentUserResponseDto"];
+                };
+            };
+        };
+    };
+    IdentityController_updateMyPresence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMyPresenceDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentUserResponseDto"];
+                };
+            };
+        };
+    };
+    IdentityController_getMyAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    IdentityController_uploadMyAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentUserResponseDto"];
+                };
+            };
+        };
+    };
+    IdentityController_deleteMyAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentUserResponseDto"];
+                };
+            };
+        };
+    };
     UsersController_list: {
         parameters: {
             query?: {
@@ -6730,6 +7754,27 @@ export interface operations {
         };
     };
     UsersController_reactivate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponseDto"];
+                };
+            };
+        };
+    };
+    UsersController_suspend: {
         parameters: {
             query?: never;
             header?: never;
@@ -9527,6 +10572,7 @@ export interface operations {
                 status?: "OPEN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
                 dueBefore?: string;
                 dueAfter?: string;
+                caseId?: string;
             };
             header?: never;
             path?: never;
@@ -9574,6 +10620,7 @@ export interface operations {
                 status?: "OPEN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
                 dueBefore?: string;
                 dueAfter?: string;
+                caseId?: string;
             };
             header?: never;
             path?: never;
@@ -11365,6 +12412,155 @@ export interface operations {
             };
         };
     };
+    CaseKpisController_getCaseKpis: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseKpiResponseDto"];
+                };
+            };
+        };
+    };
+    SavedDashboardsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedDashboardResponseDto"][];
+                };
+            };
+        };
+    };
+    SavedDashboardsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSavedDashboardDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedDashboardResponseDto"];
+                };
+            };
+        };
+    };
+    SavedDashboardsController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedDashboardResponseDto"];
+                };
+            };
+        };
+    };
+    SavedDashboardsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SavedDashboardsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSavedDashboardDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedDashboardResponseDto"];
+                };
+            };
+        };
+    };
+    SavedDashboardsController_render: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderedDashboardResponseDto"];
+                };
+            };
+        };
+    };
     AuditLogController_list: {
         parameters: {
             query?: {
@@ -11585,6 +12781,28 @@ export interface operations {
             };
         };
     };
+    ClaimsController_applyMacro: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                macroId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyMacroResponseDto"];
+                };
+            };
+        };
+    };
     ClaimsController_listComments: {
         parameters: {
             query?: never;
@@ -11707,6 +12925,39 @@ export interface operations {
                 assignedTeamId?: string;
                 accountId?: string;
                 categoryId?: string;
+                /** @description Children of this case — powers the ticket detail page's "Related tickets" table */
+                parentCaseId?: string;
+                /** @description Assignee IN-filter — repeat the query param once per id (ticket workspace's "Agents Include") */
+                assignedToIds?: string[];
+                /** @description Team IN-filter — repeat the query param once per id ("Groups Include") */
+                assignedTeamIds?: string[];
+                /** @description status IN-filter — repeat the query param once per value */
+                statuses?: ("NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED")[];
+                /** @description status NOT-IN filter — repeat the query param once per value ("unresolved", "open in my groups", etc.) */
+                excludeStatuses?: ("NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED")[];
+                /** @description priority IN-filter — repeat the query param once per value */
+                priorities?: ("LOW" | "MEDIUM" | "HIGH" | "URGENT")[];
+                /** @description Narrow to cases whose assignedTeamId is one of the caller's own teams — resolved server-side from TeamMember, never client-suppliable team ids */
+                myTeams?: string;
+                /** @description Maps to createdById — "tickets I raised" */
+                raisedByUserId?: string;
+                /** @description Cases with a CaseWatcher row for this user — "tickets I'm watching" */
+                watchingUserId?: string;
+                /** @description status=NEW, OR assignedToId=caller AND status not in RESOLVED/CLOSED — "new and my open tickets" */
+                newOrMine?: string;
+                /** @description Cases with at least one comment whose outbound email delivery failed */
+                undeliveredOnly?: string;
+                /** @description Filters on the RUNNING RESOLUTION SlaClock's dueAt */
+                resolutionDueBy?: "OVERDUE" | "DUE_TODAY" | "DUE_THIS_WEEK";
+                createdPreset?: "TODAY" | "YESTERDAY" | "THIS_WEEK" | "THIS_MONTH";
+                closedPreset?: "TODAY" | "YESTERDAY" | "THIS_WEEK" | "THIS_MONTH";
+                resolvedPreset?: "TODAY" | "YESTERDAY" | "THIS_WEEK" | "THIS_MONTH";
+                /** @description Case-insensitive match against subject/caseNumber */
+                search?: string;
+                skip?: number;
+                take?: number;
+                sortBy?: "createdAt" | "priority" | "status";
+                sortDir?: "asc" | "desc";
             };
             header?: never;
             path?: never;
@@ -11747,6 +12998,68 @@ export interface operations {
             };
         };
     };
+    CasesController_count: {
+        parameters: {
+            query?: {
+                status?: "NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED";
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                caseType?: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
+                assignedToId?: string;
+                assignedTeamId?: string;
+                accountId?: string;
+                categoryId?: string;
+                /** @description Children of this case — powers the ticket detail page's "Related tickets" table */
+                parentCaseId?: string;
+                /** @description Assignee IN-filter — repeat the query param once per id (ticket workspace's "Agents Include") */
+                assignedToIds?: string[];
+                /** @description Team IN-filter — repeat the query param once per id ("Groups Include") */
+                assignedTeamIds?: string[];
+                /** @description status IN-filter — repeat the query param once per value */
+                statuses?: ("NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED")[];
+                /** @description status NOT-IN filter — repeat the query param once per value ("unresolved", "open in my groups", etc.) */
+                excludeStatuses?: ("NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED")[];
+                /** @description priority IN-filter — repeat the query param once per value */
+                priorities?: ("LOW" | "MEDIUM" | "HIGH" | "URGENT")[];
+                /** @description Narrow to cases whose assignedTeamId is one of the caller's own teams — resolved server-side from TeamMember, never client-suppliable team ids */
+                myTeams?: string;
+                /** @description Maps to createdById — "tickets I raised" */
+                raisedByUserId?: string;
+                /** @description Cases with a CaseWatcher row for this user — "tickets I'm watching" */
+                watchingUserId?: string;
+                /** @description status=NEW, OR assignedToId=caller AND status not in RESOLVED/CLOSED — "new and my open tickets" */
+                newOrMine?: string;
+                /** @description Cases with at least one comment whose outbound email delivery failed */
+                undeliveredOnly?: string;
+                /** @description Filters on the RUNNING RESOLUTION SlaClock's dueAt */
+                resolutionDueBy?: "OVERDUE" | "DUE_TODAY" | "DUE_THIS_WEEK";
+                createdPreset?: "TODAY" | "YESTERDAY" | "THIS_WEEK" | "THIS_MONTH";
+                closedPreset?: "TODAY" | "YESTERDAY" | "THIS_WEEK" | "THIS_MONTH";
+                resolvedPreset?: "TODAY" | "YESTERDAY" | "THIS_WEEK" | "THIS_MONTH";
+                /** @description Case-insensitive match against subject/caseNumber */
+                search?: string;
+                skip?: number;
+                take?: number;
+                sortBy?: "createdAt" | "priority" | "status";
+                sortDir?: "asc" | "desc";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        total?: number;
+                    };
+                };
+            };
+        };
+    };
     CasesController_listMine: {
         parameters: {
             query?: {
@@ -11757,6 +13070,39 @@ export interface operations {
                 assignedTeamId?: string;
                 accountId?: string;
                 categoryId?: string;
+                /** @description Children of this case — powers the ticket detail page's "Related tickets" table */
+                parentCaseId?: string;
+                /** @description Assignee IN-filter — repeat the query param once per id (ticket workspace's "Agents Include") */
+                assignedToIds?: string[];
+                /** @description Team IN-filter — repeat the query param once per id ("Groups Include") */
+                assignedTeamIds?: string[];
+                /** @description status IN-filter — repeat the query param once per value */
+                statuses?: ("NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED")[];
+                /** @description status NOT-IN filter — repeat the query param once per value ("unresolved", "open in my groups", etc.) */
+                excludeStatuses?: ("NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED")[];
+                /** @description priority IN-filter — repeat the query param once per value */
+                priorities?: ("LOW" | "MEDIUM" | "HIGH" | "URGENT")[];
+                /** @description Narrow to cases whose assignedTeamId is one of the caller's own teams — resolved server-side from TeamMember, never client-suppliable team ids */
+                myTeams?: string;
+                /** @description Maps to createdById — "tickets I raised" */
+                raisedByUserId?: string;
+                /** @description Cases with a CaseWatcher row for this user — "tickets I'm watching" */
+                watchingUserId?: string;
+                /** @description status=NEW, OR assignedToId=caller AND status not in RESOLVED/CLOSED — "new and my open tickets" */
+                newOrMine?: string;
+                /** @description Cases with at least one comment whose outbound email delivery failed */
+                undeliveredOnly?: string;
+                /** @description Filters on the RUNNING RESOLUTION SlaClock's dueAt */
+                resolutionDueBy?: "OVERDUE" | "DUE_TODAY" | "DUE_THIS_WEEK";
+                createdPreset?: "TODAY" | "YESTERDAY" | "THIS_WEEK" | "THIS_MONTH";
+                closedPreset?: "TODAY" | "YESTERDAY" | "THIS_WEEK" | "THIS_MONTH";
+                resolvedPreset?: "TODAY" | "YESTERDAY" | "THIS_WEEK" | "THIS_MONTH";
+                /** @description Case-insensitive match against subject/caseNumber */
+                search?: string;
+                skip?: number;
+                take?: number;
+                sortBy?: "createdAt" | "priority" | "status";
+                sortDir?: "asc" | "desc";
             };
             header?: never;
             path?: never;
@@ -11884,6 +13230,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CaseResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_requestClosure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestCaseClosureDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_decideClosure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideCaseClosureDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_getClosureApproval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseClosureApprovalResponseDto"];
                 };
             };
         };
@@ -13074,6 +14491,74 @@ export interface operations {
             };
         };
     };
+    AutomationRunStatesController_list: {
+        parameters: {
+            query: {
+                entityType: "CASE" | "CLAIM";
+                entityId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRunStateResponseDto"][];
+                };
+            };
+        };
+    };
+    AutomationRunStatesController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRunStateResponseDto"];
+                };
+            };
+        };
+    };
+    AutomationRunStatesController_decide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideAutomationRunDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRunStateResponseDto"];
+                };
+            };
+        };
+    };
     KnowledgeCategoriesController_list: {
         parameters: {
             query?: never;
@@ -13428,6 +14913,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnowledgeArticleAnalyticsResponseDto"];
+                };
+            };
+        };
+    };
+    PublicKnowledgeController_listCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicKnowledgeCategoryDto"][];
+                };
+            };
+        };
+    };
+    PublicKnowledgeController_list: {
+        parameters: {
+            query?: {
+                /** @description Case-insensitive substring match on title */
+                q?: string;
+                categoryId?: string;
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicKnowledgeArticleListItemDto"][];
+                };
+            };
+        };
+    };
+    PublicKnowledgeController_findBySlug: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicKnowledgeArticleDetailDto"];
                 };
             };
         };
@@ -14137,6 +15687,30 @@ export interface operations {
             };
         };
     };
+    CampaignSuppressionsController_list: {
+        parameters: {
+            query?: {
+                channel?: "EMAIL" | "SMS" | "WHATSAPP";
+                search?: string;
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignSuppressionResponseDto"][];
+                };
+            };
+        };
+    };
     CampaignWebhooksController_handleEmailEvent: {
         parameters: {
             query?: never;
@@ -14474,6 +16048,438 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScheduledReportRunDownloadResponseDto"];
+                };
+            };
+        };
+    };
+    CustomReportController_listEntities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomReportEntityDto"][];
+                };
+            };
+        };
+    };
+    CustomReportController_listFields: {
+        parameters: {
+            query: {
+                entity: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomReportEntityDto"];
+                };
+            };
+        };
+    };
+    CustomReportController_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunCustomReportDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomReportResultDto"];
+                };
+            };
+        };
+    };
+    SearchController_search: {
+        parameters: {
+            query: {
+                /** @description Search term — matched case-insensitively against each entity type's natural-language identifier (name, number, subject, etc). */
+                q: string;
+                /** @description Max results returned per entity type, not a total cap. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResponseDto"];
+                };
+            };
+        };
+    };
+    LiveChatController_startSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartLiveChatSessionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveChatSessionResponseDto"];
+                };
+            };
+        };
+    };
+    LiveChatController_listMessages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveChatMessageDto"][];
+                };
+            };
+        };
+    };
+    LiveChatController_postMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostLiveChatMessageDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveChatMessageDto"];
+                };
+            };
+        };
+    };
+    InboundEmailController_receive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InboundEmailWebhookDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboundWebhookResponseDto"];
+                };
+            };
+        };
+    };
+    InboundMessagingController_receiveWhatsapp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InboundMessagingWebhookDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboundWebhookResponseDto"];
+                };
+            };
+        };
+    };
+    InboundMessagingController_receiveSms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InboundMessagingWebhookDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboundWebhookResponseDto"];
+                };
+            };
+        };
+    };
+    LoyaltyAccountsController_list: {
+        parameters: {
+            query: {
+                search: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyAccountResponseDto"][];
+                };
+            };
+        };
+    };
+    LoyaltyAccountsController_enroll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrollLoyaltyAccountDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyAccountResponseDto"];
+                };
+            };
+        };
+    };
+    LoyaltyAccountsController_findByAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyAccountResponseDto"];
+                };
+            };
+        };
+    };
+    LoyaltyAccountsController_findOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyAccountResponseDto"];
+                };
+            };
+        };
+    };
+    LoyaltyAccountsController_transactions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyTransactionResponseDto"][];
+                };
+            };
+        };
+    };
+    LoyaltyAccountsController_updateTier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLoyaltyTierDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyAccountResponseDto"];
+                };
+            };
+        };
+    };
+    LoyaltyAccountsController_earn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EarnPointsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyTransactionResponseDto"];
+                };
+            };
+        };
+    };
+    LoyaltyAccountsController_redeem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RedeemPointsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyTransactionResponseDto"];
+                };
+            };
+        };
+    };
+    LoyaltyAccountsController_adjust: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdjustPointsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyTransactionResponseDto"];
                 };
             };
         };

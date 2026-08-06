@@ -1,6 +1,16 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { ArrayMinSize, IsArray, IsBooleanString, IsEnum, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, Min, MinLength } from 'class-validator';
 import { ActivityType, CasePriority, CaseStatus, CaseType } from '@topiadesk/db';
+
+/** Express/qs collapses a single repeated query param (`?assignedToIds=a`) to a bare string instead of a 1-element array — normalize before @IsArray/@IsUUID(each) run. */
+const toArray = ({ value }: { value: unknown }): unknown => (value === undefined || Array.isArray(value) ? value : [value]);
+
+export const DATE_RANGE_PRESETS = ['TODAY', 'YESTERDAY', 'THIS_WEEK', 'THIS_MONTH'] as const;
+export type DateRangePreset = (typeof DATE_RANGE_PRESETS)[number];
+
+export const RESOLUTION_DUE_BY_PRESETS = ['OVERDUE', 'DUE_TODAY', 'DUE_THIS_WEEK'] as const;
+export type ResolutionDueByPreset = (typeof RESOLUTION_DUE_BY_PRESETS)[number];
 
 export class CreateCaseDto {
   @ApiProperty({ enum: CaseType }) @IsEnum(CaseType) caseType!: CaseType;
@@ -45,6 +55,81 @@ export class CaseQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsUUID() assignedTeamId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() accountId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() categoryId?: string;
+  @ApiPropertyOptional({ description: 'Children of this case — powers the ticket detail page\'s "Related tickets" table' }) @IsOptional() @IsUUID() parentCaseId?: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'Assignee IN-filter — repeat the query param once per id (ticket workspace\'s "Agents Include")' })
+  @IsOptional()
+  @Transform(toArray)
+  @IsArray()
+  @IsUUID('4', { each: true })
+  assignedToIds?: string[];
+
+  @ApiPropertyOptional({ type: [String], description: 'Team IN-filter — repeat the query param once per id ("Groups Include")' })
+  @IsOptional()
+  @Transform(toArray)
+  @IsArray()
+  @IsUUID('4', { each: true })
+  assignedTeamIds?: string[];
+
+  @ApiPropertyOptional({ type: [String], enum: CaseStatus, isArray: true, description: 'status IN-filter — repeat the query param once per value' })
+  @IsOptional()
+  @Transform(toArray)
+  @IsArray()
+  @IsEnum(CaseStatus, { each: true })
+  statuses?: CaseStatus[];
+
+  @ApiPropertyOptional({ type: [String], enum: CaseStatus, isArray: true, description: 'status NOT-IN filter — repeat the query param once per value ("unresolved", "open in my groups", etc.)' })
+  @IsOptional()
+  @Transform(toArray)
+  @IsArray()
+  @IsEnum(CaseStatus, { each: true })
+  excludeStatuses?: CaseStatus[];
+
+  @ApiPropertyOptional({ type: [String], enum: CasePriority, isArray: true, description: 'priority IN-filter — repeat the query param once per value' })
+  @IsOptional()
+  @Transform(toArray)
+  @IsArray()
+  @IsEnum(CasePriority, { each: true })
+  priorities?: CasePriority[];
+
+  @ApiPropertyOptional({ description: 'Narrow to cases whose assignedTeamId is one of the caller\'s own teams — resolved server-side from TeamMember, never client-suppliable team ids' })
+  @IsOptional()
+  @IsBooleanString()
+  myTeams?: string;
+
+  @ApiPropertyOptional({ description: 'Maps to createdById — "tickets I raised"' }) @IsOptional() @IsUUID() raisedByUserId?: string;
+  @ApiPropertyOptional({ description: 'Cases with a CaseWatcher row for this user — "tickets I\'m watching"' }) @IsOptional() @IsUUID() watchingUserId?: string;
+
+  @ApiPropertyOptional({ description: 'status=NEW, OR assignedToId=caller AND status not in RESOLVED/CLOSED — "new and my open tickets"' })
+  @IsOptional()
+  @IsBooleanString()
+  newOrMine?: string;
+
+  @ApiPropertyOptional({ description: 'Cases with at least one comment whose outbound email delivery failed' })
+  @IsOptional()
+  @IsBooleanString()
+  undeliveredOnly?: string;
+
+  @ApiPropertyOptional({ enum: RESOLUTION_DUE_BY_PRESETS, description: 'Filters on the RUNNING RESOLUTION SlaClock\'s dueAt' })
+  @IsOptional()
+  @IsIn(RESOLUTION_DUE_BY_PRESETS)
+  resolutionDueBy?: ResolutionDueByPreset;
+
+  @ApiPropertyOptional({ enum: DATE_RANGE_PRESETS }) @IsOptional() @IsIn(DATE_RANGE_PRESETS) createdPreset?: DateRangePreset;
+  @ApiPropertyOptional({ enum: DATE_RANGE_PRESETS }) @IsOptional() @IsIn(DATE_RANGE_PRESETS) closedPreset?: DateRangePreset;
+  @ApiPropertyOptional({ enum: DATE_RANGE_PRESETS }) @IsOptional() @IsIn(DATE_RANGE_PRESETS) resolvedPreset?: DateRangePreset;
+
+  @ApiPropertyOptional({ description: 'Case-insensitive match against subject/caseNumber' }) @IsOptional() @IsString() search?: string;
+
+  @ApiPropertyOptional({ minimum: 0 }) @IsOptional() @IsInt() @Min(0) skip?: number;
+  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 100 }) @IsOptional() @IsInt() @Min(1) @Max(100) take?: number;
+
+  @ApiPropertyOptional({ enum: ['createdAt', 'priority', 'status'], default: 'createdAt' })
+  @IsOptional()
+  @IsIn(['createdAt', 'priority', 'status'])
+  sortBy?: 'createdAt' | 'priority' | 'status';
+
+  @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'desc' }) @IsOptional() @IsIn(['asc', 'desc']) sortDir?: 'asc' | 'desc';
 }
 
 export class CaseQueueQueryDto {
@@ -90,4 +175,16 @@ export class CaseResponseDto {
   @ApiProperty({ nullable: true }) closedAt!: Date | null;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
+}
+
+/** Cases have no delete endpoint at all (not a deletable entity) — bulk actions are assign + status-update only, mirroring exactly what the ticket workspace's UI already offers (reassign owner, close). */
+export class BulkAssignCasesDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @IsUUID(undefined, { each: true }) ids!: string[];
+  @ApiProperty() @IsUUID() assignedToId!: string;
+}
+
+/** `status` is required, not optional — unlike CRM's bulk/update (a generic field-patch), this always goes through applyCaseStatusTransition per row (case-lifecycle.ts's real state machine), so there's no meaningful "update with nothing to update" call. */
+export class BulkUpdateCasesDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @IsUUID(undefined, { each: true }) ids!: string[];
+  @ApiProperty({ enum: CaseStatus }) @IsEnum(CaseStatus) status!: CaseStatus;
 }

@@ -363,6 +363,8 @@ async function seedDefaultDashboards(adminUserId: string): Promise<void> {
         { id: 'premium-aging', title: 'Premium Aging by Branch', reportKey: 'premium-aging-by-branch', filters: {}, dimension: 'branch' },
         { id: 'pipeline-conversion', title: 'Sales Pipeline Conversion', reportKey: 'sales-pipeline-conversion-velocity', filters: {} },
         { id: 'portfolio-concentration', title: 'Top Accounts by Premium', reportKey: 'account-portfolio-concentration', filters: { topN: 10 } },
+        { id: 'lead-source-roi', title: 'Lead Source & Campaign ROI', reportKey: 'lead-source-campaign-roi', filters: {} },
+        { id: 'sla-compliance', title: 'SLA Compliance by Team', reportKey: 'sla-compliance-by-team', filters: {} },
       ],
     },
     {
@@ -371,6 +373,8 @@ async function seedDefaultDashboards(adminUserId: string): Promise<void> {
         { id: 'broker-productivity', title: 'Broker Productivity', reportKey: 'broker-productivity', filters: {}, dimension: 'broker' },
         { id: 'policy-lapse-rate', title: 'Policy Lapse Rate by Branch', reportKey: 'policy-lapse-rate', filters: {}, dimension: 'branch' },
         { id: 'renewal-pipeline', title: 'Renewal Pipeline by Carrier', reportKey: 'renewal-pipeline-by-carrier', filters: {} },
+        { id: 'agent-throughput', title: 'Agent Case Throughput', reportKey: 'agent-case-throughput', filters: {} },
+        { id: 'case-resolution-time', title: 'Case Resolution Time by Category', reportKey: 'case-resolution-time-by-category', filters: {} },
       ],
     },
     {
@@ -379,6 +383,8 @@ async function seedDefaultDashboards(adminUserId: string): Promise<void> {
         { id: 'my-productivity', title: 'My Productivity', reportKey: 'broker-productivity', filters: {}, dimension: 'broker' },
         { id: 'my-renewals', title: 'My Renewal Pipeline', reportKey: 'renewal-pipeline-by-carrier', filters: {} },
         { id: 'market-submissions', title: 'Market Submission Performance', reportKey: 'market-submission-performance', filters: {} },
+        { id: 'lead-source-roi', title: 'Lead Source & Campaign ROI', reportKey: 'lead-source-campaign-roi', filters: {} },
+        { id: 'case-reopen-quality', title: 'Case Reopen & Quality Rate', reportKey: 'case-reopen-quality-rate', filters: {} },
       ],
     },
     {
@@ -387,6 +393,8 @@ async function seedDefaultDashboards(adminUserId: string): Promise<void> {
         { id: 'doc-compliance', title: 'Document Compliance Readiness', reportKey: 'document-compliance-readiness', filters: {} },
         { id: 'complaint-trends', title: 'Complaint Case Volume Trends', reportKey: 'complaint-case-volume-trends', filters: {}, dimension: 'month' },
         { id: 'claims-turnaround', title: 'Claims Turnaround Time', reportKey: 'claims-turnaround-time', filters: {} },
+        { id: 'sla-compliance', title: 'SLA Compliance by Team', reportKey: 'sla-compliance-by-team', filters: {} },
+        { id: 'case-resolution-time', title: 'Case Resolution Time by Category', reportKey: 'case-resolution-time-by-category', filters: {} },
       ],
     },
   ];

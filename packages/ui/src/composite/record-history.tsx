@@ -230,7 +230,7 @@ export function RecordHistoryRow({ entry }: { entry: RecordHistoryEntry }) {
   const Icon = ACTION_ICON[entry.action] ?? Pencil;
   return (
     <li className="relative pb-6 last:pb-0">
-      <span className="absolute -left-[29px] flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground">
+      <span className="absolute -left-[29px] flex h-6 w-6 items-center justify-center rounded-none border border-border bg-background text-muted-foreground">
         <Icon className="h-3.5 w-3.5" aria-hidden />
       </span>
       <div className="flex flex-wrap items-center gap-2">

@@ -1,6 +1,5 @@
 'use client';
 
-import * as React from 'react';
 import { ChevronDown } from 'lucide-react';
 import {
   Button,
@@ -17,66 +16,34 @@ import {
   Input,
   Label,
 } from '@topiadesk/ui';
-import { CASE_STATUS_TRANSITIONS, type Case, type CaseStatus } from '../../../_lib/types';
-import { caseStatusLabel } from '../../../_lib/constants';
-import { useChangeCaseStatus, useRequestCaseClosure } from '../../../_lib/hooks';
-
-/** Distinct labels for the PENDING_CUSTOMER/PENDING_CARRIER holds — see case-lifecycle.ts's doc comment: "different escalation paths, SlaClock pauses/resumes independently for each" — a real differentiator worth surfacing explicitly rather than a generic "Pending". */
-const TARGET_LABEL: Partial<Record<CaseStatus, string>> = {
-  PENDING_CUSTOMER: 'Mark pending — waiting on customer',
-  PENDING_CARRIER: 'Mark pending — waiting on carrier',
-};
+import type { Case } from '../../../_lib/types';
+import { useCaseLifecycle } from '../../_components/use-case-lifecycle';
 
 /**
- * Case detail header's status-transition control — same shape as
- * ClaimLifecycleActions/lifecycle-actions.tsx: a dropdown restricted to
- * CASE_STATUS_TRANSITIONS[current status] (case-lifecycle.ts, hand-mirrored
- * into _lib/types.ts). Only RESOLVED accepts an optional extra field
- * (resolutionNotes) via a small dialog; every other move fires straight
- * from the dropdown item.
+ * Case detail header's status-transition control — see
+ * use-case-lifecycle.ts for the shared transition rules (also consumed by
+ * TicketCard's compact dropdown in the ticket workspace).
  */
 export function CaseLifecycleActions({ kase }: { kase: Case }) {
-  const nextStatuses = CASE_STATUS_TRANSITIONS[kase.status];
-  const changeStatus = useChangeCaseStatus(kase.id);
-  const requestClosure = useRequestCaseClosure(kase.id);
-  const [resolveDialogOpen, setResolveDialogOpen] = React.useState(false);
-  const [reason, setReason] = React.useState('');
+  const { nextStatuses, selectTarget, targetLabel, isPending, resolveDialogOpen, setResolveDialogOpen, reason, setReason, confirmResolve } =
+    useCaseLifecycle(kase);
 
   if (nextStatuses.length === 0) {
     return <span className="text-sm text-muted-foreground">No further transitions — this ticket is in a terminal state.</span>;
-  }
-
-  function selectTarget(target: CaseStatus) {
-    if (target === 'RESOLVED') {
-      setReason('');
-      setResolveDialogOpen(true);
-      return;
-    }
-    if (target === 'CLOSED' && kase.caseType === 'COMPLAINT') {
-      // Backend rejects a direct CLOSED transition for COMPLAINT cases —
-      // this goes through the approval gate instead (see the "Closure
-      // approval" card on case-detail-view.tsx for the pending/decided
-      // state and the compliance-officer decision buttons).
-      requestClosure.mutate({});
-      return;
-    }
-    changeStatus.mutate({ status: target });
   }
 
   return (
     <div className="flex items-center gap-2">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" disabled={changeStatus.isPending || requestClosure.isPending}>
+          <Button variant="outline" disabled={isPending}>
             Change status <ChevronDown className="h-4 w-4" aria-hidden />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {nextStatuses.map((target) => (
             <DropdownMenuItem key={target} onSelect={() => selectTarget(target)}>
-              {target === 'CLOSED' && kase.caseType === 'COMPLAINT'
-                ? 'Request closure approval'
-                : (TARGET_LABEL[target] ?? `Mark as ${caseStatusLabel(target)}`)}
+              {targetLabel(target)}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -93,11 +60,7 @@ export function CaseLifecycleActions({ kase }: { kase: Case }) {
             <Input id="resolutionNotes" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Sent replacement document via email" />
           </div>
           <DialogFooter>
-            <Button
-              type="button"
-              disabled={changeStatus.isPending}
-              onClick={() => changeStatus.mutate({ status: 'RESOLVED', reason: reason || undefined }, { onSuccess: () => setResolveDialogOpen(false) })}
-            >
+            <Button type="button" disabled={isPending} onClick={confirmResolve}>
               Confirm
             </Button>
           </DialogFooter>

@@ -131,7 +131,7 @@ export function CommandPalette() {
         variant="outline"
         size="sm"
         onClick={() => setOpen(true)}
-        className="w-full justify-start gap-2 rounded-full bg-muted/60 text-muted-foreground hover:bg-muted"
+        className="w-full justify-start gap-2 rounded-none bg-muted/60 text-muted-foreground hover:bg-muted"
         aria-label="Search everything"
       >
         <Search className="h-4 w-4" aria-hidden />

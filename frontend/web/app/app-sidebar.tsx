@@ -106,13 +106,13 @@ export function AppSidebar() {
         })}
 
         <div className="mt-auto pt-2">
-          {isLoading ? <Skeleton className="h-9 w-9 rounded-full bg-primary-foreground/10" /> : user ? <AccountMenu user={user} side="right" /> : null}
+          {isLoading ? <Skeleton className="h-9 w-9 rounded-none bg-primary-foreground/10" /> : user ? <AccountMenu user={user} side="right" /> : null}
         </div>
       </nav>
 
       {/* Expandable panel — the active module's own sections/items only. */}
-      <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-card">
-        <div className="flex h-14 items-center border-b border-border px-4">
+      <aside className="flex w-56 shrink-0 flex-col bg-card shadow-[2px_0_8px_-2px_hsl(var(--foreground)/0.10)]">
+        <div className="flex h-11 items-center border-b border-border px-3">
           <span className="text-sm font-semibold tracking-tight text-foreground">{activeModule.label}</span>
         </div>
         <nav className="flex-1 space-y-3 overflow-y-auto p-2">
@@ -128,7 +128,7 @@ export function AppSidebar() {
                 <button
                   type="button"
                   onClick={() => toggleSection(section)}
-                  className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 transition-colors hover:text-foreground"
+                  className="flex w-full items-center justify-between rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 transition-colors hover:text-foreground"
                   aria-expanded={!isCollapsed}
                 >
                   {section}
@@ -159,7 +159,7 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
     <Link
       href={item.href}
       aria-current={active ? 'page' : undefined}
-      className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+      className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors ${
         active
           ? 'bg-secondary text-secondary-foreground'
           : 'text-muted-foreground hover:bg-secondary hover:text-secondary-foreground'

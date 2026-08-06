@@ -24,6 +24,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { SearchModule } from './modules/search/search.module';
 import { OmnichannelModule } from './modules/omnichannel/omnichannel.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
+import { IpWhitelistGuard } from './modules/identity/ip-whitelist.guard';
 
 @Module({
   imports: [
@@ -62,6 +63,12 @@ import { LoyaltyModule } from './modules/loyalty/loyalty.module';
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Enforcement layer for the already-existing IpWhitelistEntry CRUD API
+    // (ip-whitelist.controller.ts) — see ip-whitelist.guard.ts's own header
+    // comment. No-ops entirely while IP_WHITELIST_ENFORCED is unset/false
+    // (today's default), so registering it here is safe regardless of
+    // whether an operator has opted in yet.
+    { provide: APP_GUARD, useClass: IpWhitelistGuard },
     AuditService,
   ],
   exports: [AuditService],

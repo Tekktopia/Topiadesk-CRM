@@ -23,6 +23,25 @@ export interface PipelineFunnelResponse {
   stages: FunnelStage[];
 }
 
+// -- Sales forecast (backend/api/src/modules/dashboards/dashboards.controller.ts's getSalesForecast) --
+
+export interface SalesForecastGroup {
+  key: string;
+  label: string | null;
+  count: number;
+  weightedAmount: string;
+  unweightedAmount: string;
+}
+
+export interface SalesForecastResponse {
+  period: string;
+  periodStart: string;
+  periodEnd: string;
+  groups: SalesForecastGroup[];
+  totalWeightedAmount: string;
+  totalUnweightedAmount: string;
+}
+
 export interface RenewalRow {
   policyId: string;
   policyNumber: string;

@@ -54,7 +54,15 @@
     --input: 196 25% 88%;
     --ring: 199 62% 38%;
 
-    --radius: 0.5rem;
+    /* Square, flat, dense — classic Microsoft Dynamics 365 chrome per
+     * customer feedback. Every rounded-sm/md/lg/xl utility across the app
+     * derives from this one variable (see ../tailwind-preset.ts's
+     * borderRadius.sm/md/lg calc() chain), so this single change squares
+     * off buttons/inputs/cards/menus/dialogs/tables everywhere at once.
+     * The two rounded-xl outliers that don't reach exactly 0 via that
+     * calc() chain (Card, DataTable's wrapper) are hardcoded to
+     * rounded-none directly instead. */
+    --radius: 0rem;
 
     /* System font stack by default — no next/font/google dependency (that
      * fetches over the network at build time, which we deliberately avoid

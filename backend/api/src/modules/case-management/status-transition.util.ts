@@ -3,7 +3,7 @@ import { getPrismaClient, type Case, type CaseStatus, type Claim, type ClaimStat
 import { assertValidClaimTransition } from './claim-lifecycle';
 import { assertValidCaseTransition, PENDING_CASE_STATUSES } from './case-lifecycle';
 import { advanceClaimStageClocks, pauseCaseResolutionClock, resumeCaseResolutionClock, satisfyCaseResolutionClock } from './sla-clock.util';
-import { enqueueSurveyInvitesForResolvedCase } from './survey-dispatch-queue';
+import { enqueueSurveyInvitesForResolvedCase, enqueueSurveyInvitesForSettledClaim } from './survey-dispatch-queue';
 
 /**
  * Single source of truth for "move a Claim to a new status", shared by
@@ -50,6 +50,10 @@ export async function applyClaimStatusTransition(
   });
 
   await advanceClaimStageClocks(claimId, existing.status, toStatus);
+
+  if (toStatus === 'SETTLED') {
+    await enqueueSurveyInvitesForSettledClaim(claimId);
+  }
 
   return updated;
 }
