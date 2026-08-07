@@ -26,4 +26,8 @@ BEGIN
 
   RETURN v_id;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+-- Fixed search_path — see 001_audit_chain_function.sql's identical comment.
+-- Calls digest() (pgcrypto) and gen_random_uuid() (pgcrypto), both in
+-- `public`, plus references audit_log/audit_checkpoints unqualified.
+SET search_path = public;

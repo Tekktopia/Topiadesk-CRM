@@ -62,6 +62,9 @@ importers:
       '@topiadesk/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@topiadesk/db-platform':
+        specifier: workspace:*
+        version: link:../../packages/db-platform
       '@topiadesk/reports':
         specifier: workspace:*
         version: link:../../packages/reports
@@ -150,6 +153,9 @@ importers:
       '@topiadesk/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@topiadesk/db-platform':
+        specifier: workspace:*
+        version: link:../../packages/db-platform
       '@topiadesk/reports':
         specifier: workspace:*
         version: link:../../packages/reports
@@ -193,6 +199,76 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)(terser@5.49.0)
+
+  frontend/global-admin:
+    dependencies:
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      '@topiadesk/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      ioredis:
+        specifier: ^5.4.1
+        version: 5.11.1
+      jose:
+        specifier: ^6.2.6
+        version: 6.2.6
+      lucide-react:
+        specifier: ^1.28.0
+        version: 1.28.0(react@19.2.8)
+      next:
+        specifier: ^15.5.22
+        version: 15.5.22(@playwright/test@1.62.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      next-themes:
+        specifier: ^0.4.6
+        version: 0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      openid-client:
+        specifier: ^6.8.4
+        version: 6.8.4
+      react:
+        specifier: ^19.0.0
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.8(react@19.2.8)
+      server-only:
+        specifier: ^0.0.1
+        version: 0.0.1
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@eslint/eslintrc':
+        specifier: ^3.3.6
+        version: 3.3.6
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.4
+        version: 19.2.4(@types/react@19.2.18)
+      autoprefixer:
+        specifier: ^10.4.20
+        version: 10.5.4(postcss@8.5.25)
+      dotenv-cli:
+        specifier: ^8.0.0
+        version: 8.0.0
+      eslint-config-next:
+        specifier: ^15.5.22
+        version: 15.5.22(eslint@9.39.5(jiti@1.21.7))(typescript@5.9.3)
+      postcss:
+        specifier: ^8.5.6
+        version: 8.5.25
+      tailwindcss:
+        specifier: ^3.4.19
+        version: 3.4.19(tsx@4.23.1)
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
 
   frontend/web:
     dependencies:
@@ -325,6 +401,40 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)(terser@5.49.0)
+
+  packages/db-platform:
+    dependencies:
+      '@prisma/client':
+        specifier: ^5.22.0
+        version: 5.22.0(prisma@5.22.0)
+      '@topiadesk/config':
+        specifier: workspace:*
+        version: link:../config
+      '@topiadesk/db':
+        specifier: workspace:*
+        version: link:../db
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.3
+      dotenv-cli:
+        specifier: ^8.0.0
+        version: 8.0.0
+      prisma:
+        specifier: ^5.22.0
+        version: 5.22.0
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.1
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
 
   packages/reports:
     dependencies:

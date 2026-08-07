@@ -29,7 +29,11 @@ export class RlsContextMiddleware implements NestMiddleware {
   private readonly verifier: JwtVerifier;
 
   constructor(@Inject(ENV_TOKEN) private readonly env: Env) {
-    this.verifier = new JwtVerifier(env);
+    this.verifier = new JwtVerifier({
+      jwksUri: env.KEYCLOAK_JWKS_URI,
+      issuerUrl: env.KEYCLOAK_ISSUER_URL,
+      internalUrl: env.KEYCLOAK_INTERNAL_URL,
+    });
   }
 
   async use(req: Request, res: Response, next: NextFunction): Promise<void> {

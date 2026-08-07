@@ -56,7 +56,18 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+-- Fixed search_path (packages/db/src/apply-migrations-tenant.ts's tenant-
+-- provisioning path rewrites this to the tenant's own schema + public, same
+-- mechanism as 002_policies.sql's SECURITY DEFINER functions): this body
+-- calls digest() (pgcrypto, lives in `public`) and references `audit_log`
+-- unqualified — without a pinned search_path, both resolve via whatever
+-- search_path the INSERTing session happens to have, which for a
+-- Prisma-per-tenant-schema connection is that tenant schema ALONE (no
+-- `public`), breaking digest() outright. Pinning it here makes the
+-- function's behavior independent of the caller's session, not just
+-- correct for today's single `public` deployment.
+SET search_path = public;
 
 DROP TRIGGER IF EXISTS audit_log_chain_trigger ON audit_log;
 CREATE TRIGGER audit_log_chain_trigger

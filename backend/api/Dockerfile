@@ -72,6 +72,7 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY backend/api/package.json backend/api/package.json
 COPY backend/worker/package.json backend/worker/package.json
 COPY packages/db/package.json packages/db/package.json
+COPY packages/db-platform/package.json packages/db-platform/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/shared-types/package.json packages/shared-types/package.json
 COPY packages/reports/package.json packages/reports/package.json
@@ -101,6 +102,7 @@ COPY . .
 # nothing and changes no value.
 RUN touch .env
 RUN pnpm --filter @topiadesk/db generate
+RUN pnpm --filter @topiadesk/db-platform generate
 RUN pnpm --filter @topiadesk/api build
 RUN printf '{"type":"commonjs"}' > backend/api/dist/package.json
 

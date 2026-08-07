@@ -25,6 +25,7 @@ FROM base AS deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY backend/worker/package.json backend/worker/package.json
 COPY packages/db/package.json packages/db/package.json
+COPY packages/db-platform/package.json packages/db-platform/package.json
 COPY packages/config/package.json packages/config/package.json
 # packages/reports' own manifest must be present here too — see
 # backend/api/Dockerfile's `deps` stage comment for why (same
@@ -38,6 +39,7 @@ FROM deps AS build
 COPY . .
 RUN touch .env
 RUN pnpm --filter @topiadesk/db generate
+RUN pnpm --filter @topiadesk/db-platform generate
 
 FROM node:20.19.6-bookworm-slim AS runtime
 ENV NODE_ENV=production

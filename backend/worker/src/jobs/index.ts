@@ -29,6 +29,7 @@ import {
 import { createSurveyDispatchQueue, createSurveyDispatchWorker } from './surveys/send-case-survey-invite.job';
 import { createCaseOutboundEmailQueue, createCaseOutboundEmailWorker } from './case-outbound-email/send-case-comment-email.job';
 import { createPortalLoginQueue, createPortalLoginWorker } from './portal/send-portal-login-link.job';
+import { createProvisionTenantQueue, createProvisionTenantWorker } from './platform/provision-tenant.job';
 
 export interface RegisteredJobs {
   queues: Queue[];
@@ -121,6 +122,12 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
   const portalLoginQueue = createPortalLoginQueue(connection);
   const portalLoginWorker = createPortalLoginWorker(connection);
 
+  // Event-driven, not a repeatable schedule — the Platform-Admin API
+  // enqueues directly when a Global Admin operator creates a new tenant
+  // (see backend/api/src/modules/platform/tenants.controller.ts).
+  const provisionTenantQueue = createProvisionTenantQueue(connection);
+  const provisionTenantWorker = createProvisionTenantWorker(connection);
+
   return {
     queues: [
       renewalScanQueue,
@@ -139,6 +146,7 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       caseOutboundEmailQueue,
       automationRunResumeQueue,
       portalLoginQueue,
+      provisionTenantQueue,
     ],
     workers: [
       renewalScanWorker,
@@ -157,6 +165,7 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       caseOutboundEmailWorker,
       automationRunResumeWorker,
       portalLoginWorker,
+      provisionTenantWorker,
     ],
   };
 }

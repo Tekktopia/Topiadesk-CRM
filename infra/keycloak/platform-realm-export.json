@@ -1,0 +1,70 @@
+{
+  "realm": "topiadesk-platform",
+  "enabled": true,
+  "displayName": "TopiaDesk Global Admin",
+  "loginTheme": "topiadesk",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "passwordPolicy": "length(12) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1) and notUsername",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+
+  "roles": {
+    "realm": [
+      { "name": "PLATFORM_ADMIN", "description": "TopiaDesk operator — manages tenants, plans, and subscriptions across the whole platform" }
+    ]
+  },
+
+  "clients": [
+    {
+      "clientId": "topiadesk-global-admin",
+      "name": "TopiaDesk Global Admin",
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://platform.topiadesk.localhost/*##http://localhost:3010/*"
+      },
+      "redirectUris": [
+        "https://platform.topiadesk.localhost/*",
+        "http://localhost:3010/*"
+      ],
+      "webOrigins": [
+        "https://platform.topiadesk.localhost",
+        "http://localhost:3010"
+      ]
+    }
+  ],
+
+  "users": [
+    {
+      "id": "99999999-9999-9999-9999-999999999999",
+      "username": "platform-admin",
+      "email": "platform-admin@topiadesk.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "TopiaDesk",
+      "lastName": "Platform Admin",
+      "credentials": [{ "type": "password", "value": "ChangeMe!PlatformAdmin1", "temporary": true }],
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"],
+      "realmRoles": ["PLATFORM_ADMIN"]
+    }
+  ]
+}

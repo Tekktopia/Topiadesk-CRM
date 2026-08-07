@@ -7,6 +7,11 @@ node_modules
 **/.next
 **/.turbo
 **/*.tsbuildinfo
+# Prisma-generated clients (packages/db-platform's custom `output` path —
+# see that package's schema.prisma) — regenerated fresh inside every build
+# stage that needs them (`prisma generate` targets the container's own
+# platform/Prisma version), so a stale host-local copy should never ship.
+**/generated
 **/coverage
 **/playwright-report
 **/test-results

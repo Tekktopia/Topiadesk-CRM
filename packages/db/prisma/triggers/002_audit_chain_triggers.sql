@@ -41,7 +41,12 @@ BEGIN
 
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+-- Fixed search_path — see 001_audit_chain_function.sql's identical comment.
+-- This body references `audit_log` and the "AuditAction" enum unqualified;
+-- no pgcrypto call here, but pinning stays consistent with the other 2
+-- trigger functions rather than being the one exception.
+SET search_path = public;
 
 -- NOTE: role_permissions and user_roles (composite PK, no `id` column) and
 -- org_settings (PK column is `key`, not `id`) are deliberately excluded —

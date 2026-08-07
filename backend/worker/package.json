@@ -13,6 +13,7 @@
   "dependencies": {
     "@topiadesk/config": "workspace:*",
     "@topiadesk/db": "workspace:*",
+    "@topiadesk/db-platform": "workspace:*",
     "@topiadesk/reports": "workspace:*",
     "bullmq": "^6.0.5",
     "ioredis": "^5.4.1",

@@ -1,6 +1,5 @@
 import jwt, { type JwtHeader, type SigningKeyCallback } from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
-import type { Env } from '@topiadesk/config';
 
 export interface KeycloakTokenClaims {
   sub: string;
@@ -11,38 +10,52 @@ export interface KeycloakTokenClaims {
   iss: string;
 }
 
+export interface JwtVerifierConfig {
+  jwksUri: string;
+  issuerUrl: string;
+  /** Docker Compose only — see resolveInternalJwksUri's comment below. */
+  internalUrl?: string;
+}
+
 /**
  * jwks-rsa needs a URL it can actually reach from inside the api container.
- * KEYCLOAK_JWKS_URI is the public, browser/host-resolvable hostname
+ * `jwksUri` is the public, browser/host-resolvable hostname
  * (auth.topiadesk.localhost) — Docker Compose's embedded DNS doesn't know
- * it. When KEYCLOAK_INTERNAL_URL is set (Docker Compose deployments), swap
- * just the origin so the request lands on the `keycloak` service directly;
- * the path/query (realm, protocol/openid-connect/certs) is untouched. In a
- * real deployment where public DNS resolves everywhere, KEYCLOAK_INTERNAL_URL
- * is simply left unset and this is a no-op.
+ * it. When `internalUrl` is set (Docker Compose deployments), swap just the
+ * origin so the request lands on the `keycloak` service directly; the
+ * path/query (realm, protocol/openid-connect/certs) is untouched. In a real
+ * deployment where public DNS resolves everywhere, `internalUrl` is simply
+ * left unset and this is a no-op.
  */
-function resolveInternalJwksUri(env: Env): string {
-  if (!env.KEYCLOAK_INTERNAL_URL) return env.KEYCLOAK_JWKS_URI;
-  const uri = new URL(env.KEYCLOAK_JWKS_URI);
-  const internal = new URL(env.KEYCLOAK_INTERNAL_URL);
+function resolveInternalJwksUri(config: JwtVerifierConfig): string {
+  if (!config.internalUrl) return config.jwksUri;
+  const uri = new URL(config.jwksUri);
+  const internal = new URL(config.internalUrl);
   uri.protocol = internal.protocol;
   uri.host = internal.host;
   return uri.toString();
 }
 
 /**
- * Thin wrapper around jsonwebtoken + jwks-rsa validating tokens issued by
- * our self-hosted Keycloak realm. jwks-rsa caches signing keys client-side
+ * Thin wrapper around jsonwebtoken + jwks-rsa validating tokens issued by a
+ * self-hosted Keycloak realm. jwks-rsa caches signing keys client-side
  * (rate-limited + cached) so a brief Keycloak blip doesn't fail validation
  * of already-issued, still-valid tokens — see docs/runbook.md "Keycloak
  * availability" for the accepted Phase-1 single-instance limitation.
+ *
+ * Takes an explicit `{ jwksUri, issuerUrl, internalUrl }` rather than the
+ * whole `Env` — RlsContextMiddleware instantiates one of these for the main
+ * "topiadesk" (tenant) realm, and the Platform-Admin API module
+ * (backend/api/src/modules/platform/) instantiates a SECOND, independent
+ * one for the completely separate "topiadesk-platform" realm. Two realms,
+ * two verifiers, one class.
  */
 export class JwtVerifier {
   private readonly client: jwksClient.JwksClient;
 
-  constructor(private readonly env: Env) {
+  constructor(private readonly config: JwtVerifierConfig) {
     this.client = jwksClient({
-      jwksUri: resolveInternalJwksUri(env),
+      jwksUri: resolveInternalJwksUri(config),
       cache: true,
       cacheMaxAge: 10 * 60 * 1000,
       rateLimit: true,
@@ -64,7 +77,7 @@ export class JwtVerifier {
       jwt.verify(
         token,
         this.getSigningKey,
-        { issuer: this.env.KEYCLOAK_ISSUER_URL, algorithms: ['RS256'] },
+        { issuer: this.config.issuerUrl, algorithms: ['RS256'] },
         (err, decoded) => {
           if (err || !decoded || typeof decoded === 'string') {
             reject(err ?? new Error('Invalid token'));

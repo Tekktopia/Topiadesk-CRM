@@ -54,6 +54,15 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   DIRECT_URL: z.string().min(1),
 
+  // Global Admin's own control-plane schema ("platform") — same Postgres
+  // instance, different schema, read by @topiadesk/db-platform's Prisma
+  // client (see packages/db-platform/prisma/schema.prisma). Required, not
+  // optional, matching DATABASE_URL/DIRECT_URL above: this package is a
+  // hard dependency of the Platform-Admin API module, not an optional
+  // integration.
+  PLATFORM_DATABASE_URL: z.string().min(1),
+  PLATFORM_DIRECT_URL: z.string().min(1),
+
   REDIS_URL: z.string().min(1),
 
   MINIO_ENDPOINT: z.string().min(1),
@@ -81,6 +90,29 @@ const envSchema = z.object({
   // when unset, e.g. a real deployment where public DNS resolves everywhere.
   KEYCLOAK_INTERNAL_URL: z.string().url().optional(),
   KEYCLOAK_WEBHOOK_SECRET: z.string().min(1),
+
+  // Global Admin's own realm — completely separate from KEYCLOAK_REALM
+  // above (TopiaDesk's own staff, never a tenant's users). Same shape as
+  // the KEYCLOAK_REALM/ISSUER_URL/JWKS_URI trio, consumed by the
+  // Platform-Admin API module's own JwtVerifier instance (backend/api/src/
+  // modules/platform/) rather than RlsContextMiddleware's main-realm one.
+  KEYCLOAK_PLATFORM_REALM: z.string().min(1),
+  KEYCLOAK_PLATFORM_CLIENT_ID: z.string().min(1),
+  KEYCLOAK_PLATFORM_ISSUER_URL: z.string().url(),
+  KEYCLOAK_PLATFORM_JWKS_URI: z.string().url(),
+
+  // Keycloak MASTER-realm bootstrap admin — already required by
+  // docker-compose.yml's keycloak service (KC_BOOTSTRAP_ADMIN_USERNAME/
+  // PASSWORD) for every deployment, but optional/lazy here (zOptionalEnvString,
+  // same reasoning as KEYCLOAK_ADMIN_CLIENT_ID/SECRET below): the only app
+  // code that needs it is tenant realm CREATION (backend/worker's
+  // provision-tenant job calling POST /admin/realms — Keycloak requires
+  // real master-realm credentials for this, no service-account/client-
+  // credentials path exists for creating whole realms), a non-boot-critical
+  // feature that a deployment may deliberately run without (e.g. after
+  // hardening the master admin account away post-bootstrap).
+  KEYCLOAK_ADMIN: zOptionalEnvString(),
+  KEYCLOAK_ADMIN_PASSWORD: zOptionalEnvString(),
 
   // Shared-secret header check for the campaign-management module's
   // provider-callback routes (campaigns/webhooks/email|sms|whatsapp/events)

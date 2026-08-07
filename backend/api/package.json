@@ -23,6 +23,7 @@
     "@nestjs/throttler": "^6.3.0",
     "@topiadesk/config": "workspace:*",
     "@topiadesk/db": "workspace:*",
+    "@topiadesk/db-platform": "workspace:*",
     "@topiadesk/reports": "workspace:*",
     "@topiadesk/shared-types": "workspace:*",
     "bullmq": "^6.0.5",

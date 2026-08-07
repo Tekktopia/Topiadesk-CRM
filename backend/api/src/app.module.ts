@@ -28,6 +28,11 @@ import { IpWhitelistGuard } from './modules/identity/ip-whitelist.guard';
 import { PortalModule } from './modules/portal/portal.module';
 import { PortalContextMiddleware } from './modules/portal/portal-context.middleware';
 import { PortalController } from './modules/portal/portal.controller';
+import { PlatformModule } from './modules/platform/platform.module';
+import { PlatformContextMiddleware } from './modules/platform/platform-context.middleware';
+import { PlatformController } from './modules/platform/platform.controller';
+import { TenantsController } from './modules/platform/tenants.controller';
+import { PlansController } from './modules/platform/plans.controller';
 
 @Module({
   imports: [
@@ -64,6 +69,7 @@ import { PortalController } from './modules/portal/portal.controller';
     OmnichannelModule,
     LoyaltyModule,
     PortalModule,
+    PlatformModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
@@ -142,6 +148,12 @@ export class AppModule implements NestModule {
         // surface's own equivalent, applied to portal/* except portal/auth/*
         // (no session exists yet when requesting/consuming a login link).
         { path: 'portal/(.*)', method: RequestMethod.ALL },
+        // Platform-Admin API — authenticated against the completely
+        // separate "topiadesk-platform" Keycloak realm, never a tenant
+        // realm. PlatformContextMiddleware (registered below) is this
+        // surface's own equivalent, applied only to PlatformModule's
+        // controllers.
+        { path: 'platform/(.*)', method: RequestMethod.ALL },
       )
       .forRoutes('*');
 
@@ -155,5 +167,12 @@ export class AppModule implements NestModule {
     // (request-link/consume/logout) is a separate controller class never
     // targeted by this call, so no .exclude() is needed either.
     consumer.apply(PortalContextMiddleware).forRoutes(PortalController);
+
+    // Targets the controller classes directly, not a 'platform/(.*)'
+    // string pattern — see PortalContextMiddleware's registration above for
+    // why: forRoutes() with that regex-style string was found to silently
+    // match nothing in this NestJS version even though .exclude() with the
+    // identical pattern does work.
+    consumer.apply(PlatformContextMiddleware).forRoutes(PlatformController, TenantsController, PlansController);
   }
 }

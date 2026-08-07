@@ -33,6 +33,8 @@ x-common-app-env: &common-app-env
   WORKER_METRICS_PORT: ${WORKER_METRICS_PORT}
   DATABASE_URL: ${DATABASE_URL}
   DIRECT_URL: ${DIRECT_URL}
+  PLATFORM_DATABASE_URL: ${PLATFORM_DATABASE_URL}
+  PLATFORM_DIRECT_URL: ${PLATFORM_DIRECT_URL}
   REDIS_URL: ${REDIS_URL}
   MINIO_ENDPOINT: ${MINIO_ENDPOINT}
   MINIO_PORT: ${MINIO_PORT}
@@ -50,6 +52,12 @@ x-common-app-env: &common-app-env
   KEYCLOAK_JWKS_URI: ${KEYCLOAK_JWKS_URI}
   KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL}
   KEYCLOAK_WEBHOOK_SECRET: ${KEYCLOAK_WEBHOOK_SECRET}
+  KEYCLOAK_PLATFORM_REALM: ${KEYCLOAK_PLATFORM_REALM}
+  KEYCLOAK_PLATFORM_CLIENT_ID: ${KEYCLOAK_PLATFORM_CLIENT_ID}
+  KEYCLOAK_PLATFORM_ISSUER_URL: ${KEYCLOAK_PLATFORM_ISSUER_URL}
+  KEYCLOAK_PLATFORM_JWKS_URI: ${KEYCLOAK_PLATFORM_JWKS_URI}
+  KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+  KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
   CAMPAIGN_WEBHOOK_SECRET: ${CAMPAIGN_WEBHOOK_SECRET}
   OMNICHANNEL_WEBHOOK_SECRET: ${OMNICHANNEL_WEBHOOK_SECRET}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
@@ -274,6 +282,12 @@ services:
       KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
     volumes:
       - ./infra/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      # Global Admin operators authenticate against this SEPARATE realm, never
+      # the tenant "topiadesk" realm above — see packages/db-platform's plan.
+      # `--import-realm` scans the whole data/import/ directory, so a second
+      # mounted file here is picked up alongside the first with no extra
+      # config (confirmed empirically).
+      - ./infra/keycloak/platform-realm-export.json:/opt/keycloak/data/import/platform-realm-export.json:ro
       - ./infra/keycloak/themes/topiadesk:/opt/keycloak/themes/topiadesk:ro
     depends_on:
       postgres:
@@ -324,6 +338,31 @@ services:
     networks:
       - topiadesk_data
 
+  # Global Admin's own control-plane schema ("platform") — a separate
+  # one-shot service, not folded into `migrate` above: it's a completely
+  # independent Prisma project (@topiadesk/db-platform) with its own
+  # migration history, and keeping it separate means a platform-schema
+  # migration failure doesn't block the main tenant schema's migrate/seed
+  # (and vice versa). Built from the same api Dockerfile — either would do,
+  # this one just avoids adding a THIRD image only used for one command.
+  migrate-platform:
+    build:
+      context: .
+      dockerfile: backend/api/Dockerfile
+      target: build
+    restart: "no"
+    logging: *default-logging
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PLATFORM_DATABASE_URL: ${PLATFORM_DATABASE_URL}
+      PLATFORM_DIRECT_URL: ${PLATFORM_DIRECT_URL}
+    command: ["sh", "-c", "pnpm --filter @topiadesk/db-platform migrate:deploy && pnpm --filter @topiadesk/db-platform seed"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - topiadesk_data
+
   # ---------------------------------------------------------------------------
   # Application
   # ---------------------------------------------------------------------------
@@ -338,6 +377,8 @@ services:
       <<: *common-app-env
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      migrate-platform:
         condition: service_completed_successfully
       pgbouncer:
         condition: service_healthy
@@ -371,6 +412,8 @@ services:
       <<: *common-app-env
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      migrate-platform:
         condition: service_completed_successfully
       pgbouncer:
         condition: service_healthy
@@ -417,6 +460,48 @@ services:
       - topiadesk_data
       - topiadesk_public
 
+  # TopiaDesk's own operator UI for tenant/subscription management — a
+  # separate Next.js app (own Dockerfile, own subdomain), authenticated
+  # against the completely separate "topiadesk-platform" Keycloak realm.
+  # Same shape as `web` above, minus DATABASE/anything tenant-specific: it
+  # talks to backend/api's `/platform/*` surface only. See
+  # packages/db-platform's plan.
+  global-admin:
+    build:
+      context: .
+      dockerfile: frontend/global-admin/Dockerfile
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${GLOBAL_ADMIN_PORT}
+      GLOBAL_ADMIN_URL: ${GLOBAL_ADMIN_URL}
+      API_URL: ${API_URL}
+      API_INTERNAL_URL: ${API_INTERNAL_URL}
+      KEYCLOAK_URL: ${KEYCLOAK_URL}
+      KEYCLOAK_PLATFORM_REALM: ${KEYCLOAK_PLATFORM_REALM}
+      KEYCLOAK_PLATFORM_CLIENT_ID: ${KEYCLOAK_PLATFORM_CLIENT_ID}
+      KEYCLOAK_PLATFORM_ISSUER_URL: ${KEYCLOAK_PLATFORM_ISSUER_URL}
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL}
+      REDIS_URL: ${REDIS_URL}
+      GLOBAL_ADMIN_SESSION_SECRET: ${GLOBAL_ADMIN_SESSION_SECRET}
+      WEB_COOKIE_DOMAIN: ${WEB_COOKIE_DOMAIN}
+    depends_on:
+      api:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.global-admin.rule=Host(`platform.${APP_BASE_DOMAIN}`)
+      - traefik.http.routers.global-admin.entrypoints=websecure
+      - traefik.http.routers.global-admin.tls=true
+      - traefik.http.routers.global-admin.middlewares=secure-headers@file
+      - traefik.http.services.global-admin.loadbalancer.server.port=${GLOBAL_ADMIN_PORT}
+    networks:
+      - topiadesk_data
+      - topiadesk_public
+
   # ---------------------------------------------------------------------------
   # Edge
   # ---------------------------------------------------------------------------
@@ -442,6 +527,7 @@ services:
     depends_on:
       - api
       - web
+      - global-admin
       - keycloak
     networks:
       - topiadesk_public

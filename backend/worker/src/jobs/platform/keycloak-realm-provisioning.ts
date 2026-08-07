@@ -1,0 +1,253 @@
+import { loadEnv } from '@topiadesk/config';
+
+/**
+ * Creates a Keycloak realm (+ CRM role set + a `topiadesk-web`-shaped
+ * client) and a first ADMIN user for a newly-provisioned tenant — the
+ * Keycloak-side half of backend/worker/src/jobs/platform/provision-tenant.job.ts,
+ * mirrored against the Postgres-side half in @topiadesk/db's
+ * applyTenantMigrations/applyTenantRlsAndTriggers.
+ *
+ * Deliberately NOT an extension of backend/api's KeycloakAdminService: that
+ * service authenticates as a service-account client SCOPED TO the
+ * "topiadesk" realm (manage-users/view-users only, within that one realm —
+ * see its own header comment) — there is no service-account/client-
+ * credentials path for creating whole REALMS in Keycloak; `POST
+ * /admin/realms` requires real MASTER-realm admin credentials
+ * (KEYCLOAK_ADMIN/KEYCLOAK_ADMIN_PASSWORD, authenticated via the
+ * `password` grant against Keycloak's built-in `admin-cli` client in the
+ * `master` realm — confirmed empirically against the local Keycloak
+ * instance). backend/worker has no NestJS DI container to hang an
+ * `@Injectable()` service off, so this is a plain module-level token cache
+ * + functions, matching every other file under jobs/.
+ */
+
+const TENANT_REALM_NAME_PATTERN = /^tenant_[a-z0-9_]+$/;
+
+interface CachedMasterToken {
+  accessToken: string;
+  expiresAtMs: number;
+}
+
+let masterTokenCache: CachedMasterToken | undefined;
+
+function requireMasterCredentials(): { username: string; password: string } {
+  const env = loadEnv();
+  if (!env.KEYCLOAK_ADMIN || !env.KEYCLOAK_ADMIN_PASSWORD) {
+    throw new Error('KEYCLOAK_ADMIN/KEYCLOAK_ADMIN_PASSWORD are not configured — tenant realm provisioning requires master-realm credentials.');
+  }
+  return { username: env.KEYCLOAK_ADMIN, password: env.KEYCLOAK_ADMIN_PASSWORD };
+}
+
+function keycloakBaseUrl(): string {
+  // Same internal-vs-public-hostname reasoning as KeycloakAdminService's
+  // adminBaseUrl(): *.topiadesk.localhost only resolves via host-machine/
+  // browser DNS, not Docker Compose's embedded DNS.
+  const env = loadEnv();
+  return env.KEYCLOAK_INTERNAL_URL ?? env.KEYCLOAK_URL;
+}
+
+async function getMasterAccessToken(): Promise<string> {
+  const now = Date.now();
+  if (masterTokenCache && masterTokenCache.expiresAtMs > now + 5000) {
+    return masterTokenCache.accessToken;
+  }
+  const { username, password } = requireMasterCredentials();
+  const res = await fetch(`${keycloakBaseUrl()}/realms/master/protocol/openid-connect/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'password', client_id: 'admin-cli', username, password }),
+  });
+  if (!res.ok) {
+    throw new Error(`Keycloak master-realm token request failed (${res.status}): ${await safeBody(res)}`);
+  }
+  const json = (await res.json()) as { access_token: string; expires_in: number };
+  masterTokenCache = { accessToken: json.access_token, expiresAtMs: now + json.expires_in * 1000 };
+  return json.access_token;
+}
+
+async function masterFetch(path: string, init: RequestInit): Promise<Response> {
+  const token = await getMasterAccessToken();
+  return fetch(`${keycloakBaseUrl()}${path}`, {
+    ...init,
+    headers: { ...init.headers, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  });
+}
+
+async function safeBody(res: Response): Promise<string> {
+  return (await res.text().catch(() => '')).slice(0, 500);
+}
+
+/**
+ * The 4 CRM roles, verbatim from infra/keycloak/realm-export.json's own
+ * `roles.realm` — kept as a literal copy (not imported: that file is a
+ * static Keycloak import fixture, not a TS module) so a tenant realm's
+ * role set matches the one the "topiadesk" realm already ships with,
+ * ready for Phase 2 to point frontend/web at per-tenant realms with no
+ * further Keycloak-side setup.
+ */
+const TENANT_REALM_ROLES = [
+  { name: 'ADMIN', description: 'Full system access' },
+  { name: 'MANAGER', description: 'Department head — sees and manages records within their department' },
+  { name: 'ACCOUNT_HANDLER', description: 'Front-line broker — manages their own book of business' },
+  { name: 'COMPLIANCE_OFFICER', description: 'Audit, approvals, and regulatory oversight' },
+] as const;
+
+/**
+ * Root domain derived from APP_URL (e.g. `https://app.topiadesk.localhost`
+ * -> `topiadesk.localhost`) — used only to shape this tenant's future web
+ * client's redirect URI (`https://<slug>.<root>/*`). Wildcard subdomain
+ * routing + real TLS for arbitrary tenant subdomains is Phase 2 work (see
+ * the plan's "Explicitly deferred" list) — frontend/web cannot actually be
+ * reached at this URL yet, but provisioning the client with its eventual
+ * shape now means Phase 2 doesn't need to re-provision every existing
+ * tenant's Keycloak client when it lands.
+ */
+function tenantRootDomain(): string {
+  const env = loadEnv();
+  return new URL(env.APP_URL).host.replace(/^app\./, '');
+}
+
+export async function createTenantRealm(opts: { realmName: string; displayName: string; tenantSlug: string }): Promise<void> {
+  if (!TENANT_REALM_NAME_PATTERN.test(opts.realmName)) {
+    throw new Error(`Refusing to create Keycloak realm: "${opts.realmName}" is not a valid tenant realm name (expected /${TENANT_REALM_NAME_PATTERN.source}/).`);
+  }
+  const tenantWebOrigin = `https://${opts.tenantSlug}.${tenantRootDomain()}`;
+
+  const res = await masterFetch('/admin/realms', {
+    method: 'POST',
+    body: JSON.stringify({
+      realm: opts.realmName,
+      enabled: true,
+      displayName: opts.displayName,
+      loginTheme: 'topiadesk',
+      sslRequired: 'external',
+      registrationAllowed: false,
+      resetPasswordAllowed: true,
+      editUsernameAllowed: false,
+      bruteForceProtected: true,
+      failureFactor: 5,
+      waitIncrementSeconds: 60,
+      maxFailureWaitSeconds: 900,
+      passwordPolicy: 'length(12) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1) and notUsername',
+      otpPolicyType: 'totp',
+      otpPolicyAlgorithm: 'HmacSHA1',
+      otpPolicyDigits: 6,
+      otpPolicyPeriod: 30,
+      accessTokenLifespan: 900,
+      ssoSessionIdleTimeout: 1800,
+      ssoSessionMaxLifespan: 36000,
+      revokeRefreshToken: true,
+      refreshTokenMaxReuse: 0,
+      roles: { realm: TENANT_REALM_ROLES },
+      clients: [
+        {
+          clientId: 'topiadesk-web',
+          name: 'TopiaDesk Web',
+          protocol: 'openid-connect',
+          publicClient: true,
+          standardFlowEnabled: true,
+          implicitFlowEnabled: false,
+          directAccessGrantsEnabled: false,
+          serviceAccountsEnabled: false,
+          attributes: {
+            'pkce.code.challenge.method': 'S256',
+            'post.logout.redirect.uris': `${tenantWebOrigin}/*`,
+          },
+          redirectUris: [`${tenantWebOrigin}/*`],
+          webOrigins: [tenantWebOrigin],
+        },
+      ],
+    }),
+  });
+  if (res.status !== 201) {
+    throw new Error(`Keycloak create-realm failed for "${opts.realmName}" (${res.status}): ${await safeBody(res)}`);
+  }
+}
+
+export async function deleteTenantRealm(realmName: string): Promise<void> {
+  if (!TENANT_REALM_NAME_PATTERN.test(realmName)) {
+    throw new Error(`Refusing to delete Keycloak realm: "${realmName}" is not a valid tenant realm name.`);
+  }
+  const res = await masterFetch(`/admin/realms/${encodeURIComponent(realmName)}`, { method: 'DELETE' });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`Keycloak delete-realm failed for "${realmName}" (${res.status}): ${await safeBody(res)}`);
+  }
+}
+
+function splitName(fullName: string): { firstName: string; lastName: string } {
+  const parts = fullName.trim().split(/\s+/);
+  const firstName = parts[0] ?? fullName;
+  const lastName = parts.slice(1).join(' ') || firstName;
+  return { firstName, lastName };
+}
+
+function generateTemporaryPassword(): string {
+  // Must satisfy the realm's own passwordPolicy above (12+ chars, upper/
+  // lower/digit/special) — this is a one-time value the user is forced to
+  // change via the UPDATE_PASSWORD required action below, never displayed
+  // or logged, so its exact shape only matters for passing that policy
+  // check at creation time.
+  const random = Math.random().toString(36).slice(2, 10);
+  return `Tdk!${random}A1`;
+}
+
+/**
+ * Creates the tenant's first real user (in the tenant's own realm, not
+ * "topiadesk-platform"), grants ADMIN, and returns credentials for the
+ * invite email. Role assignment is a SEPARATE call after creation —
+ * confirmed empirically against the local Keycloak instance that
+ * UserRepresentation's inline `realmRoles` field on `POST .../users` is
+ * silently ignored (the created user ends up with only the realm's
+ * `default-roles-<realm>` composite, no ADMIN); `POST .../role-mappings/
+ * realm` with the role's own representation is the call that actually
+ * works.
+ */
+export async function createTenantAdminUser(opts: {
+  realmName: string;
+  email: string;
+  fullName: string;
+}): Promise<{ keycloakSubjectId: string; temporaryPassword: string }> {
+  if (!TENANT_REALM_NAME_PATTERN.test(opts.realmName)) {
+    throw new Error(`Refusing to create user in Keycloak realm: "${opts.realmName}" is not a valid tenant realm name.`);
+  }
+  const { firstName, lastName } = splitName(opts.fullName);
+  const temporaryPassword = generateTemporaryPassword();
+
+  const createRes = await masterFetch(`/admin/realms/${encodeURIComponent(opts.realmName)}/users`, {
+    method: 'POST',
+    body: JSON.stringify({
+      username: opts.email,
+      email: opts.email,
+      emailVerified: true,
+      enabled: true,
+      firstName,
+      lastName,
+      credentials: [{ type: 'password', value: temporaryPassword, temporary: true }],
+      requiredActions: ['UPDATE_PASSWORD', 'CONFIGURE_TOTP'],
+    }),
+  });
+  if (createRes.status !== 201) {
+    throw new Error(`Keycloak create-tenant-admin-user failed for "${opts.realmName}"/"${opts.email}" (${createRes.status}): ${await safeBody(createRes)}`);
+  }
+  const location = createRes.headers.get('location');
+  const keycloakSubjectId = location?.split('/').pop();
+  if (!keycloakSubjectId) {
+    throw new Error(`Keycloak create-tenant-admin-user succeeded but returned no Location header for "${opts.realmName}"/"${opts.email}"`);
+  }
+
+  const roleRes = await masterFetch(`/admin/realms/${encodeURIComponent(opts.realmName)}/roles/ADMIN`, { method: 'GET' });
+  if (!roleRes.ok) {
+    throw new Error(`Keycloak get-role(ADMIN) failed for "${opts.realmName}" (${roleRes.status}): ${await safeBody(roleRes)}`);
+  }
+  const adminRole = await roleRes.json();
+
+  const assignRes = await masterFetch(`/admin/realms/${encodeURIComponent(opts.realmName)}/users/${keycloakSubjectId}/role-mappings/realm`, {
+    method: 'POST',
+    body: JSON.stringify([adminRole]),
+  });
+  if (!assignRes.ok) {
+    throw new Error(`Keycloak assign-role(ADMIN) failed for "${opts.realmName}"/"${opts.email}" (${assignRes.status}): ${await safeBody(assignRes)}`);
+  }
+
+  return { keycloakSubjectId, temporaryPassword };
+}

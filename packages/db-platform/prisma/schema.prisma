@@ -1,0 +1,150 @@
+// TopiaDesk Global Admin — platform control-plane schema.
+// Lives in its own Postgres schema ("platform", see PLATFORM_DATABASE_URL/
+// PLATFORM_DIRECT_URL), in the SAME database instance as every tenant
+// schema (packages/db), but structurally and operationally independent:
+// one instance of this schema total, vs. one full tenant-schema instance
+// PER customer org. See packages/db-platform/src/client.ts's header
+// comment for why this is a separate Prisma project rather than extra
+// models bolted onto packages/db.
+//
+// Row-level-security here is deliberately much simpler than the tenant
+// schema's OWN/DEPARTMENT/BRANCH hierarchy (see prisma/rls/002_policies.sql)
+// — there is no ownership concept at the platform level, only "is this a
+// legitimate platform-admin session (or SYSTEM_JOB)".
+
+// Custom `output` is NOT optional here — packages/db (the tenant schema)
+// declares the exact same `@prisma/client`/`prisma` version range with no
+// differentiating peer deps, so pnpm's content-addressable store dedupes
+// both packages onto ONE shared virtual-store entry, which is also where
+// Prisma's DEFAULT (no `output`) generation target lives
+// (node_modules/.pnpm/@prisma+client@.../node_modules/.prisma/client).
+// Confirmed empirically: generating this schema without `output` silently
+// overwrote packages/db's already-generated tenant client in place — every
+// tenant-schema type (Account, User, ...) vanished, replaced by this
+// schema's types, with no error from either `prisma generate` invocation.
+// A package-local, non-hoisted output path sidesteps the shared store
+// entirely regardless of how pnpm resolves the dependency graph.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("PLATFORM_DATABASE_URL")
+  directUrl = env("PLATFORM_DIRECT_URL")
+}
+
+enum TenantStatus {
+  PROVISIONING
+  ACTIVE
+  SUSPENDED
+  FAILED
+  DELETED
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum ProvisioningStepStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+/// One row per customer organization. `schemaName`/`keycloakRealm` are the
+/// two coordinates that locate everything else about this tenant — the
+/// actual Postgres schema (packages/db's table set, applied fresh per
+/// tenant by the provisioning job) and the Keycloak realm its users
+/// authenticate against. Neither is derived at read time; both are decided
+/// once at creation (from `slug`) and stored, so renaming a tenant's
+/// display `name` later never risks touching live infrastructure.
+model Tenant {
+  id                  String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                String
+  slug                String       @unique
+  schemaName          String       @unique @map("schema_name")
+  keycloakRealm       String       @unique @map("keycloak_realm")
+  status              TenantStatus @default(PROVISIONING)
+  primaryContactEmail String       @map("primary_contact_email")
+  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  subscription       Subscription?
+  provisioningEvents TenantProvisioningEvent[]
+
+  @@map("tenants")
+}
+
+/// Deliberately thin — no pricing/billing fields (Phase 1 is internal
+/// tracking only, see the plan's scoping decision). `seatLimit` is what
+/// Phase 3's seat-enforcement would check against a tenant's active user
+/// count; unused for now beyond display.
+model Plan {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @unique
+  seatLimit   Int      @map("seat_limit")
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+/// One-to-one with Tenant, not embedded directly on it — keeps the
+/// "which plan, what billing period" concern separable from tenant
+/// identity/provisioning state, and leaves room for a real subscription
+/// history (plan changes over time) without widening Tenant itself later.
+model Subscription {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String             @unique @map("tenant_id") @db.Uuid
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planId           String             @map("plan_id") @db.Uuid
+  plan             Plan               @relation(fields: [planId], references: [id])
+  status           SubscriptionStatus @default(TRIALING)
+  currentPeriodEnd DateTime?          @map("current_period_end") @db.Timestamptz(6)
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("subscriptions")
+}
+
+/// Global Admin's OWN operator accounts (TopiaDesk company staff) —
+/// completely separate from any tenant's `users` table, authenticated
+/// against the "topiadesk-platform" Keycloak realm, never a tenant realm.
+model PlatformAdminUser {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  keycloakSubjectId String   @unique @map("keycloak_subject_id")
+  email             String   @unique
+  fullName          String   @map("full_name")
+  status            String   @default("ACTIVE")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("platform_admin_users")
+}
+
+/// Append-only progress/audit trail for one tenant's provisioning run
+/// (create schema -> migrate -> RLS -> baseline seed -> Keycloak realm ->
+/// first admin user -> active), so the Global Admin UI can show real
+/// progress/failure detail instead of a single opaque spinner. See
+/// backend/worker/src/jobs/platform/provision-tenant.job.ts.
+model TenantProvisioningEvent {
+  id         String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String                 @map("tenant_id") @db.Uuid
+  tenant     Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  step       String
+  status     ProvisioningStepStatus
+  detail     String?
+  occurredAt DateTime               @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([tenantId, occurredAt])
+  @@map("tenant_provisioning_events")
+}

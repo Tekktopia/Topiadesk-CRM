@@ -24,6 +24,7 @@ secrets/
 
 # Prisma
 packages/db/generated/
+packages/db-platform/generated/
 
 # Logs
 *.log
