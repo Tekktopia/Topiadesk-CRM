@@ -54,6 +54,33 @@ export type UpdateUserBody = Omit<RawUpdateUserBody, 'departmentId' | 'branchId'
 
 export type AssignRoleBody = JsonBody<'/identity/users/{id}/roles', 'post'>;
 
+/** POST /identity/users/:id/roles returns EITHER UserDto (immediate grant,
+ * Role.requiredApprovalsToGrant === 1) OR this (approval-gated). Hand-written
+ * rather than derived — the backend's `oneOf` Swagger response for that
+ * endpoint doesn't resolve into a clean discriminated union via the
+ * generator, same "hand-mirror when the generated shape doesn't fit"
+ * convention this file's header comment already documents for
+ * NullableString. Distinguish from UserDto at the call site with
+ * `'approvedCount' in result` — UserDto never has that field. */
+export interface PendingRoleGrantDto {
+  id: string;
+  userId: string;
+  userName: string;
+  roleId: string;
+  roleName: string;
+  requestedById: string;
+  requestedByName: string;
+  chainId: string;
+  approvedCount: number;
+  requiredApprovals: number;
+  createdAt: string;
+}
+
+export interface DecideRoleGrantBody {
+  decision: 'APPROVED' | 'REJECTED';
+  reason?: string;
+}
+
 // -- Roles & permissions --------------------------------------------------
 type RawRoleDto = Json200<'/identity/roles', 'get'>[number];
 export type RoleDto = Omit<RawRoleDto, 'description'> & { description: NullableString };

@@ -1,7 +1,7 @@
 import type { NestMiddleware } from '@nestjs/common';
 import { Inject, Injectable } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
-import { getPrismaClient, runWithRlsContext, type RlsContext } from '@topiadesk/db';
+import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, type RlsContext } from '@topiadesk/db';
 import { ENV_TOKEN, type Env } from '../config/config.module';
 import { JwtVerifier } from './jwt-verifier';
 import type { AuthenticatedUser } from './authenticated-user';
@@ -47,13 +47,23 @@ export class RlsContextMiddleware implements NestMiddleware {
       return;
     }
 
-    // users/roles/departments/branches carry no RLS policy (org-wide
-    // reference data) — safe to query with no bound context yet.
+    // roles/departments/branches still carry no RLS policy — but `users`
+    // now does (identity-enterprise pass: delegated admin scoping, see
+    // users_rw in prisma/rls/002_policies.sql), so this bootstrap lookup —
+    // which necessarily runs before ANY real RlsContext can be bound, since
+    // it's what DERIVES that context — must explicitly bypass RLS itself
+    // rather than relying on the (now false) assumption that this table is
+    // unprotected. Without this, users_rw's USING clause evaluates against
+    // no bound session variables at all (app_current_user_id() is NULL),
+    // which resolves to `false` for every row — every login would 403 with
+    // "No active local account", not just this one caller.
     const prisma = getPrismaClient();
-    const localUser = await prisma.user.findUnique({
-      where: { keycloakSubjectId: claims.sub },
-      include: { roles: { include: { role: true } } },
-    });
+    const localUser = await runWithRlsContext(SYSTEM_JOB_CONTEXT, () =>
+      prisma.user.findUnique({
+        where: { keycloakSubjectId: claims.sub },
+        include: { roles: { include: { role: true } } },
+      }),
+    );
 
     if (!localUser || localUser.status !== 'ACTIVE') {
       res.status(403).json({ statusCode: 403, message: 'No active local account for this identity' });

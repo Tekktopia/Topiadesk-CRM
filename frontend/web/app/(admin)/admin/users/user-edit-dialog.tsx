@@ -27,7 +27,7 @@ import { ConfirmDialog } from '../_components/confirm-dialog';
 import { UserStatusBadge } from '../_components/status-badge';
 import { apiFetch } from '../_lib/api';
 import { useBranches, useDepartments, useRoles } from '../_lib/queries';
-import type { ForceLogoutResponseDto, UpdateUserBody, UserDto } from '../_lib/types';
+import type { ForceLogoutResponseDto, PendingRoleGrantDto, UpdateUserBody, UserDto } from '../_lib/types';
 
 const UNASSIGNED = '__unassigned__';
 
@@ -83,9 +83,13 @@ export function UserEditDialog({
 
   const assignRoleMutation = useMutation({
     mutationFn: (roleId: string) =>
-      apiFetch<UserDto>(`/api/admin/users/${userId}/roles`, { method: 'POST', body: JSON.stringify({ roleId }) }),
-    onSuccess: () => {
-      toast.success('Role assigned');
+      apiFetch<UserDto | PendingRoleGrantDto>(`/api/admin/users/${userId}/roles`, { method: 'POST', body: JSON.stringify({ roleId }) }),
+    onSuccess: (result) => {
+      if ('approvedCount' in result) {
+        toast.info(`"${result.roleName}" requires approval — 0 of ${result.requiredApprovals} approvers so far. See Pending role grants.`);
+      } else {
+        toast.success('Role assigned');
+      }
       setRoleToAdd('');
       invalidateUser();
     },

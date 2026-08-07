@@ -61,7 +61,19 @@ CREATE OR REPLACE FUNCTION app_max_scope(p_resource text, p_action text) RETURNS
   END;
 $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
 
-/** True if `p_owner_id` (a users.id) is visible to the current session at the given resource/action. */
+/** True if `p_owner_id` (a users.id) is visible to the current session at
+ * the given resource/action. SECURITY DEFINER (identity-enterprise pass,
+ * matching app_max_scope's existing pattern) — `users` now carries its own
+ * RLS (users_rw below). Its read side is deliberately left unconditionally
+ * open (see that policy's comment), so in the FINAL design this function's
+ * BRANCH/DEPARTMENT subqueries against `users` aren't actually narrowed by
+ * it; DEFINER is kept anyway as defense in depth — this function backs
+ * WRITE-side scoping for accounts/cases/policies/users/etc. across the
+ * whole app, and its BRANCH/DEPARTMENT branches need a guaranteed-unfiltered
+ * view of `users` regardless of whatever that table's read policy happens
+ * to be at any given time, not something that should depend on a different
+ * policy's current shape staying exactly as-is.
+ */
 CREATE OR REPLACE FUNCTION app_can_access_owner(p_resource text, p_action text, p_owner_id uuid) RETURNS boolean AS $$
   SELECT CASE app_max_scope(p_resource, p_action)
     WHEN 'ALL' THEN true
@@ -70,7 +82,7 @@ CREATE OR REPLACE FUNCTION app_can_access_owner(p_resource text, p_action text, 
     WHEN 'OWN' THEN p_owner_id = app_current_user_id()
     ELSE false
   END;
-$$ LANGUAGE sql STABLE;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
 
 /** Additive visibility grant on top of department/branch scoping — matches
  * TeamMember's own doc comment ("not a third nested RLS level"). Used by
@@ -78,6 +90,54 @@ $$ LANGUAGE sql STABLE;
 CREATE OR REPLACE FUNCTION app_is_team_member(p_team_id uuid) RETURNS boolean AS $$
   SELECT EXISTS (SELECT 1 FROM team_members WHERE team_id = p_team_id AND user_id = app_current_user_id());
 $$ LANGUAGE sql STABLE;
+
+/** True if `p_user_id` is in the same department as the current session's
+ * user — extracted (identity-enterprise pass) from what was previously an
+ * inline `SELECT ... FROM users u1, users u2 ...` subquery duplicated in
+ * saved_views_rw/saved_dashboards_rw below, purely for DRYness/single
+ * source of truth. SECURITY DEFINER as defense in depth, same reasoning as
+ * app_can_access_owner above. */
+CREATE OR REPLACE FUNCTION app_same_department(p_user_id uuid) RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM users u1, users u2
+    WHERE u1.id = p_user_id AND u2.id = app_current_user_id() AND u1.department_id = u2.department_id
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
+
+-- =============================================================================
+-- users — identity-enterprise pass: delegated admin scoping for WRITES only.
+-- `users` previously had no RLS at all (see 001_enable_rls.sql's enable
+-- list), meaning any 'identity':'write' grant — regardless of scope — was
+-- effectively org-wide, since PermissionGuard only checks that a grant
+-- exists for the resource+action, not which scope. This closes that gap for
+-- writes (deactivate/suspend/role-assign/etc.) using the same
+-- OWN/DEPARTMENT/BRANCH/ALL shape as accounts_rw immediately below: `id`
+-- (the row's own PK) is passed as the "owner".
+--
+-- READ deliberately stays "any authenticated user" (documents_select's
+-- exact philosophy, not accounts_rw's owner-scoped one) rather than also
+-- gating on app_can_access_owner('identity', 'read', id) — a user's name/
+-- department is routine, low-sensitivity metadata resolved constantly
+-- throughout the app for purposes that have nothing to do with "managing"
+-- anyone: assignee dropdowns, "created by" labels, notification-recipient
+-- lookups (e.g. cases.controller.ts notifying every COMPLIANCE_OFFICER of
+-- a pending closure approval), dashboard agent-workload name resolution.
+-- None of those call sites hold (or should need) a broad 'identity' grant.
+-- Gating read the same way write is gated was tried first and rejected:
+-- it would have silently emptied every one of those lookups for any role
+-- below ALL/DEPARTMENT scope — the exact "fails closed, no error" RLS bug
+-- class this session already hit twice for documents/approval_chains.
+--
+-- RlsContextMiddleware's own bootstrap lookup (which necessarily runs
+-- before any real context exists, so even the open read side doesn't help
+-- it) explicitly runs under SYSTEM_JOB_CONTEXT to bypass this — see that
+-- file's comment.
+-- =============================================================================
+
+DROP POLICY IF EXISTS users_rw ON users;
+CREATE POLICY users_rw ON users FOR ALL
+  USING (app_current_user_id() IS NOT NULL OR app_current_role() = 'SYSTEM_JOB')
+  WITH CHECK (app_can_access_owner('identity', 'write', id));
 
 -- =============================================================================
 -- accounts / account_relationships / contacts
@@ -598,8 +658,7 @@ CREATE POLICY saved_views_rw ON saved_views FOR ALL
   USING (
     owner_id = app_current_user_id()
     OR (visibility = 'TEAM' AND team_id IS NOT NULL AND app_is_team_member(team_id))
-    OR (visibility = 'DEPARTMENT' AND EXISTS (
-          SELECT 1 FROM users u1, users u2 WHERE u1.id = owner_id AND u2.id = app_current_user_id() AND u1.department_id = u2.department_id))
+    OR (visibility = 'DEPARTMENT' AND app_same_department(owner_id))
     OR visibility = 'ORG'
   )
   WITH CHECK (owner_id = app_current_user_id());
@@ -611,8 +670,7 @@ DROP POLICY IF EXISTS saved_dashboards_rw ON saved_dashboards;
 CREATE POLICY saved_dashboards_rw ON saved_dashboards FOR ALL
   USING (
     owner_id = app_current_user_id()
-    OR (visibility = 'DEPARTMENT' AND EXISTS (
-          SELECT 1 FROM users u1, users u2 WHERE u1.id = owner_id AND u2.id = app_current_user_id() AND u1.department_id = u2.department_id))
+    OR (visibility = 'DEPARTMENT' AND app_same_department(owner_id))
     OR visibility = 'ORG'
   )
   WITH CHECK (owner_id = app_current_user_id());

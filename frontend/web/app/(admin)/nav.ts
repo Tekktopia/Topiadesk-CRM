@@ -9,6 +9,7 @@ import {
   ScrollText,
   Settings,
   ShieldCheck,
+  ShieldQuestion,
   UsersRound,
   Webhook,
   Wifi,
@@ -32,6 +33,7 @@ import type { NavItem } from '@/lib/nav-types';
 export const adminNav: NavItem[] = [
   { label: 'Users', href: '/admin/users', icon: UsersRound, section: 'People & Access', adminOnly: true },
   { label: 'Roles & Permissions', href: '/admin/roles', icon: ShieldCheck, section: 'People & Access', adminOnly: true },
+  { label: 'Pending Role Grants', href: '/admin/role-grants', icon: ShieldQuestion, section: 'People & Access', adminOnly: true },
   { label: 'Departments', href: '/admin/departments', icon: Building2, section: 'People & Access', adminOnly: true },
   { label: 'Branches', href: '/admin/branches', icon: MapPin, section: 'People & Access', adminOnly: true },
   { label: 'Teams', href: '/admin/teams', icon: UsersRound, section: 'People & Access', adminOnly: true },

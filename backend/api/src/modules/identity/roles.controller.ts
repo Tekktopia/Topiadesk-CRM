@@ -32,6 +32,7 @@ function toRoleResponse(role: RoleWithPermissions): RoleResponseDto {
     name: role.name,
     description: role.description,
     isSystemRole: role.isSystemRole,
+    requiredApprovalsToGrant: role.requiredApprovalsToGrant,
     createdAt: role.createdAt,
     permissions: role.permissions.map((rp) => ({
       id: rp.permission.id,
@@ -112,6 +113,7 @@ export class RolesController {
         data: {
           ...(dto.name !== undefined && { name: dto.name }),
           ...(dto.description !== undefined && { description: dto.description }),
+          ...(dto.requiredApprovalsToGrant !== undefined && { requiredApprovalsToGrant: dto.requiredApprovalsToGrant }),
         },
         include: ROLE_WITH_PERMISSIONS_INCLUDE,
       });

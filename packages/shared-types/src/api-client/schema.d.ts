@@ -228,6 +228,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/identity/role-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RoleGrantsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/identity/role-grants/{id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RoleGrantsController_decide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/identity/roles": {
         parameters: {
             query?: never;
@@ -4822,6 +4854,25 @@ export interface components {
                 [key: string]: string;
             };
         };
+        PendingRoleGrantResponseDto: {
+            id: string;
+            userId: string;
+            userName: string;
+            roleId: string;
+            roleName: string;
+            requestedById: string;
+            requestedByName: string;
+            chainId: string;
+            approvedCount: number;
+            requiredApprovals: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        DecideRoleGrantDto: {
+            /** @enum {string} */
+            decision: "APPROVED" | "REJECTED";
+            reason?: string;
+        };
         PermissionResponseDto: {
             id: string;
             resource: string;
@@ -4833,6 +4884,7 @@ export interface components {
             name: string;
             description: Record<string, never> | null;
             isSystemRole: boolean;
+            requiredApprovalsToGrant: number;
             /** Format: date-time */
             createdAt: string;
             permissions: components["schemas"]["PermissionResponseDto"][];
@@ -4844,6 +4896,8 @@ export interface components {
         UpdateRoleDto: {
             name?: string;
             description?: string;
+            /** @description 1 = immediate grant (default). >1 requires that many distinct approvers. */
+            requiredApprovalsToGrant?: number;
         };
         GrantPermissionDto: {
             permissionId: string;
@@ -8545,7 +8599,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserResponseDto"];
+                    "application/json": components["schemas"]["UserResponseDto"] | components["schemas"]["PendingRoleGrantResponseDto"];
                 };
             };
         };
@@ -8610,6 +8664,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KeycloakSessionResponseDto"][];
+                };
+            };
+        };
+    };
+    RoleGrantsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingRoleGrantResponseDto"][];
+                };
+            };
+        };
+    };
+    RoleGrantsController_decide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideRoleGrantDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingRoleGrantResponseDto"];
                 };
             };
         };

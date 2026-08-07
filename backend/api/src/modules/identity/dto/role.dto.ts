@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBooleanString, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsBooleanString, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { PermissionResponseDto } from './permission.dto';
 
 export class RoleResponseDto {
@@ -7,6 +7,10 @@ export class RoleResponseDto {
   @ApiProperty() name!: string;
   @ApiProperty({ nullable: true }) description!: string | null;
   @ApiProperty() isSystemRole!: boolean;
+  /** 1 (default, every role starts here) = granting this role is
+   * immediate. >1 routes a grant through approval — see
+   * UsersController.assignRole()'s header comment. */
+  @ApiProperty() requiredApprovalsToGrant!: number;
   @ApiProperty() createdAt!: Date;
   @ApiProperty({ type: [PermissionResponseDto] }) permissions!: PermissionResponseDto[];
 }
@@ -26,4 +30,10 @@ export class CreateRoleDto {
 export class UpdateRoleDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(2) @MaxLength(100) name?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) description?: string;
+  @ApiPropertyOptional({ minimum: 1, maximum: 10, description: '1 = immediate grant (default). >1 requires that many distinct approvers.' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  requiredApprovalsToGrant?: number;
 }

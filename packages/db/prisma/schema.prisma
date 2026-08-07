@@ -462,6 +462,10 @@ model User {
   // --- Phase 2: Admin / integrations ---
   createdWebhookSubscriptions WebhookSubscription[] @relation("WebhookSubscriptionCreatedBy")
 
+  // --- Enterprise pass: identity ---
+  pendingRoleGrants          PendingRoleGrant[]
+  requestedPendingRoleGrants PendingRoleGrant[] @relation("PendingRoleGrantRequestedBy")
+
   @@map("users")
 }
 
@@ -470,11 +474,39 @@ model Role {
   name         String           @unique
   description  String?
   isSystemRole Boolean          @default(false) @map("is_system_role")
+  /// Same semantics as ApprovalThresholdRule.requiredApprovals — 1 (the
+  /// default) means granting this role is immediate, today's behavior for
+  /// every existing role, byte-for-byte unchanged. >1 routes the grant
+  /// through a PendingRoleGrant + ApprovalChain instead (see
+  /// UsersController.assignRole()), requiring that many distinct approvers
+  /// before the UserRole row is actually created. Backfilled to 2 for
+  /// ADMIN/COMPLIANCE_OFFICER by this migration; admin-editable afterward.
+  requiredApprovalsToGrant Int   @default(1) @map("required_approvals_to_grant")
   permissions  RolePermission[]
   users        UserRole[]
+  pendingGrants PendingRoleGrant[]
   createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("roles")
+}
+
+/// The "not yet effective" row an Approval/ApprovalChain points at via
+/// entityId for a USER_ROLE_CHANGE — plays the exact same structural role
+/// PolicyVersion plays for POLICY_ENDORSEMENT/CANCELLATION approvals (see
+/// that model's own doc comment). Deleted once the chain resolves either
+/// way: APPROVED creates the real UserRole row first, REJECTED just drops
+/// this row — neither outcome leaves it lingering.
+model PendingRoleGrant {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId        String   @map("role_id") @db.Uuid
+  role          Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  requestedById String   @map("requested_by_id") @db.Uuid
+  requestedBy   User     @relation("PendingRoleGrantRequestedBy", fields: [requestedById], references: [id])
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("pending_role_grants")
 }
 
 /// scope drives the RLS predicate chosen for resources granted by this

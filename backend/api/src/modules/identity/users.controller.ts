@@ -17,8 +17,11 @@ import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient, Prisma } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
+import { CurrentUser } from '../../common/auth/current-user.decorator';
+import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
 import { AuditService } from '../../common/audit/audit.service';
 import { AssignRoleDto, ListUsersQueryDto, UpdateUserDto, UserResponseDto } from './dto/user.dto';
+import { PendingRoleGrantResponseDto } from './dto/role-grant.dto';
 import { ForceLogoutResponseDto, KeycloakSessionResponseDto } from './dto/keycloak-session-response.dto';
 import { rethrowAsHttpException } from './prisma-error.util';
 // NOT a type-only import: KeycloakAdminService is constructor-injected
@@ -175,10 +178,25 @@ export class UsersController {
     }
   }
 
+  /**
+   * Immediate grant when the target Role's requiredApprovalsToGrant is 1
+   * (every role's default — today's behavior, byte-for-byte unchanged).
+   * When it's >1 (ADMIN/COMPLIANCE_OFFICER, seeded to 2), this instead
+   * creates a PendingRoleGrant + ApprovalChain (entityType
+   * USER_ROLE_CHANGE — pre-reserved in ApprovalEntityType, unused until
+   * now) and returns PendingRoleGrantResponseDto, NOT UserResponseDto — no
+   * UserRole row exists yet. See role-grants.controller.ts for the
+   * decide side, which mirrors policy-version.controller.ts's
+   * decideChainedApproval() shape.
+   */
   @Post(':id/roles')
   @RequirePermission('identity', 'write')
-  @ApiOkResponse({ type: UserResponseDto })
-  async assignRole(@Param('id') userId: string, @Body() dto: AssignRoleDto): Promise<UserResponseDto> {
+  @ApiOkResponse({ schema: { oneOf: [{ $ref: '#/components/schemas/UserResponseDto' }, { $ref: '#/components/schemas/PendingRoleGrantResponseDto' }] } })
+  async assignRole(
+    @Param('id') userId: string,
+    @Body() dto: AssignRoleDto,
+    @CurrentUser() actingUser: AuthenticatedUser,
+  ): Promise<UserResponseDto | PendingRoleGrantResponseDto> {
     const prisma = getPrismaClient();
     const [user, role] = await Promise.all([
       prisma.user.findUnique({ where: { id: userId } }),
@@ -186,6 +204,35 @@ export class UsersController {
     ]);
     if (!user) throw new NotFoundException('User not found');
     if (!role) throw new NotFoundException('Role not found');
+
+    const existingRole = await prisma.userRole.findUnique({ where: { userId_roleId: { userId, roleId: dto.roleId } } });
+    if (existingRole) throw new ConflictException('User already has this role');
+
+    if (role.requiredApprovalsToGrant > 1) {
+      const existingPending = await prisma.pendingRoleGrant.findFirst({ where: { userId, roleId: dto.roleId } });
+      if (existingPending) throw new ConflictException('A grant of this role is already pending approval for this user');
+
+      const grant = await prisma.pendingRoleGrant.create({
+        data: { userId, roleId: dto.roleId, requestedById: actingUser.id },
+        include: { user: { select: { fullName: true } }, role: { select: { name: true } }, requestedBy: { select: { fullName: true } } },
+      });
+      const chain = await prisma.approvalChain.create({
+        data: { entityType: 'USER_ROLE_CHANGE', entityId: grant.id, requiredApprovals: role.requiredApprovalsToGrant, status: 'PENDING' },
+      });
+      return {
+        id: grant.id,
+        userId: grant.userId,
+        userName: grant.user.fullName,
+        roleId: grant.roleId,
+        roleName: grant.role.name,
+        requestedById: grant.requestedById,
+        requestedByName: grant.requestedBy.fullName,
+        chainId: chain.id,
+        approvedCount: 0,
+        requiredApprovals: chain.requiredApprovals,
+        createdAt: grant.createdAt,
+      };
+    }
 
     try {
       await prisma.userRole.create({ data: { userId, roleId: dto.roleId } });

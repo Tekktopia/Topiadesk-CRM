@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuditService } from '../../common/audit/audit.service';
 import { IdentityController } from './identity.controller';
 import { UsersController } from './users.controller';
+import { RoleGrantsController } from './role-grants.controller';
 import { RolesController } from './roles.controller';
 import { PermissionsController } from './permissions.controller';
 import { DepartmentsController } from './departments.controller';
@@ -26,6 +27,7 @@ import { KeycloakAdminService } from './keycloak-admin.service';
   controllers: [
     IdentityController,
     UsersController,
+    RoleGrantsController,
     RolesController,
     PermissionsController,
     DepartmentsController,

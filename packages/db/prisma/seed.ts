@@ -119,8 +119,22 @@ async function main() {
     }
   }
 
-  async function grantRole(name: string, description: string, isSystemRole: boolean, grants: Array<[string, string, (typeof scopes)[number]]>) {
-    const role = await prisma.role.upsert({ where: { name }, update: { description }, create: { name, description, isSystemRole } });
+  async function grantRole(
+    name: string,
+    description: string,
+    isSystemRole: boolean,
+    grants: Array<[string, string, (typeof scopes)[number]]>,
+    // Enterprise pass — dual-control default for granting ADMIN/
+    // COMPLIANCE_OFFICER themselves (see Role.requiredApprovalsToGrant's
+    // doc comment). Every other role keeps the default of 1 (immediate
+    // grant, today's behavior) by simply not passing this.
+    requiredApprovalsToGrant = 1,
+  ) {
+    const role = await prisma.role.upsert({
+      where: { name },
+      update: { description, requiredApprovalsToGrant },
+      create: { name, description, isSystemRole, requiredApprovalsToGrant },
+    });
     for (const [resource, action, scope] of grants) {
       const perm = permissionByKey.get(`${resource}:${action}:${scope}`);
       if (!perm) continue;
@@ -133,7 +147,13 @@ async function main() {
     return role;
   }
 
-  const adminRole = await grantRole('ADMIN', 'Full system access', true, resources.flatMap((r) => actions.map((a) => [r, a, 'ALL'] as [string, string, (typeof scopes)[number]])));
+  const adminRole = await grantRole(
+    'ADMIN',
+    'Full system access',
+    true,
+    resources.flatMap((r) => actions.map((a) => [r, a, 'ALL'] as [string, string, (typeof scopes)[number]])),
+    2,
+  );
   const managerRole = await grantRole(
     'MANAGER',
     'Department head — sees and manages all records owned within their department',
@@ -166,6 +186,30 @@ async function main() {
       // status/commission terms) is a department-head-level action, same
       // tier as this role's other supply-side-adjacent grants.
       ['carrier', 'write', 'DEPARTMENT'],
+      // Baseline self-service (identity-enterprise pass) — PATCH
+      // /identity/me, presence, and avatar (identity.controller.ts) write
+      // the caller's OWN users row with no @RequirePermission of their
+      // own; the only thing standing between that and a hard failure is
+      // users_rw's WITH CHECK (app_can_access_owner('identity', 'write',
+      // id)), which needs an actual grant to resolve true even for
+      // `id = self`. (Read needs no matching grant — users_rw's USING
+      // clause is unconditionally open to any authenticated user, see that
+      // policy's own comment for why — so there is no 'identity':'read':
+      // 'OWN' grant here; adding one would also satisfy
+      // UsersController.list()/get()'s @RequirePermission('identity',
+      // 'read') and hand this role the full admin user-directory endpoint,
+      // which is not the intent.)
+      ['identity', 'write', 'OWN'],
+      // Department-head user management — the actual point of B1's
+      // delegated-admin scoping: a MANAGER can now deactivate/suspend/
+      // reassign/role-change users in their own department without the
+      // ADMIN-only ALL tier. 'read' here only satisfies
+      // UsersController.list()/get()'s coarse @RequirePermission gate (any
+      // scope passes it, same as every other DEPARTMENT-tier grant in this
+      // file) — the actual result set from those endpoints is org-wide
+      // (see users_rw's comment), not narrowed to this department; only
+      // the WRITE tier is truly scope-enforced.
+      ['identity', 'read', 'DEPARTMENT'], ['identity', 'write', 'DEPARTMENT'],
     ],
   );
   const accountHandlerRole = await grantRole(
@@ -203,6 +247,13 @@ async function main() {
       // 'sla_config' has no write grant here — creating/editing this
       // config stays admin-only.
       ['sla_config', 'read', 'ALL'],
+      // Baseline self-service (identity-enterprise pass) — see MANAGER's
+      // identical write:OWN grant above for the full reasoning. A
+      // front-line broker gets ONLY this floor, not DEPARTMENT/BRANCH/ALL
+      // — they can edit their own profile but not manage colleagues, and
+      // (deliberately no 'identity':'read' grant at any scope) never gain
+      // access to the admin user-directory endpoints.
+      ['identity', 'write', 'OWN'],
       // Preserves pre-existing behavior: brokers already have 'account':
       // write:OWN, which is what let them create/edit carriers before this
       // resource existed (carriers.controller.ts's stale reuse of
@@ -221,9 +272,16 @@ async function main() {
     // /decision endpoint.
     ['policy', 'write', 'ALL'],
     ['audit_log', 'read', 'ALL'], ['ai_usage', 'read', 'ALL'], ['document', 'read', 'ALL'], ['carrier', 'read', 'ALL'],
-    // Read-only user/role directory visibility for oversight — not write,
-    // consistent with this role's other grants being read-heavy.
-    ['identity', 'read', 'ALL'],
+    // Directory visibility for oversight, satisfying
+    // UsersController.list()/get()'s @RequirePermission gate (users_rw's
+    // read side is unconditionally open regardless of scope — see that
+    // policy's comment — so 'ALL' here is really just this role's
+    // documented intent, not a narrower tier being widened). write:OWN is
+    // this role's own self-service PATCH /identity/me/presence/avatar
+    // floor (see MANAGER's identical grant above for the full reasoning),
+    // not a broader user-management write tier — COMPLIANCE_OFFICER is
+    // oversight, not delegated admin.
+    ['identity', 'read', 'ALL'], ['identity', 'write', 'OWN'],
     // Claims/complaints oversight (this role's users sit in the
     // Claims & Compliance department) — read-only across the whole org,
     // plus write so this role can action a claim/case directly during an
@@ -265,7 +323,10 @@ async function main() {
     // and to apply the decision's effect (posting the confirmed REDEEM
     // LoyaltyTransaction) via a write this role doesn't otherwise own.
     ['loyalty', 'read', 'ALL'], ['loyalty', 'write', 'ALL'],
-  ]);
+    // Dual-control on granting this role itself — see
+    // Role.requiredApprovalsToGrant's doc comment and the trailing `2`
+    // argument below.
+  ], 2);
 
   console.log('[seed] demo users');
   const adminUser = await prisma.user.upsert({

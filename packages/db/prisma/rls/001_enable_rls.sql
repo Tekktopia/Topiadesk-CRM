@@ -77,7 +77,15 @@ BEGIN
     -- depth against a regular internal-staff session ever browsing another
     -- contact's login tokens/sessions, which no legitimate app feature
     -- needs.
-    'portal_login_tokens', 'portal_sessions'
+    'portal_login_tokens', 'portal_sessions',
+    -- Enterprise pass — identity/users. Previously the one org-wide-visible
+    -- table with no RLS at all that ALSO has real per-row 'owner' semantics
+    -- (a User's own department/branch) worth scoping — unlike roles/
+    -- departments/branches, which stay genuinely unprotected reference
+    -- data. See users_rw in 002_policies.sql and
+    -- rls-context.middleware.ts's header comment for the one caller
+    -- (the bootstrap identity lookup) that must explicitly bypass this.
+    'users'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);

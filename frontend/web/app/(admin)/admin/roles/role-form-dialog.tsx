@@ -33,14 +33,17 @@ export function RoleFormDialog({
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [requiredApprovalsToGrant, setRequiredApprovalsToGrant] = useState('1');
 
   useEffect(() => {
     if (mode === 'edit' && role) {
       setName(role.name);
       setDescription(role.description ?? '');
+      setRequiredApprovalsToGrant(String(role.requiredApprovalsToGrant));
     } else if (mode === 'create') {
       setName('');
       setDescription('');
+      setRequiredApprovalsToGrant('1');
     }
   }, [mode, role]);
 
@@ -74,6 +77,10 @@ export function RoleFormDialog({
       const body: UpdateRoleBody = {};
       if (name !== role.name) body.name = name;
       if (description !== (role.description ?? '')) body.description = description;
+      const parsedApprovals = Number.parseInt(requiredApprovalsToGrant, 10);
+      if (!Number.isNaN(parsedApprovals) && parsedApprovals !== role.requiredApprovalsToGrant) {
+        body.requiredApprovalsToGrant = parsedApprovals;
+      }
       if (Object.keys(body).length === 0) {
         onOpenChange(false);
         return;
@@ -120,6 +127,22 @@ export function RoleFormDialog({
               maxLength={500}
             />
           </div>
+          {mode === 'edit' ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="role-approvals">Approvals required to grant this role</Label>
+              <Input
+                id="role-approvals"
+                type="number"
+                min={1}
+                max={10}
+                value={requiredApprovalsToGrant}
+                onChange={(e) => setRequiredApprovalsToGrant(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                1 (default) grants immediately when assigned. A higher number requires that many distinct approvers before it takes effect.
+              </p>
+            </div>
+          ) : null}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

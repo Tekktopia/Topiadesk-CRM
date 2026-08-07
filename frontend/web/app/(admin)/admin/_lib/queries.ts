@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from './api';
-import type { BranchDto, DepartmentDto, PermissionDto, RoleDto, UserDto } from './types';
+import type { BranchDto, DepartmentDto, PendingRoleGrantDto, PermissionDto, RoleDto, UserDto } from './types';
 
 /** Shared reference-data queries reused across several admin pages (e.g.
  * department/branch pickers on the Users and Teams pages). Kept in one
@@ -27,6 +27,13 @@ export function useRoles() {
   return useQuery({
     queryKey: ['admin', 'roles'],
     queryFn: () => apiFetch<RoleDto[]>('/api/admin/roles'),
+  });
+}
+
+export function useRoleGrants() {
+  return useQuery({
+    queryKey: ['admin', 'role-grants'],
+    queryFn: () => apiFetch<PendingRoleGrantDto[]>('/api/admin/role-grants'),
   });
 }
 
