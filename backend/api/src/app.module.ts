@@ -154,6 +154,20 @@ export class AppModule implements NestModule {
         // surface's own equivalent, applied only to PlatformModule's
         // controllers.
         { path: 'platform/(.*)', method: RequestMethod.ALL },
+        // Integrations OAuth callback and inbound connector webhooks — both
+        // already carried a header comment on their own controllers
+        // claiming this exclusion existed, but it was never actually added
+        // here (found live: every external OAuth redirect / connector
+        // webhook POST 401'd from this middleware before ever reaching
+        // oauth.controller.ts / webhook-receiver.controller.ts). The
+        // OAuth callback is secured by its own signed `state` param
+        // (oauth-connector.service.ts); the webhook receiver is secured by
+        // a per-connector shared secret (config.webhookSecret) checked
+        // inside the controller itself — neither presents a TopiaDesk-
+        // issued Keycloak JWT, same reasoning as every other exclusion
+        // above.
+        { path: 'integrations/oauth/:connectorId/callback', method: RequestMethod.GET },
+        { path: 'integrations/webhooks/:webhookPath', method: RequestMethod.POST },
       )
       .forRoutes('*');
 

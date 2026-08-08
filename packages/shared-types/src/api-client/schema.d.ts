@@ -4772,6 +4772,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/platform/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlatformController_me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlatformController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/tenants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TenantsController_list"];
+        put?: never;
+        post: operations["TenantsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/tenants/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TenantsController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/tenants/{id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TenantsController_suspend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/tenants/{id}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TenantsController_reactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/tenants/{id}/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TenantsController_getSubscription"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["TenantsController_updateSubscription"];
+        trace?: never;
+    };
+    "/platform/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlansController_list"];
+        put?: never;
+        post: operations["PlansController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/plans/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["PlansController_update"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6033,6 +6177,8 @@ export interface components {
                 [key: string]: unknown;
             }[] | null;
             isActive: boolean;
+            /** @enum {string} */
+            status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
             createdById: string;
             /** Format: date-time */
             createdAt: string;
@@ -6057,6 +6203,11 @@ export interface components {
             }[];
             /** @default true */
             isActive: boolean;
+            /**
+             * @description Defaults to PUBLISHED when omitted — every existing caller (including the /admin/automations JSON dialog) never sends this and must keep running unchanged. DRAFT is the /admin/workflows builder's "Save as draft" — never matched by the engine (see automation-events.queue.ts/renewal-playbook.ts) regardless of isActive.
+             * @enum {string}
+             */
+            status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
         };
         UpdateAutomationRuleDto: {
             name?: string;
@@ -6076,6 +6227,11 @@ export interface components {
             }[];
             /** @default true */
             isActive: boolean;
+            /**
+             * @description Defaults to PUBLISHED when omitted — every existing caller (including the /admin/automations JSON dialog) never sends this and must keep running unchanged. DRAFT is the /admin/workflows builder's "Save as draft" — never matched by the engine (see automation-events.queue.ts/renewal-playbook.ts) regardless of isActive.
+             * @enum {string}
+             */
+            status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
         };
         SiteResponseDto: {
             id: string;
@@ -7248,6 +7404,8 @@ export interface components {
         DecideAutomationRunDto: {
             /** @enum {string} */
             decision: "APPROVED" | "REJECTED";
+            /** @description Required when decision is REJECTED. */
+            note?: string;
         };
         KnowledgeCategoryResponseDto: {
             id: string;
@@ -8077,6 +8235,54 @@ export interface components {
             sizeBytes: number;
             /** Format: date-time */
             createdAt: string;
+        };
+        CreateTenantDto: {
+            /** @description The tenant organization's display name, e.g. "Acme Insurance Brokers". */
+            name: string;
+            /** @description URL-safe, globally unique identifier — becomes this tenant's Postgres schema name and Keycloak realm name (both `tenant_<slug>`). Lowercase letters, digits, and underscores only. */
+            slug: string;
+            /** @description The tenant's first ADMIN user is created with this address and receives the invite email. */
+            primaryContactEmail: string;
+            /** @description Plan to start this tenant on (TRIALING). */
+            planId: string;
+        };
+        TenantResponseDto: {
+            id: string;
+            name: string;
+            slug: string;
+            schemaName: string;
+            keycloakRealm: string;
+            status: string;
+            primaryContactEmail: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        UpdateTenantSubscriptionDto: {
+            planId?: string;
+            /** @enum {string} */
+            status?: "TRIALING" | "ACTIVE" | "PAST_DUE" | "CANCELED";
+        };
+        PlanResponseDto: {
+            id: string;
+            name: string;
+            seatLimit: number;
+            description?: Record<string, never>;
+            isActive: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreatePlanDto: {
+            name: string;
+            seatLimit: number;
+            description?: string;
+        };
+        UpdatePlanDto: {
+            name?: string;
+            seatLimit?: number;
+            description?: string;
+            isActive?: boolean;
         };
     };
     responses: never;
@@ -18118,6 +18324,254 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    PlatformController_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformController_stats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TenantsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantResponseDto"][];
+                };
+            };
+        };
+    };
+    TenantsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTenantDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantResponseDto"];
+                };
+            };
+        };
+    };
+    TenantsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantResponseDto"];
+                };
+            };
+        };
+    };
+    TenantsController_suspend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantResponseDto"];
+                };
+            };
+        };
+    };
+    TenantsController_reactivate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantResponseDto"];
+                };
+            };
+        };
+    };
+    TenantsController_getSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TenantsController_updateSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTenantSubscriptionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlansController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanResponseDto"][];
+                };
+            };
+        };
+    };
+    PlansController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePlanDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanResponseDto"];
+                };
+            };
+        };
+    };
+    PlansController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePlanDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanResponseDto"];
+                };
             };
         };
     };

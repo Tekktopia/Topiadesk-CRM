@@ -1,0 +1,3 @@
+-- AlterEnum
+ALTER TYPE "ConnectorType" ADD VALUE 'TEAMS_WEBHOOK';
+ALTER TYPE "ConnectorType" ADD VALUE 'SEAMLESSHR';

@@ -5,9 +5,16 @@ import { WebhookSubscriptionsController } from './webhook-subscriptions.controll
 import { WebhookReceiverController } from './webhook-receiver.controller';
 import { OAuthController } from './oauth.controller';
 import { OAuthConnectorService } from './oauth-connector.service';
+import { KeycloakAdminService } from '../identity/keycloak-admin.service';
 
+// KeycloakAdminService (needed by IntegrationsService's SeamlessHR sync
+// path) is provided by IdentityModule but not exported from it — same
+// "re-provide the stateless service directly" pattern IdentityModule's own
+// header comment documents for AuditService, applied here for the same
+// reason (a second injector instance is harmless: it only holds a
+// short-lived cached admin token).
 @Module({
   controllers: [IntegrationsController, WebhookSubscriptionsController, WebhookReceiverController, OAuthController],
-  providers: [IntegrationsService, OAuthConnectorService],
+  providers: [IntegrationsService, OAuthConnectorService, KeycloakAdminService],
 })
 export class IntegrationsModule {}

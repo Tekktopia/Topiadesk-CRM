@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Network, RefreshCw } from 'lucide-react';
+import { Network, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -17,11 +17,13 @@ import {
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { PageHeader } from '../_components/page-header';
 import { EmptyState, ErrorState } from '../_components/query-states';
+import { ConfirmDialog } from '../_components/confirm-dialog';
 import { SyncJobStatusBadge } from '../_components/status-badge';
 import { apiFetch } from '../_lib/api';
 import { canWriteAdmin } from '../_lib/permissions';
 import type { ConnectorDto, SyncJobDto } from '../_lib/types';
 import { SyncJobLogsDialog } from './sync-job-logs-dialog';
+import { ConnectorFormDialog } from './connector-form-dialog';
 
 export default function IntegrationsPage() {
   const { user: currentUser } = useCurrentUser();
@@ -36,6 +38,19 @@ export default function IntegrationsPage() {
   const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
   const [logsJobId, setLogsJobId] = useState<string | null>(null);
   const [syncJobsPagination, setSyncJobsPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [formTarget, setFormTarget] = useState<'create' | ConnectorDto | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<ConnectorDto | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/api/admin/integrations/connectors/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      toast.success('Connector deleted');
+      setPendingDelete(null);
+      setSelectedConnectorId(null);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'integrations', 'connectors'] });
+    },
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to delete connector'),
+  });
 
   useEffect(() => {
     const first = connectorsQuery.data?.[0];
@@ -113,7 +128,14 @@ export default function IntegrationsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Integrations"
-        description="Connector health, sync job history, and per-job logs. Monitoring is read-only; triggering a sync requires an integration:write grant (ADMIN only, per the seeded role grid)."
+        description="Connector health, sync job history, and per-job logs. Monitoring is read-only; managing connectors and triggering a sync both require an integration:write grant (ADMIN only, per the seeded role grid)."
+        actions={
+          canWrite ? (
+            <Button size="sm" onClick={() => setFormTarget('create')}>
+              <Plus className="h-4 w-4" /> New connector
+            </Button>
+          ) : undefined
+        }
       />
 
       {connectorsQuery.isLoading ? (
@@ -162,14 +184,22 @@ export default function IntegrationsPage() {
                     </p>
                   </div>
                   {canWrite ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={triggerSyncMutation.isPending}
-                      onClick={() => triggerSyncMutation.mutate(selectedConnector.id)}
-                    >
-                      <RefreshCw className="h-4 w-4" /> Trigger sync
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={triggerSyncMutation.isPending}
+                        onClick={() => triggerSyncMutation.mutate(selectedConnector.id)}
+                      >
+                        <RefreshCw className="h-4 w-4" /> Trigger sync
+                      </Button>
+                      <Button variant="ghost" size="icon" aria-label={`Edit ${selectedConnector.name}`} onClick={() => setFormTarget(selectedConnector)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" aria-label={`Delete ${selectedConnector.name}`} onClick={() => setPendingDelete(selectedConnector)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   ) : null}
                 </div>
 
@@ -197,6 +227,21 @@ export default function IntegrationsPage() {
 
       {logsJobId ? (
         <SyncJobLogsDialog syncJobId={logsJobId} open={!!logsJobId} onOpenChange={(open) => !open && setLogsJobId(null)} />
+      ) : null}
+
+      {formTarget ? <ConnectorFormDialog target={formTarget} open={!!formTarget} onOpenChange={(open) => !open && setFormTarget(null)} /> : null}
+
+      {pendingDelete ? (
+        <ConfirmDialog
+          open={!!pendingDelete}
+          onOpenChange={(open) => !open && setPendingDelete(null)}
+          title={`Delete "${pendingDelete.name}"?`}
+          description="This permanently removes the connector and its sync job history. This cannot be undone."
+          confirmLabel="Delete connector"
+          destructive
+          isPending={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate(pendingDelete.id)}
+        />
       ) : null}
     </div>
   );
