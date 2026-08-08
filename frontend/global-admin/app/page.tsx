@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { Building2, CheckCircle2, Loader2, ShieldAlert, XCircle } from 'lucide-react';
-import { Button, StatTile } from '@topiadesk/ui';
+import { Building2, CheckCircle2, Loader2, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Button, Card, CardContent, CardHeader, CardTitle, StatTile } from '@topiadesk/ui';
 import { apiFetch } from './_lib/api';
 import type { PlatformStats } from './_lib/types';
 
@@ -39,29 +39,33 @@ export default function DashboardPage() {
         <StatTile label="Suspended / failed" value={isLoading ? '—' : (data?.suspended ?? 0) + (data?.failed ?? 0)} icon={<ShieldAlert />} description={data?.failed ? `${data.failed} failed` : undefined} />
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-6">
-        <h2 className="mb-4 text-sm font-semibold text-muted-foreground">Top actions</h2>
-        <div className="flex flex-wrap gap-3">
-          <Button variant="secondary" asChild>
-            <Link href="/tenants?new=1">
-              <Building2 className="mr-2 h-4 w-4" />
-              Provision a new tenant
-            </Link>
-          </Button>
-          <Button variant="secondary" asChild>
-            <Link href="/tenants">
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-              Review tenant status
-            </Link>
-          </Button>
-          <Button variant="secondary" asChild>
-            <Link href="/plans">
-              <XCircle className="mr-2 h-4 w-4" />
-              Manage plans
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium text-muted-foreground">Top actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3">
+            <Button variant="secondary" asChild>
+              <Link href="/tenants?new=1">
+                <Building2 className="mr-2 h-4 w-4" />
+                Provision a new tenant
+              </Link>
+            </Button>
+            <Button variant="secondary" asChild>
+              <Link href="/tenants">
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Review tenant status
+              </Link>
+            </Button>
+            <Button variant="secondary" asChild>
+              <Link href="/admins?new=1">
+                <ShieldCheck className="mr-2 h-4 w-4" />
+                Add a platform admin
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
