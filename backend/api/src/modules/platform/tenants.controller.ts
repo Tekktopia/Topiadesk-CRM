@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPlatformPrismaClient, Prisma } from '@topiadesk/db-platform';
+import { invalidateTenantRealmCache } from '../../common/auth/tenant-realm-resolver';
 import { CreateTenantDto, TenantProvisioningEventResponseDto, TenantResponseDto, UpdateTenantSubscriptionDto } from './dto/tenant.dto';
 import { enqueueTenantProvisioning } from './provision-tenant-queue';
 
@@ -89,7 +90,12 @@ export class TenantsController {
     if (tenant.status === 'PROVISIONING' || tenant.status === 'FAILED') {
       throw new BadRequestException(`Cannot ${status === 'ACTIVE' ? 'reactivate' : 'suspend'} a tenant with status ${tenant.status}`);
     }
-    return prisma.tenant.update({ where: { id }, data: { status } });
+    const updated = await prisma.tenant.update({ where: { id }, data: { status } });
+    // RlsContextMiddleware's resolveActiveTenantByRealm() cache has its own
+    // 30s TTL either way — this just makes suspend/reactivate effective
+    // immediately instead of waiting out that window.
+    await invalidateTenantRealmCache(tenant.keycloakRealm);
+    return updated;
   }
 
   @Get(':id/subscription')

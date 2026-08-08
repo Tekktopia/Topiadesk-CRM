@@ -69,7 +69,10 @@ export class PlatformContextMiddleware implements NestMiddleware {
 
     req.platformAdmin = { id: admin.id, email: admin.email, fullName: admin.fullName };
 
-    const ctx: RlsContext = { userId: admin.id, role: 'PLATFORM_ADMIN', departmentId: null, branchId: null, clientIp: req.ip ?? null };
+    // tenantSchema: null — a platform-admin session never touches a tenant
+    // schema at all (only getPlatformPrismaClient(), which doesn't read
+    // this field — see packages/db-platform/src/client.ts).
+    const ctx: RlsContext = { userId: admin.id, role: 'PLATFORM_ADMIN', departmentId: null, branchId: null, clientIp: req.ip ?? null, tenantSchema: null };
     runWithRlsContext(ctx, () => next());
   }
 }

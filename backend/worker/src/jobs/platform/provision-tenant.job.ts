@@ -16,7 +16,7 @@
 import { Queue, Worker, type Job } from 'bullmq';
 import type Redis from 'ioredis';
 import { loadEnv } from '@topiadesk/config';
-import { PrismaClient, createTenantSchema, applyTenantMigrations, applyTenantRlsAndTriggers, seedBaseline } from '@topiadesk/db';
+import { PrismaClient, createTenantSchema, applyTenantMigrations, applyTenantRlsAndTriggers, seedBaseline, tenantSchemaUrl } from '@topiadesk/db';
 import { getPlatformPrismaClient, type TenantStatus } from '@topiadesk/db-platform';
 import { runWithRlsContext, SYSTEM_JOB_CONTEXT } from '@topiadesk/db';
 import { sendMail } from '../scheduled-reports/mailer';
@@ -29,20 +29,6 @@ export interface ProvisionTenantJobData {
 }
 
 type StepStatus = 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
-
-/**
- * `directUrl` for raw pg operations (schema create/migrate/RLS) is
- * DIRECT_URL as-is — its `?schema=public` query param is inert for these
- * (node-postgres ignores unknown query params; every raw-pg function here
- * sets search_path itself). For the Prisma-based seedBaseline() step,
- * Prisma DOES read `?schema=`, so that one needs a URL rebuilt with the
- * tenant's own schema name.
- */
-function tenantPrismaUrl(baseDirectUrl: string, schemaName: string): string {
-  const url = new URL(baseDirectUrl);
-  url.searchParams.set('schema', schemaName);
-  return url.toString();
-}
 
 export async function provisionTenant(data: ProvisionTenantJobData): Promise<{ status: 'provisioned' | 'failed' }> {
   return runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
@@ -95,10 +81,17 @@ export async function provisionTenant(data: ProvisionTenantJobData): Promise<{ s
     }
 
     // One-off PrismaClient scoped to the new tenant schema — used only for
-    // this provisioning run, not cached/reused for ongoing requests. A
-    // keyed cache of these per tenant, for the main app's actual runtime
-    // traffic, is Phase 2 (see the plan's "load-bearing insight").
-    const tenantPrisma = new PrismaClient({ datasources: { db: { url: tenantPrismaUrl(env.DIRECT_URL, tenant.schemaName) } } });
+    // this provisioning run, not cached/reused for ongoing requests (the
+    // main app's actual runtime traffic goes through @topiadesk/db's own
+    // keyed cache instead — see client.ts). Deliberately built off
+    // DIRECT_URL (bypasses PgBouncer entirely, straight to Postgres, same
+    // as createTenantSchema/applyTenantMigrations/applyTenantRlsAndTriggers
+    // above) rather than the pooled DATABASE_URL client.ts's cache uses —
+    // this one-shot client only ever runs ONE seed script's worth of
+    // queries, so it doesn't need PgBouncer's pooling benefit, and
+    // DIRECT_URL sidesteps the whole PgBouncer-transaction-mode class of
+    // concern client.ts's header comment documents in detail.
+    const tenantPrisma = new PrismaClient({ datasources: { db: { url: tenantSchemaUrl(env.DIRECT_URL, tenant.schemaName) } } });
     let baseline: Awaited<ReturnType<typeof seedBaseline>>;
     try {
       await logEvent('SEED_BASELINE', 'IN_PROGRESS');

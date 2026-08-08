@@ -23,6 +23,24 @@ export interface RlsContext {
   branchId: string | null;
   /** Populated from the request's client IP; stored on audit_log rows via app.current_client_ip. */
   clientIp: string | null;
+  /**
+   * The tenant's Postgres schema name AND Keycloak realm name — both are
+   * guaranteed identical by construction (backend/api's tenants.controller.ts
+   * writes the same `tenant_<slug>` string to Tenant.schemaName and
+   * Tenant.keycloakRealm in one insert). `null` selects the original
+   * pre-multi-tenant deployment (resolves to `'public'` in client.ts) —
+   * each consumer applies its OWN correct default for `null`, since e.g.
+   * client.ts's default ('public') and KeycloakAdminService's default
+   * (env.KEYCLOAK_REALM) are NOT the same literal string.
+   *
+   * Every one of SYSTEM_JOB_CONTEXT's ~50 existing bare consumers keeps
+   * working unmodified (scoped to 'public', today's behavior) since this
+   * constant's own tenantSchema is null — only code that needs a
+   * *different* tenant's SYSTEM_JOB privileges spreads-and-overrides:
+   * `{ ...SYSTEM_JOB_CONTEXT, tenantSchema: schema }` (see
+   * RlsContextMiddleware's bootstrap lookup for the one existing example).
+   */
+  tenantSchema: string | null;
 }
 
 const rlsStorage = new AsyncLocalStorage<RlsContext>();
@@ -61,4 +79,5 @@ export const SYSTEM_JOB_CONTEXT: RlsContext = {
   departmentId: null,
   branchId: null,
   clientIp: null,
+  tenantSchema: null,
 };

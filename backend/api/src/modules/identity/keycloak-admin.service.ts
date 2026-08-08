@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { getRlsContext } from '@topiadesk/db';
 import { ENV_TOKEN, type Env } from '../../common/config/config.module';
 
 export interface KeycloakUserRepresentation {
@@ -28,23 +29,38 @@ interface CachedAdminToken {
 }
 
 /**
- * Thin wrapper around Keycloak's Admin REST API, authenticated via a
- * dedicated client-credentials service account (KEYCLOAK_ADMIN_CLIENT_ID/
- * SECRET — see packages/config/src/env.ts's comment for why this is a
- * SEPARATE client from KEYCLOAK_CLIENT_ID_API, which only ever verifies
- * JWTs). Used by ScimController (create/update/deactivate the real
- * Keycloak-side user — Keycloak has no native SCIM support) and by
- * UsersController's force-logout/sessions endpoints.
+ * Thin wrapper around Keycloak's Admin REST API — realm-aware (Phase 2a):
+ * every method operates against WHICHEVER realm the current request's
+ * RlsContext.tenantSchema resolves to (via `realmName()`, falling back to
+ * `env.KEYCLOAK_REALM` when no context/tenantSchema is bound), since
+ * `Tenant.schemaName` and `Tenant.keycloakRealm` are always the identical
+ * string by construction (see tenants.controller.ts's create()).
+ *
+ * Authenticates with the MASTER-realm credentials (KEYCLOAK_ADMIN/
+ * KEYCLOAK_ADMIN_PASSWORD, password grant against the built-in `admin-cli`
+ * client in the `master` realm) rather than the previous per-realm
+ * client-credentials service account — confirmed empirically (via
+ * backend/worker/src/jobs/platform/keycloak-realm-provisioning.ts's
+ * createTenantAdminUser(), which already does exactly this) that a
+ * master-realm token works for `POST /admin/realms/{realm}/...` calls
+ * against ANY realm, no per-realm service account needed. Deliberate,
+ * confirmed trade-off (not a free simplification): this widens a
+ * compromised `api` process's blast radius for this one credential from
+ * "one realm" to "every tenant's Keycloak realm" — a per-tenant service-
+ * account client (stronger isolation) remains a valid future hardening
+ * step, not needed for this pass. One cached token still suffices
+ * (master-realm privileges span every realm), so `tokenCache` stays a
+ * single value, not a per-realm map.
  *
  * Same lazy/optional-config contract as anthropic-client.ts/
  * voyage-client.ts: every public method fails with a clean
- * ServiceUnavailableException up front if the admin client credentials
- * aren't configured, rather than letting a `fetch()` call fail opaquely
- * deep inside a request. Implemented as an injectable service (not a bare
+ * ServiceUnavailableException up front if the master credentials aren't
+ * configured, rather than letting a `fetch()` call fail opaquely deep
+ * inside a request. Implemented as an injectable service (not a bare
  * factory function like getAnthropicClient()) because it also needs to
- * cache the client-credentials access token across calls within its TTL —
- * that's per-process state a plain function can't hold as cleanly as a
- * singleton-scoped Nest provider.
+ * cache the access token across calls within its TTL — that's per-process
+ * state a plain function can't hold as cleanly as a singleton-scoped Nest
+ * provider.
  */
 @Injectable()
 export class KeycloakAdminService {
@@ -54,7 +70,7 @@ export class KeycloakAdminService {
   constructor(@Inject(ENV_TOKEN) private readonly env: Env) {}
 
   isConfigured(): boolean {
-    return Boolean(this.env.KEYCLOAK_ADMIN_CLIENT_ID && this.env.KEYCLOAK_ADMIN_CLIENT_SECRET);
+    return Boolean(this.env.KEYCLOAK_ADMIN && this.env.KEYCLOAK_ADMIN_PASSWORD);
   }
 
   async createUser(user: KeycloakUserRepresentation): Promise<string> {
@@ -98,17 +114,22 @@ export class KeycloakAdminService {
     return (await res.json()) as KeycloakSessionRepresentation[];
   }
 
+  /** `Tenant.schemaName`/`Tenant.keycloakRealm` are always the identical string by construction — see this class's header comment. */
+  private realmName(): string {
+    return getRlsContext()?.tenantSchema ?? this.env.KEYCLOAK_REALM;
+  }
+
   private adminBaseUrl(): string {
     // Same internal-vs-public-hostname reasoning as JwtVerifier's
     // resolveInternalJwksUri: *.topiadesk.localhost only resolves via
     // host-machine/browser DNS, not Docker Compose's embedded DNS.
     const base = this.env.KEYCLOAK_INTERNAL_URL ?? this.env.KEYCLOAK_URL;
-    return `${base}/admin/realms/${this.env.KEYCLOAK_REALM}`;
+    return `${base}/admin/realms/${this.realmName()}`;
   }
 
   private tokenUrl(): string {
     const base = this.env.KEYCLOAK_INTERNAL_URL ?? this.env.KEYCLOAK_URL;
-    return `${base}/realms/${this.env.KEYCLOAK_REALM}/protocol/openid-connect/token`;
+    return `${base}/realms/master/protocol/openid-connect/token`;
   }
 
   private async getAccessToken(): Promise<string> {
@@ -122,13 +143,14 @@ export class KeycloakAdminService {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: this.env.KEYCLOAK_ADMIN_CLIENT_ID!,
-        client_secret: this.env.KEYCLOAK_ADMIN_CLIENT_SECRET!,
+        grant_type: 'password',
+        client_id: 'admin-cli',
+        username: this.env.KEYCLOAK_ADMIN!,
+        password: this.env.KEYCLOAK_ADMIN_PASSWORD!,
       }),
     });
     if (!res.ok) {
-      throw new Error(`Keycloak admin client-credentials token request failed (${res.status}): ${await safeBody(res)}`);
+      throw new Error(`Keycloak admin master-realm token request failed (${res.status}): ${await safeBody(res)}`);
     }
     const json = (await res.json()) as { access_token: string; expires_in: number };
     this.tokenCache = { accessToken: json.access_token, expiresAtMs: now + json.expires_in * 1000 };
@@ -137,9 +159,7 @@ export class KeycloakAdminService {
 
   private async adminFetch(path: string, init: RequestInit): Promise<Response> {
     if (!this.isConfigured()) {
-      throw new ServiceUnavailableException(
-        'Keycloak admin integration is not configured: KEYCLOAK_ADMIN_CLIENT_ID/KEYCLOAK_ADMIN_CLIENT_SECRET are not set.',
-      );
+      throw new ServiceUnavailableException('Keycloak admin integration is not configured: KEYCLOAK_ADMIN/KEYCLOAK_ADMIN_PASSWORD are not set.');
     }
     const token = await this.getAccessToken();
     return fetch(`${this.adminBaseUrl()}${path}`, {

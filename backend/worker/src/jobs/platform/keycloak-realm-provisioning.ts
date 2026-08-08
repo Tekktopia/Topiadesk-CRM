@@ -107,11 +107,27 @@ function tenantRootDomain(): string {
   return new URL(env.APP_URL).host.replace(/^app\./, '');
 }
 
+/**
+ * DNS hostname labels don't allow underscores (RFC 1123) — tenant slugs
+ * do (matching the `tenant_<slug>` schema/realm naming convention, where
+ * underscores are perfectly valid). Confirmed empirically: a Keycloak
+ * client's redirectUris containing an underscore in the host causes every
+ * authorization request against it to fail with `invalid_redirect_uri`
+ * (Keycloak's own redirect_uri matcher rejects it outright, not just a
+ * theoretical DNS concern). Hyphens are valid in both slugs and hostnames,
+ * so this is a one-way, lossy-but-safe substitution for subdomain use only
+ * — `opts.tenantSlug` itself (and the schema/realm names derived from it
+ * elsewhere) are untouched.
+ */
+function slugToHostLabel(slug: string): string {
+  return slug.replace(/_/g, '-');
+}
+
 export async function createTenantRealm(opts: { realmName: string; displayName: string; tenantSlug: string }): Promise<void> {
   if (!TENANT_REALM_NAME_PATTERN.test(opts.realmName)) {
     throw new Error(`Refusing to create Keycloak realm: "${opts.realmName}" is not a valid tenant realm name (expected /${TENANT_REALM_NAME_PATTERN.source}/).`);
   }
-  const tenantWebOrigin = `https://${opts.tenantSlug}.${tenantRootDomain()}`;
+  const tenantWebOrigin = `https://${slugToHostLabel(opts.tenantSlug)}.${tenantRootDomain()}`;
 
   const res = await masterFetch('/admin/realms', {
     method: 'POST',

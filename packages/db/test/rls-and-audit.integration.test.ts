@@ -90,6 +90,7 @@ describe('RLS-aware Prisma client (packages/db/src/client.ts) — the actual app
       departmentId: brokerDeptId,
       branchId: null,
       clientIp: '127.0.0.1',
+      tenantSchema: 'public',
     };
     const accounts = await runWithRlsContext(ctx, () => prisma.account.findMany());
     expect(accounts.length).toBeGreaterThan(0);
@@ -98,8 +99,8 @@ describe('RLS-aware Prisma client (packages/db/src/client.ts) — the actual app
 
   it('does not leak session context across concurrent requests with different users', async () => {
     const prisma = getPrismaClient();
-    const brokerCtx: RlsContext = { userId: brokerId, role: 'ACCOUNT_HANDLER', departmentId: brokerDeptId, branchId: null, clientIp: null };
-    const complianceCtx: RlsContext = { userId: complianceId, role: 'COMPLIANCE_OFFICER', departmentId: null, branchId: null, clientIp: null };
+    const brokerCtx: RlsContext = { userId: brokerId, role: 'ACCOUNT_HANDLER', departmentId: brokerDeptId, branchId: null, clientIp: null, tenantSchema: 'public' };
+    const complianceCtx: RlsContext = { userId: complianceId, role: 'COMPLIANCE_OFFICER', departmentId: null, branchId: null, clientIp: null, tenantSchema: 'public' };
 
     const results = await Promise.all(
       Array.from({ length: 20 }, (_, i) =>

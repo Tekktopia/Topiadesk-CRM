@@ -176,7 +176,7 @@ export class ScimController {
 
     if (!this.keycloakAdmin.isConfigured()) {
       throw new ServiceUnavailableException(
-        'SCIM user provisioning requires Keycloak admin integration (KEYCLOAK_ADMIN_CLIENT_ID/KEYCLOAK_ADMIN_CLIENT_SECRET) to be configured.',
+        'SCIM user provisioning requires Keycloak admin integration (KEYCLOAK_ADMIN/KEYCLOAK_ADMIN_PASSWORD) to be configured.',
       );
     }
 

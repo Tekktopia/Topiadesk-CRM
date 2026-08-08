@@ -103,14 +103,17 @@ const envSchema = z.object({
 
   // Keycloak MASTER-realm bootstrap admin — already required by
   // docker-compose.yml's keycloak service (KC_BOOTSTRAP_ADMIN_USERNAME/
-  // PASSWORD) for every deployment, but optional/lazy here (zOptionalEnvString,
-  // same reasoning as KEYCLOAK_ADMIN_CLIENT_ID/SECRET below): the only app
-  // code that needs it is tenant realm CREATION (backend/worker's
-  // provision-tenant job calling POST /admin/realms — Keycloak requires
-  // real master-realm credentials for this, no service-account/client-
-  // credentials path exists for creating whole realms), a non-boot-critical
-  // feature that a deployment may deliberately run without (e.g. after
-  // hardening the master admin account away post-bootstrap).
+  // PASSWORD) for every deployment, but optional/lazy here
+  // (zOptionalEnvString) since a deployment MAY deliberately run without it
+  // (e.g. after hardening the master admin account away post-bootstrap).
+  // Two live consumers as of Phase 2a, both needing real master-realm
+  // credentials (no service-account/client-credentials path exists for
+  // either): backend/worker's provision-tenant job (POST /admin/realms,
+  // tenant realm CREATION) and backend/api's KeycloakAdminService
+  // (force-logout/SCIM user provisioning against WHICHEVER tenant realm
+  // the current request belongs to — see that file's header comment for
+  // the confirmed trade-off this makes: a compromised api process's blast
+  // radius for this credential is now "every tenant's realm", not one).
   KEYCLOAK_ADMIN: zOptionalEnvString(),
   KEYCLOAK_ADMIN_PASSWORD: zOptionalEnvString(),
 
@@ -137,17 +140,6 @@ const envSchema = z.object({
   // zOptionalEnvString (not `.optional()` alone) — see that helper's
   // comment for a real docker-compose footgun this avoids.
   VOYAGE_API_KEY: zOptionalEnvString(),
-
-  // Keycloak Admin REST API service-account credentials (manage-users realm-
-  // management role) for forced-logout/session-list — see identity/
-  // keycloak-admin.service.ts. Deliberately a SEPARATE client from
-  // KEYCLOAK_CLIENT_ID_API/KEYCLOAK_CLIENT_SECRET_API (which only ever needs
-  // to verify JWTs, never call Keycloak back) so a leak of one credential
-  // doesn't hand over the other's privileges. Optional/lazy for the same
-  // reason as ANTHROPIC_API_KEY — force-logout is a real but non-boot-
-  // critical admin feature.
-  KEYCLOAK_ADMIN_CLIENT_ID: zOptionalEnvString(),
-  KEYCLOAK_ADMIN_CLIENT_SECRET: zOptionalEnvString(),
 
   // AES-256-GCM key (32 bytes, hex-encoded = 64 chars) for app-layer
   // encryption of IntegrationOAuthCredential's stored access/refresh tokens
