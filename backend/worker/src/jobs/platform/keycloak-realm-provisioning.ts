@@ -267,3 +267,61 @@ export async function createTenantAdminUser(opts: {
 
   return { keycloakSubjectId, temporaryPassword };
 }
+
+/**
+ * Sibling to createTenantAdminUser() above, for the SAME reason this whole
+ * file is separate from backend/api's KeycloakAdminService (master-realm
+ * credentials, no per-realm service account) — but targets the fixed
+ * "topiadesk-platform" realm (env.KEYCLOAK_PLATFORM_REALM) and grants
+ * PLATFORM_ADMIN instead of ADMIN. Not a parameter on createTenantAdminUser
+ * itself: that function's TENANT_REALM_NAME_PATTERN guard would reject
+ * "topiadesk-platform" outright (it doesn't match `tenant_...`), and the
+ * role-to-grant differs too — cleaner as its own small function than an
+ * escape hatch bolted onto the tenant-specific one.
+ */
+export async function createPlatformAdminKeycloakUser(opts: {
+  platformRealm: string;
+  email: string;
+  fullName: string;
+}): Promise<{ keycloakSubjectId: string; temporaryPassword: string }> {
+  const { firstName, lastName } = splitName(opts.fullName);
+  const temporaryPassword = generateTemporaryPassword();
+
+  const createRes = await masterFetch(`/admin/realms/${encodeURIComponent(opts.platformRealm)}/users`, {
+    method: 'POST',
+    body: JSON.stringify({
+      username: opts.email,
+      email: opts.email,
+      emailVerified: true,
+      enabled: true,
+      firstName,
+      lastName,
+      credentials: [{ type: 'password', value: temporaryPassword, temporary: true }],
+      requiredActions: ['UPDATE_PASSWORD', 'CONFIGURE_TOTP'],
+    }),
+  });
+  if (createRes.status !== 201) {
+    throw new Error(`Keycloak create-platform-admin-user failed for "${opts.email}" (${createRes.status}): ${await safeBody(createRes)}`);
+  }
+  const location = createRes.headers.get('location');
+  const keycloakSubjectId = location?.split('/').pop();
+  if (!keycloakSubjectId) {
+    throw new Error(`Keycloak create-platform-admin-user succeeded but returned no Location header for "${opts.email}"`);
+  }
+
+  const roleRes = await masterFetch(`/admin/realms/${encodeURIComponent(opts.platformRealm)}/roles/PLATFORM_ADMIN`, { method: 'GET' });
+  if (!roleRes.ok) {
+    throw new Error(`Keycloak get-role(PLATFORM_ADMIN) failed (${roleRes.status}): ${await safeBody(roleRes)}`);
+  }
+  const platformAdminRole = await roleRes.json();
+
+  const assignRes = await masterFetch(`/admin/realms/${encodeURIComponent(opts.platformRealm)}/users/${keycloakSubjectId}/role-mappings/realm`, {
+    method: 'POST',
+    body: JSON.stringify([platformAdminRole]),
+  });
+  if (!assignRes.ok) {
+    throw new Error(`Keycloak assign-role(PLATFORM_ADMIN) failed for "${opts.email}" (${assignRes.status}): ${await safeBody(assignRes)}`);
+  }
+
+  return { keycloakSubjectId, temporaryPassword };
+}

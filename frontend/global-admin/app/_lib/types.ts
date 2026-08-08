@@ -48,6 +48,17 @@ export interface TenantDetail extends Tenant {
   subscription: Subscription | null;
 }
 
+export type PlatformAdminStatus = 'ACTIVE' | 'INACTIVE';
+
+export interface PlatformAdmin {
+  id: string;
+  email: string;
+  fullName: string;
+  status: PlatformAdminStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PlatformStats {
   totalTenants: number;
   active: number;

@@ -33,6 +33,7 @@ import { PlatformContextMiddleware } from './modules/platform/platform-context.m
 import { PlatformController } from './modules/platform/platform.controller';
 import { TenantsController } from './modules/platform/tenants.controller';
 import { PlansController } from './modules/platform/plans.controller';
+import { PlatformAdminsController } from './modules/platform/platform-admins.controller';
 
 @Module({
   imports: [
@@ -187,6 +188,6 @@ export class AppModule implements NestModule {
     // why: forRoutes() with that regex-style string was found to silently
     // match nothing in this NestJS version even though .exclude() with the
     // identical pattern does work.
-    consumer.apply(PlatformContextMiddleware).forRoutes(PlatformController, TenantsController, PlansController);
+    consumer.apply(PlatformContextMiddleware).forRoutes(PlatformController, TenantsController, PlansController, PlatformAdminsController);
   }
 }
