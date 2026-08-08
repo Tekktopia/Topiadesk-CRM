@@ -59,6 +59,25 @@ export interface PlatformAdmin {
   updatedAt: string;
 }
 
+export interface TenantUser {
+  id: string;
+  keycloakSubjectId: string;
+  email: string;
+  fullName: string;
+  status: string;
+  roles: string[];
+  lastSyncedAt: string | null;
+  createdAt: string;
+}
+
+export interface TenantAdminSummary {
+  tenantId: string;
+  tenantName: string;
+  status: TenantStatus;
+  totalUsers: number;
+  adminCount: number;
+}
+
 export interface PlatformStats {
   totalTenants: number;
   active: number;

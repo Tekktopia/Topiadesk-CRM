@@ -1,8 +1,10 @@
 import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPlatformPrismaClient, Prisma } from '@topiadesk/db-platform';
+import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT } from '@topiadesk/db';
 import { invalidateTenantRealmCache } from '../../common/auth/tenant-realm-resolver';
 import { CreateTenantDto, TenantProvisioningEventResponseDto, TenantResponseDto, UpdateTenantSubscriptionDto } from './dto/tenant.dto';
+import { TenantAdminSummaryDto } from './dto/tenant-user.dto';
 import { enqueueTenantProvisioning } from './provision-tenant-queue';
 
 function isUniqueConstraintViolation(err: unknown): boolean {
@@ -58,6 +60,41 @@ export class TenantsController {
   @ApiOkResponse({ type: [TenantResponseDto] })
   async list(): Promise<TenantResponseDto[]> {
     return getPlatformPrismaClient().tenant.findMany({ orderBy: { createdAt: 'desc' } });
+  }
+
+  /**
+   * One row per tenant with its total/admin user counts — backs both the
+   * "Tenant Admins" and "Usage & Monitoring" nav pages. Declared BEFORE
+   * `:id` below: Nest matches routes in declaration order within a
+   * controller, and "admin-summary" would otherwise be captured by `:id`.
+   * Loops over tenants (one tenant-schema query pair each) — acceptable at
+   * Phase 1 tenant-count scale, see this session's plan for when that
+   * stops being true.
+   */
+  @Get('admin-summary')
+  @ApiOkResponse({ type: [TenantAdminSummaryDto] })
+  async adminSummary(): Promise<TenantAdminSummaryDto[]> {
+    const tenants = await getPlatformPrismaClient().tenant.findMany({ where: { status: 'ACTIVE' }, orderBy: { name: 'asc' } });
+    return Promise.all(
+      tenants.map(async (tenant) => {
+        try {
+          const [totalUsers, adminCount] = await runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema: tenant.keycloakRealm }, () => {
+            const prisma = getPrismaClient();
+            return Promise.all([prisma.user.count(), prisma.user.count({ where: { roles: { some: { role: { name: 'ADMIN' } } } } })]);
+          });
+          return { tenantId: tenant.id, tenantName: tenant.name, status: tenant.status, totalUsers, adminCount };
+        } catch (err) {
+          // A tenant whose keycloakRealm/schemaName doesn't match the
+          // tenant_<slug> convention (e.g. a legacy fixture predating
+          // proper multi-tenant provisioning) would otherwise fail this
+          // whole endpoint for every tenant, not just itself — surfaced
+          // live via exactly that. -1 signals "couldn't be read", not 0
+          // ("confirmed empty"), so the UI can tell the two apart.
+          console.error(`[tenants.adminSummary] failed to read user counts for tenant ${tenant.id} (${tenant.name}):`, err);
+          return { tenantId: tenant.id, tenantName: tenant.name, status: tenant.status, totalUsers: -1, adminCount: -1 };
+        }
+      }),
+    );
   }
 
   @Get(':id')

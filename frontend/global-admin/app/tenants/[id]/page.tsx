@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Clock, Loader2, XCircle } from 'lucide-react';
 import {
@@ -16,12 +16,17 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   cn,
   toast,
 } from '@topiadesk/ui';
 import { apiFetch, ApiError } from '../../_lib/api';
 import type { Plan, TenantDetail } from '../../_lib/types';
 import { TenantStatusBadge } from '../_status-badge';
+import { AdminsTab } from './_admins-tab';
 
 const STEP_ICON: Record<string, React.ReactNode> = {
   IN_PROGRESS: <Loader2 className="h-4 w-4 animate-spin text-warning" />,
@@ -43,7 +48,16 @@ const STEP_LABEL: Record<string, string> = {
 };
 
 export default function TenantDetailPage() {
+  return (
+    <React.Suspense fallback={<p className="text-muted-foreground">Loading…</p>}>
+      <TenantDetailPageContent />
+    </React.Suspense>
+  );
+}
+
+function TenantDetailPageContent() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
   const { data: tenant, isLoading } = useQuery({
@@ -108,70 +122,88 @@ export default function TenantDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">Profile</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2 text-sm">
-            <Row label="Primary contact" value={tenant.primaryContactEmail} />
-            <Row label="Slug" value={tenant.slug} />
-            <Row label="Keycloak realm" value={tenant.keycloakRealm} />
-            <Row label="Created" value={new Date(tenant.createdAt).toLocaleString()} />
-          </CardContent>
-        </Card>
+      <Tabs defaultValue={searchParams.get('tab') === 'admins' ? 'admins' : 'overview'}>
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="admins">Admins</TabsTrigger>
+          <TabsTrigger value="usage">Usage</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">Subscription</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 text-sm">
-            {tenant.subscription ? (
-              <>
-                <Row label="Status" value={<Badge variant="outline">{tenant.subscription.status}</Badge>} />
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Plan</span>
-                  <Select value={tenant.subscription.planId} onValueChange={(planId) => updatePlan.mutate(planId)} disabled={updatePlan.isPending}>
-                    <SelectTrigger className="h-8 w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {plans?.map((plan) => (
-                        <SelectItem key={plan.id} value={plan.id}>
-                          {plan.name} ({plan.seatLimit} seats)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            ) : (
-              <p className="text-muted-foreground">No subscription.</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+        <TabsContent value="overview" className="flex flex-col gap-6">
+          <div className="grid grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Profile</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2 text-sm">
+                <Row label="Primary contact" value={tenant.primaryContactEmail} />
+                <Row label="Slug" value={tenant.slug} />
+                <Row label="Keycloak realm" value={tenant.keycloakRealm} />
+                <Row label="Created" value={new Date(tenant.createdAt).toLocaleString()} />
+              </CardContent>
+            </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground">Provisioning timeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ol className="flex flex-col gap-3">
-            {tenant.provisioningEvents.map((event) => (
-              <li key={event.id} className="flex items-start gap-3">
-                {STEP_ICON[event.status] ?? STEP_ICON.PENDING}
-                <div className="flex-1">
-                  <p className={cn('text-sm font-medium', event.status === 'FAILED' && 'text-destructive')}>{STEP_LABEL[event.step] ?? event.step}</p>
-                  {event.detail ? <p className="text-xs text-muted-foreground">{event.detail}</p> : null}
-                </div>
-                <span className="text-xs text-muted-foreground">{new Date(event.occurredAt).toLocaleTimeString()}</span>
-              </li>
-            ))}
-            {tenant.provisioningEvents.length === 0 ? <p className="text-sm text-muted-foreground">No provisioning events yet.</p> : null}
-          </ol>
-        </CardContent>
-      </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Subscription</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3 text-sm">
+                {tenant.subscription ? (
+                  <>
+                    <Row label="Status" value={<Badge variant="outline">{tenant.subscription.status}</Badge>} />
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Plan</span>
+                      <Select value={tenant.subscription.planId} onValueChange={(planId) => updatePlan.mutate(planId)} disabled={updatePlan.isPending}>
+                        <SelectTrigger className="h-8 w-48">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {plans?.map((plan) => (
+                            <SelectItem key={plan.id} value={plan.id}>
+                              {plan.name} ({plan.seatLimit} seats)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">No subscription.</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Provisioning timeline</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ol className="flex flex-col gap-3">
+                {tenant.provisioningEvents.map((event) => (
+                  <li key={event.id} className="flex items-start gap-3">
+                    {STEP_ICON[event.status] ?? STEP_ICON.PENDING}
+                    <div className="flex-1">
+                      <p className={cn('text-sm font-medium', event.status === 'FAILED' && 'text-destructive')}>{STEP_LABEL[event.step] ?? event.step}</p>
+                      {event.detail ? <p className="text-xs text-muted-foreground">{event.detail}</p> : null}
+                    </div>
+                    <span className="text-xs text-muted-foreground">{new Date(event.occurredAt).toLocaleTimeString()}</span>
+                  </li>
+                ))}
+                {tenant.provisioningEvents.length === 0 ? <p className="text-sm text-muted-foreground">No provisioning events yet.</p> : null}
+              </ol>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="admins">
+          <AdminsTab tenantId={tenant.id} />
+        </TabsContent>
+
+        <TabsContent value="usage">
+          <p className="text-sm text-muted-foreground">Usage details land in the next pass.</p>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

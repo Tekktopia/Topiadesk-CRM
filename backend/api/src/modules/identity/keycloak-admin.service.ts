@@ -95,6 +95,21 @@ export class KeycloakAdminService {
     await this.updateUser(keycloakUserId, { enabled });
   }
 
+  /** `PUT .../users/{id}/reset-password` sets a temp password directly (no
+   * email round-trip) — the caller decides the value and `temporary: true`
+   * forces Keycloak's own UPDATE_PASSWORD flow on next login, same as the
+   * initial-creation temp-password pattern in keycloak-realm-provisioning.ts.
+   * The password itself is never logged here — callers own not persisting
+   * it anywhere beyond a single API response, same discipline as
+   * generateTemporaryPassword()'s own doc comment. */
+  async resetPassword(keycloakUserId: string, temporaryPassword: string): Promise<void> {
+    const res = await this.adminFetch(`/users/${encodeURIComponent(keycloakUserId)}/reset-password`, {
+      method: 'PUT',
+      body: JSON.stringify({ type: 'password', value: temporaryPassword, temporary: true }),
+    });
+    if (!res.ok) throw new Error(`Keycloak reset-password failed (${res.status}): ${await safeBody(res)}`);
+  }
+
   async findUserByEmail(email: string): Promise<KeycloakUserRepresentation | null> {
     const res = await this.adminFetch(`/users?email=${encodeURIComponent(email)}&exact=true`, { method: 'GET' });
     if (!res.ok) throw new Error(`Keycloak find-user-by-email failed (${res.status}): ${await safeBody(res)}`);

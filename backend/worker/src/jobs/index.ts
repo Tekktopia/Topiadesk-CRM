@@ -31,6 +31,7 @@ import { createCaseOutboundEmailQueue, createCaseOutboundEmailWorker } from './c
 import { createPortalLoginQueue, createPortalLoginWorker } from './portal/send-portal-login-link.job';
 import { createProvisionTenantQueue, createProvisionTenantWorker } from './platform/provision-tenant.job';
 import { createCreatePlatformAdminQueue, createCreatePlatformAdminWorker } from './platform/create-platform-admin.job';
+import { createCreateTenantAdminQueue, createCreateTenantAdminWorker } from './platform/create-tenant-admin.job';
 
 export interface RegisteredJobs {
   queues: Queue[];
@@ -136,6 +137,14 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
   const createPlatformAdminQueue = createCreatePlatformAdminQueue(connection);
   const createPlatformAdminWorker = createCreatePlatformAdminWorker(connection);
 
+  // Event-driven, not a repeatable schedule — same reasoning as
+  // createPlatformAdminQueue above: the Platform-Admin API enqueues
+  // directly when a Global Admin operator creates an additional admin for
+  // an existing tenant (see backend/api/src/modules/platform/
+  // tenant-users.controller.ts).
+  const createTenantAdminQueue = createCreateTenantAdminQueue(connection);
+  const createTenantAdminWorker = createCreateTenantAdminWorker(connection);
+
   return {
     queues: [
       renewalScanQueue,
@@ -156,6 +165,7 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       portalLoginQueue,
       provisionTenantQueue,
       createPlatformAdminQueue,
+      createTenantAdminQueue,
     ],
     workers: [
       renewalScanWorker,
@@ -176,6 +186,7 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       portalLoginWorker,
       provisionTenantWorker,
       createPlatformAdminWorker,
+      createTenantAdminWorker,
     ],
   };
 }
