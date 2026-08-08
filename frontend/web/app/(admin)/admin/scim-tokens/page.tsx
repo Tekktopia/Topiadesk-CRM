@@ -2,16 +2,18 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { KeyRound, Plus } from 'lucide-react';
-import { Badge, Button, type ColumnDef, DataTable, DataTableColumnHeader, toast } from '@topiadesk/ui';
+import { KeyRound, Pencil, Plus, ShieldOff } from 'lucide-react';
+import { Badge, Button, type ColumnDef, DataTable, DataTableColumnHeader, type RowSelectionState, selectionColumn, toast } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { PageHeader } from '../_components/page-header';
 import { EmptyState, ErrorState } from '../_components/query-states';
 import { ConfirmDialog } from '../_components/confirm-dialog';
+import { AdminBulkActionToolbar } from '../_components/admin-bulk-action-toolbar';
 import { apiFetch } from '../_lib/api';
 import { canWriteAdmin } from '../_lib/permissions';
 import type { ScimTokenDto } from '../_lib/types';
 import { ScimTokenCreateDialog } from './scim-token-create-dialog';
+import { ScimTokenEditDialog } from './scim-token-edit-dialog';
 
 export default function ScimTokensPage() {
   const { user: currentUser } = useCurrentUser();
@@ -19,8 +21,10 @@ export default function ScimTokensPage() {
   const queryClient = useQueryClient();
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<ScimTokenDto | null>(null);
   const [revoking, setRevoking] = useState<ScimTokenDto | null>(null);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 });
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const tokensQuery = useQuery({
     queryKey: ['admin', 'scim-tokens'],
@@ -37,10 +41,22 @@ export default function ScimTokensPage() {
     onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to revoke token'),
   });
 
+  const bulkRevokeMutation = useMutation({
+    mutationFn: (ids: string[]) => Promise.all(ids.map((id) => apiFetch<ScimTokenDto>(`/api/admin/scim-tokens/${id}/deactivate`, { method: 'POST' }))),
+    onSuccess: (_data, ids) => {
+      toast.success(`${ids.length} token${ids.length === 1 ? '' : 's'} revoked`);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'scim-tokens'] });
+      setRowSelection({});
+    },
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to revoke tokens'),
+  });
+  const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
+
   const tokens = tokensQuery.data ?? [];
 
   const columns = useMemo<ColumnDef<ScimTokenDto>[]>(() => {
     const cols: ColumnDef<ScimTokenDto>[] = [
+      selectionColumn<ScimTokenDto>(),
       {
         accessorKey: 'description',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Label" />,
@@ -78,17 +94,23 @@ export default function ScimTokensPage() {
         id: 'actions',
         header: '',
         enableHiding: false,
-        cell: ({ row }) =>
-          row.original.isActive ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive"
-              onClick={() => setRevoking(row.original)}
-            >
-              Revoke
+        cell: ({ row }) => (
+          <div className="flex items-center justify-end gap-1">
+            <Button variant="ghost" size="icon" aria-label={`Edit ${row.original.description}`} onClick={() => setEditing(row.original)}>
+              <Pencil className="h-4 w-4" />
             </Button>
-          ) : null,
+            {row.original.isActive ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setRevoking(row.original)}
+              >
+                Revoke
+              </Button>
+            ) : null}
+          </div>
+        ),
       });
     }
     return cols;
@@ -108,6 +130,24 @@ export default function ScimTokensPage() {
         }
       />
 
+      {canWrite ? (
+        <AdminBulkActionToolbar
+          selectedCount={selectedIds.length}
+          onClearSelection={() => setRowSelection({})}
+          actions={[
+            {
+              label: 'Revoke',
+              icon: ShieldOff,
+              destructive: true,
+              isPending: bulkRevokeMutation.isPending,
+              confirmTitle: `Revoke ${selectedIds.length} token${selectedIds.length === 1 ? '' : 's'}?`,
+              confirmDescription: 'Any provisioning connector using these tokens will immediately lose access. This can’t be undone.',
+              onClick: () => bulkRevokeMutation.mutate(selectedIds),
+            },
+          ]}
+        />
+      ) : null}
+
       {!tokensQuery.isLoading && !tokensQuery.isError && tokens.length === 0 ? (
         <EmptyState
           icon={<KeyRound className="h-8 w-8" aria-hidden />}
@@ -125,10 +165,14 @@ export default function ScimTokensPage() {
           pagination={pagination}
           onPaginationChange={setPagination}
           totalRowCount={tokens.length}
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
         />
       )}
 
       <ScimTokenCreateDialog open={createOpen} onOpenChange={setCreateOpen} />
+
+      {editing ? <ScimTokenEditDialog target={editing} open={!!editing} onOpenChange={(open) => !open && setEditing(null)} /> : null}
 
       {revoking ? (
         <ConfirmDialog

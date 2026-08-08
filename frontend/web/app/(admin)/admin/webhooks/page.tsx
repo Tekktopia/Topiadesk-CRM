@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ListTree, MoreHorizontal, Network, Plus, Trash2 } from 'lucide-react';
+import { ListTree, MoreHorizontal, Network, Plus, Power, Trash2 } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -13,12 +13,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  type RowSelectionState,
+  selectionColumn,
   toast,
 } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { PageHeader } from '../_components/page-header';
 import { EmptyState, ErrorState } from '../_components/query-states';
 import { ConfirmDialog } from '../_components/confirm-dialog';
+import { AdminBulkActionToolbar } from '../_components/admin-bulk-action-toolbar';
 import { apiFetch } from '../_lib/api';
 import { canWriteAdmin } from '../_lib/permissions';
 import type { WebhookSubscriptionDto } from '../_lib/types';
@@ -34,6 +37,7 @@ export default function WebhooksPage() {
   const [deliveriesFor, setDeliveriesFor] = useState<WebhookSubscriptionDto | null>(null);
   const [deleting, setDeleting] = useState<WebhookSubscriptionDto | null>(null);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 });
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const subscriptionsQuery = useQuery({
     queryKey: ['admin', 'webhook-subscriptions'],
@@ -50,10 +54,33 @@ export default function WebhooksPage() {
     onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to delete subscription'),
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => Promise.all(ids.map((id) => apiFetch<void>(`/api/admin/webhook-subscriptions/${id}`, { method: 'DELETE' }))),
+    onSuccess: (_data, ids) => {
+      toast.success(`${ids.length} subscription${ids.length === 1 ? '' : 's'} deleted`);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'webhook-subscriptions'] });
+      setRowSelection({});
+    },
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to delete subscriptions'),
+  });
+
+  const bulkToggleActiveMutation = useMutation({
+    mutationFn: ({ ids, isActive }: { ids: string[]; isActive: boolean }) =>
+      Promise.all(ids.map((id) => apiFetch<WebhookSubscriptionDto>(`/api/admin/webhook-subscriptions/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive }) }))),
+    onSuccess: (_data, { ids }) => {
+      toast.success(`${ids.length} subscription${ids.length === 1 ? '' : 's'} updated`);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'webhook-subscriptions'] });
+      setRowSelection({});
+    },
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to update subscriptions'),
+  });
+  const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
+
   const subscriptions = subscriptionsQuery.data ?? [];
 
   const columns = useMemo<ColumnDef<WebhookSubscriptionDto>[]>(() => {
     const cols: ColumnDef<WebhookSubscriptionDto>[] = [
+      selectionColumn<WebhookSubscriptionDto>(),
       {
         accessorKey: 'name',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
@@ -86,6 +113,11 @@ export default function WebhooksPage() {
         accessorKey: 'isActive',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Status" />,
         cell: ({ row }) => <Badge variant={row.original.isActive ? 'success' : 'secondary'}>{row.original.isActive ? 'Active' : 'Inactive'}</Badge>,
+      },
+      {
+        accessorKey: 'createdAt',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Created" />,
+        cell: ({ row }) => <span className="text-xs text-muted-foreground">{new Date(row.original.createdAt).toLocaleDateString()}</span>,
       },
       {
         id: 'actions',
@@ -137,6 +169,36 @@ export default function WebhooksPage() {
         }
       />
 
+      {canWrite ? (
+        <AdminBulkActionToolbar
+          selectedCount={selectedIds.length}
+          onClearSelection={() => setRowSelection({})}
+          actions={[
+            {
+              label: 'Enable',
+              icon: Power,
+              isPending: bulkToggleActiveMutation.isPending,
+              onClick: () => bulkToggleActiveMutation.mutate({ ids: selectedIds, isActive: true }),
+            },
+            {
+              label: 'Disable',
+              icon: Power,
+              isPending: bulkToggleActiveMutation.isPending,
+              onClick: () => bulkToggleActiveMutation.mutate({ ids: selectedIds, isActive: false }),
+            },
+            {
+              label: 'Delete',
+              icon: Trash2,
+              destructive: true,
+              isPending: bulkDeleteMutation.isPending,
+              confirmTitle: `Delete ${selectedIds.length} subscription${selectedIds.length === 1 ? '' : 's'}?`,
+              confirmDescription: 'This permanently removes the selected subscriptions and their delivery history.',
+              onClick: () => bulkDeleteMutation.mutate(selectedIds),
+            },
+          ]}
+        />
+      ) : null}
+
       {!subscriptionsQuery.isLoading && !subscriptionsQuery.isError && subscriptions.length === 0 ? (
         <EmptyState
           icon={<Network className="h-8 w-8" aria-hidden />}
@@ -155,6 +217,8 @@ export default function WebhooksPage() {
           onPaginationChange={setPagination}
           totalRowCount={subscriptions.length}
           onRowClick={(sub) => setDeliveriesFor(sub)}
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
         />
       )}
 

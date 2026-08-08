@@ -8,6 +8,16 @@ export class CreateScimTokenDto {
   description!: string;
 }
 
+/** The only field editable after creation — the raw token itself is never
+ * re-shown/re-editable (see ScimTokenCreatedResponseDto), only revoke
+ * (deactivate) or hard-delete can change its usability. */
+export class UpdateScimTokenDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  description!: string;
+}
+
 export class ScimTokenResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() description!: string;

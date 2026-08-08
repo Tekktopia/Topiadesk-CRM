@@ -14,17 +14,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   Input,
+  type RowSelectionState,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  selectionColumn,
   toast,
 } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { PageHeader } from '../_components/page-header';
 import { EmptyState, ErrorState } from '../_components/query-states';
 import { ConfirmDialog } from '../_components/confirm-dialog';
+import { AdminBulkActionToolbar } from '../_components/admin-bulk-action-toolbar';
 import { UserStatusBadge } from '../_components/status-badge';
 import { apiFetch } from '../_lib/api';
 import { useBranches, useDepartments } from '../_lib/queries';
@@ -58,6 +61,7 @@ export default function UsersPage() {
     null,
   );
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 });
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const departmentsQuery = useDepartments();
   const branchesQuery = useBranches();
@@ -99,8 +103,21 @@ export default function UsersPage() {
     },
   });
 
+  const bulkStatusMutation = useMutation({
+    mutationFn: ({ ids, action }: { ids: string[]; action: 'deactivate' | 'reactivate' }) =>
+      Promise.all(ids.map((id) => apiFetch<UserDto>(`/api/admin/users/${id}/${action}`, { method: 'POST' }))),
+    onSuccess: (_data, { ids, action }) => {
+      toast.success(`${ids.length} user${ids.length === 1 ? '' : 's'} ${action === 'deactivate' ? 'deactivated' : 'reactivated'}`);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      setRowSelection({});
+    },
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to update users'),
+  });
+  const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
+
   const columns = useMemo<ColumnDef<UserDto>[]>(() => {
     const cols: ColumnDef<UserDto>[] = [
+      selectionColumn<UserDto>(),
       {
         accessorKey: 'fullName',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
@@ -244,6 +261,29 @@ export default function UsersPage() {
         </Select>
       </div>
 
+      {canWrite ? (
+        <AdminBulkActionToolbar
+          selectedCount={selectedIds.length}
+          onClearSelection={() => setRowSelection({})}
+          actions={[
+            {
+              label: 'Deactivate',
+              icon: Ban,
+              isPending: bulkStatusMutation.isPending,
+              confirmTitle: `Deactivate ${selectedIds.length} user${selectedIds.length === 1 ? '' : 's'}?`,
+              confirmDescription: 'They will immediately lose the ability to sign in. Their records and role assignments are kept and this can be reversed.',
+              onClick: () => bulkStatusMutation.mutate({ ids: selectedIds, action: 'deactivate' }),
+            },
+            {
+              label: 'Reactivate',
+              icon: CheckCircle2,
+              isPending: bulkStatusMutation.isPending,
+              onClick: () => bulkStatusMutation.mutate({ ids: selectedIds, action: 'reactivate' }),
+            },
+          ]}
+        />
+      ) : null}
+
       {!usersQuery.isLoading && !usersQuery.isError && (usersQuery.data ?? []).length === 0 ? (
         <EmptyState title="No users match these filters" description="Try clearing the search or filters above." />
       ) : (
@@ -259,6 +299,8 @@ export default function UsersPage() {
           totalRowCount={(usersQuery.data ?? []).length}
           onRowClick={canWrite ? (u) => setEditingUserId(u.id) : undefined}
           enableColumnVisibility
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
         />
       )}
 

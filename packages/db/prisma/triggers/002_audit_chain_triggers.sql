@@ -68,6 +68,10 @@ BEGIN
     'approvals', 'automation_rules', 'integration_connectors',
     'users', 'roles',
     'departments', 'branches', 'ip_whitelist_entries',
+    -- teams/team_members were a real gap — every other admin-managed
+    -- org-structure table above already had audit coverage, these two
+    -- silently didn't (found live during the admin-CRUD audit).
+    'teams', 'team_members',
     -- Phase 2 — case management. sla_clocks and case_watchers excluded on
     -- purpose: high-frequency derived/operational state whose meaningful
     -- moments (breachedAt/escalatedAt) are already durable on the row

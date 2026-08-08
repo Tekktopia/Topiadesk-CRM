@@ -1,9 +1,9 @@
-import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
-import { CreateScimTokenDto, ScimTokenCreatedResponseDto, ScimTokenResponseDto } from './dto/scim-token.dto';
+import { CreateScimTokenDto, ScimTokenCreatedResponseDto, ScimTokenResponseDto, UpdateScimTokenDto } from './dto/scim-token.dto';
 import { generateScimToken, hashScimToken } from './scim-token.util';
 import { rethrowAsHttpException } from './prisma-error.util';
 
@@ -36,6 +36,15 @@ export class ScimTokensController {
       data: { description: dto.description, tokenHash: hashScimToken(rawToken) },
     });
     return { ...created, token: rawToken };
+  }
+
+  @Patch(':id')
+  @RequirePermission('identity', 'write')
+  @ApiOkResponse({ type: ScimTokenResponseDto })
+  async update(@Param('id') id: string, @Body() dto: UpdateScimTokenDto): Promise<ScimTokenResponseDto> {
+    const existing = await getPrismaClient().scimApiToken.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('SCIM token not found');
+    return getPrismaClient().scimApiToken.update({ where: { id }, data: { description: dto.description } });
   }
 
   @Delete(':id')

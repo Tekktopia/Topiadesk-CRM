@@ -40,3 +40,31 @@ export async function proxyWithBody(request: Request, path: string, method: stri
     body: body || undefined,
   });
 }
+
+/** For file-streaming responses (e.g. the audit log CSV/NDJSON export) —
+ * forwards the body through as-is with its Content-Type/Content-Disposition
+ * headers instead of JSON-parsing it, matching app/api/_lib/proxy.ts's own
+ * proxyStream (that one lives outside app/api/admin/**, so this is a
+ * duplicate rather than a shared import — same per-subtree proxy module
+ * convention `proxy`/`proxyWithBody` above already establish). */
+export async function proxyStream(path: string, init?: RequestInit): Promise<NextResponse> {
+  try {
+    const res = await fetchApi(path, init);
+    if (!res.ok) {
+      const text = await res.text();
+      return NextResponse.json({ message: text || res.statusText }, { status: res.status });
+    }
+    const headers = new Headers();
+    for (const key of ['content-type', 'content-disposition', 'content-length']) {
+      const value = res.headers.get(key);
+      if (value) headers.set(key, value);
+    }
+    return new NextResponse(res.body, { status: res.status, headers });
+  } catch (err) {
+    if (err instanceof ApiUnauthenticatedError) {
+      return NextResponse.json({ message: 'Not authenticated' }, { status: 401 });
+    }
+    console.error(`[api/admin] ${path} failed`, err);
+    return NextResponse.json({ message: 'Upstream request to backend/api failed' }, { status: 502 });
+  }
+}

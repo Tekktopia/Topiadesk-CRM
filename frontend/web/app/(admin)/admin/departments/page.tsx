@@ -3,11 +3,12 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { Button, type ColumnDef, DataTable, DataTableColumnHeader, Skeleton, toast } from '@topiadesk/ui';
+import { Button, type ColumnDef, DataTable, DataTableColumnHeader, type RowSelectionState, selectionColumn, Skeleton, toast } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { PageHeader } from '../_components/page-header';
 import { EmptyState, ErrorState } from '../_components/query-states';
 import { ConfirmDialog } from '../_components/confirm-dialog';
+import { AdminBulkActionToolbar } from '../_components/admin-bulk-action-toolbar';
 import { apiFetch } from '../_lib/api';
 import { useDepartments } from '../_lib/queries';
 import { canWriteAdmin } from '../_lib/permissions';
@@ -22,6 +23,7 @@ export default function DepartmentsPage() {
 
   const [formTarget, setFormTarget] = useState<'create' | DepartmentDto | null>(null);
   const [pendingDelete, setPendingDelete] = useState<DepartmentDto | null>(null);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const nameById = useMemo(
     () => new Map((departmentsQuery.data ?? []).map((d) => [d.id, d.name])),
@@ -38,8 +40,20 @@ export default function DepartmentsPage() {
     onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to delete department'),
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => Promise.all(ids.map((id) => apiFetch<void>(`/api/admin/departments/${id}`, { method: 'DELETE' }))),
+    onSuccess: (_data, ids) => {
+      toast.success(`${ids.length} department${ids.length === 1 ? '' : 's'} deleted`);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'departments'] });
+      setRowSelection({});
+    },
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to delete departments'),
+  });
+  const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
+
   const columns = useMemo<ColumnDef<DepartmentDto>[]>(() => {
     const cols: ColumnDef<DepartmentDto>[] = [
+      selectionColumn<DepartmentDto>(),
       {
         accessorKey: 'name',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
@@ -55,6 +69,11 @@ export default function DepartmentsPage() {
         header: 'Parent department',
         accessorFn: (d) => (d.parentDepartmentId ? (nameById.get(d.parentDepartmentId) ?? '—') : '—'),
         cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
+      },
+      {
+        accessorKey: 'createdAt',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Created" />,
+        cell: ({ row }) => <span className="text-xs text-muted-foreground">{new Date(row.original.createdAt).toLocaleDateString()}</span>,
       },
     ];
     if (canWrite) {
@@ -96,6 +115,24 @@ export default function DepartmentsPage() {
         }
       />
 
+      {canWrite ? (
+        <AdminBulkActionToolbar
+          selectedCount={selectedIds.length}
+          onClearSelection={() => setRowSelection({})}
+          actions={[
+            {
+              label: 'Delete',
+              icon: Trash2,
+              destructive: true,
+              isPending: bulkDeleteMutation.isPending,
+              confirmTitle: `Delete ${selectedIds.length} department${selectedIds.length === 1 ? '' : 's'}?`,
+              confirmDescription: 'Users and reference data still pointing at these departments will keep the reference, but the departments will no longer be selectable.',
+              onClick: () => bulkDeleteMutation.mutate(selectedIds),
+            },
+          ]}
+        />
+      ) : null}
+
       {departmentsQuery.isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -107,7 +144,13 @@ export default function DepartmentsPage() {
       ) : (departmentsQuery.data ?? []).length === 0 ? (
         <EmptyState title="No departments yet" />
       ) : (
-        <DataTable<DepartmentDto, unknown> columns={columns} data={departmentsQuery.data ?? []} getRowId={(d) => d.id} />
+        <DataTable<DepartmentDto, unknown>
+          columns={columns}
+          data={departmentsQuery.data ?? []}
+          getRowId={(d) => d.id}
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
+        />
       )}
 
       {formTarget ? (

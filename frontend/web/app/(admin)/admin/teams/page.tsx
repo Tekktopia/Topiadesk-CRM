@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, Users } from 'lucide-react';
-import { Button, type ColumnDef, DataTable, DataTableColumnHeader, Skeleton, toast } from '@topiadesk/ui';
+import { Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { Button, type ColumnDef, DataTable, DataTableColumnHeader, type RowSelectionState, selectionColumn, Skeleton, toast } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { PageHeader } from '../_components/page-header';
 import { EmptyState, ErrorState } from '../_components/query-states';
 import { ConfirmDialog } from '../_components/confirm-dialog';
+import { AdminBulkActionToolbar } from '../_components/admin-bulk-action-toolbar';
 import { apiFetch } from '../_lib/api';
 import { canWriteAdmin } from '../_lib/permissions';
 import type { TeamDto } from '../_lib/types';
@@ -24,6 +25,7 @@ export default function TeamsPage() {
   const [formTarget, setFormTarget] = useState<'create' | TeamDto | null>(null);
   const [detailTeamId, setDetailTeamId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<TeamDto | null>(null);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiFetch<void>(`/api/admin/teams/${id}`, { method: 'DELETE' }),
@@ -35,8 +37,20 @@ export default function TeamsPage() {
     onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to delete team'),
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => Promise.all(ids.map((id) => apiFetch<void>(`/api/admin/teams/${id}`, { method: 'DELETE' }))),
+    onSuccess: (_data, ids) => {
+      toast.success(`${ids.length} team${ids.length === 1 ? '' : 's'} deleted`);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'teams'] });
+      setRowSelection({});
+    },
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to delete teams'),
+  });
+  const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
+
   const columns = useMemo<ColumnDef<TeamDto>[]>(() => {
     const cols: ColumnDef<TeamDto>[] = [
+      selectionColumn<TeamDto>(),
       {
         accessorKey: 'name',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
@@ -56,6 +70,11 @@ export default function TeamsPage() {
           </span>
         ),
       },
+      {
+        accessorKey: 'createdAt',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Created" />,
+        cell: ({ row }) => <span className="text-xs text-muted-foreground">{new Date(row.original.createdAt).toLocaleDateString()}</span>,
+      },
     ];
     if (canWrite) {
       cols.push({
@@ -63,7 +82,10 @@ export default function TeamsPage() {
         header: '',
         enableHiding: false,
         cell: ({ row }) => (
-          <div onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <Button variant="ghost" size="icon" aria-label={`Edit ${row.original.name}`} onClick={() => setFormTarget(row.original)}>
+              <Pencil className="h-4 w-4" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -104,12 +126,33 @@ export default function TeamsPage() {
       ) : (teamsQuery.data ?? []).length === 0 ? (
         <EmptyState title="No teams yet" icon={<Users className="h-8 w-8" aria-hidden />} />
       ) : (
-        <DataTable<TeamDto, unknown>
-          columns={columns}
-          data={teamsQuery.data ?? []}
-          getRowId={(t) => t.id}
-          onRowClick={(t) => setDetailTeamId(t.id)}
-        />
+        <>
+          {canWrite ? (
+            <AdminBulkActionToolbar
+              selectedCount={selectedIds.length}
+              onClearSelection={() => setRowSelection({})}
+              actions={[
+                {
+                  label: 'Delete',
+                  icon: Trash2,
+                  destructive: true,
+                  isPending: bulkDeleteMutation.isPending,
+                  confirmTitle: `Delete ${selectedIds.length} team${selectedIds.length === 1 ? '' : 's'}?`,
+                  confirmDescription: 'All member records for the selected teams are removed. This cannot be undone.',
+                  onClick: () => bulkDeleteMutation.mutate(selectedIds),
+                },
+              ]}
+            />
+          ) : null}
+          <DataTable<TeamDto, unknown>
+            columns={columns}
+            data={teamsQuery.data ?? []}
+            getRowId={(t) => t.id}
+            onRowClick={(t) => setDetailTeamId(t.id)}
+            rowSelection={rowSelection}
+            onRowSelectionChange={setRowSelection}
+          />
+        </>
       )}
 
       {formTarget ? (

@@ -153,8 +153,36 @@ export type UpdateIpWhitelistBody = Omit<RawUpdateIpWhitelistBody, 'appliesToRol
 };
 
 // -- Integrations -------------------------------------------------------------
-type RawConnectorDto = Json200<'/integrations/connectors', 'get'>[number];
-export type ConnectorDto = Omit<RawConnectorDto, 'lastSuccessfulSyncAt'> & { lastSuccessfulSyncAt: NullableString };
+// Hand-typed rather than generated: ConnectorResponseDto grew
+// syncDirection/pollingIntervalMinutes/webhookPath/config/createdAt/
+// updatedAt and ConnectorType grew TEAMS_WEBHOOK/SEAMLESSHR after this
+// file's last codegen cycle — same reasoning as AuditVerifyResponseDto/
+// AdminNotificationDto above.
+export type ConnectorType = 'CORE_BROKING_SYSTEM' | 'ERP' | 'MOCK_STUB' | 'TEAMS_WEBHOOK' | 'SEAMLESSHR';
+export type SyncDirection = 'INBOUND' | 'OUTBOUND' | 'BIDIRECTIONAL';
+export interface ConnectorDto {
+  id: string;
+  name: string;
+  connectorType: ConnectorType;
+  isEnabled: boolean;
+  syncDirection: SyncDirection;
+  pollingIntervalMinutes: number | null;
+  webhookPath: NullableString;
+  config: Record<string, unknown>;
+  lastSuccessfulSyncAt: NullableString;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface CreateConnectorBody {
+  name: string;
+  connectorType: ConnectorType;
+  syncDirection: SyncDirection;
+  isEnabled?: boolean;
+  pollingIntervalMinutes?: number;
+  webhookPath?: string;
+  config: Record<string, unknown>;
+}
+export type UpdateConnectorBody = Partial<CreateConnectorBody>;
 
 type RawSyncJobDto = Json200<'/integrations/connectors/{id}/sync-jobs', 'get'>[number];
 export type SyncJobDto = Omit<RawSyncJobDto, 'startedAt' | 'completedAt' | 'triggeredBy'> & {
@@ -178,6 +206,28 @@ export type IntegrationLogDto = Omit<
 type RawNotificationDto = Json200<'/notifications', 'get'>[number];
 export type NotificationDto = Omit<RawNotificationDto, 'readAt'> & { readAt: NullableString };
 
+// /notifications/admin — org-wide view (NotificationsController.listAdmin()/
+// resend()), a new route not yet reflected in the generated schema at the
+// time this was written — hand-typed to match AdminNotificationResponseDto
+// (backend/api/src/modules/notifications/dto/admin-notification.dto.ts)
+// rather than waiting on a codegen cycle, same reasoning as
+// AuditVerifyResponseDto above.
+export interface AdminNotificationDto {
+  id: string;
+  recipientUserId: string;
+  recipient: { id: string; fullName: string; email: string };
+  type: string;
+  title: string;
+  body: string;
+  channel: 'IN_APP' | 'EMAIL' | 'SMS';
+  status: 'PENDING' | 'SENT' | 'FAILED' | 'READ';
+  relatedEntityType: NullableString;
+  relatedEntityId: NullableString;
+  sentAt: NullableString;
+  readAt: NullableString;
+  createdAt: string;
+}
+
 // -- Audit log --------------------------------------------------------------
 type RawAuditLogDto = Json200<'/audit-log', 'get'>[number];
 export type AuditLogDto = Omit<
@@ -191,6 +241,32 @@ export type AuditLogDto = Omit<
   changedFields: unknown;
 };
 export type AuditLogActorDto = NonNullable<AuditLogDto['actorUser']>;
+
+// AuditExportController.verify's @ApiOkResponse only carries a plain-string
+// `description` (not a `type:`), so the generator has no structured schema
+// to emit here — hand-typed to match AuditVerifyResponseDto's real shape
+// (backend/api/src/modules/identity/audit-export.controller.ts).
+export interface AuditVerifyMismatchDto {
+  id: string;
+  entityType: string;
+  entityId: string;
+  storedHash: string;
+  recomputedHash: string;
+}
+export interface AuditVerifyCheckpointDto {
+  id: string;
+  checkpointAt: string;
+  anchorHashValid: boolean;
+}
+export interface AuditVerifyResponseDto {
+  rangeStart: string | null;
+  rangeEnd: string;
+  rowsChecked: number;
+  mismatches: AuditVerifyMismatchDto[];
+  mismatchCount: number;
+  checkpoints: AuditVerifyCheckpointDto[];
+  verified: boolean;
+}
 
 // -- SCIM tokens --------------------------------------------------------------
 type RawScimTokenDto = Json200<'/identity/scim-tokens', 'get'>[number];

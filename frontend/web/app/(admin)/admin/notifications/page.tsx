@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, Check } from 'lucide-react';
 import { Badge, Button, type ColumnDef, DataTable, DataTableColumnHeader, toast } from '@topiadesk/ui';
@@ -84,6 +85,11 @@ export default function NotificationsPage() {
           unreadCount > 0
             ? `${unreadCount} unread — this is your own inbox (RLS-scoped), not an org-wide feed.`
             : 'Your own inbox (RLS-scoped) — up to the most recent 50 notifications.'
+        }
+        actions={
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/admin/notifications/all">All notifications</Link>
+          </Button>
         }
       />
 

@@ -15,12 +15,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  type RowSelectionState,
+  selectionColumn,
   toast,
 } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { PageHeader } from './page-header';
 import { EmptyState, ErrorState } from './query-states';
 import { ConfirmDialog } from './confirm-dialog';
+import { AdminBulkActionToolbar } from './admin-bulk-action-toolbar';
 import { apiFetch } from '../_lib/api';
 import { canWriteAdmin } from '../_lib/permissions';
 import type { AutomationRuleDto } from '../_lib/types';
@@ -51,6 +54,7 @@ export function WorkflowsListView() {
 
   const [deleting, setDeleting] = useState<AutomationRuleDto | null>(null);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 });
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const queryKey = ['admin', 'automation-rules', 'ENTITY_EVENT'];
   const rulesQuery = useQuery({
@@ -68,10 +72,22 @@ export function WorkflowsListView() {
     onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to delete workflow'),
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => Promise.all(ids.map((id) => apiFetch<void>(`/api/crm/automation-rules/${id}`, { method: 'DELETE' }))),
+    onSuccess: (_data, ids) => {
+      toast.success(`${ids.length} workflow${ids.length === 1 ? '' : 's'} deleted`);
+      queryClient.invalidateQueries({ queryKey });
+      setRowSelection({});
+    },
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to delete workflows'),
+  });
+  const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
+
   const rules = useMemo(() => (rulesQuery.data ?? []).filter(isWorkflowRule), [rulesQuery.data]);
 
   const columns = useMemo<ColumnDef<AutomationRuleDto>[]>(
     () => [
+      selectionColumn<AutomationRuleDto>(),
       {
         accessorKey: 'name',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
@@ -109,7 +125,16 @@ export function WorkflowsListView() {
       {
         accessorKey: 'isActive',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Status" />,
-        cell: ({ row }) => <Badge variant={row.original.isActive ? 'success' : 'secondary'}>{row.original.isActive ? 'Active' : 'Inactive'}</Badge>,
+        cell: ({ row }) => {
+          const rule = row.original;
+          if (rule.status === 'DRAFT') return <Badge variant="outline">Draft</Badge>;
+          return <Badge variant={rule.isActive ? 'success' : 'secondary'}>{rule.isActive ? 'Active' : 'Inactive'}</Badge>;
+        },
+      },
+      {
+        accessorKey: 'createdAt',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Created" />,
+        cell: ({ row }) => <span className="text-xs text-muted-foreground">{new Date(row.original.createdAt).toLocaleDateString()}</span>,
       },
       {
         id: 'row-actions',
@@ -155,6 +180,24 @@ export function WorkflowsListView() {
         }
       />
 
+      {canWrite ? (
+        <AdminBulkActionToolbar
+          selectedCount={selectedIds.length}
+          onClearSelection={() => setRowSelection({})}
+          actions={[
+            {
+              label: 'Delete',
+              icon: Trash2,
+              destructive: true,
+              isPending: bulkDeleteMutation.isPending,
+              confirmTitle: `Delete ${selectedIds.length} workflow${selectedIds.length === 1 ? '' : 's'}?`,
+              confirmDescription: 'This permanently removes the selected workflows. This cannot be undone.',
+              onClick: () => bulkDeleteMutation.mutate(selectedIds),
+            },
+          ]}
+        />
+      ) : null}
+
       {!rulesQuery.isLoading && !rulesQuery.isError && rules.length === 0 ? (
         <EmptyState
           title="No workflows yet"
@@ -171,6 +214,8 @@ export function WorkflowsListView() {
           pagination={pagination}
           onPaginationChange={setPagination}
           totalRowCount={rules.length}
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
         />
       )}
 

@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, ScrollText } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight, Download, ScrollText, ShieldCheck } from 'lucide-react';
 import {
   Button,
   Input,
@@ -18,14 +18,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  toast,
 } from '@topiadesk/ui';
 import { PageHeader } from '../_components/page-header';
 import { EmptyState, ErrorState } from '../_components/query-states';
 import { AuditActionBadge } from '../_components/status-badge';
 import { apiFetch } from '../_lib/api';
 import { useUsers } from '../_lib/queries';
-import type { AuditLogDto } from '../_lib/types';
+import type { AuditLogDto, AuditVerifyResponseDto } from '../_lib/types';
 import { AuditLogDetailDialog } from './audit-log-detail-dialog';
+import { AuditVerifyResultDialog } from './audit-verify-result-dialog';
 
 const UNSET = '__any';
 const TAKE = 50;
@@ -52,6 +54,7 @@ export default function AuditLogPage() {
   const [to, setTo] = useState('');
   const [skip, setSkip] = useState(0);
   const [selected, setSelected] = useState<AuditLogDto | null>(null);
+  const [verifyResult, setVerifyResult] = useState<AuditVerifyResponseDto | null>(null);
 
   const debouncedEntityType = useDebounced(entityType, 300);
   const debouncedEntityId = useDebounced(entityId, 300);
@@ -82,11 +85,35 @@ export default function AuditLogPage() {
   const rows = auditLogQuery.data ?? [];
   const hasNextPage = rows.length === TAKE;
 
+  const verifyMutation = useMutation({
+    mutationFn: () => apiFetch<AuditVerifyResponseDto>('/api/admin/audit-log/verify'),
+    onSuccess: setVerifyResult,
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to verify the audit chain'),
+  });
+
+  function handleExport(format: 'csv' | 'ndjson') {
+    const params = new URLSearchParams({ format });
+    if (debouncedEntityType) params.set('entityType', debouncedEntityType);
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    window.location.href = `/api/admin/audit-log/export?${params.toString()}`;
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Audit Log"
         description="Every compliance-relevant mutation, hash-chained and structurally append-only. Visible here only to ADMIN and COMPLIANCE_OFFICER — the API enforces this independently of what this page shows."
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => verifyMutation.mutate()} disabled={verifyMutation.isPending}>
+              <ShieldCheck className="h-4 w-4" aria-hidden /> {verifyMutation.isPending ? 'Verifying…' : 'Verify chain'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleExport('csv')}>
+              <Download className="h-4 w-4" aria-hidden /> Export CSV
+            </Button>
+          </div>
+        }
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
@@ -227,6 +254,8 @@ export default function AuditLogPage() {
       )}
 
       <AuditLogDetailDialog entry={selected} open={!!selected} onOpenChange={(open) => !open && setSelected(null)} />
+
+      <AuditVerifyResultDialog result={verifyResult} open={!!verifyResult} onOpenChange={(open) => !open && setVerifyResult(null)} />
     </div>
   );
 }
