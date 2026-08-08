@@ -59,6 +59,9 @@ export class AutomationRulesController {
         actions: dto.actions as Prisma.InputJsonValue,
         steps: dto.steps as Prisma.InputJsonValue | undefined,
         isActive: dto.isActive ?? true,
+        // Explicit, not left to the bare DB default alone, for a
+        // business-meaningful field — see the DTO's status doc comment.
+        status: dto.status ?? 'PUBLISHED',
         createdById: user.id,
       },
     });
@@ -80,6 +83,7 @@ export class AutomationRulesController {
         actions: dto.actions as Prisma.InputJsonValue | undefined,
         steps: dto.steps as Prisma.InputJsonValue | undefined,
         isActive: dto.isActive,
+        status: dto.status,
       },
     });
   }

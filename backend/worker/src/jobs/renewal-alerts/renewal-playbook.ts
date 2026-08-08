@@ -63,7 +63,11 @@ export interface RenewalPlaybookParams {
 
 export async function runRenewalPlaybooks(params: RenewalPlaybookParams): Promise<{ matchedRules: number }> {
   const prisma = getPrismaClient();
-  const rules = await prisma.automationRule.findMany({ where: { triggerType: 'ENTITY_EVENT', isActive: true } });
+  // status:'PUBLISHED' excludes DRAFT rules (autosaved in-progress edits
+  // from the /admin/workflows builder's new draft support) — same guard as
+  // automation-events.queue.ts's processEntityEvent, applied here since
+  // this queries the same automation_rules table via the same triggerType.
+  const rules = await prisma.automationRule.findMany({ where: { triggerType: 'ENTITY_EVENT', isActive: true, status: 'PUBLISHED' } });
   const matched = rules.filter((rule) => conditionsMatch(rule.conditions, params.threshold, params.lineOfBusiness));
 
   for (const rule of matched) {

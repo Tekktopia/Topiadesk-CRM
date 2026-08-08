@@ -229,6 +229,15 @@ enum ConnectorType {
   CORE_BROKING_SYSTEM
   ERP
   MOCK_STUB
+  /// Posts workflow-triggered messages to a Microsoft Teams channel via an
+  /// Incoming Webhook URL (config.webhookUrl) — no OAuth, no Azure app
+  /// registration needed. See backend/worker/src/automation/handlers.ts's
+  /// NOTIFY_TEAMS_CHANNEL actionType.
+  TEAMS_WEBHOOK
+  /// Employee/org-structure sync FROM SeamlessHR INTO TopiaDesk's
+  /// Users/Departments/Branches — config.seamlessHR = {apiBaseUrl, apiKey}.
+  /// See integrations.service.ts's triggerSync() SEAMLESSHR branch.
+  SEAMLESSHR
 }
 
 enum SyncDirection {
@@ -1192,6 +1201,12 @@ model Approval {
   approvedBy    User?              @relation("ApprovalApprovedBy", fields: [approvedById], references: [id])
   status        ApprovalStatus     @default(PENDING)
   reason        String?
+  /// The DECIDER's own comment, set at decision time — distinct from
+  /// `reason` above, which is the REQUESTER's static explanation set once
+  /// at gate-open time (e.g. an AutomationRule author's configured gate
+  /// description). Different people, different moments; must not share a
+  /// column. Surfaced on AutomationRunState's decision endpoint as `note`.
+  decisionNote  String?            @map("decision_note")
   decidedAt     DateTime?          @map("decided_at") @db.Timestamptz(6)
   createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   /// Nullable, additive: when null (every pre-existing domain — CASE_CLOSURE,
@@ -1229,6 +1244,7 @@ model ApprovalChain {
   updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   approvals Approval[]
+  automationRunStates AutomationRunState[]
 
   @@index([entityType, entityId])
   @@map("approval_chains")
@@ -1351,10 +1367,24 @@ model AutomationRule {
   /// flat `actions` path" (backend/worker/src/automation/
   /// automation-events.queue.ts's processEntityEvent branches on this).
   /// Each element is `{type:'ACTION', actionType, params}` (identical
-  /// shape to one `actions` entry) or `{type:'APPROVAL_GATE', reason?}` —
-  /// see run-engine.ts for execution.
+  /// shape to one `actions` entry), `{type:'APPROVAL_GATE', reason?,
+  /// notifyTeamId?, approverUserIds?, requiredApprovals?, onApprove?,
+  /// onReject?}`, or `{type:'CONDITION', field, operator, value, onTrue,
+  /// onFalse}` — see run-engine.ts for execution. Every element also
+  /// carries a stable `id`, used as the addressable target of `goto`
+  /// (onApprove/onReject/onTrue/onFalse) — older rows predating branching
+  /// simply have no `id`/goto and execute exactly as before (fall through
+  /// to the next array index).
   steps       Json?
   isActive    Boolean               @default(true) @map("is_active")
+  /// DRAFT rules are never matched by the engine (see the `status:
+  /// 'PUBLISHED'` filter in automation-events.queue.ts and
+  /// renewal-playbook.ts) regardless of `isActive` — lets the
+  /// /admin/workflows builder autosave an in-progress rule without it ever
+  /// running. Defaults to PUBLISHED (not DRAFT) so every pre-existing rule,
+  /// including ones created via the separate /admin/automations JSON
+  /// dialog which never sends this field, keeps running unchanged.
+  status      AutomationRuleStatus  @default(PUBLISHED)
   createdById String                @map("created_by_id") @db.Uuid
   createdBy   User                  @relation("AutomationRuleCreatedBy", fields: [createdById], references: [id])
   createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1363,6 +1393,12 @@ model AutomationRule {
   runStates AutomationRunState[]
 
   @@map("automation_rules")
+}
+
+enum AutomationRuleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
 }
 
 enum AutomationRunStatus {
@@ -1386,9 +1422,24 @@ model AutomationRunState {
   entityId         String               @map("entity_id") @db.Uuid
   status           AutomationRunStatus  @default(RUNNING)
   currentStepIndex Int                  @default(0) @map("current_step_index")
+  /// Free-form per-run state bag. Currently one key: `approverAllowlist:
+  /// string[]`, written when an APPROVAL_GATE step names specific
+  /// `approverUserIds` — frozen at gate-open time so the decision endpoint
+  /// can enforce who may decide without re-resolving team membership later
+  /// (and so a person leaving a team mid-approval can't change who's
+  /// authorized). Absent for gates with no named approvers (today's
+  /// unrestricted-decider behavior, unchanged).
   context          Json?
   approvalId       String?              @map("approval_id") @db.Uuid
   approval         Approval?            @relation(fields: [approvalId], references: [id], onDelete: SetNull)
+  /// Set instead of `approvalId` when an APPROVAL_GATE step's
+  /// `requiredApprovals > 1` — the multi-approver quorum path, mirroring
+  /// PolicyVersion's existing ApprovalChain usage
+  /// (policy-version.controller.ts). Mutually exclusive with `approvalId`
+  /// per run: a gate is either the single-Approval path or the chain path,
+  /// decided once at gate-open time.
+  chainId          String?              @map("approval_chain_id") @db.Uuid
+  chain            ApprovalChain?       @relation(fields: [chainId], references: [id], onDelete: SetNull)
   failureReason    String?              @map("failure_reason")
   startedAt        DateTime             @default(now()) @map("started_at") @db.Timestamptz(6)
   completedAt      DateTime?            @map("completed_at") @db.Timestamptz(6)
@@ -1397,6 +1448,7 @@ model AutomationRunState {
   @@index([ruleId])
   @@index([entityType, entityId])
   @@index([approvalId])
+  @@index([chainId])
   @@map("automation_run_states")
 }
 

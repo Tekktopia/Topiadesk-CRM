@@ -1,10 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Bell, CheckCircle2, Loader2, Plus, ShieldQuestion, StickyNote, Trash2, UserCog, Users2 } from 'lucide-react';
 import {
+  ArrowDown,
+  ArrowUp,
+  Bell,
+  CheckCircle2,
+  GitBranch,
+  Loader2,
+  Mail,
+  MessageSquare,
+  Plus,
+  ShieldQuestion,
+  StickyNote,
+  Trash2,
+  UserCog,
+  Users2,
+} from 'lucide-react';
+import {
+  Badge,
   Button,
   Card,
   CardContent,
@@ -27,6 +43,8 @@ import { casePriorityLabel, caseStatusLabel, caseTypeLabel, claimStatusLabel, hu
 import { apiFetch } from '../_lib/api';
 import { PageHeader } from './page-header';
 import { ErrorState } from './query-states';
+import { SearchableUserPicker, SearchableUserMultiPicker } from './searchable-user-picker';
+import { WorkflowPreviewPanel } from './workflow-preview-panel';
 import type { AutomationRuleDto, CreateAutomationRuleBody, UpdateAutomationRuleBody } from '../_lib/types';
 
 // Hand-mirrored from the enqueueEntityEvent(...) call sites in
@@ -62,10 +80,25 @@ const EVENT_TYPE_LABEL: Record<string, string> = {
 };
 
 const ANY = '__ANY__';
+/** Sentinel for "no goto chosen yet" in a <Select> (which can't hold an
+ * empty-string item value) — distinct from ANY, which means "match
+ * anything" in the Conditions card above. */
+const UNSET = '__UNSET__';
 
-type StepKind = 'ASSIGN_USER' | 'ASSIGN_TEAM' | 'SET_STATUS' | 'SET_PRIORITY' | 'ADD_NOTE' | 'NOTIFY_PERSON' | 'NOTIFY_GROUP' | 'APPROVAL';
+export type StepKind =
+  | 'ASSIGN_USER'
+  | 'ASSIGN_TEAM'
+  | 'SET_STATUS'
+  | 'SET_PRIORITY'
+  | 'ADD_NOTE'
+  | 'NOTIFY_PERSON'
+  | 'NOTIFY_GROUP'
+  | 'APPROVAL'
+  | 'CONDITION'
+  | 'SEND_EMAIL'
+  | 'NOTIFY_TEAMS';
 
-const STEP_KIND_META: Record<StepKind, { label: string; icon: typeof UserCog; description: string }> = {
+export const STEP_KIND_META: Record<StepKind, { label: string; icon: typeof UserCog; description: string }> = {
   ASSIGN_USER: { label: 'Assign to a person', icon: UserCog, description: 'Sets the assignee directly.' },
   ASSIGN_TEAM: { label: 'Assign to a team', icon: Users2, description: 'Sets the owning team directly.' },
   SET_STATUS: { label: 'Set status', icon: CheckCircle2, description: 'Transitions the record to a new status.' },
@@ -73,10 +106,29 @@ const STEP_KIND_META: Record<StepKind, { label: string; icon: typeof UserCog; de
   ADD_NOTE: { label: 'Add an internal note', icon: StickyNote, description: 'Logs a system-authored note on the record.' },
   NOTIFY_PERSON: { label: 'Notify a person', icon: Bell, description: 'Sends an in-app and/or email notification to one user.' },
   NOTIFY_GROUP: { label: 'Notify a group', icon: Users2, description: 'Notifies every member of a team.' },
-  APPROVAL: { label: 'Require approval', icon: ShieldQuestion, description: 'Pauses the workflow until a Compliance Officer or Admin decides.' },
+  APPROVAL: { label: 'Require approval', icon: ShieldQuestion, description: 'Pauses the workflow until it is approved or rejected.' },
+  CONDITION: { label: 'If / else condition', icon: GitBranch, description: 'Branches the workflow based on a field value.' },
+  SEND_EMAIL: { label: 'Send an email', icon: Mail, description: "Emails a person, a team, or the ticket/claim's customer." },
+  NOTIFY_TEAMS: { label: 'Post to a Teams channel', icon: MessageSquare, description: 'Posts a message via a configured Microsoft Teams webhook connector.' },
 };
 
-interface BuilderStep {
+/** Fixed allow-list of fields a CONDITION step can branch on — mirrors
+ * backend/worker/src/automation/run-engine.ts's CONDITION_FIELDS exactly
+ * (same set the "Conditions" card above already exposes; no custom-field
+ * conditions in this pass). */
+const CONDITION_FIELDS_BY_ENTITY: Record<'CASE' | 'CLAIM', string[]> = {
+  CASE: ['status', 'priority', 'caseType', 'categoryId', 'assignedTeamId'],
+  CLAIM: ['status', 'priority', 'assignedTeamId'],
+};
+const CONDITION_FIELD_LABEL: Record<string, string> = {
+  status: 'Status',
+  priority: 'Priority',
+  caseType: 'Ticket type',
+  categoryId: 'Category',
+  assignedTeamId: 'Assigned team',
+};
+
+export interface BuilderStep {
   id: string;
   kind: StepKind;
   userId?: string;
@@ -90,51 +142,108 @@ interface BuilderStep {
   notifyChannel?: 'IN_APP' | 'EMAIL';
   approvalReason?: string;
   approvalNotifyTeamId?: string;
+  /** Named individual approvers (searchable multi-picker) — non-empty
+   * turns on decision-time allow-list enforcement server-side. */
+  approverUserIds?: string[];
+  /** Quorum among approverUserIds. 1 (or unset) = today's single-approver behavior. */
+  requiredApprovals?: number;
+  /** Step id to jump to once this gate is fully approved/rejected — unset = today's default (approve falls through, reject fails the run). */
+  onApproveGoto?: string;
+  onRejectGoto?: string;
+  conditionField?: string;
+  conditionOperator?: 'EQUALS' | 'NOT_EQUALS';
+  conditionValue?: string;
+  conditionOnTrueGoto?: string;
+  conditionOnFalseGoto?: string;
+  emailRecipientMode?: 'USER' | 'TEAM' | 'CASE_CUSTOMER';
+  emailRecipientUserId?: string;
+  emailRecipientTeamId?: string;
+  emailSubject?: string;
+  emailBody?: string;
+  teamsConnectorId?: string;
+  teamsTitle?: string;
+  teamsBody?: string;
 }
 
 interface RawStep {
+  id?: string;
   type?: string;
   actionType?: string;
   params?: Record<string, unknown>;
   reason?: string;
   notifyTeamId?: string;
+  approverUserIds?: string[];
+  requiredApprovals?: number;
+  onApprove?: { goto?: string };
+  onReject?: { goto?: string };
+  field?: string;
+  operator?: string;
+  value?: string;
+  onTrue?: { goto?: string };
+  onFalse?: { goto?: string };
 }
 
 function newStep(kind: StepKind): BuilderStep {
-  return { id: crypto.randomUUID(), kind, notifyChannel: 'IN_APP' };
+  return { id: crypto.randomUUID(), kind, notifyChannel: 'IN_APP', emailRecipientMode: 'USER', conditionOperator: 'EQUALS' };
 }
 
 /** Best-effort parse of an existing rule's `steps` JSON back into builder
- * form state — anything that doesn't match one of the 8 step kinds this
- * builder knows how to render is silently dropped rather than crashing the
- * edit page (a rule with a step this builder doesn't understand yet is
- * still safely editable for its other steps). */
+ * form state. Every step is kept — including ones this builder can't fully
+ * render — rather than silently dropped, now that drafts depend on
+ * round-tripping partial/unfamiliar data without data loss. A step's `id`
+ * is preserved (goto targets address steps by id); older rows predating
+ * branching have no `id`, so `step-${index}` is synthesized — the exact
+ * same fallback backend/worker's run-engine.ts and the decide() endpoint
+ * use, so any (currently nonexistent, since old rules have no goto)
+ * cross-reference stays consistent. */
 function deserializeSteps(raw: unknown): BuilderStep[] {
   if (!Array.isArray(raw)) return [];
   const out: BuilderStep[] = [];
-  for (const entry of raw as RawStep[]) {
+  (raw as RawStep[]).forEach((entry, index) => {
+    const id = entry.id ?? `step-${index}`;
     if (entry.type === 'APPROVAL_GATE') {
-      out.push({ id: crypto.randomUUID(), kind: 'APPROVAL', approvalReason: entry.reason, approvalNotifyTeamId: entry.notifyTeamId });
-      continue;
+      out.push({
+        id,
+        kind: 'APPROVAL',
+        approvalReason: entry.reason,
+        approvalNotifyTeamId: entry.notifyTeamId,
+        approverUserIds: entry.approverUserIds,
+        requiredApprovals: entry.requiredApprovals,
+        onApproveGoto: entry.onApprove?.goto,
+        onRejectGoto: entry.onReject?.goto,
+      });
+      return;
     }
-    if (entry.type !== 'ACTION') continue;
+    if (entry.type === 'CONDITION') {
+      out.push({
+        id,
+        kind: 'CONDITION',
+        conditionField: entry.field,
+        conditionOperator: entry.operator === 'NOT_EQUALS' ? 'NOT_EQUALS' : 'EQUALS',
+        conditionValue: entry.value,
+        conditionOnTrueGoto: entry.onTrue?.goto,
+        conditionOnFalseGoto: entry.onFalse?.goto,
+      });
+      return;
+    }
+    if (entry.type !== 'ACTION') return;
     const p = entry.params ?? {};
     switch (entry.actionType) {
       case 'ASSIGN_TO_USER':
-        out.push({ id: crypto.randomUUID(), kind: 'ASSIGN_USER', userId: typeof p.userId === 'string' ? p.userId : undefined });
+        out.push({ id, kind: 'ASSIGN_USER', userId: typeof p.userId === 'string' ? p.userId : undefined });
         break;
       case 'ASSIGN_TO_TEAM':
-        out.push({ id: crypto.randomUUID(), kind: 'ASSIGN_TEAM', teamId: typeof p.teamId === 'string' ? p.teamId : undefined });
+        out.push({ id, kind: 'ASSIGN_TEAM', teamId: typeof p.teamId === 'string' ? p.teamId : undefined });
         break;
       case 'SET_STATUS':
-        out.push({ id: crypto.randomUUID(), kind: 'SET_STATUS', status: typeof p.status === 'string' ? p.status : undefined });
+        out.push({ id, kind: 'SET_STATUS', status: typeof p.status === 'string' ? p.status : undefined });
         break;
       case 'SET_PRIORITY':
-        out.push({ id: crypto.randomUUID(), kind: 'SET_PRIORITY', priority: typeof p.priority === 'string' ? p.priority : undefined });
+        out.push({ id, kind: 'SET_PRIORITY', priority: typeof p.priority === 'string' ? p.priority : undefined });
         break;
       case 'ADD_INTERNAL_NOTE':
         out.push({
-          id: crypto.randomUUID(),
+          id,
           kind: 'ADD_NOTE',
           noteSubject: typeof p.subject === 'string' ? p.subject : undefined,
           noteBody: typeof p.body === 'string' ? p.body : undefined,
@@ -142,7 +251,7 @@ function deserializeSteps(raw: unknown): BuilderStep[] {
         break;
       case 'SEND_NOTIFICATION':
         out.push({
-          id: crypto.randomUUID(),
+          id,
           kind: typeof p.recipientTeamId === 'string' ? 'NOTIFY_GROUP' : 'NOTIFY_PERSON',
           userId: typeof p.recipientUserId === 'string' ? p.recipientUserId : undefined,
           teamId: typeof p.recipientTeamId === 'string' ? p.recipientTeamId : undefined,
@@ -151,45 +260,141 @@ function deserializeSteps(raw: unknown): BuilderStep[] {
           notifyChannel: p.channel === 'EMAIL' ? 'EMAIL' : 'IN_APP',
         });
         break;
+      case 'SEND_EMAIL':
+        out.push({
+          id,
+          kind: 'SEND_EMAIL',
+          emailRecipientMode: p.recipientMode === 'TEAM' || p.recipientMode === 'CASE_CUSTOMER' ? p.recipientMode : 'USER',
+          emailRecipientUserId: typeof p.recipientUserId === 'string' ? p.recipientUserId : undefined,
+          emailRecipientTeamId: typeof p.recipientTeamId === 'string' ? p.recipientTeamId : undefined,
+          emailSubject: typeof p.subject === 'string' ? p.subject : undefined,
+          emailBody: typeof p.body === 'string' ? p.body : undefined,
+        });
+        break;
+      case 'NOTIFY_TEAMS_CHANNEL':
+        out.push({
+          id,
+          kind: 'NOTIFY_TEAMS',
+          teamsConnectorId: typeof p.connectorId === 'string' ? p.connectorId : undefined,
+          teamsTitle: typeof p.title === 'string' ? p.title : undefined,
+          teamsBody: typeof p.body === 'string' ? p.body : undefined,
+        });
+        break;
       default:
         break;
     }
-  }
+  });
   return out;
 }
 
-function serializeStep(step: BuilderStep): RawStep | null {
+/** Always returns a step (never drops one for being incomplete) — a draft
+ * is explicitly allowed to have half-filled steps, so completeness is
+ * validated separately (see isStepComplete/canSubmit) rather than baked
+ * into serialization. Publishing is what enforces completeness. */
+function serializeStep(step: BuilderStep): RawStep {
   switch (step.kind) {
     case 'ASSIGN_USER':
-      return step.userId ? { type: 'ACTION', actionType: 'ASSIGN_TO_USER', params: { userId: step.userId } } : null;
+      return { id: step.id, type: 'ACTION', actionType: 'ASSIGN_TO_USER', params: { userId: step.userId } };
     case 'ASSIGN_TEAM':
-      return step.teamId ? { type: 'ACTION', actionType: 'ASSIGN_TO_TEAM', params: { teamId: step.teamId } } : null;
+      return { id: step.id, type: 'ACTION', actionType: 'ASSIGN_TO_TEAM', params: { teamId: step.teamId } };
     case 'SET_STATUS':
-      return step.status ? { type: 'ACTION', actionType: 'SET_STATUS', params: { status: step.status } } : null;
+      return { id: step.id, type: 'ACTION', actionType: 'SET_STATUS', params: { status: step.status } };
     case 'SET_PRIORITY':
-      return step.priority ? { type: 'ACTION', actionType: 'SET_PRIORITY', params: { priority: step.priority } } : null;
+      return { id: step.id, type: 'ACTION', actionType: 'SET_PRIORITY', params: { priority: step.priority } };
     case 'ADD_NOTE':
-      return step.noteBody ? { type: 'ACTION', actionType: 'ADD_INTERNAL_NOTE', params: { subject: step.noteSubject, body: step.noteBody } } : null;
+      return { id: step.id, type: 'ACTION', actionType: 'ADD_INTERNAL_NOTE', params: { subject: step.noteSubject, body: step.noteBody } };
     case 'NOTIFY_PERSON':
-      return step.userId && step.notifyTitle && step.notifyBody
-        ? {
-            type: 'ACTION',
-            actionType: 'SEND_NOTIFICATION',
-            params: { title: step.notifyTitle, body: step.notifyBody, recipientUserId: step.userId, channel: step.notifyChannel ?? 'IN_APP' },
-          }
-        : null;
+      return {
+        id: step.id,
+        type: 'ACTION',
+        actionType: 'SEND_NOTIFICATION',
+        params: { title: step.notifyTitle, body: step.notifyBody, recipientUserId: step.userId, channel: step.notifyChannel ?? 'IN_APP' },
+      };
     case 'NOTIFY_GROUP':
-      return step.teamId && step.notifyTitle && step.notifyBody
-        ? {
-            type: 'ACTION',
-            actionType: 'SEND_NOTIFICATION',
-            params: { title: step.notifyTitle, body: step.notifyBody, recipientTeamId: step.teamId, channel: step.notifyChannel ?? 'IN_APP' },
-          }
-        : null;
+      return {
+        id: step.id,
+        type: 'ACTION',
+        actionType: 'SEND_NOTIFICATION',
+        params: { title: step.notifyTitle, body: step.notifyBody, recipientTeamId: step.teamId, channel: step.notifyChannel ?? 'IN_APP' },
+      };
     case 'APPROVAL':
-      return { type: 'APPROVAL_GATE', reason: step.approvalReason || undefined, notifyTeamId: step.approvalNotifyTeamId || undefined };
+      return {
+        id: step.id,
+        type: 'APPROVAL_GATE',
+        reason: step.approvalReason || undefined,
+        notifyTeamId: step.approvalNotifyTeamId || undefined,
+        approverUserIds: step.approverUserIds && step.approverUserIds.length > 0 ? step.approverUserIds : undefined,
+        requiredApprovals: step.requiredApprovals && step.requiredApprovals > 1 ? step.requiredApprovals : undefined,
+        onApprove: step.onApproveGoto ? { goto: step.onApproveGoto } : undefined,
+        onReject: step.onRejectGoto ? { goto: step.onRejectGoto } : undefined,
+      };
+    case 'CONDITION':
+      return {
+        id: step.id,
+        type: 'CONDITION',
+        field: step.conditionField,
+        operator: step.conditionOperator ?? 'EQUALS',
+        value: step.conditionValue ?? '',
+        onTrue: { goto: step.conditionOnTrueGoto },
+        onFalse: { goto: step.conditionOnFalseGoto },
+      };
+    case 'SEND_EMAIL':
+      return {
+        id: step.id,
+        type: 'ACTION',
+        actionType: 'SEND_EMAIL',
+        params: {
+          recipientMode: step.emailRecipientMode ?? 'USER',
+          recipientUserId: step.emailRecipientMode === 'USER' ? step.emailRecipientUserId : undefined,
+          recipientTeamId: step.emailRecipientMode === 'TEAM' ? step.emailRecipientTeamId : undefined,
+          subject: step.emailSubject,
+          body: step.emailBody,
+        },
+      };
+    case 'NOTIFY_TEAMS':
+      return {
+        id: step.id,
+        type: 'ACTION',
+        actionType: 'NOTIFY_TEAMS_CHANNEL',
+        params: { connectorId: step.teamsConnectorId, title: step.teamsTitle, body: step.teamsBody },
+      };
     default:
-      return null;
+      return { id: step.id };
+  }
+}
+
+/** Publish-time completeness — draft saves skip this entirely. */
+function isStepComplete(step: BuilderStep): boolean {
+  switch (step.kind) {
+    case 'ASSIGN_USER':
+      return !!step.userId;
+    case 'ASSIGN_TEAM':
+      return !!step.teamId;
+    case 'SET_STATUS':
+      return !!step.status;
+    case 'SET_PRIORITY':
+      return !!step.priority;
+    case 'ADD_NOTE':
+      return !!step.noteBody;
+    case 'NOTIFY_PERSON':
+      return !!(step.userId && step.notifyTitle && step.notifyBody);
+    case 'NOTIFY_GROUP':
+      return !!(step.teamId && step.notifyTitle && step.notifyBody);
+    case 'APPROVAL':
+      return true;
+    case 'CONDITION':
+      // onTrue/onFalse goto are optional (unset = ends the workflow on
+      // that branch, see run-engine.ts's AutomationStep doc comment) — a
+      // condition only needs its field/value actually chosen to be
+      // publishable. Requiring a goto here used to make a CONDITION with
+      // no other steps impossible to ever complete (found live).
+      return !!(step.conditionField && step.conditionValue);
+    case 'SEND_EMAIL':
+      return !!(step.emailSubject && step.emailBody && (step.emailRecipientMode === 'CASE_CUSTOMER' || step.emailRecipientUserId || step.emailRecipientTeamId));
+    case 'NOTIFY_TEAMS':
+      return !!(step.teamsConnectorId && step.teamsTitle && step.teamsBody);
+    default:
+      return false;
   }
 }
 
@@ -200,9 +405,11 @@ function serializeStep(step: BuilderStep): RawStep | null {
  * domain out of scope here. This builder writes the exact same
  * AutomationRule.conditions/steps shape the worker's run-engine.ts already
  * executes (backend/worker/src/automation/run-engine.ts,
- * automation-events.queue.ts) — activating a rule here takes effect on the
+ * automation-events.queue.ts) — publishing a rule here takes effect on the
  * very next matching event, no restart needed (processEntityEvent
- * re-queries active rules fresh on every event).
+ * re-queries active PUBLISHED rules fresh on every event). A DRAFT rule is
+ * never matched regardless of isActive, which is what lets autosave run
+ * silently in the background without the in-progress rule ever executing.
  */
 export function WorkflowBuilderView({ ruleId }: { ruleId?: string }) {
   const router = useRouter();
@@ -218,6 +425,15 @@ export function WorkflowBuilderView({ ruleId }: { ruleId?: string }) {
   const { users } = useDirectoryUsers();
   const { teams } = useTeams();
   const { data: categories } = useCaseCategories();
+  // Only TEAMS_WEBHOOK connectors are relevant to the NOTIFY_TEAMS step —
+  // filtered client-side out of the same connector list
+  // /admin/integrations itself reads (backend/api/src/modules/
+  // integrations/integrations.controller.ts's list()).
+  const { data: connectors } = useQuery({
+    queryKey: ['admin', 'integrations', 'connectors'],
+    queryFn: () => apiFetch<{ id: string; name: string; connectorType: string; isEnabled: boolean }[]>('/api/admin/integrations/connectors'),
+  });
+  const teamsWebhookConnectors = useMemo(() => (connectors ?? []).filter((c) => c.connectorType === 'TEAMS_WEBHOOK' && c.isEnabled), [connectors]);
 
   const [name, setName] = useState('');
   const [entityType, setEntityType] = useState<'CASE' | 'CLAIM'>('CASE');
@@ -229,12 +445,16 @@ export function WorkflowBuilderView({ ruleId }: { ruleId?: string }) {
   const [assignedTeamId, setAssignedTeamId] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [steps, setSteps] = useState<BuilderStep[]>([]);
+  const [ruleStatus, setRuleStatus] = useState<'DRAFT' | 'PUBLISHED' | 'ARCHIVED'>('PUBLISHED');
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     const rule = ruleQuery.data;
     if (!rule) return;
     setName(rule.name);
     setIsActive(rule.isActive);
+    setRuleStatus((rule.status as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | undefined) ?? 'PUBLISHED');
     const conditions = (rule.conditions ?? {}) as {
       entityType?: 'CASE' | 'CLAIM';
       eventTypes?: string[];
@@ -249,6 +469,7 @@ export function WorkflowBuilderView({ ruleId }: { ruleId?: string }) {
     setCategoryId(typeof filters.categoryId === 'string' ? filters.categoryId : '');
     setAssignedTeamId(typeof filters.assignedTeamId === 'string' ? filters.assignedTeamId : '');
     setSteps(deserializeSteps(rule.steps));
+    initializedRef.current = true;
   }, [ruleQuery.data]);
 
   const eventTypeOptions = entityType === 'CASE' ? TICKET_EVENT_TYPES : CLAIM_EVENT_TYPES;
@@ -288,14 +509,13 @@ export function WorkflowBuilderView({ ruleId }: { ruleId?: string }) {
     if (assignedTeamId) filters.assignedTeamId = assignedTeamId;
 
     const conditions = { entityType, eventTypes, filters };
-    const serializedSteps = steps.map(serializeStep).filter((s): s is RawStep => s !== null);
-    return { conditions, steps: serializedSteps };
+    return { conditions, steps: steps.map(serializeStep) };
   }
 
   const createMutation = useMutation({
     mutationFn: (body: CreateAutomationRuleBody) => apiFetch<AutomationRuleDto>('/api/crm/automation-rules', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => {
-      toast.success('Workflow created');
+      toast.success('Workflow published');
       queryClient.invalidateQueries({ queryKey: ['admin', 'automation-rules'] });
       router.push('/admin/workflows');
     },
@@ -313,16 +533,79 @@ export function WorkflowBuilderView({ ruleId }: { ruleId?: string }) {
     onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to save workflow'),
   });
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
-  const canSubmit = name.trim().length > 0 && eventTypes.length > 0 && steps.length > 0;
+  // Handles both create (new workflow) and update (existing) — status is
+  // always forced to DRAFT here regardless of which path runs, and stays
+  // on the builder page afterward (redirecting to the edit route for a
+  // brand-new rule, via replace so "new" never sits in browser history
+  // pointing at a rule that now has a real id) rather than jumping to the
+  // list the way Publish does, so the user can keep working.
+  const saveDraftMutation = useMutation({
+    mutationFn: async (body: CreateAutomationRuleBody) => {
+      if (isEdit) return apiFetch<AutomationRuleDto>(`/api/crm/automation-rules/${ruleId}`, { method: 'PATCH', body: JSON.stringify(body) });
+      return apiFetch<AutomationRuleDto>('/api/crm/automation-rules', { method: 'POST', body: JSON.stringify(body) });
+    },
+    onSuccess: (saved) => {
+      toast.success('Saved as draft');
+      setRuleStatus('DRAFT');
+      queryClient.invalidateQueries({ queryKey: ['admin', 'automation-rules'] });
+      if (!isEdit) router.replace(`/admin/workflows/${saved.id}`);
+    },
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to save draft'),
+  });
 
-  function handleSubmit() {
+  // Silent — no toast, no navigation, just a small text indicator. Only
+  // ever runs for an already-saved rule (isEdit), debounced ~3s after the
+  // last edit, and deliberately omits `status` so it never un-publishes a
+  // PUBLISHED rule or re-publishes a DRAFT one — only Publish/Save-as-draft
+  // change status.
+  const autosaveMutation = useMutation({
+    mutationFn: (body: UpdateAutomationRuleBody) =>
+      apiFetch<AutomationRuleDto>(`/api/crm/automation-rules/${ruleId}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    onSuccess: () => {
+      setSaveState('saved');
+      queryClient.invalidateQueries({ queryKey: ['admin', 'automation-rules'] });
+    },
+    onError: () => setSaveState('idle'),
+  });
+
+  const payloadKey = useMemo(() => JSON.stringify(buildPayload()), [entityType, eventTypes, status, priority, caseType, categoryId, assignedTeamId, steps]);
+
+  useEffect(() => {
+    if (!isEdit || !initializedRef.current || !name.trim()) return;
+    setSaveState('saving');
+    const timeout = setTimeout(() => {
+      const { conditions, steps: serializedSteps } = buildPayload();
+      autosaveMutation.mutate({ name, triggerType: 'ENTITY_EVENT', conditions, actions: [], steps: serializedSteps, isActive });
+    }, 3000);
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, name, isActive, payloadKey]);
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isSavingDraft = saveDraftMutation.isPending;
+  const canSaveDraft = name.trim().length > 0;
+  const canSubmit = name.trim().length > 0 && eventTypes.length > 0 && steps.length > 0 && steps.every(isStepComplete);
+
+  function handlePublish() {
     const { conditions, steps: serializedSteps } = buildPayload();
     if (isEdit) {
-      updateMutation.mutate({ name, triggerType: 'ENTITY_EVENT', conditions, actions: [], steps: serializedSteps, isActive });
+      updateMutation.mutate({ name, triggerType: 'ENTITY_EVENT', conditions, actions: [], steps: serializedSteps, isActive, status: 'PUBLISHED' });
     } else {
-      createMutation.mutate({ name, triggerType: 'ENTITY_EVENT', conditions, actions: [], steps: serializedSteps, isActive });
+      createMutation.mutate({ name, triggerType: 'ENTITY_EVENT', conditions, actions: [], steps: serializedSteps, isActive, status: 'PUBLISHED' });
     }
+  }
+
+  function handleSaveDraft() {
+    const { conditions, steps: serializedSteps } = buildPayload();
+    saveDraftMutation.mutate({
+      name: name.trim() || 'Untitled workflow',
+      triggerType: 'ENTITY_EVENT',
+      conditions,
+      actions: [],
+      steps: serializedSteps,
+      isActive: false,
+      status: 'DRAFT',
+    });
   }
 
   if (isEdit && ruleQuery.isLoading) {
@@ -339,206 +622,278 @@ export function WorkflowBuilderView({ ruleId }: { ruleId?: string }) {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <PageHeader
-        title={isEdit ? `Edit workflow` : 'New workflow'}
-        description="A trigger, optional conditions, and an ordered list of steps — activating it takes effect on the very next matching event."
-      />
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
+      <div className="space-y-6">
+        <PageHeader
+          title={isEdit ? `Edit workflow` : 'New workflow'}
+          description="A trigger, optional conditions, and an ordered list of steps — publishing it takes effect on the very next matching event."
+          actions={
+            <div className="flex items-center gap-2">
+              {ruleStatus === 'DRAFT' ? <Badge variant="outline">Draft — not running yet</Badge> : null}
+              <span className="text-xs text-muted-foreground">
+                {isEdit && saveState === 'saving' ? 'Saving…' : null}
+                {isEdit && saveState === 'saved' ? 'Saved' : null}
+              </span>
+            </div>
+          }
+        />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>1. Name &amp; entity</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="workflow-name">Name</Label>
-            <Input id="workflow-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Escalate urgent complaints" required />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Applies to</Label>
-            <Select value={entityType} onValueChange={(v) => { setEntityType(v as 'CASE' | 'CLAIM'); setEventTypes([]); setStatus(''); setCaseType(''); }} disabled={isEdit}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="CASE">Ticket</SelectItem>
-                <SelectItem value="CLAIM">Claim</SelectItem>
-              </SelectContent>
-            </Select>
-            {isEdit ? <p className="text-xs text-muted-foreground">Can&apos;t be changed after creation.</p> : null}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>2. Trigger</CardTitle>
-          <CardDescription>Which event(s) should evaluate this workflow.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {eventTypeOptions.map((et) => (
-            <Button key={et} type="button" size="sm" variant={eventTypes.includes(et) ? 'default' : 'outline'} onClick={() => toggleEventType(et)}>
-              {EVENT_TYPE_LABEL[et] ?? humanize(et)}
-            </Button>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>3. Conditions</CardTitle>
-          <CardDescription>Optional — leave as &ldquo;Any&rdquo; to match every event of the selected type(s).</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Status</Label>
-            <Select value={status || ANY} onValueChange={(v) => setStatus(v === ANY ? '' : v)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ANY}>Any</SelectItem>
-                {statusOptions.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {statusLabel(s)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Priority</Label>
-            <Select value={priority || ANY} onValueChange={(v) => setPriority(v === ANY ? '' : v)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ANY}>Any</SelectItem>
-                {CASE_PRIORITIES.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {casePriorityLabel(p)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {entityType === 'CASE' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>1. Name &amp; entity</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Ticket type</Label>
-              <Select value={caseType || ANY} onValueChange={(v) => setCaseType(v === ANY ? '' : v)}>
+              <Label htmlFor="workflow-name">Name</Label>
+              <Input id="workflow-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Escalate urgent complaints" required />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Applies to</Label>
+              <Select
+                value={entityType}
+                onValueChange={(v) => {
+                  setEntityType(v as 'CASE' | 'CLAIM');
+                  setEventTypes([]);
+                  setStatus('');
+                  setCaseType('');
+                }}
+                disabled={isEdit}
+              >
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CASE">Ticket</SelectItem>
+                  <SelectItem value="CLAIM">Claim</SelectItem>
+                </SelectContent>
+              </Select>
+              {isEdit ? <p className="text-xs text-muted-foreground">Can&apos;t be changed after creation.</p> : null}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>2. Trigger</CardTitle>
+            <CardDescription>Which event(s) should evaluate this workflow.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {eventTypeOptions.map((et) => (
+              <Button key={et} type="button" size="sm" variant={eventTypes.includes(et) ? 'default' : 'outline'} onClick={() => toggleEventType(et)}>
+                {EVENT_TYPE_LABEL[et] ?? humanize(et)}
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>3. Conditions</CardTitle>
+            <CardDescription>Optional — leave as &ldquo;Any&rdquo; to match every event of the selected type(s).</CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select value={status || ANY} onValueChange={(v) => setStatus(v === ANY ? '' : v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ANY}>Any</SelectItem>
-                  {CASE_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {caseTypeLabel(t)}
+                  {statusOptions.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {statusLabel(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          ) : null}
-          {entityType === 'CASE' ? (
             <div className="space-y-1.5">
-              <Label>Category</Label>
-              <Select value={categoryId || ANY} onValueChange={(v) => setCategoryId(v === ANY ? '' : v)}>
+              <Label>Priority</Label>
+              <Select value={priority || ANY} onValueChange={(v) => setPriority(v === ANY ? '' : v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ANY}>Any</SelectItem>
-                  {(categories ?? []).map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
+                  {CASE_PRIORITIES.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {casePriorityLabel(p)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          ) : null}
-          <div className="space-y-1.5">
-            <Label>Assigned team</Label>
-            <Select value={assignedTeamId || ANY} onValueChange={(v) => setAssignedTeamId(v === ANY ? '' : v)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ANY}>Any</SelectItem>
-                {teams.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.name}
-                  </SelectItem>
+            {entityType === 'CASE' ? (
+              <div className="space-y-1.5">
+                <Label>Ticket type</Label>
+                <Select value={caseType || ANY} onValueChange={(v) => setCaseType(v === ANY ? '' : v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ANY}>Any</SelectItem>
+                    {CASE_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {caseTypeLabel(t)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+            {entityType === 'CASE' ? (
+              <div className="space-y-1.5">
+                <Label>Category</Label>
+                <Select value={categoryId || ANY} onValueChange={(v) => setCategoryId(v === ANY ? '' : v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ANY}>Any</SelectItem>
+                    {(categories ?? []).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+            <div className="space-y-1.5">
+              <Label>Assigned team</Label>
+              <Select value={assignedTeamId || ANY} onValueChange={(v) => setAssignedTeamId(v === ANY ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>Any</SelectItem>
+                  {teams.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>4. Steps</CardTitle>
+            <CardDescription>Runs in order (or branches, for conditions/approvals with custom routing) — an approval step pauses the workflow until decided.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {steps.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No steps yet — add one below.</p>
+            ) : (
+              <ol className="space-y-3">
+                {steps.map((step, index) => (
+                  <StepEditor
+                    key={step.id}
+                    step={step}
+                    index={index}
+                    isFirst={index === 0}
+                    isLast={index === steps.length - 1}
+                    entityType={entityType}
+                    statusOptions={statusOptions}
+                    statusLabel={statusLabel}
+                    categories={categories ?? []}
+                    users={users}
+                    teams={teams}
+                    teamsWebhookConnectors={teamsWebhookConnectors}
+                    allSteps={steps}
+                    onChange={(patch) => updateStep(step.id, patch)}
+                    onRemove={() => removeStep(step.id)}
+                    onMoveUp={() => moveStep(step.id, -1)}
+                    onMoveDown={() => moveStep(step.id, 1)}
+                  />
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+              </ol>
+            )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>4. Steps</CardTitle>
-          <CardDescription>Runs in order — an approval step pauses the workflow until decided.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {steps.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No steps yet — add one below.</p>
-          ) : (
-            <ol className="space-y-3">
-              {steps.map((step, index) => (
-                <StepEditor
-                  key={step.id}
-                  step={step}
-                  index={index}
-                  isFirst={index === 0}
-                  isLast={index === steps.length - 1}
-                  statusOptions={statusOptions}
-                  statusLabel={statusLabel}
-                  users={users}
-                  teams={teams}
-                  onChange={(patch) => updateStep(step.id, patch)}
-                  onRemove={() => removeStep(step.id)}
-                  onMoveUp={() => moveStep(step.id, -1)}
-                  onMoveDown={() => moveStep(step.id, 1)}
-                />
-              ))}
-            </ol>
-          )}
+            <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+              {(Object.keys(STEP_KIND_META) as StepKind[]).map((kind) => {
+                const meta = STEP_KIND_META[kind];
+                return (
+                  <Button key={kind} type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => setSteps((prev) => [...prev, newStep(kind)])}>
+                    <Plus className="h-3.5 w-3.5" aria-hidden />
+                    {meta.label}
+                  </Button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
-          <div className="flex flex-wrap gap-2 border-t border-border pt-4">
-            {(Object.keys(STEP_KIND_META) as StepKind[]).map((kind) => {
-              const meta = STEP_KIND_META[kind];
-              return (
-                <Button key={kind} type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => setSteps((prev) => [...prev, newStep(kind)])}>
-                  <Plus className="h-3.5 w-3.5" aria-hidden />
-                  {meta.label}
+        <Card>
+          <CardContent className="space-y-3 pt-6">
+            {ruleStatus === 'DRAFT' && !canSubmit ? (
+              <p className="text-xs text-muted-foreground">
+                This workflow is still a draft — it won&apos;t run until published. Publish needs a name, at least one trigger event, at least one step, and every step fully filled in.
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" className="h-4 w-4 rounded border-input" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+                Active — takes effect immediately once published
+              </label>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => router.push('/admin/workflows')}>
+                  Cancel
                 </Button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                <Button type="button" variant="outline" disabled={!canSaveDraft || isSavingDraft} onClick={handleSaveDraft}>
+                  {isSavingDraft ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                  Save as draft
+                </Button>
+                <Button type="button" disabled={!canSubmit || isPending} onClick={handlePublish}>
+                  {isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                  {isEdit && ruleStatus !== 'DRAFT' ? 'Save changes' : 'Publish workflow'}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-      <Card>
-        <CardContent className="flex items-center justify-between pt-6">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" className="h-4 w-4 rounded border-input" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-            Active — takes effect immediately on the next matching event
-          </label>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={() => router.push('/admin/workflows')}>
-              Cancel
-            </Button>
-            <Button type="button" disabled={!canSubmit || isPending} onClick={handleSubmit}>
-              {isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-              {isEdit ? 'Save changes' : 'Create workflow'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <WorkflowPreviewPanel entityType={entityType} eventTypes={eventTypes} steps={steps} users={users} teams={teams} />
     </div>
+  );
+}
+
+function GotoStepSelect({
+  allSteps,
+  currentStepId,
+  value,
+  onChange,
+  unsetLabel,
+}: {
+  allSteps: BuilderStep[];
+  currentStepId: string;
+  value: string | undefined;
+  onChange: (stepId: string | undefined) => void;
+  /** Label for the "no explicit target" option — pass null to make a choice required (CONDITION's branches). */
+  unsetLabel: string | null;
+}) {
+  const options = allSteps.filter((s) => s.id !== currentStepId);
+  return (
+    <Select value={value || UNSET} onValueChange={(v) => onChange(v === UNSET ? undefined : v)}>
+      <SelectTrigger>
+        <SelectValue placeholder="Choose a step" />
+      </SelectTrigger>
+      <SelectContent>
+        {unsetLabel ? <SelectItem value={UNSET}>{unsetLabel}</SelectItem> : null}
+        {options.map((s) => {
+          const stepNumber = allSteps.findIndex((x) => x.id === s.id) + 1;
+          return (
+            <SelectItem key={s.id} value={s.id}>
+              {stepNumber}. {STEP_KIND_META[s.kind].label}
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -547,10 +902,14 @@ function StepEditor({
   index,
   isFirst,
   isLast,
+  entityType,
   statusOptions,
   statusLabel,
+  categories,
   users,
   teams,
+  teamsWebhookConnectors,
+  allSteps,
   onChange,
   onRemove,
   onMoveUp,
@@ -560,10 +919,14 @@ function StepEditor({
   index: number;
   isFirst: boolean;
   isLast: boolean;
+  entityType: 'CASE' | 'CLAIM';
   statusOptions: readonly string[];
   statusLabel: (s: string) => string;
+  categories: { id: string; name: string }[];
   users: { id: string; fullName: string }[];
   teams: { id: string; name: string }[];
+  teamsWebhookConnectors: { id: string; name: string }[];
+  allSteps: BuilderStep[];
   onChange: (patch: Partial<BuilderStep>) => void;
   onRemove: () => void;
   onMoveUp: () => void;
@@ -571,6 +934,7 @@ function StepEditor({
 }) {
   const meta = STEP_KIND_META[step.kind];
   const Icon = meta.icon;
+  const conditionFields = CONDITION_FIELDS_BY_ENTITY[entityType];
 
   return (
     <li className="rounded-lg border border-border p-4">
@@ -595,20 +959,9 @@ function StepEditor({
 
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {step.kind === 'ASSIGN_USER' || step.kind === 'NOTIFY_PERSON' ? (
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 sm:col-span-2">
             <Label>Person</Label>
-            <Select value={step.userId ?? ''} onValueChange={(v) => onChange({ userId: v })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a person" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.fullName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableUserPicker users={users} value={step.userId} onChange={(userId) => onChange({ userId })} />
           </div>
         ) : null}
 
@@ -711,7 +1064,28 @@ function StepEditor({
               <Input value={step.approvalReason ?? ''} onChange={(e) => onChange({ approvalReason: e.target.value })} placeholder="e.g. Needs sign-off before escalating priority" />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <Label>Notify (optional)</Label>
+              <Label>Specific approvers (optional)</Label>
+              <SearchableUserMultiPicker
+                users={users}
+                value={step.approverUserIds ?? []}
+                onChange={(approverUserIds) => onChange({ approverUserIds })}
+                placeholder="Anyone who can approve (default) — or name specific people"
+              />
+            </div>
+            {(step.approverUserIds ?? []).length > 1 ? (
+              <div className="space-y-1.5">
+                <Label>Approvals required</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={(step.approverUserIds ?? []).length}
+                  value={step.requiredApprovals ?? 1}
+                  onChange={(e) => onChange({ requiredApprovals: Math.max(1, Math.min(Number(e.target.value) || 1, (step.approverUserIds ?? []).length)) })}
+                />
+              </div>
+            ) : null}
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Also notify (optional)</Label>
               <Select value={step.approvalNotifyTeamId || ANY} onValueChange={(v) => onChange({ approvalNotifyTeamId: v === ANY ? undefined : v })}>
                 <SelectTrigger>
                   <SelectValue />
@@ -725,6 +1099,211 @@ function StepEditor({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>On approve, go to</Label>
+              <GotoStepSelect allSteps={allSteps} currentStepId={step.id} value={step.onApproveGoto} onChange={(v) => onChange({ onApproveGoto: v })} unsetLabel="Continue to next step (default)" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>On reject, go to</Label>
+              <GotoStepSelect allSteps={allSteps} currentStepId={step.id} value={step.onRejectGoto} onChange={(v) => onChange({ onRejectGoto: v })} unsetLabel="End the workflow (default)" />
+            </div>
+          </>
+        ) : null}
+
+        {step.kind === 'CONDITION' ? (
+          <>
+            <div className="space-y-1.5">
+              <Label>If</Label>
+              <Select value={step.conditionField ?? ''} onValueChange={(v) => onChange({ conditionField: v, conditionValue: '' })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a field" />
+                </SelectTrigger>
+                <SelectContent>
+                  {conditionFields.map((f) => (
+                    <SelectItem key={f} value={f}>
+                      {CONDITION_FIELD_LABEL[f] ?? f}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Is</Label>
+              <Select value={step.conditionOperator ?? 'EQUALS'} onValueChange={(v) => onChange({ conditionOperator: v as 'EQUALS' | 'NOT_EQUALS' })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EQUALS">Equal to</SelectItem>
+                  <SelectItem value="NOT_EQUALS">Not equal to</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Value</Label>
+              {step.conditionField === 'status' ? (
+                <Select value={step.conditionValue ?? ''} onValueChange={(v) => onChange({ conditionValue: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {statusLabel(s)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : step.conditionField === 'priority' ? (
+                <Select value={step.conditionValue ?? ''} onValueChange={(v) => onChange({ conditionValue: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CASE_PRIORITIES.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {casePriorityLabel(p)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : step.conditionField === 'caseType' ? (
+                <Select value={step.conditionValue ?? ''} onValueChange={(v) => onChange({ conditionValue: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a ticket type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CASE_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {caseTypeLabel(t)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : step.conditionField === 'categoryId' ? (
+                <Select value={step.conditionValue ?? ''} onValueChange={(v) => onChange({ conditionValue: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : step.conditionField === 'assignedTeamId' ? (
+                <Select value={step.conditionValue ?? ''} onValueChange={(v) => onChange({ conditionValue: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-xs text-muted-foreground">Choose a field above first.</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>If true, go to</Label>
+              <GotoStepSelect allSteps={allSteps} currentStepId={step.id} value={step.conditionOnTrueGoto} onChange={(v) => onChange({ conditionOnTrueGoto: v })} unsetLabel="End the workflow (default)" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>If false, go to</Label>
+              <GotoStepSelect allSteps={allSteps} currentStepId={step.id} value={step.conditionOnFalseGoto} onChange={(v) => onChange({ conditionOnFalseGoto: v })} unsetLabel="End the workflow (default)" />
+            </div>
+          </>
+        ) : null}
+
+        {step.kind === 'SEND_EMAIL' ? (
+          <>
+            <div className="space-y-1.5">
+              <Label>Send to</Label>
+              <Select value={step.emailRecipientMode ?? 'USER'} onValueChange={(v) => onChange({ emailRecipientMode: v as 'USER' | 'TEAM' | 'CASE_CUSTOMER' })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USER">A specific person</SelectItem>
+                  <SelectItem value="TEAM">Every member of a team</SelectItem>
+                  <SelectItem value="CASE_CUSTOMER">{entityType === 'CLAIM' ? "The claim's customer" : "The ticket's customer"}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {step.emailRecipientMode === 'USER' ? (
+              <div className="space-y-1.5">
+                <Label>Person</Label>
+                <SearchableUserPicker users={users} value={step.emailRecipientUserId} onChange={(userId) => onChange({ emailRecipientUserId: userId })} />
+              </div>
+            ) : null}
+            {step.emailRecipientMode === 'TEAM' ? (
+              <div className="space-y-1.5">
+                <Label>Team</Label>
+                <Select value={step.emailRecipientTeamId ?? ''} onValueChange={(v) => onChange({ emailRecipientTeamId: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Subject</Label>
+              <Input value={step.emailSubject ?? ''} onChange={(e) => onChange({ emailSubject: e.target.value })} placeholder="e.g. Your ticket has been resolved" />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Message</Label>
+              <Input value={step.emailBody ?? ''} onChange={(e) => onChange({ emailBody: e.target.value })} placeholder="What should the email say?" />
+            </div>
+          </>
+        ) : null}
+
+        {step.kind === 'NOTIFY_TEAMS' ? (
+          <>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Teams connector</Label>
+              <Select value={step.teamsConnectorId ?? ''} onValueChange={(v) => onChange({ teamsConnectorId: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder={teamsWebhookConnectors.length > 0 ? 'Choose a connector' : 'No Teams connector configured yet'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamsWebhookConnectors.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {teamsWebhookConnectors.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Set one up under{' '}
+                  <a href="/admin/integrations" className="underline" target="_blank" rel="noreferrer">
+                    Integrations
+                  </a>
+                  first.
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Title</Label>
+              <Input value={step.teamsTitle ?? ''} onChange={(e) => onChange({ teamsTitle: e.target.value })} placeholder="e.g. Urgent ticket needs attention" />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Message</Label>
+              <Input value={step.teamsBody ?? ''} onChange={(e) => onChange({ teamsBody: e.target.value })} placeholder="What should the Teams message say?" />
             </div>
           </>
         ) : null}

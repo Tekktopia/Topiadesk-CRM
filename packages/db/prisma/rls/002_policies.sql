@@ -86,10 +86,20 @@ $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
 
 /** Additive visibility grant on top of department/branch scoping — matches
  * TeamMember's own doc comment ("not a third nested RLS level"). Used by
- * cases_rw for team-queue visibility. */
+ * cases_rw for team-queue visibility.
+ * `SET search_path = public` was missing here (unlike every sibling
+ * function above/below it) — found live via a real, intermittent
+ * "relation team_members does not exist" error: PgBouncer transaction
+ * pooling means the physical connection a query lands on isn't guaranteed
+ * to be the one Prisma's `?schema=` set search_path on for this specific
+ * PrismaClient, so an unqualified reference inside a SQL-language function
+ * (inlined into the caller's plan, same class of risk as raw SQL —
+ * SECURITY DEFINER's own proconfig doesn't protect an inlined function
+ * body) resolves against whatever the pooled connection's search_path
+ * happened to be left at. */
 CREATE OR REPLACE FUNCTION app_is_team_member(p_team_id uuid) RETURNS boolean AS $$
   SELECT EXISTS (SELECT 1 FROM team_members WHERE team_id = p_team_id AND user_id = app_current_user_id());
-$$ LANGUAGE sql STABLE;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
 
 /** True if `p_user_id` is in the same department as the current session's
  * user — extracted (identity-enterprise pass) from what was previously an
@@ -367,10 +377,16 @@ CREATE POLICY approvals_rw ON approvals FOR ALL
 -- already happened one layer up, at PolicyVersionController's own
 -- @RequirePermission('policy','read'/'write') gate. WITH CHECK is equally
 -- open for the same "Nest guard is the real creation gate" reason.
+-- `app_current_role() = 'SYSTEM_JOB'` was added alongside the user check —
+-- found live (42501 row-security violation) once run-engine.ts started
+-- creating chains too, for an APPROVAL_GATE step with requiredApprovals >
+-- 1: that path runs under SYSTEM_JOB_CONTEXT (a background worker job has
+-- no authenticated app_current_user_id()), same reasoning as
+-- approval_threshold_rules_rw below.
 DROP POLICY IF EXISTS approval_chains_rw ON approval_chains;
 CREATE POLICY approval_chains_rw ON approval_chains FOR ALL
-  USING (app_current_user_id() IS NOT NULL)
-  WITH CHECK (app_current_user_id() IS NOT NULL);
+  USING (app_current_user_id() IS NOT NULL OR app_current_role() = 'SYSTEM_JOB')
+  WITH CHECK (app_current_user_id() IS NOT NULL OR app_current_role() = 'SYSTEM_JOB');
 
 -- Same reasoning as approval_chains_rw above: resolveApprovalThreshold()
 -- (policy-lifecycle.ts) runs inside a plain broker's policy:write request
@@ -400,13 +416,25 @@ CREATE POLICY portal_sessions_rw ON portal_sessions FOR ALL
   WITH CHECK (app_current_role() = 'SYSTEM_JOB');
 
 -- =============================================================================
--- notifications — strictly per-recipient.
+-- notifications — strictly per-recipient, plus an ALL-scope carve-out for
+-- the org-wide admin view (/admin/notifications/all —
+-- NotificationsController.listAdmin()/resend()). WITH CHECK also gets the
+-- carve-out (unlike ai_usage_ledger_rw's read-only one) because resend()
+-- needs to flip status on someone else's row back to PENDING — an UPDATE,
+-- gated by NestJS's own 'identity'/write RequirePermission one layer up,
+-- not a path that can fabricate a brand-new notification pretending to be
+-- from the system (INSERT still effectively requires recipientUserId ==
+-- self OR SYSTEM_JOB in every real call site — NotificationsService.
+-- createNotification()'s own header comment documents this contract).
+-- Reuses 'identity' rather than a new 'notification' permission resource,
+-- matching every other user-administration surface (users/departments/
+-- branches/teams controllers all gate on 'identity' too).
 -- =============================================================================
 
 DROP POLICY IF EXISTS notifications_rw ON notifications;
 CREATE POLICY notifications_rw ON notifications FOR ALL
-  USING (recipient_user_id = app_current_user_id() OR app_current_role() = 'SYSTEM_JOB')
-  WITH CHECK (recipient_user_id = app_current_user_id() OR app_current_role() = 'SYSTEM_JOB');
+  USING (recipient_user_id = app_current_user_id() OR app_max_scope('identity', 'read') = 'ALL' OR app_current_role() = 'SYSTEM_JOB')
+  WITH CHECK (recipient_user_id = app_current_user_id() OR app_max_scope('identity', 'read') = 'ALL' OR app_current_role() = 'SYSTEM_JOB');
 
 -- =============================================================================
 -- ai_usage_ledger — self plus ALL-scope (admin/finance reviewing spend).

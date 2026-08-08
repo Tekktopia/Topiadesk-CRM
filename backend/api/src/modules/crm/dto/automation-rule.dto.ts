@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsEnum, IsObject, IsOptional, IsString, MinLength } from 'class-validator';
-import { AutomationTriggerType } from '@topiadesk/db';
+import { AutomationRuleStatus, AutomationTriggerType } from '@topiadesk/db';
 
 /**
  * `@Type(() => Object)` on `actions`/`steps` below is load-bearing, not
@@ -50,6 +50,14 @@ export class CreateAutomationRuleDto {
   @Type(() => Object)
   steps?: unknown[];
   @ApiProperty({ required: false, default: true }) @IsOptional() @IsBoolean() isActive?: boolean;
+  @ApiPropertyOptional({
+    enum: AutomationRuleStatus,
+    description:
+      'Defaults to PUBLISHED when omitted — every existing caller (including the /admin/automations JSON dialog) never sends this and must keep running unchanged. DRAFT is the /admin/workflows builder\'s "Save as draft" — never matched by the engine (see automation-events.queue.ts/renewal-playbook.ts) regardless of isActive.',
+  })
+  @IsOptional()
+  @IsEnum(AutomationRuleStatus)
+  status?: AutomationRuleStatus;
 }
 
 export class UpdateAutomationRuleDto extends PartialType(CreateAutomationRuleDto) {}
@@ -66,6 +74,7 @@ export class AutomationRuleResponseDto {
   @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true } }) actions!: unknown;
   @ApiPropertyOptional({ type: 'array', items: { type: 'object', additionalProperties: true }, nullable: true }) steps?: unknown;
   @ApiProperty() isActive!: boolean;
+  @ApiProperty({ enum: AutomationRuleStatus }) status!: string;
   @ApiProperty() createdById!: string;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;

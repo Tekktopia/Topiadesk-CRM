@@ -24,6 +24,32 @@ function toResponse(run: AutomationRunState & { rule: { name: string } | null })
   };
 }
 
+/** Mirrors (duplicated, not imported — separate deployable, see
+ * backend/worker/src/automation/run-engine.ts's own copy) the step-id
+ * resolution the engine uses for goto targets. Older persisted rows
+ * predating branching have no `id` on their steps; the `step-${index}`
+ * fallback exists purely so this stays consistent with the engine's own
+ * synthesis — such rows never actually reference a goto in practice. */
+interface AutomationStepLike {
+  id?: string;
+  type?: string;
+  onApprove?: { goto?: string };
+  onReject?: { goto?: string };
+}
+
+function withStepIds(raw: unknown): AutomationStepLike[] {
+  if (!Array.isArray(raw)) return [];
+  return (raw as AutomationStepLike[]).map((step, index) => (step.id ? step : { ...step, id: `step-${index}` }));
+}
+
+function resolveGoalIndex(steps: AutomationStepLike[], targetId: string): number {
+  const index = steps.findIndex((s) => s.id === targetId);
+  if (index === -1) {
+    throw new NotFoundException(`Workflow step "${targetId}" not found — the workflow may have been edited since this run started.`);
+  }
+  return index;
+}
+
 /**
  * Visibility + human-decision surface for AutomationRunState (the
  * multi-step workflow engine's in-progress/finished runs) — see
@@ -60,25 +86,55 @@ export class AutomationRunStatesController {
   }
 
   /**
-   * Decides the Approval blocking a WAITING_APPROVAL run and, if approved,
-   * resumes execution from the next step. Mirrors
-   * KnowledgeArticlesService.decideApproval()'s segregation-of-duties
-   * shape — the rule's own author (Approval.requestedById, set by
-   * run-engine.ts to AutomationRule.createdById) can never decide their
-   * own rule's gate.
+   * Decides whatever is blocking a WAITING_APPROVAL run and, once fully
+   * decided, resumes execution — either the next array index (today's
+   * default) or the step named by the gate's `onApprove`/`onReject.goto`
+   * (new — see run-engine.ts's AutomationStep doc comment). Branches on
+   * `run.chainId` (new: multi-approver quorum, requiredApprovals > 1,
+   * mirrors PolicyVersionController's decideChainedApproval()) vs
+   * `run.approvalId` (existing: single approver). Segregation of duties —
+   * the rule's own author (AutomationRule.createdById) can never decide
+   * their own rule's gate — applies to both paths.
    */
   @Post(':id/decision')
   @RequirePermission('approval', 'write')
   @ApiOkResponse({ type: AutomationRunStateResponseDto })
   async decide(@Param('id') id: string, @Body() dto: DecideAutomationRunDto, @CurrentUser() user: AuthenticatedUser): Promise<AutomationRunStateResponseDto> {
     const prisma = getPrismaClient();
-    const run = await prisma.automationRunState.findUnique({ where: { id }, include: { rule: { select: { name: true } } } });
+    const run = await prisma.automationRunState.findUnique({ where: { id }, include: { rule: true } });
     if (!run) throw new NotFoundException('AutomationRunState not found');
-    if (run.status !== 'WAITING_APPROVAL' || !run.approvalId) {
+    if (run.status !== 'WAITING_APPROVAL' || (!run.approvalId && !run.chainId)) {
       throw new NotFoundException('This run is not awaiting a decision');
     }
 
-    const approval = await prisma.approval.findUnique({ where: { id: run.approvalId } });
+    // Named-approver allow-list, frozen at gate-open time onto
+    // run.context (see run-engine.ts) — absent means today's unrestricted
+    // behavior (any approval:write holder may decide), unchanged.
+    const context = run.context as { approverAllowlist?: string[] } | null;
+    if (context?.approverAllowlist && !context.approverAllowlist.includes(user.id)) {
+      throw new ForbiddenException('You are not an approver for this step');
+    }
+
+    const steps = withStepIds(run.rule.steps);
+    const gateStep = steps[run.currentStepIndex];
+
+    if (run.chainId) {
+      return this.decideChainedGate(id, run, run.chainId, dto, user, gateStep, steps);
+    }
+    return this.decideSingleGate(id, run, run.approvalId!, dto, user, gateStep, steps);
+  }
+
+  private async decideSingleGate(
+    id: string,
+    run: AutomationRunState,
+    approvalId: string,
+    dto: DecideAutomationRunDto,
+    user: AuthenticatedUser,
+    gateStep: AutomationStepLike | undefined,
+    steps: AutomationStepLike[],
+  ): Promise<AutomationRunStateResponseDto> {
+    const prisma = getPrismaClient();
+    const approval = await prisma.approval.findUnique({ where: { id: approvalId } });
     if (!approval || approval.status !== 'PENDING') {
       throw new NotFoundException('No pending approval for this run');
     }
@@ -87,17 +143,122 @@ export class AutomationRunStatesController {
     }
 
     if (dto.decision === 'APPROVED') {
-      await prisma.approval.update({ where: { id: approval.id }, data: { status: 'APPROVED', approvedById: user.id, decidedAt: new Date() } });
+      await prisma.approval.update({
+        where: { id: approval.id },
+        data: { status: 'APPROVED', approvedById: user.id, decidedAt: new Date(), decisionNote: dto.note },
+      });
+      const nextIndex = gateStep?.onApprove?.goto ? resolveGoalIndex(steps, gateStep.onApprove.goto) : run.currentStepIndex + 1;
       const updated = await prisma.automationRunState.update({
         where: { id },
-        data: { status: 'RUNNING', currentStepIndex: run.currentStepIndex + 1 },
+        data: { status: 'RUNNING', currentStepIndex: nextIndex },
         include: { rule: { select: { name: true } } },
       });
       await enqueueAutomationRunResume(id).catch(() => undefined);
       return toResponse(updated);
     }
 
-    await prisma.approval.update({ where: { id: approval.id }, data: { status: 'REJECTED', approvedById: user.id, decidedAt: new Date() } });
+    await prisma.approval.update({
+      where: { id: approval.id },
+      data: { status: 'REJECTED', approvedById: user.id, decidedAt: new Date(), decisionNote: dto.note },
+    });
+    return this.resumeOrFailAfterRejection(id, run, gateStep, steps);
+  }
+
+  /**
+   * Each decision on a chain appends its OWN Approval row (chainId set)
+   * rather than mutating a single shared row — mirrors
+   * PolicyVersionController.decideChainedApproval() exactly: REJECTED the
+   * instant any one approver rejects, APPROVED only once
+   * `requiredApprovals` distinct APPROVED rows exist.
+   */
+  private async decideChainedGate(
+    id: string,
+    run: AutomationRunState & { rule: { name: string; createdById: string } },
+    chainId: string,
+    dto: DecideAutomationRunDto,
+    user: AuthenticatedUser,
+    gateStep: AutomationStepLike | undefined,
+    steps: AutomationStepLike[],
+  ): Promise<AutomationRunStateResponseDto> {
+    const prisma = getPrismaClient();
+    const chain = await prisma.approvalChain.findUnique({ where: { id: chainId } });
+    if (!chain || chain.status !== 'PENDING') {
+      throw new NotFoundException('No pending approval for this run');
+    }
+    if (run.rule.createdById === user.id) {
+      throw new ForbiddenException("Cannot decide your own rule's approval gate");
+    }
+    const alreadyDecided = await prisma.approval.findFirst({ where: { chainId, approvedById: user.id } });
+    if (alreadyDecided) {
+      throw new ForbiddenException('You have already decided on this approval');
+    }
+
+    if (dto.decision === 'REJECTED') {
+      await prisma.approval.create({
+        data: {
+          entityType: 'CASE_AUTOMATION_GATE',
+          entityId: run.id,
+          requestedById: run.rule.createdById,
+          approvedById: user.id,
+          status: 'REJECTED',
+          decidedAt: new Date(),
+          decisionNote: dto.note,
+          chainId,
+        },
+      });
+      await prisma.approvalChain.update({ where: { id: chainId }, data: { status: 'REJECTED' } });
+      return this.resumeOrFailAfterRejection(id, run, gateStep, steps);
+    }
+
+    await prisma.approval.create({
+      data: {
+        entityType: 'CASE_AUTOMATION_GATE',
+        entityId: run.id,
+        requestedById: run.rule.createdById,
+        approvedById: user.id,
+        status: 'APPROVED',
+        decidedAt: new Date(),
+        decisionNote: dto.note,
+        chainId,
+      },
+    });
+    const approvedCount = await prisma.approval.count({ where: { chainId, status: 'APPROVED' } });
+    if (approvedCount < chain.requiredApprovals) {
+      return toResponse(run);
+    }
+
+    await prisma.approvalChain.update({ where: { id: chainId }, data: { status: 'APPROVED' } });
+    const nextIndex = gateStep?.onApprove?.goto ? resolveGoalIndex(steps, gateStep.onApprove.goto) : run.currentStepIndex + 1;
+    const updated = await prisma.automationRunState.update({
+      where: { id },
+      data: { status: 'RUNNING', currentStepIndex: nextIndex },
+      include: { rule: { select: { name: true } } },
+    });
+    await enqueueAutomationRunResume(id).catch(() => undefined);
+    return toResponse(updated);
+  }
+
+  /** Shared by both decision paths' reject branch — routes to
+   * `onReject.goto` when the gate configured one, otherwise preserves
+   * today's exact behavior (the whole run FAILs). */
+  private async resumeOrFailAfterRejection(
+    id: string,
+    run: AutomationRunState,
+    gateStep: AutomationStepLike | undefined,
+    steps: AutomationStepLike[],
+  ): Promise<AutomationRunStateResponseDto> {
+    const prisma = getPrismaClient();
+    const rejectGoto = gateStep?.onReject?.goto;
+    if (rejectGoto) {
+      const nextIndex = resolveGoalIndex(steps, rejectGoto);
+      const updated = await prisma.automationRunState.update({
+        where: { id },
+        data: { status: 'RUNNING', currentStepIndex: nextIndex },
+        include: { rule: { select: { name: true } } },
+      });
+      await enqueueAutomationRunResume(id).catch(() => undefined);
+      return toResponse(updated);
+    }
     const updated = await prisma.automationRunState.update({
       where: { id },
       data: { status: 'FAILED', failureReason: 'Approval rejected' },

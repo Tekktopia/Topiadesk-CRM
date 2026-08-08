@@ -73,7 +73,10 @@ export async function processEntityEvent(payload: EntityEventPayload): Promise<{
       return { matchedRules: 0, results: [] };
     }
 
-    const rules = await prisma.automationRule.findMany({ where: { triggerType: 'ENTITY_EVENT', isActive: true } });
+    // status:'PUBLISHED' keeps DRAFT rules (autosaved in-progress edits
+    // from the /admin/workflows builder) from ever running, regardless of
+    // isActive — see AutomationRule.status's schema comment.
+    const rules = await prisma.automationRule.findMany({ where: { triggerType: 'ENTITY_EVENT', isActive: true, status: 'PUBLISHED' } });
     const matched = rules.filter((rule) => conditionsMatch(rule.conditions, payload, entity as unknown as Record<string, unknown>));
 
     const entityRef: CaseManagementEntityRef =
