@@ -76,6 +76,17 @@ export interface TenantAdminSummary {
   status: TenantStatus;
   totalUsers: number;
   adminCount: number;
+  seatLimit: number | null;
+}
+
+export interface TenantUsage {
+  totalUsers: number;
+  activeUsers: number;
+  deactivatedUsers: number;
+  suspendedUsers: number;
+  adminCount: number;
+  planName: string | null;
+  seatLimit: number | null;
 }
 
 export interface PlatformStats {

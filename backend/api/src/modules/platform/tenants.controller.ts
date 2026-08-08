@@ -4,7 +4,7 @@ import { getPlatformPrismaClient, Prisma } from '@topiadesk/db-platform';
 import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT } from '@topiadesk/db';
 import { invalidateTenantRealmCache } from '../../common/auth/tenant-realm-resolver';
 import { CreateTenantDto, TenantProvisioningEventResponseDto, TenantResponseDto, UpdateTenantSubscriptionDto } from './dto/tenant.dto';
-import { TenantAdminSummaryDto } from './dto/tenant-user.dto';
+import { TenantAdminSummaryDto, TenantUsageDto } from './dto/tenant-user.dto';
 import { enqueueTenantProvisioning } from './provision-tenant-queue';
 
 function isUniqueConstraintViolation(err: unknown): boolean {
@@ -74,15 +74,20 @@ export class TenantsController {
   @Get('admin-summary')
   @ApiOkResponse({ type: [TenantAdminSummaryDto] })
   async adminSummary(): Promise<TenantAdminSummaryDto[]> {
-    const tenants = await getPlatformPrismaClient().tenant.findMany({ where: { status: 'ACTIVE' }, orderBy: { name: 'asc' } });
+    const tenants = await getPlatformPrismaClient().tenant.findMany({
+      where: { status: 'ACTIVE' },
+      orderBy: { name: 'asc' },
+      include: { subscription: { include: { plan: true } } },
+    });
     return Promise.all(
       tenants.map(async (tenant) => {
+        const seatLimit = tenant.subscription?.plan.seatLimit ?? null;
         try {
           const [totalUsers, adminCount] = await runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema: tenant.keycloakRealm }, () => {
             const prisma = getPrismaClient();
             return Promise.all([prisma.user.count(), prisma.user.count({ where: { roles: { some: { role: { name: 'ADMIN' } } } } })]);
           });
-          return { tenantId: tenant.id, tenantName: tenant.name, status: tenant.status, totalUsers, adminCount };
+          return { tenantId: tenant.id, tenantName: tenant.name, status: tenant.status, totalUsers, adminCount, seatLimit };
         } catch (err) {
           // A tenant whose keycloakRealm/schemaName doesn't match the
           // tenant_<slug> convention (e.g. a legacy fixture predating
@@ -91,10 +96,47 @@ export class TenantsController {
           // live via exactly that. -1 signals "couldn't be read", not 0
           // ("confirmed empty"), so the UI can tell the two apart.
           console.error(`[tenants.adminSummary] failed to read user counts for tenant ${tenant.id} (${tenant.name}):`, err);
-          return { tenantId: tenant.id, tenantName: tenant.name, status: tenant.status, totalUsers: -1, adminCount: -1 };
+          return { tenantId: tenant.id, tenantName: tenant.name, status: tenant.status, totalUsers: -1, adminCount: -1, seatLimit };
         }
       }),
     );
+  }
+
+  /**
+   * Fuller per-tenant breakdown than admin-summary's one-row-per-tenant
+   * shape — backs the tenant detail page's Usage tab. Same
+   * `{...SYSTEM_JOB_CONTEXT, tenantSchema}` reach-into-a-tenant-schema
+   * pattern as tenant-users.controller.ts.
+   */
+  @Get(':id/usage')
+  @ApiOkResponse({ type: TenantUsageDto })
+  async usage(@Param('id') id: string): Promise<TenantUsageDto> {
+    const tenant = await getPlatformPrismaClient().tenant.findUnique({ where: { id }, include: { subscription: { include: { plan: true } } } });
+    if (!tenant) throw new NotFoundException(`Tenant ${id} not found`);
+
+    const [totalUsers, activeUsers, deactivatedUsers, suspendedUsers, adminCount] = await runWithRlsContext(
+      { ...SYSTEM_JOB_CONTEXT, tenantSchema: tenant.keycloakRealm },
+      () => {
+        const prisma = getPrismaClient();
+        return Promise.all([
+          prisma.user.count(),
+          prisma.user.count({ where: { status: 'ACTIVE' } }),
+          prisma.user.count({ where: { status: 'DEACTIVATED' } }),
+          prisma.user.count({ where: { status: 'SUSPENDED' } }),
+          prisma.user.count({ where: { roles: { some: { role: { name: 'ADMIN' } } } } }),
+        ]);
+      },
+    );
+
+    return {
+      totalUsers,
+      activeUsers,
+      deactivatedUsers,
+      suspendedUsers,
+      adminCount,
+      planName: tenant.subscription?.plan.name ?? null,
+      seatLimit: tenant.subscription?.plan.seatLimit ?? null,
+    };
   }
 
   @Get(':id')

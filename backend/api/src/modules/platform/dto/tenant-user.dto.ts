@@ -34,4 +34,16 @@ export class TenantAdminSummaryDto {
   @ApiProperty() status!: string;
   @ApiProperty() totalUsers!: number;
   @ApiProperty() adminCount!: number;
+  @ApiPropertyOptional({ description: 'Null if the tenant has no subscription (shouldn\'t happen in practice — every tenant gets one at creation — but not enforced at the DB level).' })
+  seatLimit?: number | null;
+}
+
+export class TenantUsageDto {
+  @ApiProperty() totalUsers!: number;
+  @ApiProperty() activeUsers!: number;
+  @ApiProperty() deactivatedUsers!: number;
+  @ApiProperty() suspendedUsers!: number;
+  @ApiProperty() adminCount!: number;
+  @ApiPropertyOptional() planName?: string | null;
+  @ApiPropertyOptional() seatLimit?: number | null;
 }

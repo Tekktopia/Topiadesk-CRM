@@ -27,6 +27,7 @@ import { apiFetch, ApiError } from '../../_lib/api';
 import type { Plan, TenantDetail } from '../../_lib/types';
 import { TenantStatusBadge } from '../_status-badge';
 import { AdminsTab } from './_admins-tab';
+import { UsageTab } from './_usage-tab';
 
 const STEP_ICON: Record<string, React.ReactNode> = {
   IN_PROGRESS: <Loader2 className="h-4 w-4 animate-spin text-warning" />,
@@ -122,7 +123,7 @@ function TenantDetailPageContent() {
         </div>
       </div>
 
-      <Tabs defaultValue={searchParams.get('tab') === 'admins' ? 'admins' : 'overview'}>
+      <Tabs defaultValue={searchParams.get('tab') === 'admins' || searchParams.get('tab') === 'usage' ? searchParams.get('tab')! : 'overview'}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="admins">Admins</TabsTrigger>
@@ -201,7 +202,7 @@ function TenantDetailPageContent() {
         </TabsContent>
 
         <TabsContent value="usage">
-          <p className="text-sm text-muted-foreground">Usage details land in the next pass.</p>
+          <UsageTab tenantId={tenant.id} />
         </TabsContent>
       </Tabs>
     </div>
