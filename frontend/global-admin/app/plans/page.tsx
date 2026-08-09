@@ -24,6 +24,7 @@ import {
 } from '@topiadesk/ui';
 import { apiFetch, ApiError } from '../_lib/api';
 import type { Plan } from '../_lib/types';
+import { PageHeader } from '../_components/page-header';
 
 export default function PlansPage() {
   const queryClient = useQueryClient();
@@ -53,11 +54,10 @@ export default function PlansPage() {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Plans</h1>
-          <p className="text-sm text-muted-foreground">Seat limits and pricing tiers tenants subscribe to.</p>
-        </div>
+      <PageHeader
+        title="Plans"
+        description="Seat limits and pricing tiers tenants subscribe to."
+        actions={
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button>New plan</Button>
@@ -94,7 +94,8 @@ export default function PlansPage() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+        }
+      />
 
       <div className="rounded-lg border border-border bg-card">
         <Table>

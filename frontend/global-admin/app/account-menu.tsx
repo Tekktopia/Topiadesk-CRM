@@ -33,23 +33,34 @@ function initials(fullName: string): string {
  * Global Admin's own account menu — same profile-card + theme + sign-out
  * shape as frontend/web's AccountMenu, trimmed for PlatformAdminUser's
  * thinner shape ({id, email, fullName} — no roles/presence, since every
- * platform admin has equal, flat access today). Pinned at the bottom of
- * the sidebar, not a nav item itself.
+ * platform admin has equal, flat access today). `trigger`/`side` mirror
+ * frontend/web's AccountMenu props exactly: a "chip" (avatar + name) for
+ * the top header bar, an "icon"-only trigger for the sidebar's narrow
+ * bottom slot — same dropdown content either way.
  */
-export function AccountMenu({ admin }: { admin: PlatformAdminUser }) {
+export function AccountMenu({ admin, trigger = 'icon', side = 'right' }: { admin: PlatformAdminUser; trigger?: 'icon' | 'chip'; side?: 'bottom' | 'right' }) {
   const { theme, setTheme } = useTheme();
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-auto w-full justify-start gap-2 px-2 py-2" aria-label="Account menu">
-          <Avatar className="h-8 w-8 shrink-0">
-            <AvatarFallback className="text-xs">{initials(admin.fullName)}</AvatarFallback>
-          </Avatar>
-          <span className="min-w-0 flex-1 truncate text-left text-sm font-medium text-foreground">{admin.fullName}</span>
-        </Button>
+        {trigger === 'chip' ? (
+          <Button variant="ghost" className="h-9 gap-2 rounded-none pl-1.5 pr-3" aria-label="Account menu">
+            <Avatar className="h-7 w-7 text-xs">
+              <AvatarFallback>{initials(admin.fullName)}</AvatarFallback>
+            </Avatar>
+            <span className="max-w-[140px] truncate text-sm font-medium text-foreground">{admin.fullName}</span>
+          </Button>
+        ) : (
+          <Button variant="ghost" className="h-auto w-full justify-start gap-2 px-2 py-2" aria-label="Account menu">
+            <Avatar className="h-8 w-8 shrink-0">
+              <AvatarFallback className="text-xs">{initials(admin.fullName)}</AvatarFallback>
+            </Avatar>
+            <span className="min-w-0 flex-1 truncate text-left text-sm font-medium text-foreground">{admin.fullName}</span>
+          </Button>
+        )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="right" className="w-64 overflow-hidden p-0">
+      <DropdownMenuContent align={trigger === 'chip' ? 'end' : 'start'} side={side} className="w-64 overflow-hidden p-0">
         <div className="flex items-center gap-3 bg-secondary/40 p-4">
           <Avatar className="h-11 w-11 text-sm">
             <AvatarFallback>{initials(admin.fullName)}</AvatarFallback>

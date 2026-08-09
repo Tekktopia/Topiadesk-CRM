@@ -3,6 +3,7 @@
 import { ShieldCheck } from 'lucide-react';
 import { Avatar, AvatarFallback, Badge, Card, CardContent, CardHeader, CardTitle } from '@topiadesk/ui';
 import { useCurrentPlatformAdmin } from '@/lib/auth/use-current-platform-admin';
+import { PageHeader } from '../_components/page-header';
 
 function initials(fullName: string): string {
   const parts = fullName.trim().split(/\s+/);
@@ -24,10 +25,7 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">My profile</h1>
-        <p className="text-sm text-muted-foreground">Your TopiaDesk Global Admin account.</p>
-      </div>
+      <PageHeader title="My profile" description="Your TopiaDesk Global Admin account." />
 
       <Card>
         <CardHeader>

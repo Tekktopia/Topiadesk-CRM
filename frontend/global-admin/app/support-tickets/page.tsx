@@ -7,6 +7,7 @@ import { DataTable, DataTableColumnHeader, type ColumnDef } from '@topiadesk/ui'
 import { apiFetch } from '../_lib/api';
 import type { PlatformSupportTicket } from '../_lib/types';
 import { TicketPriorityBadge, TicketStatusBadge } from './_badges';
+import { PageHeader } from '../_components/page-header';
 
 function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -61,10 +62,7 @@ export default function SupportTicketsPage() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Support Tickets</h1>
-        <p className="text-sm text-muted-foreground">Requests raised by tenant admins across every customer organization.</p>
-      </div>
+      <PageHeader title="Support Tickets" description="Requests raised by tenant admins across every customer organization." />
 
       <DataTable columns={columns} data={data ?? []} getRowId={(t) => t.id} isLoading={isLoading} emptyState={<p className="text-muted-foreground">No support tickets yet.</p>} />
     </div>

@@ -7,6 +7,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Select, SelectContent
 import { apiFetch, ApiError } from '../../_lib/api';
 import type { PlatformAdmin, PlatformSupportTicket, SupportTicketPriority, SupportTicketStatus } from '../../_lib/types';
 import { TicketPriorityBadge, TicketStatusBadge } from '../_badges';
+import { PageHeader } from '../../_components/page-header';
 
 const STATUSES: SupportTicketStatus[] = ['OPEN', 'IN_PROGRESS', 'WAITING_ON_TENANT', 'RESOLVED', 'CLOSED'];
 const PRIORITIES: SupportTicketPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
@@ -49,13 +50,19 @@ export default function SupportTicketDetailPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
-      <div>
-        <p className="text-xs text-muted-foreground">{ticket.tenantName}</p>
-        <h1 className="text-2xl font-semibold tracking-tight">{ticket.subject}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Raised by {ticket.raisedByName} ({ticket.raisedByEmail})
-        </p>
-      </div>
+      <PageHeader
+        title={
+          <>
+            <p className="text-xs font-normal text-muted-foreground">{ticket.tenantName}</p>
+            {ticket.subject}
+          </>
+        }
+        description={
+          <>
+            Raised by {ticket.raisedByName} ({ticket.raisedByEmail})
+          </>
+        }
+      />
 
       <Card>
         <CardHeader>

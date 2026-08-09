@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { cn } from '@topiadesk/ui';
+import { cn, Skeleton } from '@topiadesk/ui';
 import { NAV_ITEMS, isNavItemActive } from '@/lib/nav';
 import { useCurrentPlatformAdmin } from '@/lib/auth/use-current-platform-admin';
 import { AccountMenu } from './account-menu';
+import { AppHeader } from './app-header';
 
 /**
  * Single-tier left sidebar (icon + label per row) — see this session's
@@ -17,7 +18,7 @@ import { AccountMenu } from './account-menu';
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { admin } = useCurrentPlatformAdmin();
+  const { admin, isLoading } = useCurrentPlatformAdmin();
 
   return (
     <div className="flex min-h-screen">
@@ -47,10 +48,15 @@ export function AppShell({ children }: { children: ReactNode }) {
           })}
         </nav>
 
-        <div className="border-t border-border p-2">{admin ? <AccountMenu admin={admin} /> : null}</div>
+        <div className="border-t border-border p-2">
+          {isLoading ? <Skeleton className="h-11 w-full" /> : admin ? <AccountMenu admin={admin} /> : null}
+        </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto bg-muted/30 p-6">{children}</main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <AppHeader />
+        <main className="flex-1 overflow-y-auto bg-muted/30 p-6">{children}</main>
+      </div>
     </div>
   );
 }

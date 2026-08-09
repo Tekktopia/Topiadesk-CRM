@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { DataTable, DataTableColumnHeader, type ColumnDef } from '@topiadesk/ui';
 import { apiFetch } from '../_lib/api';
 import type { PlatformAuditLogEntry } from '../_lib/types';
+import { PageHeader } from '../_components/page-header';
 
 function formatTimestamp(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -62,10 +63,7 @@ export default function AuditLogPage() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Audit Log</h1>
-        <p className="text-sm text-muted-foreground">Every mutating action taken from Global Admin, most recent first. Read-only.</p>
-      </div>
+      <PageHeader title="Audit Log" description="Every mutating action taken from Global Admin, most recent first. Read-only." />
 
       <DataTable columns={columns} data={data ?? []} getRowId={(e) => e.id} isLoading={isLoading} emptyState={<p className="text-muted-foreground">No activity recorded yet.</p>} />
     </div>

@@ -7,6 +7,7 @@ import { Badge, Button, DataTable, DataTableColumnHeader, type ColumnDef, toast 
 import { apiFetch, ApiError } from '../_lib/api';
 import type { PlatformAdmin } from '../_lib/types';
 import { CreateAdminDialog } from './_create-admin-dialog';
+import { PageHeader } from '../_components/page-header';
 
 export default function PlatformAdminsPage() {
   return (
@@ -84,13 +85,11 @@ function PlatformAdminsPageContent() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Platform Admins</h1>
-          <p className="text-sm text-muted-foreground">Operator accounts with access to this Global Admin console.</p>
-        </div>
-        <CreateAdminDialog open={dialogOpen} onOpenChange={setDialogOpen} />
-      </div>
+      <PageHeader
+        title="Platform Admins"
+        description="Operator accounts with access to this Global Admin console."
+        actions={<CreateAdminDialog open={dialogOpen} onOpenChange={setDialogOpen} />}
+      />
 
       <DataTable columns={columns} data={admins ?? []} getRowId={(a) => a.id} isLoading={isLoading} emptyState={<p className="text-muted-foreground">No platform admins yet.</p>} />
     </div>

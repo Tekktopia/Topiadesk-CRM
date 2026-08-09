@@ -6,6 +6,7 @@ import { Building2, CheckCircle2, Loader2, ShieldAlert, ShieldCheck } from 'luci
 import { Button, Card, CardContent, CardHeader, CardTitle, StatTile } from '@topiadesk/ui';
 import { apiFetch } from './_lib/api';
 import type { PlatformStats } from './_lib/types';
+import { PageHeader } from './_components/page-header';
 
 /**
  * Home dashboard — Phase 1 scope only (tenant counts by status, "top
@@ -22,15 +23,15 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Org at a glance</h1>
-          <p className="text-sm text-muted-foreground">Every TopiaDesk customer organization, in one place.</p>
-        </div>
-        <Button asChild>
-          <Link href="/tenants?new=1">Create tenant</Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Org at a glance"
+        description="Every TopiaDesk customer organization, in one place."
+        actions={
+          <Button asChild>
+            <Link href="/tenants?new=1">Create tenant</Link>
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatTile label="Total tenants" value={isLoading ? '—' : (data?.totalTenants ?? 0)} icon={<Building2 />} />

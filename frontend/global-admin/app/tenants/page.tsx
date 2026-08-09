@@ -9,6 +9,7 @@ import { apiFetch } from '../_lib/api';
 import type { Tenant } from '../_lib/types';
 import { CreateTenantDialog } from './_create-tenant-dialog';
 import { TenantStatusBadge } from './_status-badge';
+import { PageHeader } from '../_components/page-header';
 
 export default function TenantsPage() {
   return (
@@ -30,13 +31,11 @@ function TenantsPageContent() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Tenants</h1>
-          <p className="text-sm text-muted-foreground">Every customer organization on the TopiaDesk platform.</p>
-        </div>
-        <CreateTenantDialog open={dialogOpen} onOpenChange={setDialogOpen} />
-      </div>
+      <PageHeader
+        title="Tenants"
+        description="Every customer organization on the TopiaDesk platform."
+        actions={<CreateTenantDialog open={dialogOpen} onOpenChange={setDialogOpen} />}
+      />
 
       <div className="rounded-lg border border-border bg-card">
         <Table>

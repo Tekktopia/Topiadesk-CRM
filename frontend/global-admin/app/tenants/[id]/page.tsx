@@ -29,6 +29,8 @@ import { TenantStatusBadge } from '../_status-badge';
 import { AdminsTab } from './_admins-tab';
 import { UsageTab } from './_usage-tab';
 import { GenerateLicenseDialog } from './_generate-license-dialog';
+import { PageHeader } from '../../_components/page-header';
+import { ConfirmDialog } from '../../_components/confirm-dialog';
 
 /** Days until `currentPeriodEnd`, or null if there's no expiry set yet
  * (a subscription that's never had a license "generated" against it —
@@ -77,11 +79,14 @@ function TenantDetailPageContent() {
 
   const { data: plans } = useQuery({ queryKey: ['plans'], queryFn: () => apiFetch<Plan[]>('/api/plans') });
 
+  const [confirmSuspendOpen, setConfirmSuspendOpen] = React.useState(false);
+
   const suspend = useMutation({
     mutationFn: () => apiFetch(`/api/tenants/${params.id}/suspend`, { method: 'POST' }),
     onSuccess: () => {
       toast.success('Tenant suspended');
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      setConfirmSuspendOpen(false);
     },
     onError: (err) => toast.error('Could not suspend tenant', { description: err instanceof ApiError ? err.message : undefined }),
   });
@@ -110,26 +115,37 @@ function TenantDetailPageContent() {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{tenant.name}</h1>
+      <PageHeader
+        title={
+          <span className="flex items-center gap-3">
+            {tenant.name}
             <TenantStatusBadge status={tenant.status} />
-          </div>
-          <p className="font-mono text-xs text-muted-foreground">{tenant.schemaName}</p>
-        </div>
-        <div className="flex gap-2">
-          {tenant.status === 'ACTIVE' ? (
-            <Button variant="destructive" onClick={() => suspend.mutate()} disabled={suspend.isPending}>
+          </span>
+        }
+        description={<span className="font-mono text-xs">{tenant.schemaName}</span>}
+        actions={
+          tenant.status === 'ACTIVE' ? (
+            <Button variant="destructive" onClick={() => setConfirmSuspendOpen(true)} disabled={suspend.isPending}>
               Suspend
             </Button>
           ) : tenant.status === 'SUSPENDED' ? (
             <Button onClick={() => reactivate.mutate()} disabled={reactivate.isPending}>
               Reactivate
             </Button>
-          ) : null}
-        </div>
-      </div>
+          ) : undefined
+        }
+      />
+
+      <ConfirmDialog
+        open={confirmSuspendOpen}
+        onOpenChange={setConfirmSuspendOpen}
+        title={`Suspend ${tenant.name}?`}
+        description="Every user in this organization will immediately lose access, including admins. Reactivating restores access right away."
+        confirmLabel="Suspend"
+        destructive
+        isPending={suspend.isPending}
+        onConfirm={() => suspend.mutate()}
+      />
 
       <Tabs defaultValue={searchParams.get('tab') === 'admins' || searchParams.get('tab') === 'usage' ? searchParams.get('tab')! : 'overview'}>
         <TabsList>

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { cn, DataTable, DataTableColumnHeader, type ColumnDef } from '@topiadesk/ui';
 import { apiFetch } from '../_lib/api';
 import type { TenantAdminSummary } from '../_lib/types';
+import { PageHeader } from '../_components/page-header';
 
 /** Reuses the same admin-summary data as the "Tenant Admins" page (one
  * backend call, two views) — this one leads with seat usage instead of
@@ -52,10 +53,7 @@ export default function UsagePage() {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Usage & Monitoring</h1>
-        <p className="text-sm text-muted-foreground">Seat usage against each tenant's plan. Open a tenant for the full breakdown.</p>
-      </div>
+      <PageHeader title="Usage & Monitoring" description="Seat usage against each tenant's plan. Open a tenant for the full breakdown." />
 
       <DataTable columns={columns} data={data ?? []} getRowId={(t) => t.tenantId} isLoading={isLoading} emptyState={<p className="text-muted-foreground">No active tenants yet.</p>} />
     </div>
