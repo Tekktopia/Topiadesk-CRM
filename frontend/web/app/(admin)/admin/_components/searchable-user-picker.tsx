@@ -23,18 +23,26 @@ export function SearchableUserPicker({
   value,
   onChange,
   placeholder = 'Choose a person',
+  disabled = false,
 }: {
   users: UserLike[];
   value: string | undefined;
   onChange: (userId: string) => void;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const selected = useMemo(() => users.find((u) => u.id === value), [users, value]);
 
   return (
     <>
-      <Button type="button" variant="outline" className="w-full justify-between font-normal" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full justify-between font-normal"
+        onClick={() => setOpen(true)}
+        disabled={disabled}
+      >
         <span className="flex min-w-0 items-center gap-2">
           <User className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
           <span className="truncate">{selected?.fullName ?? placeholder}</span>

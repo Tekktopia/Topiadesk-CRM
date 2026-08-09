@@ -24,9 +24,10 @@ import {
   toast,
 } from '@topiadesk/ui';
 import { ConfirmDialog } from '../_components/confirm-dialog';
+import { SearchableUserPicker } from '../_components/searchable-user-picker';
 import { UserStatusBadge } from '../_components/status-badge';
 import { apiFetch } from '../_lib/api';
-import { useBranches, useDepartments, useRoles } from '../_lib/queries';
+import { useBranches, useDepartments, useRoles, useUsers } from '../_lib/queries';
 import type { ForceLogoutResponseDto, PendingRoleGrantDto, UpdateUserBody, UserDto } from '../_lib/types';
 
 const UNASSIGNED = '__unassigned__';
@@ -51,11 +52,14 @@ export function UserEditDialog({
   const departmentsQuery = useDepartments();
   const branchesQuery = useBranches();
   const rolesQuery = useRoles();
+  const usersQuery = useUsers();
 
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [departmentId, setDepartmentId] = useState<string>(UNASSIGNED);
   const [branchId, setBranchId] = useState<string>(UNASSIGNED);
+  const [managerId, setManagerId] = useState<string | undefined>(undefined);
+  const [positionTitle, setPositionTitle] = useState('');
   const [roleToAdd, setRoleToAdd] = useState<string>('');
   const [confirmingForceLogout, setConfirmingForceLogout] = useState(false);
 
@@ -65,8 +69,13 @@ export function UserEditDialog({
       setPhone(userQuery.data.phone ?? '');
       setDepartmentId(userQuery.data.departmentId ?? UNASSIGNED);
       setBranchId(userQuery.data.branchId ?? UNASSIGNED);
+      setManagerId(userQuery.data.managerId ?? undefined);
+      setPositionTitle(userQuery.data.positionTitle ?? '');
     }
   }, [userQuery.data]);
+
+  // A user can't be their own manager — mirrors the same guard server-side.
+  const availableManagers = (usersQuery.data ?? []).filter((u) => u.id !== userId);
 
   function invalidateUser() {
     queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
@@ -129,6 +138,10 @@ export function UserEditDialog({
     if (newDepartmentId !== userQuery.data.departmentId) body.departmentId = newDepartmentId;
     const newBranchId = branchId === UNASSIGNED ? null : branchId;
     if (newBranchId !== userQuery.data.branchId) body.branchId = newBranchId;
+    const newManagerId = managerId ?? null;
+    if (newManagerId !== userQuery.data.managerId) body.managerId = newManagerId;
+    const positionTitleOrUndefined = positionTitle || undefined;
+    if ((positionTitleOrUndefined ?? null) !== userQuery.data.positionTitle) body.positionTitle = positionTitleOrUndefined ?? null;
     if (Object.keys(body).length === 0) {
       toast.info('Nothing changed');
       return;
@@ -204,6 +217,26 @@ export function UserEditDialog({
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Manager</Label>
+                <SearchableUserPicker
+                  users={availableManagers}
+                  value={managerId}
+                  onChange={setManagerId}
+                  placeholder="No manager set"
+                  disabled={!canWrite}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="positionTitle">Position title</Label>
+                <Input
+                  id="positionTitle"
+                  placeholder="e.g. Team Lead, Supervisor"
+                  value={positionTitle}
+                  onChange={(e) => setPositionTitle(e.target.value)}
+                  disabled={!canWrite}
+                />
               </div>
               {canWrite ? (
                 <Button type="submit" size="sm" disabled={updateMutation.isPending}>
