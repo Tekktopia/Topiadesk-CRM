@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, CheckCircle2, MoreHorizontal, Search, Upload } from 'lucide-react';
+import { Ban, CheckCircle2, MoreHorizontal, Plus, Search, Upload } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -35,6 +35,7 @@ import { canWriteAdmin } from '../_lib/permissions';
 import type { UserDto } from '../_lib/types';
 import { UserEditDialog } from './user-edit-dialog';
 import { BulkInviteDialog } from './bulk-invite-dialog';
+import { CreateUserDialog } from './create-user-dialog';
 
 const STATUS_OPTIONS = ['ACTIVE', 'SUSPENDED', 'DEACTIVATED'] as const;
 
@@ -58,6 +59,7 @@ export default function UsersPage() {
   const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
 
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [createUserOpen, setCreateUserOpen] = useState(false);
   const [bulkInviteOpen, setBulkInviteOpen] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState<{ user: UserDto; action: 'deactivate' | 'reactivate' } | null>(
     null,
@@ -225,10 +227,16 @@ export default function UsersPage() {
         description="Directory of every synced identity, their org placement, and role assignments."
         actions={
           canWrite ? (
-            <Button variant="outline" onClick={() => setBulkInviteOpen(true)}>
-              <Upload className="mr-2 h-4 w-4" aria-hidden />
-              Bulk invite
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => setBulkInviteOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" aria-hidden />
+                Bulk invite
+              </Button>
+              <Button onClick={() => setCreateUserOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" aria-hidden />
+                New user
+              </Button>
+            </>
           ) : undefined
         }
       />
@@ -324,6 +332,8 @@ export default function UsersPage() {
       ) : null}
 
       <BulkInviteDialog open={bulkInviteOpen} onOpenChange={setBulkInviteOpen} />
+
+      <CreateUserDialog open={createUserOpen} onOpenChange={setCreateUserOpen} />
 
       {pendingStatusChange ? (
         <ConfirmDialog

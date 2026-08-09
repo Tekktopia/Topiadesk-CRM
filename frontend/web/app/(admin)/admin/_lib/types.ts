@@ -39,18 +39,42 @@ type JsonBody<P extends keyof ApiPaths, M extends keyof ApiPaths[P]> = ApiPaths[
 
 // -- Users --------------------------------------------------------------
 type RawUserDto = Json200<'/identity/users', 'get'>[number];
-export type UserDto = Omit<RawUserDto, 'phone' | 'departmentId' | 'branchId' | 'lastSyncedAt'> & {
+export type UserDto = Omit<RawUserDto, 'phone' | 'departmentId' | 'branchId' | 'managerId' | 'positionTitle' | 'lastSyncedAt'> & {
   phone: NullableString;
   departmentId: NullableString;
   branchId: NullableString;
+  managerId: NullableString;
+  positionTitle: NullableString;
   lastSyncedAt: NullableString;
 };
 
 type RawUpdateUserBody = JsonBody<'/identity/users/{id}', 'patch'>;
-export type UpdateUserBody = Omit<RawUpdateUserBody, 'departmentId' | 'branchId'> & {
+export type UpdateUserBody = Omit<RawUpdateUserBody, 'departmentId' | 'branchId' | 'managerId' | 'positionTitle'> & {
   departmentId?: NullableString;
   branchId?: NullableString;
+  managerId?: NullableString;
+  positionTitle?: NullableString;
 };
+
+/** POST /identity/users — hand-written, not derived from ApiPaths: this
+ * route landed after the last schema regeneration, same "hand-mirror when
+ * generation lags" convention this file's header comment documents. Keep
+ * in sync with backend/api/src/modules/identity/dto/user.dto.ts's
+ * CreateUserDto/CreateUserResponseDto by hand. */
+export interface CreateUserBody {
+  email: string;
+  fullName: string;
+  phone?: string;
+  departmentId?: string;
+  branchId?: string;
+  managerId?: string;
+  positionTitle?: string;
+}
+
+export interface CreateUserResponse {
+  user: UserDto;
+  temporaryPassword: string;
+}
 
 export type AssignRoleBody = JsonBody<'/identity/users/{id}/roles', 'post'>;
 

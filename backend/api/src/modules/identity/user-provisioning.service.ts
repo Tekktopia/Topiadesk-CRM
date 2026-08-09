@@ -10,6 +10,12 @@ export interface UpsertLocalUserParams {
   enabled?: boolean;
   departmentCode?: string;
   branchCode?: string;
+  /** Already-resolved ids (unlike departmentCode/branchCode above) — the
+   * only caller that sets these (UsersController's single-user create) has
+   * a real picker, not a CSV code lookup, so no resolution step is needed
+   * here. */
+  managerId?: string;
+  positionTitle?: string;
 }
 
 export interface ProvisioningResult {
@@ -66,6 +72,8 @@ export class UserProvisioningService {
           status,
           ...(departmentId !== undefined && { departmentId }),
           ...(branchId !== undefined && { branchId }),
+          ...(params.managerId !== undefined && { managerId: params.managerId }),
+          ...(params.positionTitle !== undefined && { positionTitle: params.positionTitle }),
           lastSyncedAt: new Date(),
         },
       });
@@ -80,6 +88,8 @@ export class UserProvisioningService {
         status,
         departmentId,
         branchId,
+        managerId: params.managerId,
+        positionTitle: params.positionTitle,
         lastSyncedAt: new Date(),
       },
     });
