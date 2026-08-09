@@ -4,6 +4,7 @@ import {
   ConflictException,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   NotFoundException,
@@ -321,6 +322,9 @@ export class UsersController {
     ]);
     if (!user) throw new NotFoundException('User not found');
     if (!role) throw new NotFoundException('Role not found');
+    if (role.name === 'ADMIN') {
+      throw new ForbiddenException('The ADMIN role can only be granted from the Global Admin platform.');
+    }
 
     const existingRole = await prisma.userRole.findUnique({ where: { userId_roleId: { userId, roleId: dto.roleId } } });
     if (existingRole) throw new ConflictException('User already has this role');

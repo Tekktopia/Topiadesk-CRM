@@ -137,7 +137,8 @@ export function UserEditDialog({
   }
 
   const assignedRoleIds = new Set((userQuery.data?.roles ?? []).map((r) => r.id));
-  const availableRoles = (rolesQuery.data ?? []).filter((r) => !assignedRoleIds.has(r.id));
+  // ADMIN can only be granted from the Global Admin platform — never from a tenant.
+  const availableRoles = (rolesQuery.data ?? []).filter((r) => !assignedRoleIds.has(r.id) && r.name !== 'ADMIN');
 
   return (
     <>
