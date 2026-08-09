@@ -10,6 +10,15 @@ import { RenewalTimeline } from './renewal-timeline';
 import { SalesForecastPanel } from './sales-forecast-panel';
 import type { PipelineFunnelResponse, RenewalRow } from './types';
 
+interface DepartmentPipelineBreakdown {
+  departmentId: string;
+  departmentName: string;
+  openOpportunityCount: number;
+  pipelineValue: string;
+  wonThisMonthCount: number;
+  wonThisMonthValue: string;
+}
+
 interface OperationalKpis {
   openOpportunities: number;
   pipelineValue: string;
@@ -18,6 +27,7 @@ interface OperationalKpis {
   wonThisMonthCount: number;
   wonThisMonthValue: string;
   winRate: number | null;
+  byDepartment: DepartmentPipelineBreakdown[];
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -142,6 +152,45 @@ export function DashboardView() {
         </CardHeader>
         <CardContent>
           <SalesForecastPanel />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Pipeline by department</CardTitle>
+          <CardDescription>Open pipeline value and deals won this month, grouped by the opportunity owner&apos;s department.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {kpisQuery.isLoading ? (
+            <Skeleton className="h-40 w-full" />
+          ) : !kpis || kpis.byDepartment.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No opportunities assigned to an owner with a department yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="py-2 pr-4 font-medium">Department</th>
+                    <th className="py-2 pr-4 font-medium">Open opportunities</th>
+                    <th className="py-2 pr-4 font-medium">Pipeline value</th>
+                    <th className="py-2 pr-4 font-medium">Won this month</th>
+                    <th className="py-2 font-medium">Won value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {kpis.byDepartment.map((d) => (
+                    <tr key={d.departmentId} className="border-b last:border-0">
+                      <td className="py-2 pr-4 font-medium text-foreground">{d.departmentName}</td>
+                      <td className="py-2 pr-4 tabular-nums text-muted-foreground">{d.openOpportunityCount}</td>
+                      <td className="py-2 pr-4 tabular-nums text-muted-foreground">{formatNaira(d.pipelineValue)}</td>
+                      <td className="py-2 pr-4 tabular-nums text-muted-foreground">{d.wonThisMonthCount}</td>
+                      <td className="py-2 tabular-nums text-muted-foreground">{formatNaira(d.wonThisMonthValue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 

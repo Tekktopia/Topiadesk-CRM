@@ -30,6 +30,8 @@ interface CaseKpiResponse {
   openCaseCountByStatus: Array<{ status: string; count: number }>;
   caseVolumeTrend: Array<{ date: string; count: number }>;
   agentWorkload: Array<{ userId: string; userName: string; openCaseCount: number }>;
+  byDepartment: Array<{ departmentId: string; departmentName: string; openCaseCount: number; slaBreachRatePercent: number | null }>;
+  byTeam: Array<{ teamId: string; teamName: string; openCaseCount: number; slaBreachRatePercent: number | null }>;
 }
 
 const DAY_OPTIONS = [
@@ -88,6 +90,30 @@ export function CaseDashboardView() {
         ],
         rows: kpis.agentWorkload,
         totalRowCount: kpis.agentWorkload.length,
+        generatedAt: new Date().toISOString(),
+      }
+    : null;
+
+  const byDepartmentResult: ReportResult | null = kpis
+    ? {
+        columns: [
+          { key: 'departmentName', label: 'Department', format: 'text' },
+          { key: 'openCaseCount', label: 'Open tickets', format: 'number' },
+        ],
+        rows: kpis.byDepartment,
+        totalRowCount: kpis.byDepartment.length,
+        generatedAt: new Date().toISOString(),
+      }
+    : null;
+
+  const byTeamResult: ReportResult | null = kpis
+    ? {
+        columns: [
+          { key: 'teamName', label: 'Team', format: 'text' },
+          { key: 'openCaseCount', label: 'Open tickets', format: 'number' },
+        ],
+        rows: kpis.byTeam,
+        totalRowCount: kpis.byTeam.length,
         generatedAt: new Date().toISOString(),
       }
     : null;
@@ -202,6 +228,62 @@ export function CaseDashboardView() {
               <p className="py-8 text-center text-sm text-muted-foreground">No open tickets are currently assigned.</p>
             ) : (
               <ReportBarChart result={workloadResult} shape={{ dimensionColumn: workloadResult.columns[0]!, measureColumn: workloadResult.columns[1]! }} />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>By department</CardTitle>
+            <CardDescription>Open ticket count and SLA breach rate, grouped by assignee&apos;s department.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {kpisQuery.isLoading ? (
+              <Skeleton className="h-56 w-full" />
+            ) : !byDepartmentResult || byDepartmentResult.rows.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No open tickets currently assigned to a department.</p>
+            ) : (
+              <>
+                <ReportBarChart result={byDepartmentResult} shape={{ dimensionColumn: byDepartmentResult.columns[0]!, measureColumn: byDepartmentResult.columns[1]! }} />
+                <ul className="space-y-1.5">
+                  {kpis!.byDepartment.map((d) => (
+                    <li key={d.departmentId} className="flex items-center justify-between text-xs">
+                      <span className="text-foreground">{d.departmentName}</span>
+                      <span className="tabular-nums text-muted-foreground">
+                        SLA breach: {d.slaBreachRatePercent === null ? '—' : `${d.slaBreachRatePercent}%`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>By team</CardTitle>
+            <CardDescription>Open ticket count and SLA breach rate, grouped by assigned team.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {kpisQuery.isLoading ? (
+              <Skeleton className="h-56 w-full" />
+            ) : !byTeamResult || byTeamResult.rows.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No open tickets currently assigned to a team.</p>
+            ) : (
+              <>
+                <ReportBarChart result={byTeamResult} shape={{ dimensionColumn: byTeamResult.columns[0]!, measureColumn: byTeamResult.columns[1]! }} />
+                <ul className="space-y-1.5">
+                  {kpis!.byTeam.map((t) => (
+                    <li key={t.teamId} className="flex items-center justify-between text-xs">
+                      <span className="text-foreground">{t.teamName}</span>
+                      <span className="tabular-nums text-muted-foreground">
+                        SLA breach: {t.slaBreachRatePercent === null ? '—' : `${t.slaBreachRatePercent}%`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </CardContent>
         </Card>

@@ -3,7 +3,15 @@ import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
-import { AgentWorkloadDto, CaseKpiQueryDto, CaseKpiResponseDto, CaseStatusCountDto, CaseVolumeTrendPointDto } from './dto/case-kpi-response.dto';
+import {
+  AgentWorkloadDto,
+  CaseKpiQueryDto,
+  CaseKpiResponseDto,
+  CaseStatusCountDto,
+  CaseVolumeTrendPointDto,
+  DepartmentCaseBreakdownDto,
+  TeamCaseBreakdownDto,
+} from './dto/case-kpi-response.dto';
 
 const OPEN_STATUSES = ['NEW', 'OPEN', 'PENDING_CUSTOMER', 'PENDING_CARRIER', 'REOPENED'] as const;
 
@@ -35,7 +43,7 @@ export class CaseKpisController {
     const since = new Date();
     since.setDate(since.getDate() - days);
 
-    const [windowCases, statusGroups, slaClocks, openAssignedGroups] = await Promise.all([
+    const [windowCases, statusGroups, slaClocks, openAssignedGroups, openCasesForBreakdown, slaClocksForBreakdown, departments, teams] = await Promise.all([
       prisma.case.findMany({
         where: { createdAt: { gte: since } },
         select: { createdAt: true, firstRespondedAt: true, resolvedAt: true },
@@ -50,6 +58,21 @@ export class CaseKpisController {
         where: { assignedToId: { not: null }, status: { in: [...OPEN_STATUSES] } },
         _count: { _all: true },
       }),
+      // byDepartment/byTeam open-case counts — Case has no direct
+      // departmentId (see the "keep team-based" decision this session), so
+      // department is derived from the assignee's own User.departmentId.
+      // Aggregated in JS (same convention as the rest of this endpoint):
+      // Prisma can't groupBy across a relation in one query.
+      prisma.case.findMany({
+        where: { status: { in: [...OPEN_STATUSES] } },
+        select: { assignedTeamId: true, assignedTo: { select: { departmentId: true } } },
+      }),
+      prisma.slaClock.findMany({
+        where: { caseId: { not: null }, case: { createdAt: { gte: since } } },
+        select: { status: true, case: { select: { assignedTeamId: true, assignedTo: { select: { departmentId: true } } } } },
+      }),
+      prisma.department.findMany({ select: { id: true, name: true } }),
+      prisma.team.findMany({ select: { id: true, name: true } }),
     ]);
 
     const avgFirstResponseHours = avgHoursBetween(windowCases.map((c) => ({ start: c.createdAt, end: c.firstRespondedAt })));
@@ -77,6 +100,57 @@ export class CaseKpisController {
       .map((g) => ({ userId: g.assignedToId as string, userName: agentNameById.get(g.assignedToId as string) ?? 'Unknown', openCaseCount: g._count._all }))
       .sort((a, b) => b.openCaseCount - a.openCaseCount);
 
-    return { days, avgFirstResponseHours, avgResolutionHours, slaBreachRatePercent, openCaseCountByStatus, caseVolumeTrend, agentWorkload };
+    const departmentNameById = new Map(departments.map((d) => [d.id, d.name]));
+    const teamNameById = new Map(teams.map((t) => [t.id, t.name]));
+
+    const openCountByDept = new Map<string, number>();
+    const openCountByTeam = new Map<string, number>();
+    for (const c of openCasesForBreakdown) {
+      const deptId = c.assignedTo?.departmentId;
+      if (deptId) openCountByDept.set(deptId, (openCountByDept.get(deptId) ?? 0) + 1);
+      if (c.assignedTeamId) openCountByTeam.set(c.assignedTeamId, (openCountByTeam.get(c.assignedTeamId) ?? 0) + 1);
+    }
+
+    const breachTotalsByDept = new Map<string, { total: number; breached: number }>();
+    const breachTotalsByTeam = new Map<string, { total: number; breached: number }>();
+    for (const clock of slaClocksForBreakdown) {
+      const deptId = clock.case?.assignedTo?.departmentId;
+      const teamId = clock.case?.assignedTeamId;
+      const isBreached = clock.status === 'BREACHED';
+      if (deptId) {
+        const totals = breachTotalsByDept.get(deptId) ?? { total: 0, breached: 0 };
+        totals.total++;
+        if (isBreached) totals.breached++;
+        breachTotalsByDept.set(deptId, totals);
+      }
+      if (teamId) {
+        const totals = breachTotalsByTeam.get(teamId) ?? { total: 0, breached: 0 };
+        totals.total++;
+        if (isBreached) totals.breached++;
+        breachTotalsByTeam.set(teamId, totals);
+      }
+    }
+    const breachRate = (totals: { total: number; breached: number } | undefined): number | null =>
+      !totals || totals.total === 0 ? null : Math.round((totals.breached / totals.total) * 1000) / 10;
+
+    const byDepartment: DepartmentCaseBreakdownDto[] = [...openCountByDept.entries()]
+      .map(([departmentId, openCaseCount]) => ({
+        departmentId,
+        departmentName: departmentNameById.get(departmentId) ?? 'Unknown',
+        openCaseCount,
+        slaBreachRatePercent: breachRate(breachTotalsByDept.get(departmentId)),
+      }))
+      .sort((a, b) => b.openCaseCount - a.openCaseCount);
+
+    const byTeam: TeamCaseBreakdownDto[] = [...openCountByTeam.entries()]
+      .map(([teamId, openCaseCount]) => ({
+        teamId,
+        teamName: teamNameById.get(teamId) ?? 'Unknown',
+        openCaseCount,
+        slaBreachRatePercent: breachRate(breachTotalsByTeam.get(teamId)),
+      }))
+      .sort((a, b) => b.openCaseCount - a.openCaseCount);
+
+    return { days, avgFirstResponseHours, avgResolutionHours, slaBreachRatePercent, openCaseCountByStatus, caseVolumeTrend, agentWorkload, byDepartment, byTeam };
   }
 }

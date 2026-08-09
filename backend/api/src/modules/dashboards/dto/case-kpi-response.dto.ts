@@ -28,6 +28,20 @@ export class AgentWorkloadDto {
   @ApiProperty() openCaseCount!: number;
 }
 
+export class DepartmentCaseBreakdownDto {
+  @ApiProperty() departmentId!: string;
+  @ApiProperty() departmentName!: string;
+  @ApiProperty() openCaseCount!: number;
+  @ApiPropertyOptional({ nullable: true }) slaBreachRatePercent!: number | null;
+}
+
+export class TeamCaseBreakdownDto {
+  @ApiProperty() teamId!: string;
+  @ApiProperty() teamName!: string;
+  @ApiProperty() openCaseCount!: number;
+  @ApiPropertyOptional({ nullable: true }) slaBreachRatePercent!: number | null;
+}
+
 export class CaseKpiResponseDto {
   @ApiProperty() days!: number;
   @ApiPropertyOptional({ nullable: true }) avgFirstResponseHours!: number | null;
@@ -36,4 +50,6 @@ export class CaseKpiResponseDto {
   @ApiProperty({ type: [CaseStatusCountDto] }) openCaseCountByStatus!: CaseStatusCountDto[];
   @ApiProperty({ type: [CaseVolumeTrendPointDto] }) caseVolumeTrend!: CaseVolumeTrendPointDto[];
   @ApiProperty({ type: [AgentWorkloadDto] }) agentWorkload!: AgentWorkloadDto[];
+  @ApiProperty({ type: [DepartmentCaseBreakdownDto] }) byDepartment!: DepartmentCaseBreakdownDto[];
+  @ApiProperty({ type: [TeamCaseBreakdownDto] }) byTeam!: TeamCaseBreakdownDto[];
 }

@@ -2,7 +2,7 @@ import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
-import { OperationalKpiResponseDto } from './dto/operational-kpi-response.dto';
+import { DepartmentPipelineBreakdownDto, OperationalKpiResponseDto } from './dto/operational-kpi-response.dto';
 import { SalesForecastGroupDto, SalesForecastQueryDto, SalesForecastResponseDto } from './dto/sales-forecast.dto';
 
 /**
@@ -29,24 +29,59 @@ export class DashboardsController {
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
 
-    const [openOpportunities, renewalsDueNext90Days, activeClients, wonThisMonth, wonAllTime, lostAllTime] = await Promise.all([
+    const [openOpportunities, renewalsDueNext90Days, activeClients, wonThisMonth, wonAllTime, lostAllTime, departments] = await Promise.all([
       prisma.opportunity.findMany({
         where: { pipelineStage: { isWon: false, isLost: false } },
-        select: { amount: true },
+        select: { amount: true, owner: { select: { departmentId: true } } },
       }),
       prisma.renewalSchedule.count({ where: { renewalDueDate: { lte: in90Days } } }),
       prisma.account.count({ where: { status: 'CLIENT' } }),
       prisma.opportunity.findMany({
         where: { pipelineStage: { isWon: true }, actualCloseDate: { gte: monthStart, lte: monthEnd } },
-        select: { amount: true },
+        select: { amount: true, owner: { select: { departmentId: true } } },
       }),
       prisma.opportunity.count({ where: { pipelineStage: { isWon: true }, actualCloseDate: { not: null } } }),
       prisma.opportunity.count({ where: { pipelineStage: { isLost: true }, actualCloseDate: { not: null } } }),
+      prisma.department.findMany({ select: { id: true, name: true } }),
     ]);
 
     const pipelineValue = openOpportunities.reduce((sum: number, o: { amount: unknown }) => sum + Number(o.amount), 0);
     const wonThisMonthValue = wonThisMonth.reduce((sum: number, o: { amount: unknown }) => sum + Number(o.amount), 0);
     const decidedAllTime = wonAllTime + lostAllTime;
+
+    const departmentNameById = new Map(departments.map((d) => [d.id, d.name]));
+    const byDeptTotals = new Map<string, { openCount: number; openValue: number; wonCount: number; wonValue: number }>();
+    const getTotals = (deptId: string) => {
+      const existing = byDeptTotals.get(deptId);
+      if (existing) return existing;
+      const fresh = { openCount: 0, openValue: 0, wonCount: 0, wonValue: 0 };
+      byDeptTotals.set(deptId, fresh);
+      return fresh;
+    };
+    for (const o of openOpportunities) {
+      const deptId = o.owner?.departmentId;
+      if (!deptId) continue;
+      const totals = getTotals(deptId);
+      totals.openCount++;
+      totals.openValue += Number(o.amount);
+    }
+    for (const o of wonThisMonth) {
+      const deptId = o.owner?.departmentId;
+      if (!deptId) continue;
+      const totals = getTotals(deptId);
+      totals.wonCount++;
+      totals.wonValue += Number(o.amount);
+    }
+    const byDepartment: DepartmentPipelineBreakdownDto[] = [...byDeptTotals.entries()]
+      .map(([departmentId, t]) => ({
+        departmentId,
+        departmentName: departmentNameById.get(departmentId) ?? 'Unknown',
+        openOpportunityCount: t.openCount,
+        pipelineValue: t.openValue.toFixed(2),
+        wonThisMonthCount: t.wonCount,
+        wonThisMonthValue: t.wonValue.toFixed(2),
+      }))
+      .sort((a, b) => Number(b.pipelineValue) - Number(a.pipelineValue));
 
     return {
       openOpportunities: openOpportunities.length,
@@ -56,6 +91,7 @@ export class DashboardsController {
       wonThisMonthCount: wonThisMonth.length,
       wonThisMonthValue: wonThisMonthValue.toFixed(2),
       winRate: decidedAllTime > 0 ? wonAllTime / decidedAllTime : null,
+      byDepartment,
     };
   }
 
