@@ -34,6 +34,7 @@ import { applyCaseStatusTransition } from './status-transition.util';
 import { assertValidCaseTransition } from './case-lifecycle';
 import { ensureCaseSlaClocks } from './sla-clock.util';
 import { enqueueEntityEvent } from './automation-events.util';
+import { enqueueTeamAssignmentNotification } from './notify-team-assignment-queue';
 import { findMatchingAssignmentRule, resolveNextAssignee } from './assignment-resolver.util';
 import { buildCaseOrderBy, buildCaseWhere } from './case-query.util';
 import { diffBulkIds } from './bulk-actions';
@@ -227,6 +228,10 @@ export class CasesController {
     }
     const kase = created!;
 
+    if (kase.assignedTeamId) {
+      await enqueueTeamAssignmentNotification({ caseId: kase.id, teamId: kase.assignedTeamId }).catch(() => undefined);
+    }
+
     await ensureCaseSlaClocks(kase.id, dto.slaPolicyId ?? null, kase.caseType, kase.priority, kase.accountId).catch((err: unknown) => {
       console.error(`[cases] failed to start SLA clocks for case ${kase.id}`, err);
     });
@@ -253,6 +258,9 @@ export class CasesController {
             data: { assignedToId: resolution.userId, assignedTeamId: rule.candidatePoolTeamId },
           });
           await enqueueEntityEvent({ entityType: 'CASE', entityId: kase.id, eventType: 'ASSIGNED', occurredAt: new Date().toISOString() }).catch(() => undefined);
+          if (rule.candidatePoolTeamId) {
+            await enqueueTeamAssignmentNotification({ caseId: kase.id, teamId: rule.candidatePoolTeamId }).catch(() => undefined);
+          }
         }
       }
     }
@@ -287,6 +295,9 @@ export class CasesController {
       },
     });
     await enqueueEntityEvent({ entityType: 'CASE', entityId: id, eventType: 'UPDATED', occurredAt: updated.updatedAt.toISOString() }).catch(() => undefined);
+    if (dto.assignedTeamId && dto.assignedTeamId !== existing.assignedTeamId) {
+      await enqueueTeamAssignmentNotification({ caseId: id, teamId: dto.assignedTeamId }).catch(() => undefined);
+    }
     return updated;
   }
 

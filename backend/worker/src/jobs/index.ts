@@ -34,6 +34,7 @@ import { createProvisionTenantQueue, createProvisionTenantWorker } from './platf
 import { createCreatePlatformAdminQueue, createCreatePlatformAdminWorker } from './platform/create-platform-admin.job';
 import { createCreateTenantAdminQueue, createCreateTenantAdminWorker } from './platform/create-tenant-admin.job';
 import { createCreateSupportTicketQueue, createCreateSupportTicketWorker } from './platform/create-support-ticket.job';
+import { createNotifyTeamAssignmentQueue, createNotifyTeamAssignmentWorker } from './case-management/notify-team-assignment.job';
 
 export interface RegisteredJobs {
   queues: Queue[];
@@ -160,6 +161,13 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
   const createSupportTicketQueue = createCreateSupportTicketQueue(connection);
   const createSupportTicketWorker = createCreateSupportTicketWorker(connection);
 
+  // Event-driven, not a repeatable schedule — the API enqueues directly
+  // when a case is created with, or updated to have, a real
+  // assignedTeamId (see backend/api/src/modules/case-management/
+  // cases.controller.ts).
+  const notifyTeamAssignmentQueue = createNotifyTeamAssignmentQueue(connection);
+  const notifyTeamAssignmentWorker = createNotifyTeamAssignmentWorker(connection);
+
   return {
     queues: [
       renewalScanQueue,
@@ -183,6 +191,7 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       createPlatformAdminQueue,
       createTenantAdminQueue,
       createSupportTicketQueue,
+      notifyTeamAssignmentQueue,
     ],
     workers: [
       renewalScanWorker,
@@ -206,6 +215,7 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       createPlatformAdminWorker,
       createTenantAdminWorker,
       createSupportTicketWorker,
+      notifyTeamAssignmentWorker,
     ],
   };
 }
