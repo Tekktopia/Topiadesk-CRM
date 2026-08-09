@@ -30,11 +30,16 @@ interface CachedAdminToken {
 
 /**
  * Thin wrapper around Keycloak's Admin REST API — realm-aware (Phase 2a):
- * every method operates against WHICHEVER realm the current request's
- * RlsContext.tenantSchema resolves to (via `realmName()`, falling back to
- * `env.KEYCLOAK_REALM` when no context/tenantSchema is bound), since
- * `Tenant.schemaName` and `Tenant.keycloakRealm` are always the identical
- * string by construction (see tenants.controller.ts's create()).
+ * every method operates against WHICHEVER realm `realmName()` resolves —
+ * RlsContext.keycloakRealm (the JWT's own verified issuer, set by
+ * RlsContextMiddleware) when bound, else RlsContext.tenantSchema (kept as
+ * a fallback specifically so platform-admins.controller.ts's deliberate
+ * `{ ...ctx, tenantSchema: KEYCLOAK_PLATFORM_REALM }` override trick keeps
+ * working unchanged), else `env.KEYCLOAK_REALM`. tenantSchema and
+ * keycloakRealm are the identical string for every tenant created through
+ * tenants.controller.ts's create() flow, but that's not a guaranteed
+ * invariant — see RlsContext.keycloakRealm's own comment for the
+ * grandfathered tenant that broke it.
  *
  * Authenticates with the MASTER-realm credentials (KEYCLOAK_ADMIN/
  * KEYCLOAK_ADMIN_PASSWORD, password grant against the built-in `admin-cli`
@@ -129,9 +134,10 @@ export class KeycloakAdminService {
     return (await res.json()) as KeycloakSessionRepresentation[];
   }
 
-  /** `Tenant.schemaName`/`Tenant.keycloakRealm` are always the identical string by construction — see this class's header comment. */
+  /** See this class's header comment for the keycloakRealm/tenantSchema/env.KEYCLOAK_REALM fallback order. */
   private realmName(): string {
-    return getRlsContext()?.tenantSchema ?? this.env.KEYCLOAK_REALM;
+    const ctx = getRlsContext();
+    return ctx?.keycloakRealm ?? ctx?.tenantSchema ?? this.env.KEYCLOAK_REALM;
   }
 
   private adminBaseUrl(): string {

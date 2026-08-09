@@ -24,14 +24,15 @@ export interface RlsContext {
   /** Populated from the request's client IP; stored on audit_log rows via app.current_client_ip. */
   clientIp: string | null;
   /**
-   * The tenant's Postgres schema name AND Keycloak realm name — both are
-   * guaranteed identical by construction (backend/api's tenants.controller.ts
-   * writes the same `tenant_<slug>` string to Tenant.schemaName and
-   * Tenant.keycloakRealm in one insert). `null` selects the original
-   * pre-multi-tenant deployment (resolves to `'public'` in client.ts) —
-   * each consumer applies its OWN correct default for `null`, since e.g.
-   * client.ts's default ('public') and KeycloakAdminService's default
-   * (env.KEYCLOAK_REALM) are NOT the same literal string.
+   * The tenant's Postgres schema name. For every tenant created through
+   * tenants.controller.ts's create() flow this is the identical string as
+   * its Keycloak realm too — but that's NOT a guaranteed invariant: the
+   * original pre-multi-tenant seed tenant has schemaName='public' with a
+   * genuinely different keycloakRealm ('topiadesk') — see keycloakRealm
+   * below, which exists specifically because code that used to read THIS
+   * field as a stand-in for the realm name (KeycloakAdminService.realmName())
+   * broke for exactly that tenant. `null` selects the original
+   * pre-multi-tenant deployment (resolves to `'public'` in client.ts).
    *
    * Every one of SYSTEM_JOB_CONTEXT's ~50 existing bare consumers keeps
    * working unmodified (scoped to 'public', today's behavior) since this
@@ -41,6 +42,18 @@ export interface RlsContext {
    * RlsContextMiddleware's bootstrap lookup for the one existing example).
    */
   tenantSchema: string | null;
+  /**
+   * The tenant's real Keycloak realm — set directly from the JWT's own
+   * verified issuer in RlsContextMiddleware (no assumption needed, since
+   * that's literally which realm authenticated this request), NOT derived
+   * from tenantSchema. Optional (not every RlsContext construction site
+   * has been updated to set it) — KeycloakAdminService.realmName() falls
+   * back to tenantSchema, then env.KEYCLOAK_REALM, preserving every
+   * existing caller's behavior (including platform-admins.controller.ts's
+   * deliberate `{ ...ctx, tenantSchema: KEYCLOAK_PLATFORM_REALM }`
+   * override trick) for any context that doesn't set this.
+   */
+  keycloakRealm?: string | null;
 }
 
 const rlsStorage = new AsyncLocalStorage<RlsContext>();
@@ -80,4 +93,5 @@ export const SYSTEM_JOB_CONTEXT: RlsContext = {
   branchId: null,
   clientIp: null,
   tenantSchema: null,
+  keycloakRealm: null,
 };

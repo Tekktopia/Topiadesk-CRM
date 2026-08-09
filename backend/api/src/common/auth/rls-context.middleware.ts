@@ -157,6 +157,11 @@ export class RlsContextMiddleware implements NestMiddleware {
       branchId: localUser.branchId,
       clientIp: req.ip ?? null,
       tenantSchema,
+      // The JWT's own verified issuer — the real Keycloak realm this
+      // request authenticated against, not assumed from tenantSchema (see
+      // RlsContext.keycloakRealm's own comment for why that assumption
+      // broke for the original pre-multi-tenant seed tenant).
+      keycloakRealm: realmName,
     };
 
     runWithRlsContext(ctx, () => next());
