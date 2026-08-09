@@ -2,8 +2,9 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Search } from 'lucide-react';
-import { Badge, Card, CardContent, type ColumnDef, DataTable, Input } from '@topiadesk/ui';
+import { Pencil, Search } from 'lucide-react';
+import { Badge, Button, Card, CardContent, type ColumnDef, DataTable, Input } from '@topiadesk/ui';
+import { ChangeTierDialog } from '../../_components/change-tier-dialog';
 import { EmptyState } from '../../_components/empty-state';
 import { PageHeader } from '../../_components/page-header';
 import { useDebouncedValue } from '../../_lib/use-debounced-value';
@@ -21,6 +22,7 @@ export function LoyaltyListView() {
   const debouncedSearch = useDebouncedValue(search, 300);
   const { data, isLoading, isError } = useLoyaltyAccounts(debouncedSearch || undefined);
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 20 });
+  const [tierTarget, setTierTarget] = React.useState<LoyaltyAccount | null>(null);
 
   const rows = data ?? [];
 
@@ -54,6 +56,16 @@ export function LoyaltyListView() {
         header: 'Enrolled',
         meta: { label: 'Enrolled' },
         cell: ({ row }) => <span className="text-muted-foreground">{new Date(row.original.enrolledAt).toLocaleDateString()}</span>,
+      },
+      {
+        id: 'actions',
+        header: 'Actions',
+        enableHiding: false,
+        cell: ({ row }) => (
+          <Button variant="ghost" size="icon" aria-label={`Change tier for ${row.original.accountName ?? row.original.id}`} onClick={() => setTierTarget(row.original)}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+        ),
       },
     ],
     [],
@@ -93,6 +105,16 @@ export function LoyaltyListView() {
           totalRowCount={rows.length}
         />
       )}
+
+      {tierTarget ? (
+        <ChangeTierDialog
+          open={!!tierTarget}
+          onOpenChange={(open) => !open && setTierTarget(null)}
+          loyaltyAccountId={tierTarget.id}
+          accountId={tierTarget.accountId}
+          currentTier={tierTarget.tier}
+        />
+      ) : null}
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Award, Loader2, Minus, Plus, Settings2 } from 'lucide-react';
+import { Award, Loader2, Minus, Pencil, Plus, Settings2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import {
@@ -34,6 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from '@topiadesk/ui';
+import { ChangeTierDialog } from '../../../_components/change-tier-dialog';
 import { EmptyState } from '../../../_components/empty-state';
 import { formatDate } from '../../../_lib/format';
 import {
@@ -57,6 +58,7 @@ export function LoyaltyTab({ accountId }: { accountId: string }) {
   const { data: loyaltyAccount, isLoading } = useLoyaltyAccountByAccountId(accountId);
   const enroll = useEnrollLoyaltyAccount();
   const [dialogMode, setDialogMode] = React.useState<'earn' | 'redeem' | 'adjust' | null>(null);
+  const [tierDialogOpen, setTierDialogOpen] = React.useState(false);
 
   if (isLoading) {
     return (
@@ -96,6 +98,9 @@ export function LoyaltyTab({ accountId }: { accountId: string }) {
           <Badge variant="secondary" className="ml-auto">
             {loyaltyAccount.tier}
           </Badge>
+          <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Change tier" onClick={() => setTierDialogOpen(true)}>
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
         </div>
         <div className="flex items-center gap-2 rounded-none border border-border p-4">
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Enrolled</span>
@@ -130,6 +135,16 @@ export function LoyaltyTab({ accountId }: { accountId: string }) {
           onOpenChange={(open) => setDialogMode(open ? dialogMode : null)}
           loyaltyAccountId={loyaltyAccount.id}
           accountId={accountId}
+        />
+      ) : null}
+
+      {tierDialogOpen ? (
+        <ChangeTierDialog
+          open={tierDialogOpen}
+          onOpenChange={setTierDialogOpen}
+          loyaltyAccountId={loyaltyAccount.id}
+          accountId={accountId}
+          currentTier={loyaltyAccount.tier}
         />
       ) : null}
     </div>

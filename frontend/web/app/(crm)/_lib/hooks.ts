@@ -1156,6 +1156,20 @@ function useLoyaltyLedgerMutation(action: 'earn' | 'redeem' | 'adjust', successV
   });
 }
 
+export function useUpdateLoyaltyTier() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ loyaltyAccountId, tier }: { loyaltyAccountId: string; accountId: string; tier: string }) =>
+      apiFetch<LoyaltyAccount>(`/api/loyalty-accounts/${loyaltyAccountId}/tier`, { method: 'PATCH', body: JSON.stringify({ tier }) }),
+    onSuccess: (_account, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'loyalty-account', 'by-account', vars.accountId] });
+      queryClient.invalidateQueries({ queryKey: ['crm', 'loyalty-accounts'] });
+      toast.success('Tier updated');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
 export function useEarnPoints() {
   return useLoyaltyLedgerMutation('earn', 'earned');
 }
