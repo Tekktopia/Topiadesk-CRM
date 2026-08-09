@@ -20,6 +20,8 @@ function toResponse(ticket: {
   assignedTo: { fullName: string } | null;
   createdAt: Date;
   updatedAt: Date;
+  resolvedAt: Date | null;
+  closedAt: Date | null;
   comments?: { id: string; authorName: string; authorPlatformAdminId: string | null; body: string; createdAt: Date }[];
 }): PlatformSupportTicketResponseDto {
   return {
@@ -36,6 +38,8 @@ function toResponse(ticket: {
     assignedToName: ticket.assignedTo?.fullName ?? null,
     createdAt: ticket.createdAt,
     updatedAt: ticket.updatedAt,
+    resolvedAt: ticket.resolvedAt,
+    closedAt: ticket.closedAt,
     comments: ticket.comments,
   };
 }

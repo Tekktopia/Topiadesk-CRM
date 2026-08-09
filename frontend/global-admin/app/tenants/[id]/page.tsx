@@ -1,9 +1,10 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Clock, Loader2, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, LifeBuoy, Loader2, XCircle } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -31,6 +32,7 @@ import { UsageTab } from './_usage-tab';
 import { GenerateLicenseDialog } from './_generate-license-dialog';
 import { PageHeader } from '../../_components/page-header';
 import { ConfirmDialog } from '../../_components/confirm-dialog';
+import { AuditActivityList } from '../../_components/audit-activity-list';
 
 /** Days until `currentPeriodEnd`, or null if there's no expiry set yet
  * (a subscription that's never had a license "generated" against it —
@@ -147,11 +149,12 @@ function TenantDetailPageContent() {
         onConfirm={() => suspend.mutate()}
       />
 
-      <Tabs defaultValue={searchParams.get('tab') === 'admins' || searchParams.get('tab') === 'usage' ? searchParams.get('tab')! : 'overview'}>
+      <Tabs defaultValue={['admins', 'usage', 'activity'].includes(searchParams.get('tab') ?? '') ? searchParams.get('tab')! : 'overview'}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="admins">Admins</TabsTrigger>
           <TabsTrigger value="usage">Usage</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="flex flex-col gap-6">
@@ -165,6 +168,14 @@ function TenantDetailPageContent() {
                 <Row label="Slug" value={tenant.slug} />
                 <Row label="Keycloak realm" value={tenant.keycloakRealm} />
                 <Row label="Created" value={new Date(tenant.createdAt).toLocaleString()} />
+                <div className="pt-1">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/support-tickets?tenantId=${tenant.id}`}>
+                      <LifeBuoy className="mr-2 h-3.5 w-3.5" aria-hidden />
+                      View support tickets
+                    </Link>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -247,6 +258,10 @@ function TenantDetailPageContent() {
 
         <TabsContent value="usage">
           <UsageTab tenantId={tenant.id} />
+        </TabsContent>
+
+        <TabsContent value="activity">
+          <AuditActivityList entityType="tenants" entityId={tenant.id} />
         </TabsContent>
       </Tabs>
     </div>

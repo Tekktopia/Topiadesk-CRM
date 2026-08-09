@@ -8,6 +8,7 @@ import { apiFetch, ApiError } from '../../_lib/api';
 import type { PlatformAdmin, PlatformSupportTicket, SupportTicketPriority, SupportTicketStatus } from '../../_lib/types';
 import { TicketPriorityBadge, TicketStatusBadge } from '../_badges';
 import { PageHeader } from '../../_components/page-header';
+import { AuditActivityList } from '../../_components/audit-activity-list';
 
 const STATUSES: SupportTicketStatus[] = ['OPEN', 'IN_PROGRESS', 'WAITING_ON_TENANT', 'RESOLVED', 'CLOSED'];
 const PRIORITIES: SupportTicketPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
@@ -125,6 +126,12 @@ export default function SupportTicketDetailPage() {
             </div>
           </div>
           <p className="whitespace-pre-wrap text-sm">{ticket.description}</p>
+          {ticket.resolvedAt || ticket.closedAt ? (
+            <div className="flex flex-wrap gap-4 border-t border-border pt-3 text-xs text-muted-foreground">
+              {ticket.resolvedAt ? <span>Resolved {new Date(ticket.resolvedAt).toLocaleString()}</span> : null}
+              {ticket.closedAt ? <span>Closed {new Date(ticket.closedAt).toLocaleString()}</span> : null}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -161,6 +168,15 @@ export default function SupportTicketDetailPage() {
               {addComment.isPending ? 'Sending…' : 'Reply'}
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium text-muted-foreground">Activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AuditActivityList entityType="support_tickets" entityId={ticket.id} />
         </CardContent>
       </Card>
     </div>

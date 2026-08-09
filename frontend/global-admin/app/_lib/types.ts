@@ -114,6 +114,8 @@ export interface PlatformSupportTicket {
   assignedToName: string | null;
   createdAt: string;
   updatedAt: string;
+  resolvedAt: string | null;
+  closedAt: string | null;
   comments?: SupportTicketComment[];
 }
 

@@ -44,6 +44,8 @@ export class PlatformSupportTicketResponseDto {
   @ApiPropertyOptional() assignedToName?: string | null;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
+  @ApiPropertyOptional() resolvedAt?: Date | null;
+  @ApiPropertyOptional() closedAt?: Date | null;
   @ApiPropertyOptional({ type: [PlatformSupportTicketCommentResponseDto] })
   comments?: PlatformSupportTicketCommentResponseDto[];
 }
