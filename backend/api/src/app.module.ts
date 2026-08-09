@@ -26,6 +26,7 @@ import { OmnichannelModule } from './modules/omnichannel/omnichannel.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { IpWhitelistGuard } from './modules/identity/ip-whitelist.guard';
 import { PortalModule } from './modules/portal/portal.module';
+import { SupportModule } from './modules/support/support.module';
 import { PortalContextMiddleware } from './modules/portal/portal-context.middleware';
 import { PortalController } from './modules/portal/portal.controller';
 import { PlatformModule } from './modules/platform/platform.module';
@@ -35,6 +36,7 @@ import { TenantsController } from './modules/platform/tenants.controller';
 import { PlansController } from './modules/platform/plans.controller';
 import { PlatformAdminsController } from './modules/platform/platform-admins.controller';
 import { TenantUsersController } from './modules/platform/tenant-users.controller';
+import { PlatformSupportTicketsController } from './modules/platform/support-tickets.controller';
 
 @Module({
   imports: [
@@ -72,6 +74,7 @@ import { TenantUsersController } from './modules/platform/tenant-users.controlle
     LoyaltyModule,
     PortalModule,
     PlatformModule,
+    SupportModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
@@ -189,6 +192,8 @@ export class AppModule implements NestModule {
     // why: forRoutes() with that regex-style string was found to silently
     // match nothing in this NestJS version even though .exclude() with the
     // identical pattern does work.
-    consumer.apply(PlatformContextMiddleware).forRoutes(PlatformController, TenantsController, PlansController, PlatformAdminsController, TenantUsersController);
+    consumer
+      .apply(PlatformContextMiddleware)
+      .forRoutes(PlatformController, TenantsController, PlansController, PlatformAdminsController, TenantUsersController, PlatformSupportTicketsController);
   }
 }

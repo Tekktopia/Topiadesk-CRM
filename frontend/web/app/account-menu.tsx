@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
-import { Circle, Keyboard, LogOut, Monitor, Moon, Palette, Settings, Sun } from 'lucide-react';
+import { Circle, Keyboard, LifeBuoy, LogOut, Monitor, Moon, Palette, Settings, Sun } from 'lucide-react';
 import {
   Avatar,
   AvatarFallback,
@@ -196,6 +196,13 @@ export function AccountMenu({
             <Link href="/profile" className="flex w-full cursor-pointer items-center gap-2">
               <Settings className="h-4 w-4" aria-hidden />
               Profile settings
+            </Link>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem asChild>
+            <Link href="/support" className="flex w-full cursor-pointer items-center gap-2">
+              <LifeBuoy className="h-4 w-4" aria-hidden />
+              Contact support
             </Link>
           </DropdownMenuItem>
 

@@ -32,6 +32,7 @@ import { createPortalLoginQueue, createPortalLoginWorker } from './portal/send-p
 import { createProvisionTenantQueue, createProvisionTenantWorker } from './platform/provision-tenant.job';
 import { createCreatePlatformAdminQueue, createCreatePlatformAdminWorker } from './platform/create-platform-admin.job';
 import { createCreateTenantAdminQueue, createCreateTenantAdminWorker } from './platform/create-tenant-admin.job';
+import { createCreateSupportTicketQueue, createCreateSupportTicketWorker } from './platform/create-support-ticket.job';
 
 export interface RegisteredJobs {
   queues: Queue[];
@@ -145,6 +146,12 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
   const createTenantAdminQueue = createCreateTenantAdminQueue(connection);
   const createTenantAdminWorker = createCreateTenantAdminWorker(connection);
 
+  // Event-driven, not a repeatable schedule — the API enqueues directly
+  // when a tenant user submits a support ticket (see backend/api/src/
+  // modules/support/create-support-ticket-queue.ts).
+  const createSupportTicketQueue = createCreateSupportTicketQueue(connection);
+  const createSupportTicketWorker = createCreateSupportTicketWorker(connection);
+
   return {
     queues: [
       renewalScanQueue,
@@ -166,6 +173,7 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       provisionTenantQueue,
       createPlatformAdminQueue,
       createTenantAdminQueue,
+      createSupportTicketQueue,
     ],
     workers: [
       renewalScanWorker,
@@ -187,6 +195,7 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       provisionTenantWorker,
       createPlatformAdminWorker,
       createTenantAdminWorker,
+      createSupportTicketWorker,
     ],
   };
 }

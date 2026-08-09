@@ -25,6 +25,7 @@ export * from './primitives/dialog';
 export * from './primitives/dropdown-menu';
 export * from './primitives/form';
 export * from './primitives/input';
+export * from './primitives/textarea';
 export * from './primitives/label';
 export * from './primitives/select';
 export * from './primitives/separator';

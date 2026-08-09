@@ -57,6 +57,21 @@ enum ProvisioningStepStatus {
   FAILED
 }
 
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_TENANT
+  RESOLVED
+  CLOSED
+}
+
+enum SupportTicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 /// One row per customer organization. `schemaName`/`keycloakRealm` are the
 /// two coordinates that locate everything else about this tenant — the
 /// actual Postgres schema (packages/db's table set, applied fresh per
@@ -77,6 +92,7 @@ model Tenant {
 
   subscription       Subscription?
   provisioningEvents TenantProvisioningEvent[]
+  supportTickets     SupportTicket[]
 
   @@map("tenants")
 }
@@ -128,6 +144,9 @@ model PlatformAdminUser {
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  assignedTickets SupportTicket[]
+  ticketComments  SupportTicketComment[]
+
   @@map("platform_admin_users")
 }
 
@@ -147,4 +166,57 @@ model TenantProvisioningEvent {
 
   @@index([tenantId, occurredAt])
   @@map("tenant_provisioning_events")
+}
+
+/// A tenant admin's support request to TopiaDesk itself — distinct from
+/// the tenant schema's own `cases` table (that's for the tenant's OWN
+/// customers, see packages/db/prisma/schema.prisma's Case model). Written
+/// by backend/worker's create-support-ticket job (not directly from the
+/// tenant-authenticated request that creates it) — see this session's
+/// plan for why tenant-context requests reaching into this schema go
+/// through SYSTEM_JOB_CONTEXT rather than the tenant user's own RlsContext.
+/// `raisedByEmail`/`raisedByName` are captured at creation time rather than
+/// a foreign key — there's no cross-schema FK to a tenant's own `users`
+/// table to point at.
+model SupportTicket {
+  id             String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String                 @map("tenant_id") @db.Uuid
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subject        String
+  description    String
+  status         SupportTicketStatus    @default(OPEN)
+  priority       SupportTicketPriority  @default(MEDIUM)
+  raisedByEmail  String                 @map("raised_by_email")
+  raisedByName   String                 @map("raised_by_name")
+  assignedToId   String?                @map("assigned_to_id") @db.Uuid
+  assignedTo     PlatformAdminUser?     @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  resolvedAt     DateTime?              @map("resolved_at") @db.Timestamptz(6)
+  closedAt       DateTime?              @map("closed_at") @db.Timestamptz(6)
+
+  comments SupportTicketComment[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("support_tickets")
+}
+
+/// `authorPlatformAdminId` null = a tenant-side reply (there's no
+/// cross-schema FK to point at instead, same reasoning as SupportTicket's
+/// raisedByEmail/raisedByName — authorName/authorEmail are captured at
+/// write time for that case).
+model SupportTicketComment {
+  id                    String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId              String             @map("ticket_id") @db.Uuid
+  ticket                SupportTicket      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorPlatformAdminId String?            @map("author_platform_admin_id") @db.Uuid
+  authorPlatformAdmin   PlatformAdminUser? @relation(fields: [authorPlatformAdminId], references: [id], onDelete: SetNull)
+  authorName            String             @map("author_name")
+  authorEmail           String             @map("author_email")
+  body                  String
+  createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([ticketId])
+  @@map("support_ticket_comments")
 }

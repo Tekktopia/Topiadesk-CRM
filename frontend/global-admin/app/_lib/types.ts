@@ -89,6 +89,34 @@ export interface TenantUsage {
   seatLimit: number | null;
 }
 
+export type SupportTicketStatus = 'OPEN' | 'IN_PROGRESS' | 'WAITING_ON_TENANT' | 'RESOLVED' | 'CLOSED';
+export type SupportTicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+export interface SupportTicketComment {
+  id: string;
+  authorName: string;
+  authorPlatformAdminId: string | null;
+  body: string;
+  createdAt: string;
+}
+
+export interface PlatformSupportTicket {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  subject: string;
+  description: string;
+  status: SupportTicketStatus;
+  priority: SupportTicketPriority;
+  raisedByName: string;
+  raisedByEmail: string;
+  assignedToId: string | null;
+  assignedToName: string | null;
+  createdAt: string;
+  updatedAt: string;
+  comments?: SupportTicketComment[];
+}
+
 export interface PlatformStats {
   totalTenants: number;
   active: number;
