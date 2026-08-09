@@ -3,11 +3,13 @@
 import * as React from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, DataTable, DataTableColumnHeader, type ColumnDef, toast } from '@topiadesk/ui';
+import { Search } from 'lucide-react';
+import { Badge, Button, DataTable, DataTableColumnHeader, Input, type ColumnDef, type PaginationState, toast } from '@topiadesk/ui';
 import { apiFetch, ApiError } from '../_lib/api';
 import type { PlatformAdmin } from '../_lib/types';
 import { CreateAdminDialog } from './_create-admin-dialog';
 import { PageHeader } from '../_components/page-header';
+import { useDebounced } from '@/lib/use-debounced';
 
 export default function PlatformAdminsPage() {
   return (
@@ -21,11 +23,24 @@ function PlatformAdminsPageContent() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = React.useState(searchParams.get('new') === '1');
+  const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebounced(search, 300);
+  const [pagination, setPagination] = React.useState<PaginationState>({ pageIndex: 0, pageSize: 20 });
 
   const { data: admins, isLoading } = useQuery({
     queryKey: ['platform-admins'],
     queryFn: () => apiFetch<PlatformAdmin[]>('/api/admins'),
   });
+
+  const filtered = React.useMemo(() => {
+    if (!debouncedSearch) return admins ?? [];
+    const q = debouncedSearch.toLowerCase();
+    return (admins ?? []).filter((a) => a.fullName.toLowerCase().includes(q) || a.email.toLowerCase().includes(q));
+  }, [admins, debouncedSearch]);
+
+  React.useEffect(() => {
+    setPagination((p) => ({ ...p, pageIndex: 0 }));
+  }, [debouncedSearch]);
 
   const deactivate = useMutation({
     mutationFn: (id: string) => apiFetch(`/api/admins/${id}/deactivate`, { method: 'POST' }),
@@ -91,7 +106,20 @@ function PlatformAdminsPageContent() {
         actions={<CreateAdminDialog open={dialogOpen} onOpenChange={setDialogOpen} />}
       />
 
-      <DataTable columns={columns} data={admins ?? []} getRowId={(a) => a.id} isLoading={isLoading} emptyState={<p className="text-muted-foreground">No platform admins yet.</p>} />
+      <div className="relative w-full max-w-xs">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+        <Input placeholder="Search admins…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
+      </div>
+
+      <DataTable
+        columns={columns}
+        data={filtered}
+        getRowId={(a) => a.id}
+        isLoading={isLoading}
+        pagination={pagination}
+        onPaginationChange={setPagination}
+        emptyState={<p className="text-muted-foreground">No platform admins match your search.</p>}
+      />
     </div>
   );
 }

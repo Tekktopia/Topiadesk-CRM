@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Badge,
   Button,
+  DataTable,
+  DataTableColumnHeader,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -14,13 +16,8 @@ import {
   DialogTrigger,
   Input,
   Label,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   toast,
+  type ColumnDef,
 } from '@topiadesk/ui';
 import { apiFetch, ApiError } from '../_lib/api';
 import type { Plan } from '../_lib/types';
@@ -51,6 +48,28 @@ export default function PlansPage() {
     },
     onError: (err) => toast.error('Could not create plan', { description: err instanceof ApiError ? err.message : undefined }),
   });
+
+  const columns = React.useMemo<ColumnDef<Plan>[]>(
+    () => [
+      {
+        accessorKey: 'name',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
+        cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+      },
+      { accessorKey: 'seatLimit', header: ({ column }) => <DataTableColumnHeader column={column} label="Seats" /> },
+      {
+        accessorKey: 'description',
+        header: 'Description',
+        cell: ({ row }) => <span className="text-muted-foreground">{row.original.description ?? '—'}</span>,
+      },
+      {
+        accessorKey: 'isActive',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Status" />,
+        cell: ({ row }) => <Badge variant={row.original.isActive ? 'success' : 'secondary'}>{row.original.isActive ? 'Active' : 'Inactive'}</Badge>,
+      },
+    ],
+    [],
+  );
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
@@ -97,38 +116,7 @@ export default function PlansPage() {
         }
       />
 
-      <div className="rounded-lg border border-border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Seats</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground">
-                  Loading…
-                </TableCell>
-              </TableRow>
-            ) : (
-              plans?.map((plan) => (
-                <TableRow key={plan.id}>
-                  <TableCell className="font-medium">{plan.name}</TableCell>
-                  <TableCell>{plan.seatLimit}</TableCell>
-                  <TableCell className="text-muted-foreground">{plan.description ?? '—'}</TableCell>
-                  <TableCell>
-                    <Badge variant={plan.isActive ? 'success' : 'secondary'}>{plan.isActive ? 'Active' : 'Inactive'}</Badge>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <DataTable columns={columns} data={plans ?? []} getRowId={(p) => p.id} isLoading={isLoading} emptyState={<p className="text-muted-foreground">No plans yet.</p>} />
     </div>
   );
 }
