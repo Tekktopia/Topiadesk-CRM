@@ -334,6 +334,8 @@ model Department {
   id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name               String
   code               String       @unique
+  email              String?
+  phone              String?
   parentDepartmentId String?      @map("parent_department_id") @db.Uuid
   parentDepartment   Department?  @relation("DepartmentHierarchy", fields: [parentDepartmentId], references: [id])
   subDepartments     Department[] @relation("DepartmentHierarchy")

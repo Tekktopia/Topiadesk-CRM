@@ -114,13 +114,21 @@ export type PermissionDto = Json200<'/identity/permissions', 'get'>[number];
 
 // -- Departments / branches ------------------------------------------------
 type RawDepartmentDto = Json200<'/identity/departments', 'get'>[number];
-export type DepartmentDto = Omit<RawDepartmentDto, 'parentDepartmentId'> & { parentDepartmentId: NullableString };
+export type DepartmentDto = Omit<RawDepartmentDto, 'email' | 'phone' | 'parentDepartmentId'> & {
+  email: NullableString;
+  phone: NullableString;
+  parentDepartmentId: NullableString;
+};
 type RawCreateDepartmentBody = JsonBody<'/identity/departments', 'post'>;
-export type CreateDepartmentBody = Omit<RawCreateDepartmentBody, 'parentDepartmentId'> & {
+export type CreateDepartmentBody = Omit<RawCreateDepartmentBody, 'email' | 'phone' | 'parentDepartmentId'> & {
+  email?: NullableString;
+  phone?: NullableString;
   parentDepartmentId?: NullableString;
 };
 type RawUpdateDepartmentBody = JsonBody<'/identity/departments/{id}', 'patch'>;
-export type UpdateDepartmentBody = Omit<RawUpdateDepartmentBody, 'parentDepartmentId'> & {
+export type UpdateDepartmentBody = Omit<RawUpdateDepartmentBody, 'email' | 'phone' | 'parentDepartmentId'> & {
+  email?: NullableString;
+  phone?: NullableString;
   parentDepartmentId?: NullableString;
 };
 

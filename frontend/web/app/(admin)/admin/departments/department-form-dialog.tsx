@@ -40,16 +40,22 @@ export function DepartmentFormDialog({
 
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [parentDepartmentId, setParentDepartmentId] = useState<string>(NONE);
 
   useEffect(() => {
     if (isEdit) {
       setName(target.name);
       setCode(target.code);
+      setEmail(target.email ?? '');
+      setPhone(target.phone ?? '');
       setParentDepartmentId(target.parentDepartmentId ?? NONE);
     } else {
       setName('');
       setCode('');
+      setEmail('');
+      setPhone('');
       setParentDepartmentId(NONE);
     }
   }, [target, isEdit]);
@@ -86,10 +92,12 @@ export function DepartmentFormDialog({
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const parent = parentDepartmentId === NONE ? null : parentDepartmentId;
+    const emailValue = email.trim() === '' ? null : email.trim();
+    const phoneValue = phone.trim() === '' ? null : phone.trim();
     if (isEdit) {
-      updateMutation.mutate({ name, code, parentDepartmentId: parent });
+      updateMutation.mutate({ name, code, email: emailValue, phone: phoneValue, parentDepartmentId: parent });
     } else {
-      createMutation.mutate({ name, code, parentDepartmentId: parent });
+      createMutation.mutate({ name, code, email: emailValue, phone: phoneValue, parentDepartmentId: parent });
     }
   }
 
@@ -111,6 +119,14 @@ export function DepartmentFormDialog({
           <div className="space-y-1.5">
             <Label htmlFor="dept-code">Code</Label>
             <Input id="dept-code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} required minLength={2} maxLength={30} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="dept-email">Email</Label>
+            <Input id="dept-email" type="email" placeholder="sales@company.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="dept-phone">Phone</Label>
+            <Input id="dept-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} />
           </div>
           <div className="space-y-1.5">
             <Label>Parent department</Label>
