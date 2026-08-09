@@ -27,7 +27,7 @@ export default function ProfilePage() {
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <PageHeader title="My profile" description="Your TopiaDesk Global Admin account." />
 
-      <Card>
+      <Card className="border-white/5 bg-card/60 backdrop-blur-xl">
         <CardHeader>
           <CardTitle className="text-sm font-medium text-muted-foreground">Account</CardTitle>
         </CardHeader>

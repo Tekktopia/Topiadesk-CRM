@@ -7,10 +7,12 @@ import { apiFetch, ApiError } from '../../_lib/api';
 import type { TenantUser } from '../../_lib/types';
 import { CreateTenantAdminDialog } from './_create-tenant-admin-dialog';
 import { ResetPasswordDialog } from './_reset-password-dialog';
+import { ResetPasswordInputDialog } from './_reset-password-input-dialog';
 
-export function AdminsTab({ tenantId }: { tenantId: string }) {
+export function AdminsTab({ tenantId, tenantUrl }: { tenantId: string; tenantUrl: string | null }) {
   const queryClient = useQueryClient();
   const [resetTarget, setResetTarget] = React.useState<TenantUser | null>(null);
+  const [resetInputOpen, setResetInputOpen] = React.useState(false);
   const [temporaryPassword, setTemporaryPassword] = React.useState<string | null>(null);
 
   const { data: users, isLoading } = useQuery({
@@ -19,8 +21,15 @@ export function AdminsTab({ tenantId }: { tenantId: string }) {
   });
 
   const resetPassword = useMutation({
-    mutationFn: (userId: string) => apiFetch<{ temporaryPassword: string }>(`/api/tenants/${tenantId}/users/${userId}/reset-password`, { method: 'POST' }),
-    onSuccess: (res) => setTemporaryPassword(res.temporaryPassword),
+    mutationFn: ({ userId, password }: { userId: string; password?: string }) =>
+      apiFetch<{ temporaryPassword: string }>(`/api/tenants/${tenantId}/users/${userId}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      }),
+    onSuccess: (res) => {
+      setResetInputOpen(false);
+      setTemporaryPassword(res.temporaryPassword);
+    },
     onError: (err) => toast.error('Could not reset password', { description: err instanceof ApiError ? err.message : undefined }),
   });
 
@@ -78,9 +87,8 @@ export function AdminsTab({ tenantId }: { tenantId: string }) {
                 size="sm"
                 onClick={() => {
                   setResetTarget(user);
-                  resetPassword.mutate(user.id);
+                  setResetInputOpen(true);
                 }}
-                disabled={resetPassword.isPending}
               >
                 Reset password
               </Button>
@@ -98,15 +106,28 @@ export function AdminsTab({ tenantId }: { tenantId: string }) {
         },
       },
     ],
-    [resetPassword, deactivate, reactivate],
+    [deactivate, reactivate],
   );
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-end">
-        <CreateTenantAdminDialog tenantId={tenantId} />
+        <CreateTenantAdminDialog tenantId={tenantId} tenantUrl={tenantUrl} />
       </div>
       <DataTable columns={columns} data={users ?? []} getRowId={(u) => u.id} isLoading={isLoading} emptyState={<p className="text-muted-foreground">No users yet.</p>} />
+      <ResetPasswordInputDialog
+        open={resetInputOpen}
+        onOpenChange={(open) => {
+          setResetInputOpen(open);
+          if (!open) setResetTarget(null);
+        }}
+        userName={resetTarget?.fullName ?? ''}
+        isPending={resetPassword.isPending}
+        onSubmit={(password) => {
+          if (!resetTarget) return;
+          resetPassword.mutate({ userId: resetTarget.id, password });
+        }}
+      />
       <ResetPasswordDialog
         open={resetTarget !== null && temporaryPassword !== null}
         onOpenChange={(open) => {

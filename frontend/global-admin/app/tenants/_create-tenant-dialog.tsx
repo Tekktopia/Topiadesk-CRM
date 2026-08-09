@@ -31,6 +31,17 @@ function slugify(value: string): string {
     .replace(/^_+|_+$/g, '');
 }
 
+/** Global Admin is always served at platform.<root domain> — stripping
+ * that prefix client-side gives the same root domain every tenant
+ * subdomain hangs off of, with no new env var needed (mirrors
+ * tenants.controller.ts's tenantUrl(), which does the same strip
+ * server-side from APP_URL's `app.` prefix). Guarded for the server-side
+ * render pass, where `window` doesn't exist yet. */
+function rootDomain(): string {
+  if (typeof window === 'undefined') return '';
+  return window.location.hostname.replace(/^platform\./, '');
+}
+
 export function CreateTenantDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const queryClient = useQueryClient();
   const [name, setName] = React.useState('');
@@ -40,6 +51,8 @@ export function CreateTenantDialog({ open, onOpenChange }: { open: boolean; onOp
   const [planId, setPlanId] = React.useState<string>('');
 
   const { data: plans } = useQuery({ queryKey: ['plans'], queryFn: () => apiFetch<Plan[]>('/api/plans') });
+  const [domain, setDomain] = React.useState('');
+  React.useEffect(() => setDomain(rootDomain()), []);
 
   const createTenant = useMutation({
     mutationFn: () => apiFetch<Tenant>('/api/tenants', { method: 'POST', body: JSON.stringify({ name, slug, primaryContactEmail: email, planId }) }),
@@ -101,7 +114,18 @@ export function CreateTenantDialog({ open, onOpenChange }: { open: boolean; onOp
               placeholder="acme_insurance"
               required
             />
-            <p className="text-xs text-muted-foreground">Becomes schema/realm name tenant_{slug || '…'}. Cannot be changed later.</p>
+            <p className="text-xs text-muted-foreground">
+              Becomes schema/realm name tenant_{slug || '…'}
+              {slug && domain ? (
+                <>
+                  , reachable at{' '}
+                  <span className="font-medium text-foreground">
+                    {slug.replace(/_/g, '-')}.{domain}
+                  </span>
+                </>
+              ) : null}
+              . Cannot be changed later.
+            </p>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="tenant-email">Primary contact email</Label>

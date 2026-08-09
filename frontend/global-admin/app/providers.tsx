@@ -26,7 +26,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    // Defaults to dark — the glass/glow "mission control" treatment needs
+    // a dark ground to read; the toggle in app-header.tsx still works,
+    // this only changes what a first-time visitor sees before choosing.
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider delayDuration={200}>
           {children}

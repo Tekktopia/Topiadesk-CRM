@@ -29,6 +29,8 @@ export interface Tenant {
   slug: string;
   schemaName: string;
   keycloakRealm: string;
+  subdomain: string | null;
+  tenantUrl: string | null;
   status: TenantStatus;
   primaryContactEmail: string;
   createdAt: string;
@@ -49,12 +51,14 @@ export interface TenantDetail extends Tenant {
 }
 
 export type PlatformAdminStatus = 'ACTIVE' | 'INACTIVE';
+export type PlatformAdminRole = 'SUPPORT' | 'SUPER_ADMIN';
 
 export interface PlatformAdmin {
   id: string;
   email: string;
   fullName: string;
   status: PlatformAdminStatus;
+  role: PlatformAdminRole;
   createdAt: string;
   updatedAt: string;
 }
@@ -70,6 +74,13 @@ export interface TenantUser {
   createdAt: string;
 }
 
+export type TenantHealth = 'HEALTHY' | 'AT_RISK' | 'CRITICAL';
+
+export interface TenantHealthResult {
+  health: TenantHealth;
+  healthReasons: string[];
+}
+
 export interface TenantAdminSummary {
   tenantId: string;
   tenantName: string;
@@ -77,6 +88,8 @@ export interface TenantAdminSummary {
   totalUsers: number;
   adminCount: number;
   seatLimit: number | null;
+  health: TenantHealth;
+  healthReasons: string[];
 }
 
 export interface TenantUsage {
@@ -135,5 +148,22 @@ export interface PlatformAuditLogEntry {
   entityType: string;
   entityId: string;
   detail: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+/** Mirrors backend/api/src/modules/platform/dto/platform-notification.dto.ts.
+ * Broadcast to every platform admin with a SHARED read state — see
+ * PlatformNotification's schema doc comment (packages/db-platform/prisma/
+ * schema.prisma) for why this isn't per-recipient. */
+export type PlatformNotificationType = 'TENANT_PROVISIONED' | 'TENANT_PROVISIONING_FAILED' | 'TENANT_SUSPENDED' | 'TENANT_REACTIVATED' | 'SUPPORT_TICKET_CREATED';
+
+export interface PlatformNotification {
+  id: string;
+  type: PlatformNotificationType;
+  title: string;
+  body: string | null;
+  entityType: string | null;
+  entityId: string | null;
+  readAt: string | null;
   createdAt: string;
 }

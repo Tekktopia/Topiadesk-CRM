@@ -24,9 +24,14 @@ import {
 import { apiFetch, ApiError } from '../_lib/api';
 import type { Plan } from '../_lib/types';
 import { PageHeader } from '../_components/page-header';
+import { useIsSuperAdmin } from '@/lib/auth/use-is-super-admin';
 
 export default function PlansPage() {
   const queryClient = useQueryClient();
+  // Button-gating only — the real enforcement is PlatformRoleGuard server-
+  // side; this just keeps the UI from offering an action a SUPPORT-tier
+  // admin would get a 403 attempting.
+  const isSuperAdmin = useIsSuperAdmin();
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [name, setName] = React.useState('');
   const [seatLimit, setSeatLimit] = React.useState('');
@@ -84,61 +89,67 @@ export default function PlansPage() {
         header: ({ column }) => <DataTableColumnHeader column={column} label="Status" />,
         cell: ({ row }) => <Badge variant={row.original.isActive ? 'success' : 'secondary'}>{row.original.isActive ? 'Active' : 'Inactive'}</Badge>,
       },
-      {
-        id: 'actions',
-        header: '',
-        cell: ({ row }) => (
-          <Button variant="ghost" size="icon" aria-label={`Edit ${row.original.name}`} onClick={() => setEditingPlan(row.original)}>
-            <Pencil className="h-4 w-4" aria-hidden />
-          </Button>
-        ),
-      },
+      ...(isSuperAdmin
+        ? [
+            {
+              id: 'actions',
+              header: '',
+              cell: ({ row }: { row: { original: Plan } }) => (
+                <Button variant="ghost" size="icon" aria-label={`Edit ${row.original.name}`} onClick={() => setEditingPlan(row.original)}>
+                  <Pencil className="h-4 w-4" aria-hidden />
+                </Button>
+              ),
+            } satisfies ColumnDef<Plan>,
+          ]
+        : []),
     ],
-    [],
+    [isSuperAdmin],
   );
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <PageHeader
         title="Plans"
         description="Seat limits and pricing tiers tenants subscribe to."
         actions={
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>New plan</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create a plan</DialogTitle>
-                <DialogDescription>Internal plan/status tracking only — no payment processing in this pass.</DialogDescription>
-              </DialogHeader>
-              <form
-                className="flex flex-col gap-4"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  createPlan.mutate();
-                }}
-              >
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="plan-name">Name</Label>
-                  <Input id="plan-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Professional" required />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="plan-seats">Seat limit</Label>
-                  <Input id="plan-seats" type="number" min={1} value={seatLimit} onChange={(e) => setSeatLimit(e.target.value)} required />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="plan-description">Description</Label>
-                  <Input id="plan-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Growing brokerages with multiple branches." />
-                </div>
-                <DialogFooter>
-                  <Button type="submit" disabled={createPlan.isPending || !name || !seatLimit}>
-                    {createPlan.isPending ? 'Creating…' : 'Create plan'}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          isSuperAdmin ? (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>New plan</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create a plan</DialogTitle>
+                  <DialogDescription>Internal plan/status tracking only — no payment processing in this pass.</DialogDescription>
+                </DialogHeader>
+                <form
+                  className="flex flex-col gap-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    createPlan.mutate();
+                  }}
+                >
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="plan-name">Name</Label>
+                    <Input id="plan-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Professional" required />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="plan-seats">Seat limit</Label>
+                    <Input id="plan-seats" type="number" min={1} value={seatLimit} onChange={(e) => setSeatLimit(e.target.value)} required />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="plan-description">Description</Label>
+                    <Input id="plan-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Growing brokerages with multiple branches." />
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" disabled={createPlan.isPending || !name || !seatLimit}>
+                      {createPlan.isPending ? 'Creating…' : 'Create plan'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          ) : undefined
         }
       />
 

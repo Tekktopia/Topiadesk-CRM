@@ -50,7 +50,7 @@ export default function SupportTicketDetailPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <PageHeader
         title={
           <>
@@ -65,7 +65,7 @@ export default function SupportTicketDetailPage() {
         }
       />
 
-      <Card>
+      <Card className="border-white/5 bg-card/60 backdrop-blur-xl">
         <CardHeader>
           <CardTitle className="text-sm font-medium text-muted-foreground">Details</CardTitle>
         </CardHeader>
@@ -135,7 +135,7 @@ export default function SupportTicketDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-white/5 bg-card/60 backdrop-blur-xl">
         <CardHeader>
           <CardTitle className="text-sm font-medium text-muted-foreground">Conversation</CardTitle>
         </CardHeader>
@@ -171,7 +171,7 @@ export default function SupportTicketDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-white/5 bg-card/60 backdrop-blur-xl">
         <CardHeader>
           <CardTitle className="text-sm font-medium text-muted-foreground">Activity</CardTitle>
         </CardHeader>

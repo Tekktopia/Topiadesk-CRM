@@ -10,6 +10,7 @@ export interface PlatformAdminUser {
   id: string;
   email: string;
   fullName: string;
+  role: 'SUPPORT' | 'SUPER_ADMIN';
 }
 
 /** See frontend/web/lib/auth/types.ts's SessionPayload for the full

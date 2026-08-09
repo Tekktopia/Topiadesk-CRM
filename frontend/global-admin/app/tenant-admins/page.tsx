@@ -60,7 +60,7 @@ export default function TenantAdminsPage() {
   );
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <PageHeader title="Tenant Admins" description="Admin and total user counts for every active tenant. Open a tenant to manage its admins." />
 
       <div className="relative w-full max-w-xs">

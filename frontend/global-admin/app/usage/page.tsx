@@ -8,6 +8,7 @@ import { cn, DataTable, DataTableColumnHeader, Input, type ColumnDef, type Pagin
 import { apiFetch } from '../_lib/api';
 import type { TenantAdminSummary } from '../_lib/types';
 import { PageHeader } from '../_components/page-header';
+import { HealthBadge } from '../_components/health-badge';
 import { useDebounced } from '@/lib/use-debounced';
 
 /** Reuses the same admin-summary data as the "Tenant Admins" page (one
@@ -45,6 +46,11 @@ export default function UsagePage() {
         ),
       },
       {
+        id: 'health',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Health" />,
+        cell: ({ row }) => <HealthBadge health={row.original.health} reasons={row.original.healthReasons} />,
+      },
+      {
         id: 'seatUsage',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Seat usage" />,
         cell: ({ row }) => {
@@ -68,8 +74,8 @@ export default function UsagePage() {
   );
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6">
-      <PageHeader title="Usage & Monitoring" description="Seat usage against each tenant's plan. Open a tenant for the full breakdown." />
+    <div className="flex w-full flex-col gap-6">
+      <PageHeader title="Usage & Monitoring" description="Health, seat usage, and support load for every active tenant. Open a tenant for the full breakdown." />
 
       <div className="relative w-full max-w-xs">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />

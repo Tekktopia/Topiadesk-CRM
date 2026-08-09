@@ -11,7 +11,7 @@ import { Card, CardContent } from '@topiadesk/ui';
 
 export function EmptyState({ icon, title, description }: { icon?: ReactNode; title: string; description?: string }) {
   return (
-    <Card>
+    <Card className="border-white/5 bg-card/60 backdrop-blur-xl">
       <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
         <span className="text-muted-foreground">{icon ?? <Inbox className="h-8 w-8" aria-hidden />}</span>
         <p className="text-sm font-medium text-foreground">{title}</p>
@@ -24,7 +24,7 @@ export function EmptyState({ icon, title, description }: { icon?: ReactNode; tit
 export function ErrorState({ error }: { error: unknown }) {
   const message = error instanceof Error ? error.message : 'Unexpected error';
   return (
-    <Card>
+    <Card className="border-white/5 bg-card/60 backdrop-blur-xl">
       <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
         <AlertTriangle className="h-8 w-8 text-destructive" aria-hidden />
         <p className="text-sm font-medium text-foreground">Couldn&apos;t load this page</p>

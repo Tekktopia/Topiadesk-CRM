@@ -1,1 +1,15 @@
 @import '@topiadesk/ui/styles/globals.css';
+
+/*
+ * App-local token overrides — this file compiles into its own bundle for
+ * this app only, so redefining a CSS custom property here never reaches
+ * frontend/web (which imports the same shared globals.css but has no
+ * override file of its own). Only --radius changes: Card and DataTable's
+ * outer wrapper hardcode rounded-none regardless of this variable (see
+ * this session's plan), so bumping it only softens the var-driven
+ * controls (buttons, inputs, menus, dialogs) — a deliberate "soft
+ * controls on hard panels" instrument-panel contrast, not an oversight.
+ */
+:root {
+  --radius: 0.625rem;
+}

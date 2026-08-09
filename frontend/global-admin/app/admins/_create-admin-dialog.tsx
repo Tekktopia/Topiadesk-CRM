@@ -32,7 +32,9 @@ export function CreateAdminDialog({ open, onOpenChange }: { open: boolean; onOpe
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add a platform admin</DialogTitle>
-          <DialogDescription>Creates a new operator account for the "topiadesk-platform" realm with full Global Admin access.</DialogDescription>
+          <DialogDescription>
+            Creates a new operator account for the &quot;topiadesk-platform&quot; realm, starting at the Support role. Promote to Super Admin from the admins list afterward if needed.
+          </DialogDescription>
         </DialogHeader>
         <form
           className="flex flex-col gap-4"

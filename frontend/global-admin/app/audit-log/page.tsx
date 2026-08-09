@@ -78,7 +78,7 @@ export default function AuditLogPage() {
   );
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <PageHeader title="Audit Log" description="Every mutating action taken from Global Admin, most recent first. Read-only." />
 
       <div className="relative w-full max-w-xs">

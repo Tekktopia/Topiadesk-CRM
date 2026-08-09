@@ -30,6 +30,7 @@ import { TenantStatusBadge } from './_status-badge';
 import { PageHeader } from '../_components/page-header';
 import { ConfirmDialog } from '../_components/confirm-dialog';
 import { useDebounced } from '@/lib/use-debounced';
+import { useIsSuperAdmin } from '@/lib/auth/use-is-super-admin';
 
 const STATUS_FILTERS: Array<TenantStatus | 'ALL'> = ['ALL', 'PROVISIONING', 'ACTIVE', 'SUSPENDED', 'FAILED'];
 
@@ -71,6 +72,11 @@ function TenantsPageContent() {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   }, [debouncedSearch, statusFilter]);
 
+  // Button-gating only — the real enforcement is PlatformRoleGuard server-
+  // side; this just keeps the UI from offering an action a SUPPORT-tier
+  // admin would get a 403 attempting.
+  const isSuperAdmin = useIsSuperAdmin();
+
   const setStatus = useMutation({
     mutationFn: ({ id, action }: { id: string; action: 'suspend' | 'reactivate' }) => apiFetch(`/api/tenants/${id}/${action}`, { method: 'POST' }),
     onSuccess: (_data, variables) => {
@@ -108,42 +114,46 @@ function TenantsPageContent() {
         header: ({ column }) => <DataTableColumnHeader column={column} label="Created" />,
         cell: ({ row }) => <span className="text-muted-foreground">{new Date(row.original.createdAt).toLocaleDateString()}</span>,
       },
-      {
-        id: 'actions',
-        header: '',
-        cell: ({ row }) => {
-          const tenant = row.original;
-          if (tenant.status !== 'ACTIVE' && tenant.status !== 'SUSPENDED') return null;
-          return (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Tenant actions" onClick={(e) => e.stopPropagation()}>
-                  <MoreHorizontal className="h-4 w-4" aria-hidden />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {tenant.status === 'ACTIVE' ? (
-                  <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setPendingAction({ tenant, action: 'suspend' })}>
-                    Suspend
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem onSelect={() => setPendingAction({ tenant, action: 'reactivate' })}>Reactivate</DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          );
-        },
-      },
+      ...(isSuperAdmin
+        ? [
+            {
+              id: 'actions',
+              header: '',
+              cell: ({ row }: { row: { original: Tenant } }) => {
+                const tenant = row.original;
+                if (tenant.status !== 'ACTIVE' && tenant.status !== 'SUSPENDED') return null;
+                return (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" aria-label="Tenant actions" onClick={(e) => e.stopPropagation()}>
+                        <MoreHorizontal className="h-4 w-4" aria-hidden />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {tenant.status === 'ACTIVE' ? (
+                        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setPendingAction({ tenant, action: 'suspend' })}>
+                          Suspend
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem onSelect={() => setPendingAction({ tenant, action: 'reactivate' })}>Reactivate</DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              },
+            } satisfies ColumnDef<Tenant>,
+          ]
+        : []),
     ],
-    [],
+    [isSuperAdmin],
   );
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <PageHeader
         title="Tenants"
         description="Every customer organization on the TopiaDesk platform."
-        actions={<CreateTenantDialog open={dialogOpen} onOpenChange={setDialogOpen} />}
+        actions={isSuperAdmin ? <CreateTenantDialog open={dialogOpen} onOpenChange={setDialogOpen} /> : undefined}
       />
 
       <div className="flex flex-wrap items-center gap-2">

@@ -4,12 +4,27 @@ import * as React from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
-import { Badge, Button, DataTable, DataTableColumnHeader, Input, type ColumnDef, type PaginationState, toast } from '@topiadesk/ui';
+import {
+  Badge,
+  Button,
+  DataTable,
+  DataTableColumnHeader,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  type ColumnDef,
+  type PaginationState,
+  toast,
+} from '@topiadesk/ui';
 import { apiFetch, ApiError } from '../_lib/api';
-import type { PlatformAdmin } from '../_lib/types';
+import type { PlatformAdmin, PlatformAdminRole } from '../_lib/types';
 import { CreateAdminDialog } from './_create-admin-dialog';
 import { PageHeader } from '../_components/page-header';
 import { useDebounced } from '@/lib/use-debounced';
+import { useIsSuperAdmin } from '@/lib/auth/use-is-super-admin';
 
 export default function PlatformAdminsPage() {
   return (
@@ -60,6 +75,25 @@ function PlatformAdminsPageContent() {
     onError: (err) => toast.error('Could not reactivate', { description: err instanceof ApiError ? err.message : undefined }),
   });
 
+  const changeRole = useMutation({
+    mutationFn: ({ id, role }: { id: string; role: PlatformAdminRole }) =>
+      apiFetch(`/api/admins/${id}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+    onSuccess: () => {
+      toast.success('Role updated');
+      queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
+    },
+    // The lockout guard (can't leave zero active SUPER_ADMIN accounts)
+    // surfaces here as a 400 with a real message — shown as-is rather
+    // than a generic "could not update" so it's clear WHY it was blocked.
+    onError: (err) => toast.error('Could not update role', { description: err instanceof ApiError ? err.message : undefined }),
+  });
+
+  // Button-gating only — the real enforcement is PlatformRoleGuard server-
+  // side (@RequirePlatformRole('SUPER_ADMIN') on create/deactivate/
+  // reactivate/role). This just keeps the UI from offering an action a
+  // SUPPORT-tier admin would get a 403 attempting.
+  const isSuperAdmin = useIsSuperAdmin();
+
   const columns = React.useMemo<ColumnDef<PlatformAdmin>[]>(
     () => [
       {
@@ -68,6 +102,27 @@ function PlatformAdminsPageContent() {
         cell: ({ row }) => <span className="font-medium">{row.original.fullName}</span>,
       },
       { accessorKey: 'email', header: ({ column }) => <DataTableColumnHeader column={column} label="Email" /> },
+      {
+        accessorKey: 'role',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Role" />,
+        cell: ({ row }) => {
+          const admin = row.original;
+          if (!isSuperAdmin) {
+            return <Badge variant={admin.role === 'SUPER_ADMIN' ? 'default' : 'secondary'}>{admin.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Support'}</Badge>;
+          }
+          return (
+            <Select value={admin.role} onValueChange={(role) => changeRole.mutate({ id: admin.id, role: role as PlatformAdminRole })}>
+              <SelectTrigger className="h-8 w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="SUPPORT">Support</SelectItem>
+                <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+              </SelectContent>
+            </Select>
+          );
+        },
+      },
       {
         accessorKey: 'status',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Status" />,
@@ -78,32 +133,36 @@ function PlatformAdminsPageContent() {
         header: ({ column }) => <DataTableColumnHeader column={column} label="Created" />,
         cell: ({ row }) => <span className="text-muted-foreground">{new Date(row.original.createdAt).toLocaleDateString()}</span>,
       },
-      {
-        id: 'actions',
-        header: '',
-        cell: ({ row }) => {
-          const admin = row.original;
-          return admin.status === 'ACTIVE' ? (
-            <Button variant="ghost" size="sm" onClick={() => deactivate.mutate(admin.id)} disabled={deactivate.isPending}>
-              Deactivate
-            </Button>
-          ) : (
-            <Button variant="ghost" size="sm" onClick={() => reactivate.mutate(admin.id)} disabled={reactivate.isPending}>
-              Reactivate
-            </Button>
-          );
-        },
-      },
+      ...(isSuperAdmin
+        ? [
+            {
+              id: 'actions',
+              header: '',
+              cell: ({ row }: { row: { original: PlatformAdmin } }) => {
+                const admin = row.original;
+                return admin.status === 'ACTIVE' ? (
+                  <Button variant="ghost" size="sm" onClick={() => deactivate.mutate(admin.id)} disabled={deactivate.isPending}>
+                    Deactivate
+                  </Button>
+                ) : (
+                  <Button variant="ghost" size="sm" onClick={() => reactivate.mutate(admin.id)} disabled={reactivate.isPending}>
+                    Reactivate
+                  </Button>
+                );
+              },
+            } satisfies ColumnDef<PlatformAdmin>,
+          ]
+        : []),
     ],
-    [deactivate, reactivate],
+    [deactivate, reactivate, changeRole, isSuperAdmin],
   );
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <PageHeader
         title="Platform Admins"
         description="Operator accounts with access to this Global Admin console."
-        actions={<CreateAdminDialog open={dialogOpen} onOpenChange={setDialogOpen} />}
+        actions={isSuperAdmin ? <CreateAdminDialog open={dialogOpen} onOpenChange={setDialogOpen} /> : undefined}
       />
 
       <div className="relative w-full max-w-xs">

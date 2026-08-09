@@ -25,7 +25,7 @@ import {
   toast,
 } from '@topiadesk/ui';
 import { apiFetch, ApiError } from '../../_lib/api';
-import type { Plan, TenantDetail } from '../../_lib/types';
+import type { Plan, TenantDetail, TenantHealthResult } from '../../_lib/types';
 import { TenantStatusBadge } from '../_status-badge';
 import { AdminsTab } from './_admins-tab';
 import { UsageTab } from './_usage-tab';
@@ -33,6 +33,7 @@ import { GenerateLicenseDialog } from './_generate-license-dialog';
 import { PageHeader } from '../../_components/page-header';
 import { ConfirmDialog } from '../../_components/confirm-dialog';
 import { AuditActivityList } from '../../_components/audit-activity-list';
+import { HealthBadge } from '../../_components/health-badge';
 
 /** Days until `currentPeriodEnd`, or null if there's no expiry set yet
  * (a subscription that's never had a license "generated" against it —
@@ -81,6 +82,14 @@ function TenantDetailPageContent() {
 
   const { data: plans } = useQuery({ queryKey: ['plans'], queryFn: () => apiFetch<Plan[]>('/api/plans') });
 
+  // Only meaningful for an ACTIVE tenant — PROVISIONING/SUSPENDED/FAILED
+  // already have their own clear signal via TenantStatusBadge above.
+  const { data: health } = useQuery({
+    queryKey: ['tenant-health', params.id],
+    queryFn: () => apiFetch<TenantHealthResult>(`/api/tenants/${params.id}/health`),
+    enabled: tenant?.status === 'ACTIVE',
+  });
+
   const [confirmSuspendOpen, setConfirmSuspendOpen] = React.useState(false);
 
   const suspend = useMutation({
@@ -116,7 +125,7 @@ function TenantDetailPageContent() {
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <PageHeader
         title={
           <span className="flex items-center gap-3">
@@ -124,7 +133,16 @@ function TenantDetailPageContent() {
             <TenantStatusBadge status={tenant.status} />
           </span>
         }
-        description={<span className="font-mono text-xs">{tenant.schemaName}</span>}
+        description={
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="font-mono text-xs">{tenant.schemaName}</span>
+            {tenant.tenantUrl ? (
+              <a href={tenant.tenantUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
+                {tenant.tenantUrl.replace(/^https:\/\//, '')}
+              </a>
+            ) : null}
+          </span>
+        }
         actions={
           tenant.status === 'ACTIVE' ? (
             <Button variant="destructive" onClick={() => setConfirmSuspendOpen(true)} disabled={suspend.isPending}>
@@ -159,11 +177,28 @@ function TenantDetailPageContent() {
 
         <TabsContent value="overview" className="flex flex-col gap-6">
           <div className="grid grid-cols-2 gap-4">
-            <Card>
+            <Card className="border-white/5 bg-card/60 backdrop-blur-xl">
               <CardHeader>
                 <CardTitle className="text-sm font-medium text-muted-foreground">Profile</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-2 text-sm">
+                {health ? (
+                  <Row
+                    label="Health"
+                    value={
+                      <div className="flex flex-col items-end gap-1">
+                        <HealthBadge health={health.health} reasons={health.healthReasons} />
+                        {health.healthReasons.length ? (
+                          <ul className="text-right text-xs text-muted-foreground">
+                            {health.healthReasons.map((reason) => (
+                              <li key={reason}>{reason}</li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                    }
+                  />
+                ) : null}
                 <Row label="Primary contact" value={tenant.primaryContactEmail} />
                 <Row label="Slug" value={tenant.slug} />
                 <Row label="Keycloak realm" value={tenant.keycloakRealm} />
@@ -179,7 +214,7 @@ function TenantDetailPageContent() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-white/5 bg-card/60 backdrop-blur-xl">
               <CardHeader>
                 <CardTitle className="text-sm font-medium text-muted-foreground">Subscription</CardTitle>
               </CardHeader>
@@ -230,7 +265,7 @@ function TenantDetailPageContent() {
             </Card>
           </div>
 
-          <Card>
+          <Card className="border-white/5 bg-card/60 backdrop-blur-xl">
             <CardHeader>
               <CardTitle className="text-sm font-medium text-muted-foreground">Provisioning timeline</CardTitle>
             </CardHeader>
@@ -253,7 +288,7 @@ function TenantDetailPageContent() {
         </TabsContent>
 
         <TabsContent value="admins">
-          <AdminsTab tenantId={tenant.id} />
+          <AdminsTab tenantId={tenant.id} tenantUrl={tenant.tenantUrl} />
         </TabsContent>
 
         <TabsContent value="usage">

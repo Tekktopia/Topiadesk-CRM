@@ -112,7 +112,7 @@ function SupportTicketsPageContent() {
   );
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <PageHeader title="Support Tickets" description="Requests raised by tenant admins across every customer organization." />
 
       <div className="flex flex-wrap items-center gap-2">
