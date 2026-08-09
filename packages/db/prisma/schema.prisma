@@ -409,6 +409,14 @@ model User {
   department        Department?    @relation(fields: [departmentId], references: [id])
   branchId          String?        @map("branch_id") @db.Uuid
   branch            Branch?        @relation(fields: [branchId], references: [id])
+  /// Free text (e.g. "Team Lead", "Supervisor", "Senior Agent") — display/
+  /// labeling only, deliberately not a closed enum. The functional
+  /// reporting-line piece workflows actually route approvals through is
+  /// managerId below, not this field.
+  positionTitle     String?        @map("position_title")
+  managerId         String?        @map("manager_id") @db.Uuid
+  manager           User?          @relation("UserManager", fields: [managerId], references: [id])
+  directReports     User[]         @relation("UserManager")
   status            UserStatus     @default(ACTIVE)
   presenceStatus    PresenceStatus @default(OFFLINE) @map("presence_status")
   presenceUpdatedAt DateTime?      @map("presence_updated_at") @db.Timestamptz(6)
@@ -1393,6 +1401,7 @@ model AutomationRule {
   updatedAt   DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   runStates AutomationRunState[]
+  defaultForCategories CaseCategory[]
 
   @@map("automation_rules")
 }
@@ -1762,6 +1771,15 @@ model CaseCategory {
   parent   CaseCategory?  @relation("CaseCategoryHierarchy", fields: [parentId], references: [id])
   children CaseCategory[] @relation("CaseCategoryHierarchy")
   cases    Case[]
+
+  /// Guaranteed to run on CASE CREATED for this category, regardless of
+  /// the rule's own stored conditions — see processEntityEvent's header
+  /// comment in automation-events.queue.ts for the merge logic. Purely a
+  /// convenience binding, not a second execution engine: it reuses the
+  /// exact same startRun/executeActions path every condition-matched rule
+  /// already goes through.
+  defaultWorkflowId String?        @map("default_workflow_id") @db.Uuid
+  defaultWorkflow   AutomationRule? @relation(fields: [defaultWorkflowId], references: [id])
 
   @@map("case_categories")
 }

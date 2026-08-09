@@ -1,5 +1,6 @@
 import {
   BadGatewayException,
+  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -21,7 +22,7 @@ import { RequirePermission } from '../../common/auth/require-permission.decorato
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
 import { AuditService } from '../../common/audit/audit.service';
-import { AssignRoleDto, ListUsersQueryDto, UpdateUserDto, UserResponseDto } from './dto/user.dto';
+import { AssignRoleDto, CreateUserDto, CreateUserResponseDto, ListUsersQueryDto, UpdateUserDto, UserResponseDto } from './dto/user.dto';
 import { PendingRoleGrantResponseDto } from './dto/role-grant.dto';
 import { ForceLogoutResponseDto, KeycloakSessionResponseDto } from './dto/keycloak-session-response.dto';
 import { BulkInviteResultRowDto, BulkInviteUsersDto } from './dto/bulk-invite-users.dto';
@@ -65,6 +66,8 @@ function toUserResponse(user: UserWithRoles): UserResponseDto {
     phone: user.phone,
     departmentId: user.departmentId,
     branchId: user.branchId,
+    managerId: user.managerId,
+    positionTitle: user.positionTitle,
     status: user.status,
     roles: user.roles.map((ur) => ({ id: ur.role.id, name: ur.role.name })),
     lastSyncedAt: user.lastSyncedAt,
@@ -74,9 +77,8 @@ function toUserResponse(user: UserWithRoles): UserResponseDto {
 }
 
 /**
- * User CRUD (no create — that's Keycloak-sync-owned, see
- * keycloak-webhook.controller.ts) + role assignment. `users` is covered by
- * the generic audit trigger for plain field updates (prisma/triggers/
+ * User CRUD + role assignment. `users` is covered by the generic audit
+ * trigger for plain field updates (prisma/triggers/
  * 002_audit_chain_triggers.sql); role grant/revoke is NOT (composite-PK
  * user_roles table), so those two mutations call AuditService explicitly.
  */
@@ -117,7 +119,81 @@ export class UsersController {
   }
 
   /**
-   * The one self-service "bring my team into the system" path — everything
+   * Single-user creation — same Keycloak createUser + resetPassword +
+   * upsertLocalUser sequence as bulkInvite() below, including its
+   * best-effort compensating setEnabled(false) if a later step fails
+   * after Keycloak succeeded (the exact rollback bulkInvite() already has
+   * and ScimController.doCreateUser() is missing — not duplicated as a
+   * shared helper here since the two callers' input shapes genuinely
+   * differ: this one takes real department/branch/manager ids from a
+   * form's pickers, bulkInvite() takes CSV codes it has to resolve
+   * itself). No roleIds — see CreateUserDto's own comment.
+   */
+  @Post()
+  @RequirePermission('identity', 'write')
+  @ApiOkResponse({ type: CreateUserResponseDto })
+  async create(@Body() dto: CreateUserDto): Promise<CreateUserResponseDto> {
+    const prisma = getPrismaClient();
+
+    const existing = await prisma.user.findUnique({ where: { email: dto.email } });
+    if (existing) throw new ConflictException('A user with this email already exists');
+
+    const { firstName, lastName } = splitName(dto.fullName);
+
+    const keycloakUserId = await this.keycloakAdmin.createUser({
+      username: dto.email,
+      email: dto.email,
+      firstName,
+      lastName,
+      enabled: true,
+      emailVerified: true,
+    });
+
+    const temporaryPassword = generateTemporaryPassword();
+    try {
+      await this.keycloakAdmin.resetPassword(keycloakUserId, temporaryPassword);
+    } catch (err) {
+      await this.keycloakAdmin.setEnabled(keycloakUserId, false).catch(() => undefined);
+      throw err;
+    }
+
+    let provisioned: { userId: string | null };
+    try {
+      provisioned = await this.userProvisioning.upsertLocalUser({
+        keycloakSubjectId: keycloakUserId,
+        email: dto.email,
+        firstName,
+        lastName,
+        enabled: true,
+        managerId: dto.managerId,
+        positionTitle: dto.positionTitle,
+      });
+      if (provisioned.userId && (dto.phone || dto.departmentId || dto.branchId)) {
+        await prisma.user.update({
+          where: { id: provisioned.userId },
+          data: {
+            phone: dto.phone,
+            departmentId: dto.departmentId,
+            branchId: dto.branchId,
+          },
+        });
+      }
+    } catch (err) {
+      await this.keycloakAdmin.setEnabled(keycloakUserId, false).catch(() => undefined);
+      throw err;
+    }
+
+    if (provisioned.userId) {
+      await this.auditService.recordEvent({ action: 'CREATE', entityType: 'users', entityId: provisioned.userId });
+    }
+    await enqueueBulkInviteEmail({ email: dto.email, fullName: dto.fullName, temporaryPassword });
+
+    const created = await prisma.user.findUniqueOrThrow({ where: { id: provisioned.userId! }, include: USER_WITH_ROLES_INCLUDE });
+    return { user: toUserResponse(created), temporaryPassword };
+  }
+
+  /**
+   * The one self-service "bring my team into the system" bulk path — everything
    * else that creates a User row is Keycloak-sync-owned (see this class's
    * own header comment) or SCIM (external-IdP-only). Sequential, not a
    * queued batch job — mirrors this codebase's existing "small N,
@@ -223,6 +299,9 @@ export class UsersController {
   @RequirePermission('identity', 'write')
   @ApiOkResponse({ type: UserResponseDto })
   async update(@Param('id') id: string, @Body() dto: UpdateUserDto): Promise<UserResponseDto> {
+    if (dto.managerId !== undefined && dto.managerId === id) {
+      throw new BadRequestException('A user cannot be their own manager');
+    }
     const data: Prisma.UserUpdateInput = {};
     if (dto.fullName !== undefined) data.fullName = dto.fullName;
     if (dto.phone !== undefined) data.phone = dto.phone;
@@ -232,6 +311,10 @@ export class UsersController {
     if (dto.branchId !== undefined) {
       data.branch = dto.branchId === null ? { disconnect: true } : { connect: { id: dto.branchId } };
     }
+    if (dto.managerId !== undefined) {
+      data.manager = dto.managerId === null ? { disconnect: true } : { connect: { id: dto.managerId } };
+    }
+    if (dto.positionTitle !== undefined) data.positionTitle = dto.positionTitle;
     try {
       const updated = await getPrismaClient().user.update({ where: { id }, data, include: USER_WITH_ROLES_INCLUDE });
       return toUserResponse(updated);
