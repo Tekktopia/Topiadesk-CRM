@@ -142,6 +142,11 @@ export interface BuilderStep {
   notifyChannel?: 'IN_APP' | 'EMAIL';
   approvalReason?: string;
   approvalNotifyTeamId?: string;
+  /** Default EXPLICIT (today's behavior — approverUserIds/notifyTeamId
+   * below). ASSIGNEE_MANAGER/TEAM_LEAD dynamically resolve the decider
+   * from the ticket at gate-open time instead — no picker needed for
+   * those two. */
+  approverMode?: 'EXPLICIT' | 'ASSIGNEE_MANAGER' | 'TEAM_LEAD';
   /** Named individual approvers (searchable multi-picker) — non-empty
    * turns on decision-time allow-list enforcement server-side. */
   approverUserIds?: string[];
@@ -172,6 +177,7 @@ interface RawStep {
   params?: Record<string, unknown>;
   reason?: string;
   notifyTeamId?: string;
+  approverMode?: string;
   approverUserIds?: string[];
   requiredApprovals?: number;
   onApprove?: { goto?: string };
@@ -207,6 +213,7 @@ function deserializeSteps(raw: unknown): BuilderStep[] {
         kind: 'APPROVAL',
         approvalReason: entry.reason,
         approvalNotifyTeamId: entry.notifyTeamId,
+        approverMode: entry.approverMode === 'ASSIGNEE_MANAGER' || entry.approverMode === 'TEAM_LEAD' ? entry.approverMode : 'EXPLICIT',
         approverUserIds: entry.approverUserIds,
         requiredApprovals: entry.requiredApprovals,
         onApproveGoto: entry.onApprove?.goto,
@@ -323,6 +330,7 @@ function serializeStep(step: BuilderStep): RawStep {
         type: 'APPROVAL_GATE',
         reason: step.approvalReason || undefined,
         notifyTeamId: step.approvalNotifyTeamId || undefined,
+        approverMode: step.approverMode && step.approverMode !== 'EXPLICIT' ? step.approverMode : undefined,
         approverUserIds: step.approverUserIds && step.approverUserIds.length > 0 ? step.approverUserIds : undefined,
         requiredApprovals: step.requiredApprovals && step.requiredApprovals > 1 ? step.requiredApprovals : undefined,
         onApprove: step.onApproveGoto ? { goto: step.onApproveGoto } : undefined,
@@ -1064,42 +1072,64 @@ function StepEditor({
               <Input value={step.approvalReason ?? ''} onChange={(e) => onChange({ approvalReason: e.target.value })} placeholder="e.g. Needs sign-off before escalating priority" />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <Label>Specific approvers (optional)</Label>
-              <SearchableUserMultiPicker
-                users={users}
-                value={step.approverUserIds ?? []}
-                onChange={(approverUserIds) => onChange({ approverUserIds })}
-                placeholder="Anyone who can approve (default) — or name specific people"
-              />
-            </div>
-            {(step.approverUserIds ?? []).length > 1 ? (
-              <div className="space-y-1.5">
-                <Label>Approvals required</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={(step.approverUserIds ?? []).length}
-                  value={step.requiredApprovals ?? 1}
-                  onChange={(e) => onChange({ requiredApprovals: Math.max(1, Math.min(Number(e.target.value) || 1, (step.approverUserIds ?? []).length)) })}
-                />
-              </div>
-            ) : null}
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>Also notify (optional)</Label>
-              <Select value={step.approvalNotifyTeamId || ANY} onValueChange={(v) => onChange({ approvalNotifyTeamId: v === ANY ? undefined : v })}>
+              <Label>Who approves</Label>
+              <Select value={step.approverMode ?? 'EXPLICIT'} onValueChange={(v) => onChange({ approverMode: v as 'EXPLICIT' | 'ASSIGNEE_MANAGER' | 'TEAM_LEAD' })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ANY}>Every Compliance Officer &amp; Admin (default)</SelectItem>
-                  {teams.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="EXPLICIT">Specific people (below)</SelectItem>
+                  <SelectItem value="ASSIGNEE_MANAGER">The ticket assignee&apos;s manager</SelectItem>
+                  <SelectItem value="TEAM_LEAD">The assigned team&apos;s lead</SelectItem>
                 </SelectContent>
               </Select>
+              {step.approverMode === 'ASSIGNEE_MANAGER' ? (
+                <p className="text-xs text-muted-foreground">Resolved at gate-open time from the ticket assignee&apos;s Manager field. Falls back to any Compliance Officer/Admin if the assignee has no manager set.</p>
+              ) : step.approverMode === 'TEAM_LEAD' ? (
+                <p className="text-xs text-muted-foreground">Resolved at gate-open time from whoever has the Lead role on the ticket&apos;s assigned team. Falls back to any Compliance Officer/Admin if the team has no lead.</p>
+              ) : null}
             </div>
+            {(!step.approverMode || step.approverMode === 'EXPLICIT') ? (
+              <>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Specific approvers (optional)</Label>
+                  <SearchableUserMultiPicker
+                    users={users}
+                    value={step.approverUserIds ?? []}
+                    onChange={(approverUserIds) => onChange({ approverUserIds })}
+                    placeholder="Anyone who can approve (default) — or name specific people"
+                  />
+                </div>
+                {(step.approverUserIds ?? []).length > 1 ? (
+                  <div className="space-y-1.5">
+                    <Label>Approvals required</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={(step.approverUserIds ?? []).length}
+                      value={step.requiredApprovals ?? 1}
+                      onChange={(e) => onChange({ requiredApprovals: Math.max(1, Math.min(Number(e.target.value) || 1, (step.approverUserIds ?? []).length)) })}
+                    />
+                  </div>
+                ) : null}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Also notify (optional)</Label>
+                  <Select value={step.approvalNotifyTeamId || ANY} onValueChange={(v) => onChange({ approvalNotifyTeamId: v === ANY ? undefined : v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ANY}>Every Compliance Officer &amp; Admin (default)</SelectItem>
+                      {teams.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            ) : null}
             <div className="space-y-1.5">
               <Label>On approve, go to</Label>
               <GotoStepSelect allSteps={allSteps} currentStepId={step.id} value={step.onApproveGoto} onChange={(v) => onChange({ onApproveGoto: v })} unsetLabel="Continue to next step (default)" />

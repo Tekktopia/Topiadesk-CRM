@@ -36,6 +36,15 @@ export type AutomationStep =
        * automation-run-states.controller.ts); absent/empty preserves
        * today's unrestricted-decider behavior. */
       approverUserIds?: string[];
+      /** Default EXPLICIT (today's notifyTeamId/approverUserIds behavior,
+       * unchanged). ASSIGNEE_MANAGER/TEAM_LEAD dynamically resolve the
+       * decider from the case at gate-open time (CASE only — no
+       * equivalent concept exists for Claim) instead of a fixed list; if
+       * resolution finds nobody (unassigned ticket, no manager set, team
+       * has no LEAD), falls back to the same permission-based default
+       * EXPLICIT-with-nothing-configured already uses, so a gate never
+       * opens with no one able to act on it. See resolveApprovers(). */
+      approverMode?: 'EXPLICIT' | 'ASSIGNEE_MANAGER' | 'TEAM_LEAD';
       /** Quorum among approverUserIds. Default 1 (today's single-Approval
        * behavior). >1 routes through an ApprovalChain instead. */
       requiredApprovals?: number;
@@ -137,45 +146,91 @@ export async function startRun(rule: AutomationRule, entityType: 'CASE' | 'CLAIM
   });
 }
 
+interface ApproverResolution {
+  recipientIds: string[];
+  /** True when recipientIds is a genuinely narrow/intended set of
+   * deciders (explicit named people, or a resolved manager/team-lead) —
+   * drives context.approverAllowlist for decision-time enforcement in
+   * advanceRun below. False for the permission-based "anyone who can
+   * decide" default AND for today's team-notify-without-restriction case
+   * (notifyTeamId alone never narrowed who could decide, and that stays
+   * unchanged — only ASSIGNEE_MANAGER/TEAM_LEAD and named approverUserIds
+   * are treated as restrictive).
+   */
+  restrictive: boolean;
+}
+
 /**
- * Notifies whoever should decide a newly-opened APPROVAL_GATE — the run
- * previously created an Approval row and paused but told no one, a real
- * gap for "who to approve... when workflow starts". Recipients are the
- * union of `step.notifyTeamId`'s members and `step.approverUserIds` (both,
- * when set); with neither set, defaults to every ACTIVE user holding one
- * of APPROVER_ROLE_NAMES (i.e. everyone who could actually decide it), so
- * a gate never opens silently. Both channels (IN_APP + EMAIL) — same
- * two-row pattern already used by CasesController.requestClosure for the
- * CASE_CLOSURE approval flow. Called from inside advanceRun's own
- * runWithRlsContext(SYSTEM_JOB_CONTEXT, ...) wrapper, so no separate wrap
- * is needed here.
+ * Single resolution point for "who should decide this APPROVAL_GATE",
+ * used by both advanceRun (to set/skip the decision-time allow-list) and
+ * notifyApprovers (to know who to notify) — one DB round-trip per gate
+ * open, not two independently-computed answers that could drift apart.
+ * ASSIGNEE_MANAGER/TEAM_LEAD only apply to CASE (Claim has no assignee/
+ * team-lead concept here); either falls through to today's EXPLICIT
+ * default (below) if resolution finds nobody, so a gate never opens with
+ * no one able to act on it.
  */
-async function notifyApprovers(
-  ruleName: string,
+async function resolveApprovers(
   step: Extract<AutomationStep, { type: 'APPROVAL_GATE' }>,
   entityType: 'CASE' | 'CLAIM',
   entityId: string,
-): Promise<void> {
+): Promise<ApproverResolution> {
   const prisma = getPrismaClient();
+  const approverMode = step.approverMode ?? 'EXPLICIT';
+
+  if ((approverMode === 'ASSIGNEE_MANAGER' || approverMode === 'TEAM_LEAD') && entityType === 'CASE') {
+    const kase = await prisma.case.findUnique({ where: { id: entityId }, select: { assignedToId: true, assignedTeamId: true } });
+    if (approverMode === 'ASSIGNEE_MANAGER' && kase?.assignedToId) {
+      const assignee = await prisma.user.findUnique({ where: { id: kase.assignedToId }, select: { managerId: true } });
+      if (assignee?.managerId) return { recipientIds: [assignee.managerId], restrictive: true };
+    }
+    if (approverMode === 'TEAM_LEAD' && kase?.assignedTeamId) {
+      const leads = await prisma.teamMember.findMany({ where: { teamId: kase.assignedTeamId, role: 'LEAD' }, select: { userId: true } });
+      if (leads.length > 0) return { recipientIds: leads.map((l) => l.userId), restrictive: true };
+    }
+    // Resolved to nobody — fall through to EXPLICIT's own logic below.
+  }
+
   const approverUserIds = step.approverUserIds ?? [];
-  let recipientIds: string[];
   if (step.notifyTeamId || approverUserIds.length > 0) {
     const teamMemberIds = step.notifyTeamId
       ? (await prisma.teamMember.findMany({ where: { teamId: step.notifyTeamId }, select: { userId: true } })).map((m) => m.userId)
       : [];
-    recipientIds = [...new Set([...teamMemberIds, ...approverUserIds])];
-  } else {
-    recipientIds = (
-      await prisma.user.findMany({
-        where: { status: 'ACTIVE', roles: { some: { role: { name: { in: APPROVER_ROLE_NAMES } } } } },
-        select: { id: true },
-      })
-    ).map((u) => u.id);
+    return { recipientIds: [...new Set([...teamMemberIds, ...approverUserIds])], restrictive: approverUserIds.length > 0 };
   }
-  if (recipientIds.length === 0) return;
 
+  const fallbackIds = (
+    await prisma.user.findMany({
+      where: { status: 'ACTIVE', roles: { some: { role: { name: { in: APPROVER_ROLE_NAMES } } } } },
+      select: { id: true },
+    })
+  ).map((u) => u.id);
+  return { recipientIds: fallbackIds, restrictive: false };
+}
+
+/**
+ * Notifies whoever should decide a newly-opened APPROVAL_GATE — the run
+ * previously created an Approval row and paused but told no one, a real
+ * gap for "who to approve... when workflow starts". Both channels
+ * (IN_APP + EMAIL) — same two-row pattern already used by
+ * CasesController.requestClosure for the CASE_CLOSURE approval flow.
+ * Called from inside advanceRun's own runWithRlsContext(SYSTEM_JOB_CONTEXT,
+ * ...) wrapper, so no separate wrap is needed here. Takes the already-
+ * resolved recipient list (see resolveApprovers) rather than re-resolving
+ * it, so gate-open notification and decision-time enforcement can never
+ * disagree about who's eligible.
+ */
+async function notifyApprovers(
+  ruleName: string,
+  reason: string | undefined,
+  recipientIds: string[],
+  entityType: 'CASE' | 'CLAIM',
+  entityId: string,
+): Promise<void> {
+  if (recipientIds.length === 0) return;
+  const prisma = getPrismaClient();
   const title = `Approval needed: ${ruleName}`;
-  const body = step.reason ? `A workflow step requires your approval — ${step.reason}` : 'A workflow step requires your approval.';
+  const body = reason ? `A workflow step requires your approval — ${reason}` : 'A workflow step requires your approval.';
   await prisma.notification.createMany({
     data: recipientIds.flatMap((recipientUserId) =>
       (['IN_APP', 'EMAIL'] as const).map((channel) => ({
@@ -228,8 +283,8 @@ export async function advanceRun(runStateId: string): Promise<void> {
 
       if (step.type === 'APPROVAL_GATE') {
         const requiredApprovals = step.requiredApprovals ?? 1;
-        const approverUserIds = step.approverUserIds ?? [];
-        const context = approverUserIds.length > 0 ? { approverAllowlist: approverUserIds } : undefined;
+        const { recipientIds, restrictive } = await resolveApprovers(step, run.entityType, run.entityId);
+        const context = restrictive ? { approverAllowlist: recipientIds } : undefined;
 
         if (requiredApprovals > 1) {
           const chain = await prisma.approvalChain.create({
@@ -254,7 +309,7 @@ export async function advanceRun(runStateId: string): Promise<void> {
             data: { status: 'WAITING_APPROVAL', currentStepIndex: index, approvalId: approval.id, context },
           });
         }
-        await notifyApprovers(run.rule.name, step, run.entityType, run.entityId);
+        await notifyApprovers(run.rule.name, step.reason, recipientIds, run.entityType, run.entityId);
         return;
       }
 
