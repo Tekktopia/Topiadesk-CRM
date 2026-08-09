@@ -851,6 +851,63 @@ export function useTestAssignmentRule() {
 }
 
 // ---------------------------------------------------------------------------
+// Business rules — full CRUD (app/(cases)/business-rules/**), also reused
+// read-only (useActiveBusinessRules) to drive live require/hide/readonly/
+// set-value behavior on the "New ticket"/"Edit ticket" dialog — see
+// evaluate-business-rules.ts.
+// ---------------------------------------------------------------------------
+
+export function useBusinessRules(entityType?: 'CLAIM' | 'CASE') {
+  return useQuery({
+    queryKey: ['business-rules', entityType ?? null],
+    queryFn: () => apiFetch<BusinessRule[]>(`/api/business-rules${buildQuery({ entityType })}`),
+  });
+}
+
+/** Active-only, sorted by displayOrder — the shape evaluate-business-rules.ts expects. Degrades to empty (never throws) so a case-writer with no `business_rule` grant — everyone but ADMIN — still gets a working form; reads are ungated server-side regardless (see business-rules.controller.ts). */
+export function useActiveBusinessRules(entityType: 'CLAIM' | 'CASE') {
+  const query = useBusinessRules(entityType);
+  const rules = (query.data ?? []).filter((r) => r.isActive).sort((a, b) => a.displayOrder - b.displayOrder);
+  return { ...query, data: rules };
+}
+
+export function useCreateBusinessRule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateBusinessRuleInput) => apiFetch<BusinessRule>('/api/business-rules', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (rule) => {
+      queryClient.invalidateQueries({ queryKey: ['business-rules'] });
+      toast.success(`Business rule "${rule.name}" created`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useUpdateBusinessRule(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateBusinessRuleInput) => apiFetch<BusinessRule>(`/api/business-rules/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['business-rules'] });
+      toast.success('Business rule updated');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useDeleteBusinessRule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<{ deleted: boolean }>(`/api/business-rules/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['business-rules'] });
+      toast.success('Business rule deleted');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Case categories — full CRUD (app/(cases)/case-categories/**), also reused
 // read-only as a lookup feeding the categoryId select on the "New ticket"
 // dialog.

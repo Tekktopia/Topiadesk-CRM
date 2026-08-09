@@ -7,11 +7,15 @@ import type { NavItem } from '@/lib/nav-types';
  * group's `page.tsx`/`layout.tsx`, exporting a `NavItem[]`. The root
  * layout (`app/layout.tsx`) imports every group's array and concatenates
  * them into the sidebar. Deliberately minimal (a single "Dashboard" entry
- * at "/") — the real operational dashboard (KPIs, pipeline funnel, renewal
- * timeline; see ./page.tsx and ./dashboard-view.tsx) is the destination,
- * this file just points the sidebar at it.
+ * at "/dashboard") — the real operational dashboard (KPIs, pipeline funnel,
+ * renewal timeline; see ./dashboard/page.tsx and ./dashboard-view.tsx) is
+ * the destination, this file just points the sidebar at it. "/" itself is
+ * the app's public entry chooser now (see app/page.tsx), not the
+ * dashboard — an authenticated visit to "/" redirects straight here via
+ * middleware.ts, but nothing inside the authenticated app should link to
+ * "/" directly anymore.
  */
 export const dashboardNav: NavItem[] = [
-  { label: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Live Chat Widget (demo)', href: '/widget-demo', icon: MessageCircle },
 ];

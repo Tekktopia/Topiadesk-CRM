@@ -35,12 +35,12 @@ function Breadcrumb() {
 
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <Link href="/" className="hidden shrink-0 items-center sm:flex" aria-label="TopiaDesk home">
+      <Link href="/dashboard" className="hidden shrink-0 items-center sm:flex" aria-label="TopiaDesk home">
         <Image src="/logo-mark.png" alt="" width={22} height={22} className="shrink-0" />
       </Link>
       <span className="hidden h-5 w-px shrink-0 bg-border sm:block" aria-hidden />
       <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
-        <Link href="/" className="flex shrink-0 items-center rounded p-1 hover:bg-secondary hover:text-foreground" aria-label="Dashboard">
+        <Link href="/dashboard" className="flex shrink-0 items-center rounded p-1 hover:bg-secondary hover:text-foreground" aria-label="Dashboard">
           <Home className="h-4 w-4" aria-hidden />
         </Link>
         <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden />

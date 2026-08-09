@@ -83,7 +83,7 @@ export function AppSidebar() {
       {/* Icon rail — one module per icon, active module highlighted, the
           current user's account menu pinned to the bottom (mt-auto). */}
       <nav aria-label="Modules" className="flex w-16 shrink-0 flex-col items-center gap-1 bg-primary py-3">
-        <Link href="/" className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg" aria-label="TopiaDesk home">
+        <Link href="/dashboard" className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg" aria-label="TopiaDesk home">
           <Image src="/logo-mark.png" alt="" width={24} height={24} className="shrink-0" />
         </Link>
         {visibleModules.map((mod) => {

@@ -27,7 +27,7 @@ export interface NavModule {
 }
 
 export const NAV_MODULES: NavModule[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, indexHref: '/', items: dashboardNav },
+  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, indexHref: '/dashboard', items: dashboardNav },
   { key: 'crm', label: 'CRM', icon: Briefcase, indexHref: '/accounts', items: crmNav },
   { key: 'policy', label: 'Policy', icon: FileClock, indexHref: '/policies', items: policyNav },
   { key: 'cases', label: 'Tickets', icon: LifeBuoy, indexHref: '/cases', items: casesNav },
@@ -38,7 +38,6 @@ export const NAV_MODULES: NavModule[] = [
 ];
 
 export function isNavItemActive(pathname: string, href: string): boolean {
-  if (href === '/') return pathname === '/';
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

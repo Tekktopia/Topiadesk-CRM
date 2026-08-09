@@ -59,9 +59,21 @@ import { getWebEnv } from '@/lib/env';
  * completely separate auth model (a `portal_session` cookie, checked by
  * each protected page itself via `lib/portal-auth/session.ts`, not by this
  * middleware) — see app/(portal)/portal/layout.tsx's header comment.
+ *
+ * `/` (exact root only, not a prefix — see the dedicated check below,
+ * kept separate from the matcher's static exclusion list since "public
+ * unless a valid session says otherwise" is different logic from "always
+ * public") is app/page.tsx, the entry chooser between Staff CRM/Customer
+ * Portal/Knowledge Base/Global Admin (see app-shell.tsx's
+ * PUBLIC_PATH_PREFIXES, kept in sync). A visitor with no session sees it
+ * instead of being bounced straight to Keycloak. A visitor who already
+ * has one is redirected on to /dashboard instead of seeing the chooser
+ * again — it answers "which app am I signing into", not something a
+ * signed-in staff member should hit every time they land on "/".
  */
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const isEntryChooser = request.nextUrl.pathname === '/';
 
   if (sessionCookie) {
     const env = getWebEnv();
@@ -71,8 +83,15 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     // downstream is what resolves (and can invalidate) the stored session.
     const envelope = await decryptPayload<SessionCookiePayload>(sessionCookie, env.WEB_SESSION_SECRET);
     if (envelope?.sessionId) {
+      if (isEntryChooser) {
+        return NextResponse.redirect(new URL('/dashboard', request.url));
+      }
       return NextResponse.next();
     }
+  }
+
+  if (isEntryChooser) {
+    return NextResponse.next();
   }
 
   const loginUrl = new URL('/api/auth/login', request.url);

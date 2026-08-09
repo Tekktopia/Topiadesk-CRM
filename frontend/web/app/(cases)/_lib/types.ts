@@ -589,6 +589,77 @@ export interface AssignmentTestResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Business rules — no-code field logic ("if condition, then require/hide/
+// readonly/set-value on these fields"). CASE only in v1 (see the model's
+// doc comment in schema.prisma). CONDITION_FIELDS/ACTION_FIELDS mirror
+// backend/api/src/modules/case-management/business-rules.validator.ts's
+// exports of the same name exactly — kept in sync by hand, same convention
+// as every other hand-mirrored shape in this file; a field added to one
+// without the other means the rule dialog offers an option the server then
+// rejects, or vice versa.
+// ---------------------------------------------------------------------------
+
+export const BUSINESS_RULE_OPERATORS = ['EQUALS', 'NOT_EQUALS'] as const;
+export type BusinessRuleOperator = (typeof BUSINESS_RULE_OPERATORS)[number];
+
+export const BUSINESS_RULE_ACTION_EFFECTS = ['REQUIRE', 'HIDE', 'READONLY', 'SET_VALUE'] as const;
+export type BusinessRuleActionEffect = (typeof BUSINESS_RULE_ACTION_EFFECTS)[number];
+
+export const BUSINESS_RULE_CONDITION_FIELDS: Record<CaseManagementEntityType, readonly string[]> = {
+  CASE: ['status', 'priority', 'caseType', 'categoryId', 'assignedTeamId'],
+  CLAIM: ['status', 'priority', 'assignedTeamId'],
+};
+
+export const BUSINESS_RULE_ACTION_FIELDS: Record<CaseManagementEntityType, readonly string[]> = {
+  CASE: ['caseType', 'subject', 'description', 'priority', 'categoryId', 'accountId', 'policyId', 'assignedToId'],
+  CLAIM: [],
+};
+
+export interface BusinessRuleAction {
+  field: string;
+  effect: BusinessRuleActionEffect;
+  value?: string;
+}
+
+export interface BusinessRule {
+  id: string;
+  entityType: CaseManagementEntityType;
+  name: string;
+  description: string | null;
+  conditionField: string;
+  conditionOperator: BusinessRuleOperator;
+  conditionValue: string;
+  actions: BusinessRuleAction[];
+  isActive: boolean;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateBusinessRuleInput {
+  entityType: CaseManagementEntityType;
+  name: string;
+  description?: string;
+  conditionField: string;
+  conditionOperator: BusinessRuleOperator;
+  conditionValue: string;
+  actions: BusinessRuleAction[];
+  isActive?: boolean;
+  displayOrder?: number;
+}
+
+export interface UpdateBusinessRuleInput {
+  name?: string;
+  description?: string;
+  conditionField?: string;
+  conditionOperator?: BusinessRuleOperator;
+  conditionValue?: string;
+  actions?: BusinessRuleAction[];
+  isActive?: boolean;
+  displayOrder?: number;
+}
+
+// ---------------------------------------------------------------------------
 // Business hours calendars + holidays, agent skills, case categories, loss
 // cause categories. Admin/config tier (same 'sla_config'/'case'/'claim'
 // write-gating as SLA policies/macros — see each *.controller.ts's header

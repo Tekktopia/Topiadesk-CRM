@@ -26,12 +26,13 @@ import { getWebEnv } from '../env';
  *    audit line-by-line, versus a framework's `jwt`/`session` callback
  *    indirection.
  *
- * Discovery is cached process-wide (Keycloak's issuer metadata doesn't
- * change at runtime) and only ever invoked lazily, from request-time code
- * — never at module scope — so `next build` never needs live Keycloak
- * connectivity.
+ * Discovery is cached process-wide, keyed by realm (Keycloak's issuer
+ * metadata doesn't change at runtime, but a request now may belong to any
+ * tenant's own realm, not one fixed realm — see lib/auth/tenant-realm.ts)
+ * and only ever invoked lazily, from request-time code — never at module
+ * scope — so `next build` never needs live Keycloak connectivity.
  */
-let configPromise: Promise<client.Configuration> | undefined;
+const configPromises = new Map<string, Promise<client.Configuration>>();
 
 /**
  * Discovery, token exchange, and refresh all happen server-side (this code
@@ -67,37 +68,45 @@ function internalKeycloakFetch(publicIssuer: URL, internalUrl: string): client.C
   };
 }
 
-function discoverConfig(): Promise<client.Configuration> {
+/** Builds the issuer URL for an arbitrary realm from KEYCLOAK_ISSUER_URL's
+ * own origin — that env var is `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}`,
+ * so swapping the last path segment reaches any other realm on the same
+ * Keycloak server without needing a second env var. */
+function issuerUrlForRealm(realmName: string): URL {
+  const defaultIssuer = new URL(getWebEnv().KEYCLOAK_ISSUER_URL);
+  return new URL(`/realms/${realmName}`, defaultIssuer.origin);
+}
+
+function discoverConfig(realmName: string): Promise<client.Configuration> {
   const env = getWebEnv();
-  const issuer = new URL(env.KEYCLOAK_ISSUER_URL);
+  const issuer = issuerUrlForRealm(realmName);
   const options = env.KEYCLOAK_INTERNAL_URL
     ? { [client.customFetch]: internalKeycloakFetch(issuer, env.KEYCLOAK_INTERNAL_URL) }
     : undefined;
   return client.discovery(issuer, env.KEYCLOAK_CLIENT_ID_WEB, undefined, client.None(), options).catch(
     (err: unknown) => {
       // Reset so a transient discovery failure (e.g. Keycloak not up yet
-      // in dev) doesn't permanently poison the cache for the process.
-      configPromise = undefined;
+      // in dev, or a realm that's mid-provisioning) doesn't permanently
+      // poison the cache for the process.
+      configPromises.delete(realmName);
       throw err;
     },
   );
 }
 
-export function getOidcConfig(): Promise<client.Configuration> {
-  if (!configPromise) {
-    configPromise = discoverConfig();
+export function getOidcConfig(realmName: string): Promise<client.Configuration> {
+  let promise = configPromises.get(realmName);
+  if (!promise) {
+    promise = discoverConfig(realmName);
+    configPromises.set(realmName, promise);
   }
-  // TS can't prove `configPromise` stays non-undefined across the closure
-  // in discoverConfig's `.catch` (which reassigns it on rejection) — this
-  // function itself only ever reads it synchronously right after the
-  // assignment above, so the cast is safe.
-  return configPromise as Promise<client.Configuration>;
+  return promise;
 }
 
 export const OIDC_SCOPE = 'openid profile email';
 
-export async function buildAuthorizationRequest(redirectUri: string) {
-  const config = await getOidcConfig();
+export async function buildAuthorizationRequest(realmName: string, redirectUri: string) {
+  const config = await getOidcConfig(realmName);
   const codeVerifier = client.randomPKCECodeVerifier();
   const codeChallenge = await client.calculatePKCECodeChallenge(codeVerifier);
   const state = client.randomState();
@@ -116,10 +125,11 @@ export async function buildAuthorizationRequest(redirectUri: string) {
 }
 
 export async function exchangeCodeForTokens(
+  realmName: string,
   currentUrl: URL,
   checks: { codeVerifier: string; state: string; nonce: string },
 ) {
-  const config = await getOidcConfig();
+  const config = await getOidcConfig(realmName);
   return client.authorizationCodeGrant(config, currentUrl, {
     pkceCodeVerifier: checks.codeVerifier,
     expectedState: checks.state,
@@ -127,13 +137,13 @@ export async function exchangeCodeForTokens(
   });
 }
 
-export async function refreshTokens(refreshToken: string) {
-  const config = await getOidcConfig();
+export async function refreshTokens(realmName: string, refreshToken: string) {
+  const config = await getOidcConfig(realmName);
   return client.refreshTokenGrant(config, refreshToken);
 }
 
-export async function buildLogoutUrl(idToken: string, postLogoutRedirectUri: string): Promise<URL> {
-  const config = await getOidcConfig();
+export async function buildLogoutUrl(realmName: string, idToken: string, postLogoutRedirectUri: string): Promise<URL> {
+  const config = await getOidcConfig(realmName);
   return client.buildEndSessionUrl(config, {
     id_token_hint: idToken,
     post_logout_redirect_uri: postLogoutRedirectUri,

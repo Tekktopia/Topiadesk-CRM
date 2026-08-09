@@ -148,7 +148,7 @@ export async function getValidAccessToken(): Promise<string | null> {
   }
 
   try {
-    const tokens = await refreshTokens(session.refreshToken);
+    const tokens = await refreshTokens(session.realm, session.refreshToken);
     const nowAfterRefresh = Math.floor(Date.now() / 1000);
     const nextSession: SessionPayload = {
       accessToken: tokens.access_token,
@@ -160,6 +160,7 @@ export async function getValidAccessToken(): Promise<string | null> {
       // previous one rather than guessing.
       refreshTokenExpiresAt: session.refreshTokenExpiresAt,
       subject: session.subject,
+      realm: session.realm,
     };
     await writeSession(nextSession, sessionId);
     return nextSession.accessToken;

@@ -42,6 +42,12 @@ export interface SessionPayload extends JWTPayload {
   refreshTokenExpiresAt: number;
   /** Keycloak subject (`sub`) — cheap identity check without a network call. */
   subject: string;
+  /** Which Keycloak realm these tokens belong to (default KEYCLOAK_REALM,
+   * or a tenant's own realm on a tenant subdomain — see
+   * lib/auth/tenant-realm.ts) — the refresh grant must hit the SAME realm
+   * the tokens were issued from, so this is read at refresh time rather
+   * than re-derived from whatever request happened to trigger it. */
+  realm: string;
 }
 
 /** The actual shape persisted (encrypted) in the `td_session` cookie — just
@@ -65,4 +71,9 @@ export interface OAuthTransactionPayload extends JWTPayload {
   /** Relative in-app path to return to after login; validated as
    * same-origin-relative before use (open-redirect guard). */
   returnTo: string;
+  /** Realm resolved (via tenant-realm.ts) from the Host header /login was
+   * hit on — stashed here so /callback (hit on that same subdomain, but
+   * re-deriving would just repeat the same lookup) uses the exact realm
+   * the authorization request was actually built against. */
+  realm: string;
 }
