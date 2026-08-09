@@ -665,6 +665,10 @@ export interface CaseCategory {
   caseType: CaseType | null;
   /** Self-relation for a nested hierarchy — null means top-level. See _lib/category-tree.ts for the client-side flat-list-to-tree walk (the backend keeps this flat, same convention as Knowledge's category tree). */
   parentId: string | null;
+  /** Guaranteed to run on CASE CREATED for this category, independent of
+   * the rule's own stored conditions — see automation-events.queue.ts's
+   * processEntityEvent. */
+  defaultWorkflowId: string | null;
 }
 
 export interface CreateCaseCategoryInput {
@@ -672,9 +676,23 @@ export interface CreateCaseCategoryInput {
   code: string;
   caseType?: CaseType;
   parentId?: string | null;
+  defaultWorkflowId?: string | null;
 }
 
 export type UpdateCaseCategoryInput = Partial<CreateCaseCategoryInput>;
+
+/** Lightweight reference for the "Default workflow" picker on the Case
+ * Category form — sourced from the same GET /crm/automation-rules
+ * endpoint the admin Workflow Builder already reads (via its BFF proxy,
+ * reachable cross-route-group same as every other apiFetch in this app),
+ * filtered client-side to CASE-entityType rules the same way
+ * workflows-list-view.tsx's isWorkflowRule() already does. */
+export interface WorkflowRuleRef {
+  id: string;
+  name: string;
+  status: string;
+  conditions: unknown;
+}
 
 export interface LossCauseCategory {
   id: string;

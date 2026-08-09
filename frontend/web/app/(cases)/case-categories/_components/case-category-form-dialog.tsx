@@ -20,11 +20,12 @@ import {
 } from '@topiadesk/ui';
 import { buildCategoryTree, categoryLabel, descendantsOf } from '../../_lib/category-tree';
 import { CASE_TYPES, caseTypeLabel } from '../../_lib/constants';
-import { useCreateCaseCategory, useUpdateCaseCategory } from '../../_lib/hooks';
+import { useCreateCaseCategory, useUpdateCaseCategory, useWorkflowRules } from '../../_lib/hooks';
 import type { CaseCategory, CaseType } from '../../_lib/types';
 
 const UNSET = '__any';
 const NO_PARENT = '__none';
+const NO_WORKFLOW = '__none_workflow';
 
 /** Create/edit dialog for a case category — mirrors macros/_components/macro-form-dialog.tsx's plain useState shape (the whole row is passed in, not re-fetched by id). */
 export function CaseCategoryFormDialog({
@@ -44,6 +45,7 @@ export function CaseCategoryFormDialog({
   const [code, setCode] = React.useState('');
   const [caseType, setCaseType] = React.useState<CaseType | ''>('');
   const [parentId, setParentId] = React.useState<string>(NO_PARENT);
+  const [defaultWorkflowId, setDefaultWorkflowId] = React.useState<string>(NO_WORKFLOW);
 
   React.useEffect(() => {
     if (!open) return;
@@ -52,17 +54,20 @@ export function CaseCategoryFormDialog({
       setCode(category.code);
       setCaseType((category.caseType as CaseType | null) ?? '');
       setParentId(category.parentId ?? NO_PARENT);
+      setDefaultWorkflowId(category.defaultWorkflowId ?? NO_WORKFLOW);
     } else {
       setName('');
       setCode('');
       setCaseType('');
       setParentId(NO_PARENT);
+      setDefaultWorkflowId(NO_WORKFLOW);
     }
   }, [open, category]);
 
   const createCategory = useCreateCaseCategory();
   const updateCategory = useUpdateCaseCategory(category?.id ?? '');
   const isPending = createCategory.isPending || updateCategory.isPending;
+  const workflowRulesQuery = useWorkflowRules();
 
   // A category can't be its own parent, and (to keep the client-side tree
   // walk in category-tree.ts simple, and to avoid a cycle) can't be
@@ -73,7 +78,13 @@ export function CaseCategoryFormDialog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const payload = { name, code, caseType: caseType || undefined, parentId: parentId === NO_PARENT ? null : parentId };
+    const payload = {
+      name,
+      code,
+      caseType: caseType || undefined,
+      parentId: parentId === NO_PARENT ? null : parentId,
+      defaultWorkflowId: defaultWorkflowId === NO_WORKFLOW ? null : defaultWorkflowId,
+    };
     if (isEdit && category) {
       await updateCategory.mutateAsync(payload);
     } else {
@@ -132,6 +143,23 @@ export function CaseCategoryFormDialog({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Default workflow</Label>
+            <Select value={defaultWorkflowId} onValueChange={setDefaultWorkflowId}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_WORKFLOW}>None</SelectItem>
+                {(workflowRulesQuery.data ?? []).map((rule) => (
+                  <SelectItem key={rule.id} value={rule.id}>
+                    {rule.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Runs automatically whenever a new ticket is created with this category.</p>
           </div>
 
           <DialogFooter>

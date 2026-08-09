@@ -66,6 +66,7 @@ import type {
   UpdateSlaPolicyInput,
   UpdateSlaTargetInput,
   UserOption,
+  WorkflowRuleRef,
 } from './types';
 
 function errorMessage(err: unknown): string {
@@ -884,6 +885,19 @@ export function useUpdateCaseCategory(id: string) {
       toast.success('Ticket category updated');
     },
     onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+/** For the "Default workflow" picker on the Case Category form — see
+ * WorkflowRuleRef's own comment for why this reuses the admin Workflow
+ * Builder's endpoint rather than adding a new one. */
+export function useWorkflowRules() {
+  return useQuery({
+    queryKey: ['case-categories', 'workflow-rules'],
+    queryFn: () => apiFetch<WorkflowRuleRef[]>('/api/crm/automation-rules?triggerType=ENTITY_EVENT'),
+    staleTime: 5 * 60_000,
+    select: (rules) =>
+      rules.filter((r) => r.status === 'PUBLISHED' && (r.conditions as { entityType?: string } | undefined)?.entityType === 'CASE'),
   });
 }
 

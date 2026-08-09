@@ -79,6 +79,27 @@ export async function processEntityEvent(payload: EntityEventPayload): Promise<{
     const rules = await prisma.automationRule.findMany({ where: { triggerType: 'ENTITY_EVENT', isActive: true, status: 'PUBLISHED' } });
     const matched = rules.filter((rule) => conditionsMatch(rule.conditions, payload, entity as unknown as Record<string, unknown>));
 
+    // A CaseCategory can name a "default workflow" guaranteed to run on
+    // CASE CREATED for that category, independent of the rule's own
+    // stored conditions (see CaseCategory.defaultWorkflowId's schema
+    // comment) — merged into the normally-matched set here (deduped by
+    // id, since an admin may have ALSO configured a matching condition on
+    // the same rule) rather than a second execution path, so it
+    // transparently supports both flat-action and steps-based rules with
+    // no restriction on rule shape.
+    if (payload.entityType === 'CASE' && payload.eventType === 'CREATED') {
+      const categoryId = (entity as { categoryId?: string | null }).categoryId;
+      if (categoryId) {
+        const category = await prisma.caseCategory.findUnique({ where: { id: categoryId }, select: { defaultWorkflowId: true } });
+        if (category?.defaultWorkflowId && !matched.some((r) => r.id === category.defaultWorkflowId)) {
+          const defaultRule = await prisma.automationRule.findFirst({
+            where: { id: category.defaultWorkflowId, isActive: true, status: 'PUBLISHED' },
+          });
+          if (defaultRule) matched.push(defaultRule);
+        }
+      }
+    }
+
     const entityRef: CaseManagementEntityRef =
       payload.entityType === 'CLAIM' ? { entityType: 'CLAIM', claimId: payload.entityId } : { entityType: 'CASE', caseId: payload.entityId };
 

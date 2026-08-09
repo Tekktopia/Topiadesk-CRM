@@ -17,6 +17,13 @@ export class CreateCaseCategoryDto {
   @IsOptional()
   @IsUUID()
   parentId?: string | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Guaranteed to run on CASE CREATED for this category, independent of the rule\'s own stored conditions. Omit/null to unset.',
+  })
+  @IsOptional()
+  @IsUUID()
+  defaultWorkflowId?: string | null;
 }
 
 export class UpdateCaseCategoryDto extends PartialType(CreateCaseCategoryDto) {}
@@ -27,4 +34,5 @@ export class CaseCategoryResponseDto {
   @ApiProperty() code!: string;
   @ApiProperty({ nullable: true }) caseType!: string | null;
   @ApiProperty({ nullable: true }) parentId!: string | null;
+  @ApiProperty({ nullable: true }) defaultWorkflowId!: string | null;
 }
