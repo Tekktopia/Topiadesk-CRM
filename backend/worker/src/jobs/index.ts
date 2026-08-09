@@ -29,6 +29,7 @@ import {
 import { createSurveyDispatchQueue, createSurveyDispatchWorker } from './surveys/send-case-survey-invite.job';
 import { createCaseOutboundEmailQueue, createCaseOutboundEmailWorker } from './case-outbound-email/send-case-comment-email.job';
 import { createPortalLoginQueue, createPortalLoginWorker } from './portal/send-portal-login-link.job';
+import { createBulkInviteEmailQueue, createBulkInviteEmailWorker } from './identity/send-bulk-invite-email.job';
 import { createProvisionTenantQueue, createProvisionTenantWorker } from './platform/provision-tenant.job';
 import { createCreatePlatformAdminQueue, createCreatePlatformAdminWorker } from './platform/create-platform-admin.job';
 import { createCreateTenantAdminQueue, createCreateTenantAdminWorker } from './platform/create-tenant-admin.job';
@@ -125,6 +126,13 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
   const portalLoginQueue = createPortalLoginQueue(connection);
   const portalLoginWorker = createPortalLoginWorker(connection);
 
+  // Event-driven, not a repeatable schedule — the API enqueues directly
+  // when a tenant admin's bulk-invite CSV row successfully creates a
+  // Keycloak user + local row (see backend/api/src/modules/identity/
+  // users.controller.ts's bulkInvite()).
+  const bulkInviteEmailQueue = createBulkInviteEmailQueue(connection);
+  const bulkInviteEmailWorker = createBulkInviteEmailWorker(connection);
+
   // Event-driven, not a repeatable schedule — the Platform-Admin API
   // enqueues directly when a Global Admin operator creates a new tenant
   // (see backend/api/src/modules/platform/tenants.controller.ts).
@@ -170,6 +178,7 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       caseOutboundEmailQueue,
       automationRunResumeQueue,
       portalLoginQueue,
+      bulkInviteEmailQueue,
       provisionTenantQueue,
       createPlatformAdminQueue,
       createTenantAdminQueue,
@@ -192,6 +201,7 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       caseOutboundEmailWorker,
       automationRunResumeWorker,
       portalLoginWorker,
+      bulkInviteEmailWorker,
       provisionTenantWorker,
       createPlatformAdminWorker,
       createTenantAdminWorker,

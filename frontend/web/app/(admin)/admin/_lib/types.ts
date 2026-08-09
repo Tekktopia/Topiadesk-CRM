@@ -81,6 +81,28 @@ export interface DecideRoleGrantBody {
   reason?: string;
 }
 
+/** POST /identity/users/bulk-invite — hand-written, not derived from
+ * ApiPaths: this route landed after the last schema regeneration, same
+ * "hand-mirror when generation lags" convention this file's header
+ * comment documents. Keep in sync with backend/api/src/modules/identity/
+ * dto/bulk-invite-users.dto.ts by hand. */
+export interface BulkInviteUserRow {
+  email: string;
+  fullName: string;
+  departmentCode?: string;
+  branchCode?: string;
+}
+
+export interface BulkInviteUsersBody {
+  rows: BulkInviteUserRow[];
+}
+
+export interface BulkInviteResultRow {
+  email: string;
+  status: 'created' | 'skipped' | 'failed';
+  reason?: string;
+}
+
 // -- Roles & permissions --------------------------------------------------
 type RawRoleDto = Json200<'/identity/roles', 'get'>[number];
 export type RoleDto = Omit<RawRoleDto, 'description'> & { description: NullableString };

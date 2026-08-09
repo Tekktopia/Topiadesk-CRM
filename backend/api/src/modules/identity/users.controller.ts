@@ -23,11 +23,33 @@ import { AuditService } from '../../common/audit/audit.service';
 import { AssignRoleDto, ListUsersQueryDto, UpdateUserDto, UserResponseDto } from './dto/user.dto';
 import { PendingRoleGrantResponseDto } from './dto/role-grant.dto';
 import { ForceLogoutResponseDto, KeycloakSessionResponseDto } from './dto/keycloak-session-response.dto';
+import { BulkInviteResultRowDto, BulkInviteUsersDto } from './dto/bulk-invite-users.dto';
 import { rethrowAsHttpException } from './prisma-error.util';
-// NOT a type-only import: KeycloakAdminService is constructor-injected
-// below — see the same footgun documented on Reflector in permission.guard.ts.
+import { enqueueBulkInviteEmail } from './send-bulk-invite-email-queue';
+// NOT type-only imports: constructor-injected below — see the same
+// footgun documented on Reflector in permission.guard.ts.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { KeycloakAdminService } from './keycloak-admin.service';
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import { UserProvisioningService } from './user-provisioning.service';
+
+function splitName(fullName: string): { firstName: string; lastName: string } {
+  const parts = fullName.trim().split(/\s+/);
+  const firstName = parts[0] ?? fullName;
+  const lastName = parts.slice(1).join(' ') || firstName;
+  return { firstName, lastName };
+}
+
+/** Must satisfy the realm's own passwordPolicy (12+ chars, upper/lower/
+ * digit/special) — a one-time value the user is forced to change on first
+ * sign-in (resetPassword's `temporary: true` credential flag), never
+ * displayed or logged beyond the one-time welcome email. Duplicated (not
+ * imported) from keycloak-realm-provisioning.ts — that file lives in
+ * backend/worker, a separately deployable app. */
+function generateTemporaryPassword(): string {
+  const random = Math.random().toString(36).slice(2, 10);
+  return `Tdk!${random}A1`;
+}
 
 type UserWithRoles = Prisma.UserGetPayload<{ include: { roles: { include: { role: true } } } }>;
 
@@ -65,6 +87,7 @@ export class UsersController {
   constructor(
     private readonly auditService: AuditService,
     private readonly keycloakAdmin: KeycloakAdminService,
+    private readonly userProvisioning: UserProvisioningService,
   ) {}
 
   @Get()
@@ -90,6 +113,100 @@ export class UsersController {
       skip: query.skip,
     });
     return users.map(toUserResponse);
+  }
+
+  /**
+   * The one self-service "bring my team into the system" path — everything
+   * else that creates a User row is Keycloak-sync-owned (see this class's
+   * own header comment) or SCIM (external-IdP-only). Sequential, not a
+   * queued batch job — mirrors this codebase's existing "small N,
+   * loop-per-row" bulk convention (e.g. admin/users' client-side bulk
+   * deactivate/reactivate) rather than inventing a new batch abstraction;
+   * max 200 rows (BulkInviteUsersDto) keeps a worst-case request bounded.
+   * Each row: local email-uniqueness check, Keycloak createUser +
+   * resetPassword (mirrors ScimController.doCreateUser()'s proven
+   * sequence), then upsertLocalUser — with a best-effort compensating
+   * setEnabled(false) if a later step fails after Keycloak succeeded, so a
+   * transient DB error can't leave an orphaned, enabled, blank-password
+   * Keycloak account. One row failing never aborts the batch; every row's
+   * outcome is reported back. No seat-limit check here — see this
+   * session's plan for why: that check today only exists platform-side
+   * against Subscription.plan.seatLimit (db-platform), and reaching into
+   * that schema from a tenant-authenticated request would break the
+   * "one request touches one schema" RLS invariant PlatformContext/RLS
+   * session-var sharing depends on.
+   */
+  @Post('bulk-invite')
+  @RequirePermission('identity', 'write')
+  @ApiOkResponse({ type: [BulkInviteResultRowDto] })
+  async bulkInvite(@Body() dto: BulkInviteUsersDto): Promise<BulkInviteResultRowDto[]> {
+    const prisma = getPrismaClient();
+    const results: BulkInviteResultRowDto[] = [];
+
+    for (const row of dto.rows) {
+      try {
+        const existing = await prisma.user.findUnique({ where: { email: row.email } });
+        if (existing) {
+          results.push({ email: row.email, status: 'skipped', reason: 'A user with this email already exists' });
+          continue;
+        }
+
+        const { firstName, lastName } = splitName(row.fullName);
+
+        let keycloakUserId: string;
+        try {
+          keycloakUserId = await this.keycloakAdmin.createUser({
+            username: row.email,
+            email: row.email,
+            firstName,
+            lastName,
+            enabled: true,
+            emailVerified: true,
+          });
+        } catch (err) {
+          results.push({ email: row.email, status: 'failed', reason: `Keycloak account: ${err instanceof Error ? err.message : String(err)}` });
+          continue;
+        }
+
+        const temporaryPassword = generateTemporaryPassword();
+        try {
+          await this.keycloakAdmin.resetPassword(keycloakUserId, temporaryPassword);
+        } catch (err) {
+          await this.keycloakAdmin.setEnabled(keycloakUserId, false).catch(() => undefined);
+          results.push({ email: row.email, status: 'failed', reason: `Keycloak password: ${err instanceof Error ? err.message : String(err)}` });
+          continue;
+        }
+
+        let provisioned: { userId: string | null };
+        try {
+          provisioned = await this.userProvisioning.upsertLocalUser({
+            keycloakSubjectId: keycloakUserId,
+            email: row.email,
+            firstName,
+            lastName,
+            enabled: true,
+            departmentCode: row.departmentCode,
+            branchCode: row.branchCode,
+          });
+        } catch (err) {
+          await this.keycloakAdmin.setEnabled(keycloakUserId, false).catch(() => undefined);
+          results.push({ email: row.email, status: 'failed', reason: `Local record: ${err instanceof Error ? err.message : String(err)}` });
+          continue;
+        }
+
+        // entity_id is a real uuid column (audit_log) — one event per
+        // created row, not a synthetic batch-level id.
+        if (provisioned.userId) {
+          await this.auditService.recordEvent({ action: 'CREATE', entityType: 'users', entityId: provisioned.userId });
+        }
+        await enqueueBulkInviteEmail({ email: row.email, fullName: row.fullName, temporaryPassword });
+        results.push({ email: row.email, status: 'created' });
+      } catch (err) {
+        results.push({ email: row.email, status: 'failed', reason: err instanceof Error ? err.message : String(err) });
+      }
+    }
+
+    return results;
   }
 
   @Get(':id')

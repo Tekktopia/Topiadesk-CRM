@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, CheckCircle2, MoreHorizontal, Search } from 'lucide-react';
+import { Ban, CheckCircle2, MoreHorizontal, Search, Upload } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -34,6 +34,7 @@ import { useBranches, useDepartments } from '../_lib/queries';
 import { canWriteAdmin } from '../_lib/permissions';
 import type { UserDto } from '../_lib/types';
 import { UserEditDialog } from './user-edit-dialog';
+import { BulkInviteDialog } from './bulk-invite-dialog';
 
 const STATUS_OPTIONS = ['ACTIVE', 'SUSPENDED', 'DEACTIVATED'] as const;
 
@@ -57,6 +58,7 @@ export default function UsersPage() {
   const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
 
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [bulkInviteOpen, setBulkInviteOpen] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState<{ user: UserDto; action: 'deactivate' | 'reactivate' } | null>(
     null,
   );
@@ -221,6 +223,14 @@ export default function UsersPage() {
       <PageHeader
         title="Users"
         description="Directory of every synced identity, their org placement, and role assignments."
+        actions={
+          canWrite ? (
+            <Button variant="outline" onClick={() => setBulkInviteOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" aria-hidden />
+              Bulk invite
+            </Button>
+          ) : undefined
+        }
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -312,6 +322,8 @@ export default function UsersPage() {
           onOpenChange={(open) => !open && setEditingUserId(null)}
         />
       ) : null}
+
+      <BulkInviteDialog open={bulkInviteOpen} onOpenChange={setBulkInviteOpen} />
 
       {pendingStatusChange ? (
         <ConfirmDialog
