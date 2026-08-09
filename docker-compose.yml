@@ -311,6 +311,7 @@ services:
       - traefik.http.routers.keycloak.entrypoints=websecure
       - traefik.http.routers.keycloak.tls=true
       - traefik.http.routers.keycloak.middlewares=secure-headers@file
+      - traefik.http.routers.keycloak.priority=10
       - traefik.http.services.keycloak.loadbalancer.server.port=8080
     networks:
       - topiadesk_data
@@ -397,6 +398,7 @@ services:
       - traefik.http.routers.api.entrypoints=websecure
       - traefik.http.routers.api.tls=true
       - traefik.http.routers.api.middlewares=secure-headers@file
+      - traefik.http.routers.api.priority=10
       - traefik.http.services.api.loadbalancer.server.port=${API_PORT}
     networks:
       - topiadesk_data
@@ -455,7 +457,21 @@ services:
       - traefik.http.routers.web.entrypoints=websecure
       - traefik.http.routers.web.tls=true
       - traefik.http.routers.web.middlewares=secure-headers@file
+      - traefik.http.routers.web.priority=10
       - traefik.http.services.web.loadbalancer.server.port=${WEB_PORT}
+      # Tenant subdomains (e.g. <slug>.topiadesk.localhost) — same `web`
+      # container, one subdomain level only (Host()'s wildcard doesn't
+      # match multi-label subdomains). Explicit low priority so this can
+      # never shadow app./api./auth./platform. above, which all set
+      # priority=10 for exactly this reason — Traefik's default
+      # rule-length tiebreaker already favors the exact-host routers, but
+      # this removes any doubt.
+      - traefik.http.routers.web-tenant.rule=Host(`*.${APP_BASE_DOMAIN}`)
+      - traefik.http.routers.web-tenant.entrypoints=websecure
+      - traefik.http.routers.web-tenant.tls=true
+      - traefik.http.routers.web-tenant.middlewares=secure-headers@file
+      - traefik.http.routers.web-tenant.priority=1
+      - traefik.http.routers.web-tenant.service=web
     networks:
       - topiadesk_data
       - topiadesk_public
@@ -497,6 +513,7 @@ services:
       - traefik.http.routers.global-admin.entrypoints=websecure
       - traefik.http.routers.global-admin.tls=true
       - traefik.http.routers.global-admin.middlewares=secure-headers@file
+      - traefik.http.routers.global-admin.priority=10
       - traefik.http.services.global-admin.loadbalancer.server.port=${GLOBAL_ADMIN_PORT}
     networks:
       - topiadesk_data

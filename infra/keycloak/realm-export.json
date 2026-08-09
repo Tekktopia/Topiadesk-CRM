@@ -6,6 +6,7 @@
   "sslRequired": "external",
   "registrationAllowed": false,
   "resetPasswordAllowed": true,
+  "rememberMe": true,
   "editUsernameAllowed": false,
   "bruteForceProtected": true,
   "failureFactor": 5,

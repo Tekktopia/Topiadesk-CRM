@@ -60,16 +60,27 @@ body#keycloak-bg {
 /* =============================================================================
    Shell: hero (left, dark, animated) + form panel (right, light)
    ============================================================================= */
+/* height:100vh + overflow:hidden here (not min-height) is load-bearing:
+   the hero is a grid sibling of the form panel, not a sticky/fixed
+   element, so if the shell were allowed to grow taller than the viewport
+   (e.g. the form panel's content — card + trust badges + footer —
+   exceeds a short window's height), the whole page would gain a
+   scrollbar and the hero would scroll away with everything else. Pinning
+   the shell to exactly the viewport and letting only the form panel
+   scroll internally (below) keeps the hero visually still no matter how
+   tall the card gets. */
 .td-shell {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   font-family: var(--td-font);
 }
 
 .td-hero {
   position: relative;
   overflow: hidden;
+  height: 100%;
   background: radial-gradient(ellipse 120% 90% at 20% 0%, #101827 0%, var(--td-hero-bg) 60%);
   color: var(--td-hero-ink);
   display: flex;
@@ -242,6 +253,8 @@ body#keycloak-bg {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  height: 100%;
+  overflow-y: auto;
   padding: 2.5rem 2rem;
   background: var(--td-panel-bg);
 }
@@ -262,7 +275,7 @@ body#keycloak-bg {
    duplication — it's the same pattern the reference image itself uses:
    one brand mark on the hero side, one directly on the card). */
 #kc-header {
-  margin: 0 0 0.9rem;
+  margin: 0 0 1.1rem;
   border: none !important;
   box-shadow: none !important;
   background: transparent !important;
@@ -271,33 +284,49 @@ body#keycloak-bg {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.55rem;
   color: var(--td-ink-muted) !important;
   font-family: var(--td-font);
   font-weight: 600;
-  font-size: 0.64rem;
-  letter-spacing: 0.13em;
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   text-align: center;
 }
+/* Soft concentric-ring halo behind the mark, in place of the flat logo
+   image — matches the reference card's glowing circular badge. Three
+   box-shadow rings (cheaper than a second element) fade the accent color
+   outward; the white plate underneath keeps the mark itself crisp. */
 #kc-header-wrapper::before {
   content: "";
   display: block;
   width: 40px;
   height: 40px;
+  margin-bottom: 0.15rem;
+  border-radius: 50%;
+  background-color: #ffffff;
   background-image: url("../img/logo-mark.png");
-  background-size: contain;
+  background-size: 62%;
   background-repeat: no-repeat;
   background-position: center;
+  box-shadow:
+    0 0 0 9px var(--td-accent-soft),
+    0 0 0 18px rgba(79, 140, 255, 0.07),
+    0 6px 18px -6px rgba(47, 111, 238, 0.4);
 }
 
-/* ---------- Card: clean, light, a thin single-hue accent bar ---------- */
+/* ---------- Card: clean, light, a thin single-hue accent bar ----------
+   Slightly more generous padding/radius/shadow than a default PatternFly
+   card — the goal is "considered product surface", not "unstyled form in
+   a box". Sizing/position of the card itself (.pf-v5-c-login__container's
+   width) is left alone so it keeps lining up with the trust-badge row
+   below, which lives outside this component. */
 .pf-v5-c-login__main {
   background: var(--td-card-bg);
   border: 1px solid var(--td-card-border);
-  border-radius: 18px;
-  padding: 2rem 2rem 1.6rem;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 20px 40px -12px rgba(16, 24, 40, 0.14);
+  border-radius: 20px;
+  padding: 2.35rem 2.25rem 1.9rem;
+  box-shadow: 0 2px 5px rgba(16, 24, 40, 0.05), 0 26px 52px -16px rgba(16, 24, 40, 0.18);
   position: relative;
   overflow: hidden;
 }
@@ -313,7 +342,7 @@ body#keycloak-bg {
 
 .pf-v5-c-login__main-header {
   text-align: center;
-  margin-bottom: 1.1rem;
+  margin-bottom: 1.5rem;
   border-top: none !important;
   padding-top: 0 !important;
 }
@@ -323,9 +352,9 @@ body#keycloak-bg {
   font-family: var(--td-font);
   color: var(--td-ink) !important;
   font-weight: 700 !important;
-  font-size: 1.32rem !important;
-  letter-spacing: -0.02em;
-  line-height: 1.3 !important;
+  font-size: 1.56rem !important;
+  letter-spacing: -0.025em;
+  line-height: 1.25 !important;
 }
 
 .pf-v5-c-login__main-body > .subtitle,
@@ -334,8 +363,74 @@ body#keycloak-bg {
   color: var(--td-ink-muted) !important;
 }
 
+.td-card-heading {
+  display: block;
+  width: 100%;
+}
+.td-card-subtitle {
+  margin: 0.3rem 0 0;
+  font-family: var(--td-font);
+  font-size: 0.85rem;
+  color: var(--td-ink-muted);
+}
+
 .pf-v5-c-form__group {
-  margin-bottom: 0.85rem;
+  margin-bottom: 1.15rem;
+}
+
+/* The real root cause of "fields render narrower than the card": PatternFly's
+   own `.pf-v5-c-login__main-body` carries 48px of built-in left/right
+   padding (`--pf-v5-c-login__main-body--PaddingLeft/Right`) ON TOP OF the
+   card's own padding (`.pf-v5-c-login__main` above) — confirmed live via
+   computed styles (48px + 48px measured directly), not a grid/flex
+   shrink-wrap issue as first suspected. This double-padding has silently
+   been eating ~96px of the already-narrow 23.5rem card's width the whole
+   time; it just wasn't obvious until real placeholder text (added above)
+   was long enough to visibly truncate. The card's own padding is enough
+   on its own, so main-body's copy is zeroed out here rather than kept and
+   compensated for elsewhere. */
+.pf-v5-c-login__main-body {
+  padding-inline-start: 0 !important;
+  padding-inline-end: 0 !important;
+}
+
+/* ---------- Remember-me + Forgot-password row ----------
+   Keycloak's own markup already puts both in one flex/space-between row
+   (pf-v5-u-display-flex pf-v5-u-justify-content-space-between on the
+   wrapping .pf-v5-c-helper-text) — this just restyles the checkbox itself
+   to match the card's visual language instead of PatternFly's defaults. */
+.pf-v5-c-form__helper-text {
+  margin-top: 0.7rem;
+}
+.pf-v5-c-helper-text {
+  align-items: center;
+}
+.pf-v5-c-helper-text__item,
+.pf-v5-c-helper-text__item-text,
+.pf-v5-c-helper-text__item-text a {
+  white-space: nowrap !important;
+}
+.pf-v5-c-check {
+  display: inline-flex !important;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0.5rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pf-v5-c-check__input {
+  width: 16px;
+  height: 16px;
+  margin: 0 !important;
+  accent-color: var(--td-accent-strong);
+  cursor: pointer;
+}
+.pf-v5-c-check__label {
+  font-family: var(--td-font);
+  font-size: 0.82rem !important;
+  color: var(--td-ink-muted) !important;
+  cursor: pointer;
+  white-space: nowrap !important;
 }
 
 .pf-v5-c-form__label {
@@ -352,7 +447,7 @@ body#keycloak-bg {
 }
 
 .pf-v5-c-form__actions {
-  padding-top: 0.6rem !important;
+  padding-top: 0.9rem !important;
   padding-bottom: 0 !important;
   margin: 0 !important;
 }
@@ -386,33 +481,54 @@ label {
   position: relative;
   background: var(--td-input-bg) !important;
   border: 1px solid var(--td-input-border) !important;
-  border-radius: 10px !important;
+  border-radius: 12px !important;
   color: var(--td-ink) !important;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
-  padding-left: 2.5rem !important;
+  padding-left: 2.85rem !important;
+}
+/* The input immediately followed by the password-visibility toggle button
+   (see the seam fix below) — flatten the shared edge so the two read as
+   one continuous control instead of two adjacent boxes with a visible
+   double-border bump where they meet. */
+.pf-v5-c-form-control:has(+ .pf-v5-c-button.pf-m-control) {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  border-right: none !important;
 }
 .pf-v5-c-form-control input,
 .pf-v5-c-form-control textarea {
   outline: none !important;
-  height: 2.6rem;
-  padding: 0 0.85rem 0 0 !important;
-  font-size: 0.9rem !important;
+  height: 3.35rem;
+  padding: 0 1rem 0 0 !important;
+  font-size: 0.95rem !important;
   font-family: var(--td-font);
   min-height: 0 !important;
   background: transparent !important;
+  /* The parent wrapper's `color` (above) doesn't reliably win here —
+     keycloak.v2's base stylesheet sets its own color directly on the
+     bare <input>/<textarea>, tuned for its own (darker) default
+     backgrounds, and a same-or-higher-specificity same-!important rule
+     on the element itself beats inheritance from an ancestor every time
+     regardless of stylesheet load order. Root-caused live: typed text
+     was rendering white-on-white here — invisible, not just "hard to
+     read". -webkit-text-fill-color is the belt-and-suspenders half:
+     Safari/Chrome autofill otherwise overrides `color` specifically
+     (not other properties) with its own baked-in autofill text color. */
+  color: var(--td-ink) !important;
+  -webkit-text-fill-color: var(--td-ink);
 }
 .pf-v5-c-form-control::before {
   content: "";
   position: absolute;
-  left: 0.85rem;
+  left: 1rem;
   top: 50%;
   transform: translateY(-50%);
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
-  opacity: 0.55;
+  opacity: 0.62;
   pointer-events: none;
 }
 .pf-v5-c-form-control:has(#username)::before,
@@ -431,6 +547,21 @@ label {
   color: #a3a9b3 !important;
   opacity: 1;
 }
+/* Browser autofill (the username field picking up a saved "admin" login
+   is the common trigger) paints its own background/text color that
+   ignores `color`/`background` entirely — only `-webkit-text-fill-color`
+   and this inset-box-shadow trick (there is no legitimate CSS property
+   to just turn the autofill background off) reach it. Long transition
+   delay is the standard way to stop Chrome re-flashing its yellow tint
+   a frame after this applies. */
+.pf-v5-c-form-control input:-webkit-autofill,
+.pf-v5-c-form-control input:-webkit-autofill:hover,
+.pf-v5-c-form-control input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--td-ink) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--td-input-bg) inset !important;
+  box-shadow: 0 0 0 1000px var(--td-input-bg) inset !important;
+  transition: background-color 600000s ease-in-out 0s;
+}
 .pf-v5-c-form-control:hover {
   background: #f0f1f4 !important;
 }
@@ -444,24 +575,53 @@ label {
 .pf-v5-c-button.pf-m-primary,
 .pf-v5-c-button.pf-m-secondary {
   font-family: var(--td-font);
-  height: 2.75rem;
+  height: 3.35rem;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
-  font-size: 0.92rem !important;
-  border-radius: 10px !important;
+  font-size: 0.95rem !important;
+  border-radius: 12px !important;
   margin: 0 !important;
 }
 .pf-v5-c-button.pf-m-primary {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   background: linear-gradient(135deg, var(--td-accent-strong), var(--td-accent)) !important;
   border: none !important;
   font-weight: 600;
   box-shadow: 0 8px 20px -6px rgba(47, 111, 238, 0.45);
   transition: box-shadow 0.15s ease, transform 0.15s ease, filter 0.15s ease;
 }
+/* Trailing chevron — decorative only (no accessible-name content), same
+   reasoning as the input leading icons above: CSS is the only way to add
+   an icon here without a .ftl override of the (base-theme-owned, not
+   ours) buttons.ftl macro. */
+.pf-v5-c-button.pf-m-primary::after {
+  /* keycloak.v2's own base stylesheet also puts a `::after` on
+     `.pf-v5-c-button` (an absolutely-positioned hover/focus overlay) — the
+     `content`/`background-image`/sizing below override that rule's
+     properties, but `position: absolute; top: 0; left: 0` isn't one of
+     them, so without resetting it here too the chevron inherited that
+     positioning and rendered pinned to the button's top-left corner
+     instead of inline next to the text. */
+  position: static !important;
+  content: "";
+  width: 15px;
+  height: 15px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6l6 6-6 6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  transition: transform 0.15s ease;
+}
 .pf-v5-c-button.pf-m-primary:hover {
   filter: brightness(1.06);
   box-shadow: 0 10px 26px -6px rgba(47, 111, 238, 0.55);
   transform: translateY(-1px);
+}
+.pf-v5-c-button.pf-m-primary:hover::after {
+  transform: translateX(3px);
 }
 .pf-v5-c-button.pf-m-primary:active {
   transform: translateY(0);
@@ -479,7 +639,16 @@ label {
   border: 1px solid var(--td-input-border) !important;
   border-left: none !important;
   color: var(--td-ink-muted) !important;
-  border-radius: 0 10px 10px 0 !important;
+  border-radius: 0 12px 12px 0 !important;
+  height: 3.35rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+/* Mirrors .pf-v5-c-form-control:focus-within just above — the toggle
+   button is the input's visual other half now (see the seam fix), so
+   focusing/filling either side should read as one control lighting up. */
+.pf-v5-c-form-control:focus-within + .pf-v5-c-button.pf-m-control {
+  background: #ffffff !important;
+  border-color: var(--td-accent) !important;
 }
 .pf-v5-c-button.pf-m-control:hover {
   color: var(--td-ink) !important;
@@ -508,6 +677,8 @@ a:hover {
   flex-wrap: wrap;
   gap: 1.25rem;
   margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--td-card-border);
   width: 23.5rem;
   max-width: 100%;
 }
@@ -544,12 +715,16 @@ a:hover {
 @media (max-width: 960px) {
   .td-shell {
     display: block;
+    height: auto;
+    overflow: visible;
   }
   .td-hero {
     display: none;
   }
   .td-form-panel {
+    height: auto;
     min-height: 100vh;
+    overflow-y: visible;
   }
 }
 

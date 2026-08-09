@@ -11,6 +11,11 @@ export interface KeycloakUserRepresentation {
   enabled: boolean;
   emailVerified?: boolean;
   attributes?: Record<string, string[]>;
+  /** e.g. ['UPDATE_PASSWORD', 'CONFIGURE_TOTP'] — cleared to [] when a
+   * platform admin sets a specific password directly (resetPassword's
+   * `temporary: false` alone doesn't drop a pre-existing UPDATE_PASSWORD
+   * requiredAction; that's a separate user-level field). */
+  requiredActions?: string[];
 }
 
 export interface KeycloakSessionRepresentation {
@@ -107,10 +112,14 @@ export class KeycloakAdminService {
    * The password itself is never logged here — callers own not persisting
    * it anywhere beyond a single API response, same discipline as
    * generateTemporaryPassword()'s own doc comment. */
-  async resetPassword(keycloakUserId: string, temporaryPassword: string): Promise<void> {
+  /** `temporary` defaults to true (forces a change on next sign-in) — the
+   * behavior every existing caller relies on. Pass false when the caller
+   * (a platform admin) deliberately set this password themselves, so
+   * Keycloak doesn't immediately force it to be replaced. */
+  async resetPassword(keycloakUserId: string, temporaryPassword: string, temporary = true): Promise<void> {
     const res = await this.adminFetch(`/users/${encodeURIComponent(keycloakUserId)}/reset-password`, {
       method: 'PUT',
-      body: JSON.stringify({ type: 'password', value: temporaryPassword, temporary: true }),
+      body: JSON.stringify({ type: 'password', value: temporaryPassword, temporary }),
     });
     if (!res.ok) throw new Error(`Keycloak reset-password failed (${res.status}): ${await safeBody(res)}`);
   }
