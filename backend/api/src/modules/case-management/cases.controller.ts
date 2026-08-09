@@ -298,11 +298,21 @@ export class CasesController {
     const prisma = getPrismaClient();
     const existing = await prisma.case.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Case not found');
-    if (existing.assignedToId && existing.assignedToId !== user.id) {
+    if (existing.assignedToId === user.id) return existing;
+
+    // Atomic conditional update, not the read-then-write this replaced —
+    // the old `findUnique` -> check -> `update({where:{id}})` had a real
+    // TOCTOU race: two agents opening the same unassigned ticket at once
+    // could both pass the null-check before either wrote, and the second
+    // write would silently steal the case with no error to either caller
+    // (found live, not theoretical). The `assignedToId: null` guard in the
+    // WHERE clause makes only the first writer's update actually match a
+    // row; `count === 0` means someone else's write landed first.
+    const result = await prisma.case.updateMany({ where: { id, assignedToId: null }, data: { assignedToId: user.id } });
+    if (result.count === 0) {
       throw new ConflictException('Case is already assigned to another user');
     }
-    if (existing.assignedToId === user.id) return existing;
-    const updated = await prisma.case.update({ where: { id }, data: { assignedToId: user.id } });
+    const updated = await prisma.case.findUniqueOrThrow({ where: { id } });
     await enqueueEntityEvent({ entityType: 'CASE', entityId: id, eventType: 'ASSIGNED', occurredAt: updated.updatedAt.toISOString() }).catch(() => undefined);
     return updated;
   }

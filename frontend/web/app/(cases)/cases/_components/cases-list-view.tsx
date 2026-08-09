@@ -3,14 +3,31 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Loader2, Plus } from 'lucide-react';
-import { Badge, Button, Card, CardContent, type ColumnDef, DataTable, DataTableColumnHeader, Tabs, TabsContent, TabsList, TabsTrigger } from '@topiadesk/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  type ColumnDef,
+  DataTable,
+  DataTableColumnHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@topiadesk/ui';
 import { useQuickCreateParam } from '@/lib/use-quick-create-param';
 import { EmptyState } from '../../_components/empty-state';
 import { PageHeader } from '../../_components/page-header';
 import { SlaBadge } from '../../_components/sla-badge';
 import { caseTypeLabel, casePriorityLabel, casePriorityVariant } from '../../_lib/constants';
 import { formatDate } from '../../_lib/format';
-import { useCasesQueue, useSelfAssignCase, useSlaClocksByPolicyIds } from '../../_lib/hooks';
+import { useCasesQueue, useSelfAssignCase, useSlaClocksByPolicyIds, useTeams } from '../../_lib/hooks';
 import type { Case } from '../../_lib/types';
 import { CaseFormDialog } from './case-form-dialog';
 import { TicketWorkspace } from './ticket-workspace';
@@ -49,9 +66,13 @@ export function CasesListView() {
   );
 }
 
+const ALL_TEAMS = '__all__';
+
 function QueueTab() {
-  const { data, isLoading, isFetching, isError } = useCasesQueue();
+  const [teamId, setTeamId] = React.useState(ALL_TEAMS);
+  const { data, isLoading, isFetching, isError } = useCasesQueue(teamId === ALL_TEAMS ? {} : { teamId });
   const selfAssign = useSelfAssignCase();
+  const { teams, teamsById } = useTeams();
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 20 });
   const cases = data ?? [];
   const { clocksByEntityId } = useSlaClocksByPolicyIds(cases.map((c) => c.slaPolicyId));
@@ -95,6 +116,13 @@ function QueueTab() {
         cell: ({ row }) => <SlaBadge clocks={clocksByEntityId.get(row.original.id)} />,
       },
       {
+        id: 'team',
+        header: 'Team',
+        meta: { label: 'Team' },
+        accessorFn: (c) => (c.assignedTeamId ? (teamsById.get(c.assignedTeamId)?.name ?? c.assignedTeamId) : '—'),
+        cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
+      },
+      {
         accessorKey: 'createdAt',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Created" />,
         meta: { label: 'Created' },
@@ -112,16 +140,32 @@ function QueueTab() {
         ),
       },
     ],
-    [clocksByEntityId, selfAssign],
+    [clocksByEntityId, selfAssign, teamsById],
   );
 
   return (
     <div className="space-y-6 pt-4">
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
           <p className="text-sm text-muted-foreground">
             Unassigned, still-active cases (NEW/OPEN/REOPENED) ordered by priority — pick one up with &quot;Claim&quot;.
           </p>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Team:</span>
+            <Select value={teamId} onValueChange={setTeamId}>
+              <SelectTrigger className="h-8 w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_TEAMS}>All my teams</SelectItem>
+                {teams.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </CardContent>
       </Card>
 

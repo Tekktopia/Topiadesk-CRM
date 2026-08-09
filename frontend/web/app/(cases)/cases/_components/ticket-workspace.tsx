@@ -29,7 +29,7 @@ import { EmptyState } from '../../_components/empty-state';
 import { SlaBadge } from '../../_components/sla-badge';
 import { caseTypeLabel, casePriorityLabel, casePriorityVariant, caseStatusLabel, caseStatusVariant } from '../../_lib/constants';
 import { formatDate } from '../../_lib/format';
-import { useBulkCloseCases, useBulkReassignCases, useCaseSavedViews, useCases, useCasesCount, useDirectoryUsers, usePolicyLookups, useSlaClocksByPolicyIds } from '../../_lib/hooks';
+import { useBulkCloseCases, useBulkReassignCases, useCaseSavedViews, useCases, useCasesCount, useDirectoryUsers, usePolicyLookups, useSlaClocksByPolicyIds, useTeams } from '../../_lib/hooks';
 import type { Case, CaseQuery } from '../../_lib/types';
 import { CaseFormDialog } from './case-form-dialog';
 import {
@@ -143,6 +143,7 @@ export function TicketWorkspace() {
   const total = countData?.total ?? cases.length;
 
   const { users, usersById } = useDirectoryUsers();
+  const { teamsById } = useTeams();
   const { contacts, accounts } = usePolicyLookups();
   const contactsById = React.useMemo(() => new Map(contacts.map((c) => [c.id, c.name])), [contacts]);
   const accountsById = React.useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts]);
@@ -209,6 +210,13 @@ export function TicketWorkspace() {
         cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
       },
       {
+        id: 'team',
+        header: 'Team',
+        meta: { label: 'Team' },
+        accessorFn: (c) => (c.assignedTeamId ? (teamsById.get(c.assignedTeamId)?.name ?? c.assignedTeamId) : '—'),
+        cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
+      },
+      {
         accessorKey: 'createdAt',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Created" />,
         meta: { label: 'Created' },
@@ -233,7 +241,7 @@ export function TicketWorkspace() {
         ),
       },
     ],
-    [clocksByEntityId, usersById],
+    [clocksByEntityId, usersById, teamsById],
   );
 
   return (
