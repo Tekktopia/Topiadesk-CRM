@@ -37,6 +37,7 @@ import { PlansController } from './modules/platform/plans.controller';
 import { PlatformAdminsController } from './modules/platform/platform-admins.controller';
 import { TenantUsersController } from './modules/platform/tenant-users.controller';
 import { PlatformSupportTicketsController } from './modules/platform/support-tickets.controller';
+import { PlatformAuditLogController } from './modules/platform/platform-audit-log.controller';
 
 @Module({
   imports: [
@@ -194,6 +195,14 @@ export class AppModule implements NestModule {
     // identical pattern does work.
     consumer
       .apply(PlatformContextMiddleware)
-      .forRoutes(PlatformController, TenantsController, PlansController, PlatformAdminsController, TenantUsersController, PlatformSupportTicketsController);
+      .forRoutes(
+        PlatformController,
+        TenantsController,
+        PlansController,
+        PlatformAdminsController,
+        TenantUsersController,
+        PlatformSupportTicketsController,
+        PlatformAuditLogController,
+      );
   }
 }

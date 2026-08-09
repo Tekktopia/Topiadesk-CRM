@@ -8,6 +8,9 @@ import { ENV_TOKEN, type Env } from '../../common/config/config.module';
 import { KeycloakAdminService } from '../identity/keycloak-admin.service';
 import { CreateTenantAdminUserDto, ResetTenantUserPasswordResponseDto, TenantUserResponseDto } from './dto/tenant-user.dto';
 import { enqueueCreateTenantAdmin } from './create-tenant-admin-queue';
+import { PlatformAuditService } from './platform-audit.service';
+import { CurrentPlatformAdmin } from './current-platform-admin.decorator';
+import type { PlatformAdminContext } from './platform-context';
 
 /** Same policy shape as generateTemporaryPassword() in
  * backend/worker/src/jobs/platform/keycloak-realm-provisioning.ts (12+
@@ -39,6 +42,7 @@ export class TenantUsersController {
   constructor(
     @Inject(ENV_TOKEN) private readonly env: Env,
     private readonly keycloakAdmin: KeycloakAdminService,
+    private readonly auditService: PlatformAuditService,
   ) {}
 
   private async requireTenant(tenantId: string) {
@@ -86,7 +90,11 @@ export class TenantUsersController {
 
   @Post()
   @ApiOkResponse({ schema: { type: 'object', properties: { status: { type: 'string' } } } })
-  async create(@Param('tenantId') tenantId: string, @Body() dto: CreateTenantAdminUserDto): Promise<{ status: 'queued' }> {
+  async create(
+    @Param('tenantId') tenantId: string,
+    @Body() dto: CreateTenantAdminUserDto,
+    @CurrentPlatformAdmin() actor: PlatformAdminContext,
+  ): Promise<{ status: 'queued' }> {
     const tenant = await this.requireTenant(tenantId);
 
     const subscription = await getPlatformPrismaClient().subscription.findUnique({ where: { tenantId }, include: { plan: true } });
@@ -101,12 +109,23 @@ export class TenantUsersController {
     if (existing) throw new BadRequestException(`A user with email "${dto.email}" already exists in this tenant`);
 
     await enqueueCreateTenantAdmin({ tenantId: tenant.id, email: dto.email, fullName: dto.fullName });
+    await this.auditService.recordEvent({
+      actorPlatformAdminId: actor.id,
+      action: 'CREATE_TENANT_ADMIN',
+      entityType: 'tenants',
+      entityId: tenantId,
+      detail: { email: dto.email, fullName: dto.fullName },
+    });
     return { status: 'queued' };
   }
 
   @Post(':userId/reset-password')
   @ApiOkResponse({ type: ResetTenantUserPasswordResponseDto })
-  async resetPassword(@Param('tenantId') tenantId: string, @Param('userId') userId: string): Promise<ResetTenantUserPasswordResponseDto> {
+  async resetPassword(
+    @Param('tenantId') tenantId: string,
+    @Param('userId') userId: string,
+    @CurrentPlatformAdmin() actor: PlatformAdminContext,
+  ): Promise<ResetTenantUserPasswordResponseDto> {
     const tenant = await this.requireTenant(tenantId);
     const user = await this.withTenantSchema(tenant.keycloakRealm, () => getPrismaClient().user.findUnique({ where: { id: userId } }));
     if (!user) throw new NotFoundException(`User ${userId} not found in this tenant`);
@@ -117,22 +136,29 @@ export class TenantUsersController {
     } catch (err) {
       throw new BadGatewayException(`Keycloak password reset failed: ${err instanceof Error ? err.message : String(err)}`);
     }
+    await this.auditService.recordEvent({
+      actorPlatformAdminId: actor.id,
+      action: 'RESET_TENANT_USER_PASSWORD',
+      entityType: 'tenants',
+      entityId: tenantId,
+      detail: { userId, email: user.email },
+    });
     return { temporaryPassword };
   }
 
   @Post(':userId/deactivate')
   @ApiOkResponse({ type: TenantUserResponseDto })
-  async deactivate(@Param('tenantId') tenantId: string, @Param('userId') userId: string): Promise<TenantUserResponseDto> {
-    return this.setStatus(tenantId, userId, 'DEACTIVATED', false);
+  async deactivate(@Param('tenantId') tenantId: string, @Param('userId') userId: string, @CurrentPlatformAdmin() actor: PlatformAdminContext): Promise<TenantUserResponseDto> {
+    return this.setStatus(tenantId, userId, 'DEACTIVATED', false, actor);
   }
 
   @Post(':userId/reactivate')
   @ApiOkResponse({ type: TenantUserResponseDto })
-  async reactivate(@Param('tenantId') tenantId: string, @Param('userId') userId: string): Promise<TenantUserResponseDto> {
-    return this.setStatus(tenantId, userId, 'ACTIVE', true);
+  async reactivate(@Param('tenantId') tenantId: string, @Param('userId') userId: string, @CurrentPlatformAdmin() actor: PlatformAdminContext): Promise<TenantUserResponseDto> {
+    return this.setStatus(tenantId, userId, 'ACTIVE', true, actor);
   }
 
-  private async setStatus(tenantId: string, userId: string, status: 'ACTIVE' | 'DEACTIVATED', enabled: boolean): Promise<TenantUserResponseDto> {
+  private async setStatus(tenantId: string, userId: string, status: 'ACTIVE' | 'DEACTIVATED', enabled: boolean, actor: PlatformAdminContext): Promise<TenantUserResponseDto> {
     const tenant = await this.requireTenant(tenantId);
     const updated = await this.withTenantSchema(tenant.keycloakRealm, async () => {
       const prisma = getPrismaClient();
@@ -144,6 +170,13 @@ export class TenantUsersController {
         throw new BadGatewayException(`Keycloak update failed: ${err instanceof Error ? err.message : String(err)}`);
       }
       return prisma.user.update({ where: { id: userId }, data: { status }, include: { roles: { include: { role: true } } } });
+    });
+    await this.auditService.recordEvent({
+      actorPlatformAdminId: actor.id,
+      action: status === 'ACTIVE' ? 'REACTIVATE_TENANT_USER' : 'DEACTIVATE_TENANT_USER',
+      entityType: 'tenants',
+      entityId: tenantId,
+      detail: { userId, email: updated.email },
     });
     return {
       id: updated.id,

@@ -124,3 +124,14 @@ export interface PlatformStats {
   suspended: number;
   failed: number;
 }
+
+export interface PlatformAuditLogEntry {
+  id: string;
+  actorPlatformAdminId: string | null;
+  actorName: string | null;
+  action: string;
+  entityType: string;
+  entityId: string;
+  detail: Record<string, unknown> | null;
+  createdAt: string;
+}

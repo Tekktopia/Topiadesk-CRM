@@ -4,6 +4,7 @@ import { getPlatformPrismaClient } from '@topiadesk/db-platform';
 import { CurrentPlatformAdmin } from './current-platform-admin.decorator';
 import type { PlatformAdminContext } from './platform-context';
 import { CreatePlatformTicketCommentDto, PlatformSupportTicketResponseDto, UpdateSupportTicketDto } from './dto/platform-support-ticket.dto';
+import { PlatformAuditService } from './platform-audit.service';
 
 function toResponse(ticket: {
   id: string;
@@ -47,6 +48,8 @@ function toResponse(ticket: {
 @ApiBearerAuth()
 @Controller('platform/support-tickets')
 export class PlatformSupportTicketsController {
+  constructor(private readonly auditService: PlatformAuditService) {}
+
   @Get()
   @ApiOkResponse({ type: [PlatformSupportTicketResponseDto] })
   async list(@Query('tenantId') tenantId?: string, @Query('status') status?: string): Promise<PlatformSupportTicketResponseDto[]> {
@@ -78,7 +81,7 @@ export class PlatformSupportTicketsController {
 
   @Patch(':id')
   @ApiOkResponse({ type: PlatformSupportTicketResponseDto })
-  async update(@Param('id') id: string, @Body() dto: UpdateSupportTicketDto): Promise<PlatformSupportTicketResponseDto> {
+  async update(@Param('id') id: string, @Body() dto: UpdateSupportTicketDto, @CurrentPlatformAdmin() actor: PlatformAdminContext): Promise<PlatformSupportTicketResponseDto> {
     const prisma = getPlatformPrismaClient();
     const existing = await prisma.supportTicket.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException(`Support ticket ${id} not found`);
@@ -97,6 +100,13 @@ export class PlatformSupportTicketsController {
       },
       include: { tenant: { select: { name: true } }, assignedTo: { select: { fullName: true } } },
     });
+    await this.auditService.recordEvent({
+      actorPlatformAdminId: actor.id,
+      action: 'UPDATE_SUPPORT_TICKET',
+      entityType: 'support_tickets',
+      entityId: id,
+      detail: { status: dto.status, priority: dto.priority, assignedToId: dto.assignedToId },
+    });
     return toResponse(updated);
   }
 
@@ -106,8 +116,15 @@ export class PlatformSupportTicketsController {
     const prisma = getPlatformPrismaClient();
     const ticket = await prisma.supportTicket.findUnique({ where: { id } });
     if (!ticket) throw new NotFoundException(`Support ticket ${id} not found`);
-    return prisma.supportTicketComment.create({
+    const comment = await prisma.supportTicketComment.create({
       data: { ticketId: id, authorPlatformAdminId: admin.id, authorName: admin.fullName, authorEmail: admin.email, body: dto.body },
     });
+    await this.auditService.recordEvent({
+      actorPlatformAdminId: admin.id,
+      action: 'REPLY_SUPPORT_TICKET',
+      entityType: 'support_tickets',
+      entityId: id,
+    });
+    return comment;
   }
 }

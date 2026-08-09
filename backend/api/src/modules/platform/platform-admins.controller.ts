@@ -8,6 +8,9 @@ import { KeycloakAdminService } from '../identity/keycloak-admin.service';
 import { ENV_TOKEN, type Env } from '../../common/config/config.module';
 import { CreatePlatformAdminDto, PlatformAdminResponseDto } from './dto/platform-admin.dto';
 import { enqueueCreatePlatformAdmin } from './create-platform-admin-queue';
+import { PlatformAuditService } from './platform-audit.service';
+import { CurrentPlatformAdmin } from './current-platform-admin.decorator';
+import type { PlatformAdminContext } from './platform-context';
 
 /**
  * CRUD for the platform's OWN operator accounts (PlatformAdminUser) — the
@@ -25,6 +28,7 @@ export class PlatformAdminsController {
   constructor(
     @Inject(ENV_TOKEN) private readonly env: Env,
     private readonly keycloakAdmin: KeycloakAdminService,
+    private readonly auditService: PlatformAuditService,
   ) {}
 
   @Get()
@@ -35,26 +39,33 @@ export class PlatformAdminsController {
 
   @Post()
   @ApiOkResponse({ schema: { type: 'object', properties: { status: { type: 'string' } } } })
-  async create(@Body() dto: CreatePlatformAdminDto): Promise<{ status: 'queued' }> {
+  async create(@Body() dto: CreatePlatformAdminDto, @CurrentPlatformAdmin() actor: PlatformAdminContext): Promise<{ status: 'queued' }> {
     const existing = await getPlatformPrismaClient().platformAdminUser.findUnique({ where: { email: dto.email } });
     if (existing) throw new BadRequestException(`A platform admin with email "${dto.email}" already exists`);
     await enqueueCreatePlatformAdmin({ email: dto.email, fullName: dto.fullName });
+    await this.auditService.recordEvent({
+      actorPlatformAdminId: actor.id,
+      action: 'CREATE_PLATFORM_ADMIN',
+      entityType: 'platform_admin_users',
+      entityId: dto.email,
+      detail: { fullName: dto.fullName },
+    });
     return { status: 'queued' };
   }
 
   @Post(':id/deactivate')
   @ApiOkResponse({ type: PlatformAdminResponseDto })
-  async deactivate(@Param('id') id: string): Promise<PlatformAdminResponseDto> {
-    return this.setStatus(id, 'INACTIVE', false);
+  async deactivate(@Param('id') id: string, @CurrentPlatformAdmin() actor: PlatformAdminContext): Promise<PlatformAdminResponseDto> {
+    return this.setStatus(id, 'INACTIVE', false, actor);
   }
 
   @Post(':id/reactivate')
   @ApiOkResponse({ type: PlatformAdminResponseDto })
-  async reactivate(@Param('id') id: string): Promise<PlatformAdminResponseDto> {
-    return this.setStatus(id, 'ACTIVE', true);
+  async reactivate(@Param('id') id: string, @CurrentPlatformAdmin() actor: PlatformAdminContext): Promise<PlatformAdminResponseDto> {
+    return this.setStatus(id, 'ACTIVE', true, actor);
   }
 
-  private async setStatus(id: string, status: 'ACTIVE' | 'INACTIVE', enabled: boolean): Promise<PlatformAdminResponseDto> {
+  private async setStatus(id: string, status: 'ACTIVE' | 'INACTIVE', enabled: boolean, actor: PlatformAdminContext): Promise<PlatformAdminResponseDto> {
     const prisma = getPlatformPrismaClient();
     const admin = await prisma.platformAdminUser.findUnique({ where: { id } });
     if (!admin) throw new NotFoundException(`Platform admin ${id} not found`);
@@ -68,6 +79,13 @@ export class PlatformAdminsController {
     const ctx = getRlsContext();
     await runWithRlsContext({ ...ctx!, tenantSchema: this.env.KEYCLOAK_PLATFORM_REALM }, () => this.keycloakAdmin.setEnabled(admin.keycloakSubjectId, enabled));
 
-    return prisma.platformAdminUser.update({ where: { id }, data: { status } });
+    const updated = await prisma.platformAdminUser.update({ where: { id }, data: { status } });
+    await this.auditService.recordEvent({
+      actorPlatformAdminId: actor.id,
+      action: status === 'ACTIVE' ? 'REACTIVATE_PLATFORM_ADMIN' : 'DEACTIVATE_PLATFORM_ADMIN',
+      entityType: 'platform_admin_users',
+      entityId: id,
+    });
+    return updated;
   }
 }

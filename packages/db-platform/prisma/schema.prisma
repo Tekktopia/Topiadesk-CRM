@@ -146,6 +146,7 @@ model PlatformAdminUser {
 
   assignedTickets SupportTicket[]
   ticketComments  SupportTicketComment[]
+  auditLogEntries PlatformAuditLog[]
 
   @@map("platform_admin_users")
 }
@@ -219,4 +220,28 @@ model SupportTicketComment {
 
   @@index([ticketId])
   @@map("support_ticket_comments")
+}
+
+/// Every mutating /platform/* action, for accountability — deliberately
+/// NOT hash-chained like the tenant schema's own `audit_log` (see
+/// packages/db/prisma/triggers/002_audit_chain_triggers.sql): this schema
+/// has no trigger infrastructure at all (confirmed absent when this
+/// session surveyed it), and platform-admin action volume is low enough
+/// that a plain append-only table is the right amount of ceremony for
+/// this pass. `actorPlatformAdminId` is nullable for SYSTEM_JOB-originated
+/// rows (there are none yet, but the shape matches every other nullable
+/// actor FK in this schema for the same reason).
+model PlatformAuditLog {
+  id                    String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorPlatformAdminId  String?            @map("actor_platform_admin_id") @db.Uuid
+  actorPlatformAdmin    PlatformAdminUser? @relation(fields: [actorPlatformAdminId], references: [id], onDelete: SetNull)
+  action                String
+  entityType            String             @map("entity_type")
+  entityId              String             @map("entity_id")
+  detail                Json?
+  createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@map("platform_audit_log")
 }

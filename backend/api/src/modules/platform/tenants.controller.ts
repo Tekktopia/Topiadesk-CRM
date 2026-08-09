@@ -6,6 +6,9 @@ import { invalidateTenantRealmCache } from '../../common/auth/tenant-realm-resol
 import { CreateTenantDto, TenantProvisioningEventResponseDto, TenantResponseDto, UpdateTenantSubscriptionDto } from './dto/tenant.dto';
 import { TenantAdminSummaryDto, TenantUsageDto } from './dto/tenant-user.dto';
 import { enqueueTenantProvisioning } from './provision-tenant-queue';
+import { PlatformAuditService } from './platform-audit.service';
+import { CurrentPlatformAdmin } from './current-platform-admin.decorator';
+import type { PlatformAdminContext } from './platform-context';
 
 function isUniqueConstraintViolation(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
@@ -36,9 +39,11 @@ function addMonths(date: Date, months: number): Date {
 @ApiBearerAuth()
 @Controller('platform/tenants')
 export class TenantsController {
+  constructor(private readonly auditService: PlatformAuditService) {}
+
   @Post()
   @ApiOkResponse({ type: TenantResponseDto })
-  async create(@Body() dto: CreateTenantDto): Promise<TenantResponseDto> {
+  async create(@Body() dto: CreateTenantDto, @CurrentPlatformAdmin() actor: PlatformAdminContext): Promise<TenantResponseDto> {
     const prisma = getPlatformPrismaClient();
     const plan = await prisma.plan.findUnique({ where: { id: dto.planId } });
     if (!plan) throw new BadRequestException(`Plan ${dto.planId} not found`);
@@ -57,6 +62,13 @@ export class TenantsController {
         },
       });
       await enqueueTenantProvisioning(tenant.id);
+      await this.auditService.recordEvent({
+        actorPlatformAdminId: actor.id,
+        action: 'CREATE_TENANT',
+        entityType: 'tenants',
+        entityId: tenant.id,
+        detail: { name: dto.name, slug: dto.slug, planId: dto.planId },
+      });
       return tenant;
     } catch (err) {
       if (isUniqueConstraintViolation(err)) {
@@ -162,17 +174,17 @@ export class TenantsController {
 
   @Post(':id/suspend')
   @ApiOkResponse({ type: TenantResponseDto })
-  async suspend(@Param('id') id: string): Promise<TenantResponseDto> {
-    return this.setStatus(id, 'SUSPENDED');
+  async suspend(@Param('id') id: string, @CurrentPlatformAdmin() actor: PlatformAdminContext): Promise<TenantResponseDto> {
+    return this.setStatus(id, 'SUSPENDED', actor);
   }
 
   @Post(':id/reactivate')
   @ApiOkResponse({ type: TenantResponseDto })
-  async reactivate(@Param('id') id: string): Promise<TenantResponseDto> {
-    return this.setStatus(id, 'ACTIVE');
+  async reactivate(@Param('id') id: string, @CurrentPlatformAdmin() actor: PlatformAdminContext): Promise<TenantResponseDto> {
+    return this.setStatus(id, 'ACTIVE', actor);
   }
 
-  private async setStatus(id: string, status: 'ACTIVE' | 'SUSPENDED'): Promise<TenantResponseDto> {
+  private async setStatus(id: string, status: 'ACTIVE' | 'SUSPENDED', actor: PlatformAdminContext): Promise<TenantResponseDto> {
     const prisma = getPlatformPrismaClient();
     const tenant = await prisma.tenant.findUnique({ where: { id } });
     if (!tenant) throw new NotFoundException(`Tenant ${id} not found`);
@@ -184,6 +196,12 @@ export class TenantsController {
     // 30s TTL either way — this just makes suspend/reactivate effective
     // immediately instead of waiting out that window.
     await invalidateTenantRealmCache(tenant.keycloakRealm);
+    await this.auditService.recordEvent({
+      actorPlatformAdminId: actor.id,
+      action: status === 'ACTIVE' ? 'REACTIVATE_TENANT' : 'SUSPEND_TENANT',
+      entityType: 'tenants',
+      entityId: id,
+    });
     return updated;
   }
 
@@ -197,15 +215,23 @@ export class TenantsController {
 
   @Patch(':id/subscription')
   @ApiOkResponse()
-  async updateSubscription(@Param('id') id: string, @Body() dto: UpdateTenantSubscriptionDto) {
+  async updateSubscription(@Param('id') id: string, @Body() dto: UpdateTenantSubscriptionDto, @CurrentPlatformAdmin() actor: PlatformAdminContext) {
     const prisma = getPlatformPrismaClient();
     const sub = await prisma.subscription.findUnique({ where: { tenantId: id } });
     if (!sub) throw new NotFoundException(`Tenant ${id} has no subscription`);
     const currentPeriodEnd = dto.durationMonths ? addMonths(new Date(), dto.durationMonths) : undefined;
-    return prisma.subscription.update({
+    const updated = await prisma.subscription.update({
       where: { tenantId: id },
       data: { planId: dto.planId, status: dto.status, currentPeriodEnd },
       include: { plan: true },
     });
+    await this.auditService.recordEvent({
+      actorPlatformAdminId: actor.id,
+      action: 'UPDATE_TENANT_SUBSCRIPTION',
+      entityType: 'tenants',
+      entityId: id,
+      detail: { planId: dto.planId, status: dto.status, durationMonths: dto.durationMonths },
+    });
+    return updated;
   }
 }
