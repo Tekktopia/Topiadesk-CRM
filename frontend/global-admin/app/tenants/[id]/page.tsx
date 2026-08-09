@@ -28,6 +28,14 @@ import type { Plan, TenantDetail } from '../../_lib/types';
 import { TenantStatusBadge } from '../_status-badge';
 import { AdminsTab } from './_admins-tab';
 import { UsageTab } from './_usage-tab';
+import { GenerateLicenseDialog } from './_generate-license-dialog';
+
+/** Days until `currentPeriodEnd`, or null if there's no expiry set yet
+ * (a subscription that's never had a license "generated" against it —
+ * see UpdateTenantSubscriptionDto's durationMonths field). */
+function daysUntil(isoDate: string): number {
+  return Math.ceil((new Date(isoDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
 
 const STEP_ICON: Record<string, React.ReactNode> = {
   IN_PROGRESS: <Loader2 className="h-4 w-4 animate-spin text-warning" />,
@@ -166,6 +174,26 @@ function TenantDetailPageContent() {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                    <Row
+                      label="License expires"
+                      value={
+                        tenant.subscription.currentPeriodEnd ? (
+                          (() => {
+                            const days = daysUntil(tenant.subscription.currentPeriodEnd);
+                            return (
+                              <span className={days < 0 ? 'text-destructive' : days <= 14 ? 'text-warning' : undefined}>
+                                {new Date(tenant.subscription.currentPeriodEnd).toLocaleDateString()} {days < 0 ? '(expired)' : `(${days}d)`}
+                              </span>
+                            );
+                          })()
+                        ) : (
+                          <span className="text-muted-foreground">Not set</span>
+                        )
+                      }
+                    />
+                    <div className="pt-1">
+                      <GenerateLicenseDialog tenantId={tenant.id} currentPlanId={tenant.subscription.planId} />
                     </div>
                   </>
                 ) : (

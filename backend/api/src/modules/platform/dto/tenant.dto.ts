@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, IsUUID, Matches, MinLength } from 'class-validator';
+import { IsEmail, IsInt, IsOptional, IsString, IsUUID, Matches, Max, Min, MinLength } from 'class-validator';
 
 export class CreateTenantDto {
   @ApiProperty({ description: "The tenant organization's display name, e.g. \"Acme Insurance Brokers\"." })
@@ -28,6 +28,16 @@ export class UpdateTenantSubscriptionDto {
   @IsOptional()
   @IsString()
   status?: 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELED';
+  @ApiPropertyOptional({
+    description: 'When provided, sets currentPeriodEnd to now + this many months — "generating/renewing a license" is this field plus a plan/status change, not a separate artifact. Omit to leave currentPeriodEnd untouched.',
+    minimum: 1,
+    maximum: 60,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(60)
+  durationMonths?: number;
 }
 
 export class TenantResponseDto {

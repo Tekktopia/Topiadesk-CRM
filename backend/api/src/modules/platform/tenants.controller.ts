@@ -11,6 +11,16 @@ function isUniqueConstraintViolation(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 }
 
+/** No date-fns dependency in this app yet for one calculation — JS's own
+ * Date arithmetic rolls over correctly for month-end overflow (e.g. Jan 31
+ * + 1 month -> Mar 3, not an invalid "Feb 31"), which is the standard,
+ * accepted behavior for this kind of "N months from now" calculation. */
+function addMonths(date: Date, months: number): Date {
+  const result = new Date(date);
+  result.setMonth(result.getMonth() + months);
+  return result;
+}
+
 /**
  * Tenant lifecycle CRUD + provisioning trigger. Creation is deliberately
  * thin — validate the slug is free, create the Tenant row (status
@@ -191,9 +201,10 @@ export class TenantsController {
     const prisma = getPlatformPrismaClient();
     const sub = await prisma.subscription.findUnique({ where: { tenantId: id } });
     if (!sub) throw new NotFoundException(`Tenant ${id} has no subscription`);
+    const currentPeriodEnd = dto.durationMonths ? addMonths(new Date(), dto.durationMonths) : undefined;
     return prisma.subscription.update({
       where: { tenantId: id },
-      data: { planId: dto.planId, status: dto.status },
+      data: { planId: dto.planId, status: dto.status, currentPeriodEnd },
       include: { plan: true },
     });
   }
