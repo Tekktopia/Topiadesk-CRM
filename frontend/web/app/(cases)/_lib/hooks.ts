@@ -11,12 +11,14 @@ import type {
   AssignmentTestResponse,
   BusinessHoliday,
   BusinessHoursCalendar,
+  BusinessRule,
   Case,
   CaseCategory,
   CaseClosureApproval,
   CaseComment,
   CaseQuery,
   CaseQueueQuery,
+  CaseSavedView,
   CaseWatcher,
   ChangeCaseStatusInput,
   ChangeClaimStatusInput,
@@ -27,8 +29,10 @@ import type {
   CreateAssignmentRuleInput,
   CreateBusinessHolidayInput,
   CreateBusinessHoursCalendarInput,
+  CreateBusinessRuleInput,
   CreateCaseCategoryInput,
   CreateCaseInput,
+  CreateCaseSavedViewInput,
   CreateClaimInput,
   CreateCommentInput,
   CreateLossCauseCategoryInput,
@@ -53,6 +57,7 @@ import type {
   UpdateAssignmentRuleInput,
   UpdateBusinessHolidayInput,
   UpdateBusinessHoursCalendarInput,
+  UpdateBusinessRuleInput,
   UpdateCaseCategoryInput,
   UpdateCaseInput,
   UpdateClaimInput,
@@ -227,6 +232,73 @@ export function useCasesQueue(query: CaseQueueQuery = {}) {
   return useQuery({
     queryKey: ['cases', 'queue', query],
     queryFn: () => apiFetch<Case[]>(`/api/cases/queue${buildQuery(query)}`),
+  });
+}
+
+/**
+ * The backend validates a CASE saved view's `filters` against CaseQueryDto
+ * directly (see saved-views.controller.ts), which uses @IsBooleanString()
+ * for myTeams/newOrMine/undeliveredOnly — a real string "true"/"false", not
+ * a JS boolean. buildQuery() already does this exact conversion for the
+ * live GET /cases request; these two mirror it for the JSON POST/PATCH body
+ * a saved view's filters travel in, and undo it on the way back out so the
+ * loaded value fits CaseQuery's boolean-typed fields.
+ */
+const BOOLEAN_STRING_FIELDS = ['myTeams', 'newOrMine', 'undeliveredOnly'] as const;
+
+function caseQueryToFilterPayload(query: CaseQuery): Record<string, unknown> {
+  const payload: Record<string, unknown> = { ...query };
+  delete payload.skip;
+  delete payload.take;
+  for (const field of BOOLEAN_STRING_FIELDS) {
+    if (typeof payload[field] === 'boolean') payload[field] = payload[field] ? 'true' : undefined;
+  }
+  return payload;
+}
+
+function filterPayloadToCaseQuery(filters: Record<string, unknown>): CaseQuery {
+  const query: Record<string, unknown> = { ...filters };
+  for (const field of BOOLEAN_STRING_FIELDS) {
+    if (field in query) query[field] = query[field] === 'true';
+  }
+  return query as CaseQuery;
+}
+
+export function useCaseSavedViews() {
+  return useQuery({
+    queryKey: ['case-saved-views'],
+    queryFn: async () => {
+      const views = await apiFetch<CaseSavedView[]>('/api/crm/saved-views?entityType=CASE');
+      return views.map((v) => ({ ...v, filters: filterPayloadToCaseQuery(v.filters as unknown as Record<string, unknown>) }));
+    },
+  });
+}
+
+export function useCreateCaseSavedView() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateCaseSavedViewInput) =>
+      apiFetch<CaseSavedView>('/api/crm/saved-views', {
+        method: 'POST',
+        body: JSON.stringify({ entityType: 'CASE', ...input, filters: caseQueryToFilterPayload(input.filters) }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['case-saved-views'] });
+      toast.success('View saved');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useDeleteCaseSavedView() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<{ deleted: boolean }>(`/api/crm/saved-views/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['case-saved-views'] });
+      toast.success('View removed');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
   });
 }
 

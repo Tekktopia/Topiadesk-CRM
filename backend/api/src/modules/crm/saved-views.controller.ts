@@ -1,10 +1,14 @@
-import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { validate } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
 import { getPrismaClient, type Prisma, type SavedViewEntityType } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
+import { CaseQueryDto } from '../case-management/dto/case.dto';
+import { buildCaseOrderBy, buildCaseWhere } from '../case-management/case-query.util';
 import {
   CreateSavedViewDto,
   RunSavedViewQueryDto,
@@ -15,6 +19,28 @@ import {
 } from './dto/saved-view.dto';
 import { buildSavedViewOrderBy, buildSavedViewWhere } from './saved-view-filters';
 import { toOpportunityDto } from './mapping';
+
+/**
+ * CASE saved views store the FULL CaseQueryDto shape as `filters`, not a
+ * generic FilterTree — Case filtering (team membership, watchers, date
+ * presets, OR-conditions) can't be expressed as a flat {field,operator,value}
+ * tree. Re-validating against the exact same class-validator DTO
+ * `GET /cases` itself uses (rather than a hand-rolled parallel check)
+ * guarantees identical rules even though this object came from a stored
+ * jsonb blob, not a live request body that ValidationPipe already checked.
+ */
+async function validateCaseSavedViewFilters(filters: unknown): Promise<CaseQueryDto> {
+  if (typeof filters !== 'object' || filters === null || Array.isArray(filters)) {
+    throw new BadRequestException('filters must be an object for CASE saved views');
+  }
+  const instance = plainToInstance(CaseQueryDto, filters);
+  const errors = await validate(instance, { whitelist: true, forbidNonWhitelisted: true });
+  if (errors.length > 0) {
+    const messages = errors.map((e) => Object.values(e.constraints ?? {}).join(', ')).join('; ');
+    throw new BadRequestException(`Invalid case filter: ${messages}`);
+  }
+  return instance;
+}
 
 /**
  * saved_views_rw (prisma/rls/002_policies.sql) already restricts visibility
@@ -52,8 +78,12 @@ export class SavedViewsController {
   async create(@Body() dto: CreateSavedViewDto, @CurrentUser() user: AuthenticatedUser): Promise<SavedViewResponseDto> {
     // Validate eagerly so a malformed filter/sort tree can never be saved —
     // fails at write time, not on first /run.
-    await buildSavedViewWhere(dto.entityType, dto.filters);
-    buildSavedViewOrderBy(dto.entityType, dto.sort);
+    if (dto.entityType === 'CASE') {
+      await validateCaseSavedViewFilters(dto.filters);
+    } else {
+      await buildSavedViewWhere(dto.entityType, dto.filters);
+      buildSavedViewOrderBy(dto.entityType, dto.sort);
+    }
     return getPrismaClient().savedView.create({
       data: {
         entityType: dto.entityType,
@@ -78,8 +108,12 @@ export class SavedViewsController {
     if (!existing) throw new NotFoundException('SavedView not found');
 
     const entityType = existing.entityType;
-    if (dto.filters !== undefined) await buildSavedViewWhere(entityType, dto.filters);
-    if (dto.sort !== undefined) buildSavedViewOrderBy(entityType, dto.sort);
+    if (entityType === 'CASE') {
+      if (dto.filters !== undefined) await validateCaseSavedViewFilters(dto.filters);
+    } else {
+      if (dto.filters !== undefined) await buildSavedViewWhere(entityType, dto.filters);
+      if (dto.sort !== undefined) buildSavedViewOrderBy(entityType, dto.sort);
+    }
 
     return prisma.savedView.update({
       where: { id },
@@ -108,9 +142,23 @@ export class SavedViewsController {
   @Post(':id/run')
   @RequirePermission('account', 'read')
   @ApiOkResponse({ type: RunSavedViewResponseDto })
-  async run(@Param('id') id: string, @Query() pageQuery: RunSavedViewQueryDto): Promise<RunSavedViewResponseDto> {
+  async run(@Param('id') id: string, @Query() pageQuery: RunSavedViewQueryDto, @CurrentUser() user: AuthenticatedUser): Promise<RunSavedViewResponseDto> {
     const view = await getPrismaClient().savedView.findUnique({ where: { id } });
     if (!view) throw new NotFoundException('SavedView not found');
+
+    if (view.entityType === 'CASE') {
+      const caseQuery = plainToInstance(CaseQueryDto, view.filters as Record<string, unknown>);
+      const where = await buildCaseWhere(caseQuery, user.id);
+      const orderBy = buildCaseOrderBy(caseQuery);
+      const take = pageQuery.take ?? 50;
+      const skip = pageQuery.skip ?? 0;
+      const prisma = getPrismaClient();
+      const [rows, total] = await Promise.all([
+        prisma.case.findMany({ where, orderBy, take, skip }),
+        prisma.case.count({ where }),
+      ]);
+      return { total, rows };
+    }
 
     const where = await buildSavedViewWhere(view.entityType, view.filters);
     const orderBy = buildSavedViewOrderBy(view.entityType, view.sort);
@@ -119,7 +167,7 @@ export class SavedViewsController {
 }
 
 async function runEntityQuery(
-  entityType: SavedViewEntityType,
+  entityType: Exclude<SavedViewEntityType, 'CASE'>,
   where: Record<string, unknown>,
   orderByInput: Record<string, 'asc' | 'desc'>[],
   take: number,

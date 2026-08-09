@@ -251,6 +251,36 @@ export type CaseQueueQuery = {
   teamId?: string;
 };
 
+// ---------------------------------------------------------------------------
+// Saved views (tickets) — a real, RLS-isolated saved filter, distinct from
+// TICKET_VIEWS' fixed shared presets (ticket-views.ts). Stores a full
+// CaseQuery object as `filters` (not the generic CRM SavedView's FilterTree
+// — Case filtering has OR-conditions/joins/date presets a flat filter tree
+// can't express), so this type intentionally does NOT reuse (crm)/_lib/
+// types.ts's SavedView/CreateSavedViewInput interfaces.
+
+export type SavedViewVisibility = 'PRIVATE' | 'TEAM' | 'DEPARTMENT' | 'ORG';
+
+export interface CaseSavedView {
+  id: string;
+  entityType: 'CASE';
+  name: string;
+  ownerId: string;
+  visibility: SavedViewVisibility;
+  teamId: string | null;
+  filters: CaseQuery;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCaseSavedViewInput {
+  name: string;
+  visibility: SavedViewVisibility;
+  teamId?: string;
+  filters: CaseQuery;
+}
+
 export interface CreateCaseInput {
   caseType: CaseType;
   categoryId?: string;

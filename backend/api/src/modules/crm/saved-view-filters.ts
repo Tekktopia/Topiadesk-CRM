@@ -76,6 +76,15 @@ const ALLOWLISTS: Record<SavedViewEntityType, Record<string, FieldKind>> = {
     accountId: 'uuid',
     dueDate: 'date',
   },
+  // CASE saved views bypass this generic FilterTree allowlist entirely —
+  // Case filtering is bespoke (CaseQueryDto/buildCaseWhere: team
+  // membership, watchers, undelivered-message joins, date-range presets,
+  // OR-conditions) and can't be expressed as a flat {field,operator,value}
+  // tree. saved-views.controller.ts validates/interprets CASE filters
+  // directly against CaseQueryDto instead of calling into this file. This
+  // stub only exists to satisfy Record<SavedViewEntityType, ...>'s
+  // exhaustiveness — never actually read for CASE.
+  CASE: {},
 };
 
 // Only entities with a customFields jsonb column accept `customFields.<key>`

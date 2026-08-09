@@ -2198,6 +2198,7 @@ enum SavedViewEntityType {
   LEAD
   OPPORTUNITY
   TASK
+  CASE
 }
 
 enum SavedViewVisibility {

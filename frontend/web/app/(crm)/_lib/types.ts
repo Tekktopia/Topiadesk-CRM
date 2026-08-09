@@ -480,7 +480,11 @@ export interface UpdateCustomFieldDefinitionInput {
 
 // -- Phase 2: Saved views ----------------------------------------------------
 
-export type SavedViewEntityType = 'ACCOUNT' | 'CONTACT' | 'LEAD' | 'OPPORTUNITY' | 'TASK';
+// 'CASE' saved views store a full CaseQuery object as `filters`, not a
+// FilterTree — see (cases)/_lib/types.ts's CaseSavedView, which cases
+// code uses instead of the FilterTree-typed SavedView/CreateSavedViewInput
+// below (those two interfaces are never constructed for entityType CASE).
+export type SavedViewEntityType = 'ACCOUNT' | 'CONTACT' | 'LEAD' | 'OPPORTUNITY' | 'TASK' | 'CASE';
 export type SavedViewVisibility = 'PRIVATE' | 'TEAM' | 'DEPARTMENT' | 'ORG';
 
 /** Mirrors saved-view-filters.ts's FilterOperator — kept in sync manually. */

@@ -29,7 +29,7 @@ import { EmptyState } from '../../_components/empty-state';
 import { SlaBadge } from '../../_components/sla-badge';
 import { caseTypeLabel, casePriorityLabel, casePriorityVariant, caseStatusLabel, caseStatusVariant } from '../../_lib/constants';
 import { formatDate } from '../../_lib/format';
-import { useBulkCloseCases, useBulkReassignCases, useCases, useCasesCount, useDirectoryUsers, usePolicyLookups, useSlaClocksByPolicyIds } from '../../_lib/hooks';
+import { useBulkCloseCases, useBulkReassignCases, useCaseSavedViews, useCases, useCasesCount, useDirectoryUsers, usePolicyLookups, useSlaClocksByPolicyIds } from '../../_lib/hooks';
 import type { Case, CaseQuery } from '../../_lib/types';
 import { CaseFormDialog } from './case-form-dialog';
 import {
@@ -98,8 +98,19 @@ export function TicketWorkspace() {
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const [editing, setEditing] = React.useState<Case | null>(null);
 
-  const activeView = TICKET_VIEWS.find((v) => v.id === activeViewId) ?? TICKET_VIEWS[0]!;
+  const { data: savedViews } = useCaseSavedViews();
+  const activePresetView = TICKET_VIEWS.find((v) => v.id === activeViewId);
+  const activeSavedView = savedViews?.find((v) => v.id === activeViewId);
   const sortOption = SORT_OPTIONS.find((o) => o.value === sortValue) ?? SORT_OPTIONS[0]!;
+
+  // A saved view can be deleted (by its owner, from anywhere) while it's
+  // the active selection here — fall back to the default preset rather
+  // than silently keep applying an empty {} filter under a stale id.
+  React.useEffect(() => {
+    if (!savedViews) return; // still loading — don't judge validity yet
+    const stillValid = TICKET_VIEWS.some((v) => v.id === activeViewId) || savedViews.some((v) => v.id === activeViewId);
+    if (!stillValid) setActiveViewId(DEFAULT_TICKET_VIEW_ID);
+  }, [activeViewId, savedViews]);
 
   function selectView(viewId: string) {
     setActiveViewId(viewId);
@@ -113,18 +124,18 @@ export function TicketWorkspace() {
     setRowSelection({});
   }
 
-  const query: CaseQuery = React.useMemo(() => {
-    const viewQuery = currentUserId ? activeView.resolve(currentUserId) : {};
+  // The filter/sort portion of `query`, without pagination — this is what
+  // "Save current filters as a view" persists (see ticket-views-sidebar.tsx).
+  const currentFilters: CaseQuery = React.useMemo(() => {
+    const viewQuery = activeSavedView ? activeSavedView.filters : currentUserId && activePresetView ? activePresetView.resolve(currentUserId) : {};
     const panelQuery = ticketFilterFieldsToQuery(appliedFilters);
-    return {
-      ...viewQuery,
-      ...panelQuery,
-      sortBy: sortOption.sortBy,
-      sortDir: sortOption.sortDir,
-      skip: page * PAGE_SIZE,
-      take: PAGE_SIZE,
-    };
-  }, [activeView, appliedFilters, currentUserId, page, sortOption]);
+    return { ...viewQuery, ...panelQuery, sortBy: sortOption.sortBy, sortDir: sortOption.sortDir };
+  }, [activePresetView, activeSavedView, appliedFilters, currentUserId, sortOption]);
+
+  const query: CaseQuery = React.useMemo(
+    () => ({ ...currentFilters, skip: page * PAGE_SIZE, take: PAGE_SIZE }),
+    [currentFilters, page],
+  );
 
   const { data, isLoading, isFetching, isError } = useCases(query);
   const { data: countData } = useCasesCount(query);
@@ -280,7 +291,7 @@ export function TicketWorkspace() {
       </div>
 
       <div className="flex items-start gap-6">
-        <TicketViewsSidebar activeViewId={activeViewId} onSelectView={selectView} />
+        <TicketViewsSidebar activeViewId={activeViewId} onSelectView={selectView} savedViews={savedViews ?? []} currentFilters={currentFilters} />
 
         <div className="min-w-0 flex-1 space-y-4">
           <BulkActionToolbar
