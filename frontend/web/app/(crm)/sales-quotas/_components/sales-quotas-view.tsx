@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { BarChart3, MoreHorizontal, Plus } from 'lucide-react';
+import { BarChart3, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -16,23 +16,29 @@ import {
   DropdownMenuTrigger,
   type RowSelectionState,
 } from '@topiadesk/ui';
+import { ConfirmDialog } from '../../_components/confirm-dialog';
 import { EmptyState } from '../../_components/empty-state';
 import { PageHeader } from '../../_components/page-header';
 import { humanize } from '../../_lib/constants';
 import { formatCurrency, formatDate } from '../../_lib/format';
-import { useDirectoryUsers, useSalesQuotas } from '../../_lib/hooks';
+import { useBranches, useDeleteSalesQuota, useDepartments, useDirectoryUsers, useSalesQuotas } from '../../_lib/hooks';
 import type { SalesQuota } from '../../_lib/types';
 import { SalesQuotaAttainmentDialog } from './sales-quota-attainment-dialog';
 import { SalesQuotaFormDialog } from './sales-quota-form-dialog';
 
-function targetLabel(quota: SalesQuota, usersById: Map<string, { fullName: string }>): string {
+function targetLabel(
+  quota: SalesQuota,
+  usersById: Map<string, { fullName: string }>,
+  departmentsById: Map<string, { name: string }>,
+  branchesById: Map<string, { name: string }>,
+): string {
   switch (quota.scopeType) {
     case 'USER':
       return quota.userId ? (usersById.get(quota.userId)?.fullName ?? `User ${quota.userId.slice(0, 8)}…`) : '—';
     case 'DEPARTMENT':
-      return quota.departmentId ? `Department ${quota.departmentId.slice(0, 8)}…` : '—';
+      return quota.departmentId ? (departmentsById.get(quota.departmentId)?.name ?? `Department ${quota.departmentId.slice(0, 8)}…`) : '—';
     case 'BRANCH':
-      return quota.branchId ? `Branch ${quota.branchId.slice(0, 8)}…` : '—';
+      return quota.branchId ? (branchesById.get(quota.branchId)?.name ?? `Branch ${quota.branchId.slice(0, 8)}…`) : '—';
     case 'ORG':
       return 'Whole org';
   }
@@ -42,6 +48,7 @@ export function SalesQuotasView() {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<SalesQuota | null>(null);
   const [viewingAttainmentId, setViewingAttainmentId] = React.useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = React.useState<SalesQuota | null>(null);
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 20 });
   // No bulk actions here (no selection column below), but DataTable's
   // row.getIsSelected() is called unconditionally per row and throws if
@@ -51,6 +58,11 @@ export function SalesQuotasView() {
 
   const { data, isLoading, isError } = useSalesQuotas();
   const { usersById } = useDirectoryUsers();
+  const { data: departments } = useDepartments();
+  const { data: branches } = useBranches();
+  const deleteMutation = useDeleteSalesQuota();
+  const departmentsById = React.useMemo(() => new Map((departments ?? []).map((d) => [d.id, d])), [departments]);
+  const branchesById = React.useMemo(() => new Map((branches ?? []).map((b) => [b.id, b])), [branches]);
 
   const rows = data ?? [];
 
@@ -67,7 +79,7 @@ export function SalesQuotasView() {
         header: 'Target',
         meta: { label: 'Target' },
         enableSorting: false,
-        accessorFn: (q) => targetLabel(q, usersById),
+        accessorFn: (q) => targetLabel(q, usersById, departmentsById, branchesById),
         cell: ({ getValue }) => <span className="text-foreground">{getValue<string>()}</span>,
       },
       {
@@ -112,12 +124,15 @@ export function SalesQuotasView() {
                 <BarChart3 aria-hidden /> View attainment
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setEditing(row.original)}>Edit</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setPendingDelete(row.original)}>
+                <Trash2 aria-hidden /> Delete
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ),
       },
     ],
-    [usersById],
+    [usersById, departmentsById, branchesById],
   );
 
   return (
@@ -169,6 +184,19 @@ export function SalesQuotasView() {
         onOpenChange={(open) => !open && setViewingAttainmentId(null)}
         quotaId={viewingAttainmentId ?? undefined}
       />
+
+      {pendingDelete ? (
+        <ConfirmDialog
+          open={!!pendingDelete}
+          onOpenChange={(open) => !open && setPendingDelete(null)}
+          title="Delete this sales quota?"
+          description="This permanently removes the quota and its target. This can't be undone."
+          confirmLabel="Delete"
+          destructive
+          isPending={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate(pendingDelete.id, { onSuccess: () => setPendingDelete(null) })}
+        />
+      ) : null}
     </div>
   );
 }

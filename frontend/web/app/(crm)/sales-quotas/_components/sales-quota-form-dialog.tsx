@@ -28,7 +28,7 @@ import {
   toast,
 } from '@topiadesk/ui';
 import { QUOTA_PERIOD_TYPES, QUOTA_SCOPE_TYPES, humanize } from '../../_lib/constants';
-import { useCreateSalesQuota, useDirectoryUsers, useUpdateSalesQuota } from '../../_lib/hooks';
+import { useBranches, useCreateSalesQuota, useDepartments, useDirectoryUsers, useUpdateSalesQuota } from '../../_lib/hooks';
 import type { SalesQuota } from '../../_lib/types';
 
 const salesQuotaFormSchema = z.object({
@@ -88,6 +88,8 @@ export function SalesQuotaFormDialog({
   });
   const { usersById } = useDirectoryUsers();
   const users = Array.from(usersById.values());
+  const { data: departments } = useDepartments();
+  const { data: branches } = useBranches();
 
   const createQuota = useCreateSalesQuota();
   const updateQuota = useUpdateSalesQuota(quota?.id ?? '');
@@ -202,9 +204,21 @@ export function SalesQuotaFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Department</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Department UUID" {...field} />
-                    </FormControl>
+                    <Select value={field.value || '__unset'} onValueChange={(v) => field.onChange(v === '__unset' ? '' : v)}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__unset">Select a department</SelectItem>
+                        {(departments ?? []).map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -218,9 +232,21 @@ export function SalesQuotaFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Branch</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Branch UUID" {...field} />
-                    </FormControl>
+                    <Select value={field.value || '__unset'} onValueChange={(v) => field.onChange(v === '__unset' ? '' : v)}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select branch" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__unset">Select a branch</SelectItem>
+                        {(branches ?? []).map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

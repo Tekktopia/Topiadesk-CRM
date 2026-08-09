@@ -47,6 +47,8 @@ import type {
   LoyaltyAccount,
   LoyaltyTransaction,
   MarketSubmission,
+  BranchRef,
+  DepartmentRef,
   MergeResponse,
   Opportunity,
   OpportunityQuery,
@@ -930,11 +932,41 @@ export function useUpdateSalesQuota(id: string) {
   });
 }
 
+export function useDeleteSalesQuota() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/api/crm/sales-quotas/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'sales-quotas'] });
+      toast.success('Sales quota deleted');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
 export function useQuotaAttainment(id: string | undefined) {
   return useQuery({
     queryKey: ['crm', 'sales-quotas', id, 'attainment'],
     queryFn: () => apiFetch<QuotaAttainment>(`/api/crm/sales-quotas/${id}/attainment`),
     enabled: Boolean(id),
+  });
+}
+
+/** DEPARTMENT/BRANCH sales-quota scope pickers — no CRM-scoped BFF route
+ * exists for these, so this reuses the admin-scoped ones directly
+ * (sales_quota:write is already ADMIN-tier only, so any user who can reach
+ * this picker already has identity:read). */
+export function useDepartments() {
+  return useQuery({
+    queryKey: ['crm', 'departments'],
+    queryFn: () => apiFetch<DepartmentRef[]>('/api/admin/departments'),
+  });
+}
+
+export function useBranches() {
+  return useQuery({
+    queryKey: ['crm', 'branches'],
+    queryFn: () => apiFetch<BranchRef[]>('/api/admin/branches'),
   });
 }
 

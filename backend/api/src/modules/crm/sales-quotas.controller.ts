@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient, type Prisma } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
@@ -100,6 +100,16 @@ export class SalesQuotasController {
       },
     });
     return toSalesQuotaDto(quota);
+  }
+
+  @Delete(':id')
+  @RequirePermission('sales_quota', 'write')
+  @HttpCode(204)
+  async remove(@Param('id') id: string): Promise<void> {
+    const prisma = getPrismaClient();
+    const existing = await prisma.salesQuota.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('SalesQuota not found');
+    await prisma.salesQuota.delete({ where: { id } });
   }
 
   @Get(':id/attainment')

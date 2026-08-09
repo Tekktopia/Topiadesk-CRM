@@ -576,6 +576,20 @@ export interface CreateSalesQuotaInput {
 
 export type UpdateSalesQuotaInput = Partial<CreateSalesQuotaInput>;
 
+/** Reference data for the DEPARTMENT/BRANCH sales quota scope pickers —
+ * sourced from the admin-scoped /api/admin/departments and /api/admin/branches
+ * BFF routes (no CRM-scoped equivalent exists, and sales_quota:write is
+ * already ADMIN-tier only, so reusing them directly needs no new backend). */
+export interface DepartmentRef {
+  id: string;
+  name: string;
+}
+
+export interface BranchRef {
+  id: string;
+  name: string;
+}
+
 export interface QuotaAttainment {
   targetAmount: string;
   wonAmount: string;
