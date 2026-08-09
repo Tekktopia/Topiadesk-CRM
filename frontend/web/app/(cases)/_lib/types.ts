@@ -393,6 +393,11 @@ export interface SlaTarget {
   escalateAfterMinutes: number | null;
   escalateToUserId: string | null;
   escalateToTeamId: string | null;
+  /** Same ActionSpec[] vocabulary as Macro/AutomationRule actions (see
+   * ActionSpec below) — empty/absent means the backend's hardcoded
+   * notify-the-assignee/escalateTo behavior. */
+  onBreachActions?: ActionSpec[] | null;
+  onEscalateActions?: ActionSpec[] | null;
 }
 
 export interface CreateSlaTargetInput {
@@ -403,6 +408,8 @@ export interface CreateSlaTargetInput {
   escalateAfterMinutes?: number;
   escalateToUserId?: string;
   escalateToTeamId?: string;
+  onBreachActions?: ActionSpec[];
+  onEscalateActions?: ActionSpec[];
 }
 
 export type UpdateSlaTargetInput = Partial<CreateSlaTargetInput>;

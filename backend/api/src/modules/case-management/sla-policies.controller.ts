@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { getPrismaClient, type CaseManagementEntityType } from '@topiadesk/db';
+import { getPrismaClient, type CaseManagementEntityType, type Prisma } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import {
@@ -170,6 +170,8 @@ export class SlaPoliciesController {
         escalateAfterMinutes: dto.escalateAfterMinutes,
         escalateToUserId: dto.escalateToUserId,
         escalateToTeamId: dto.escalateToTeamId,
+        onBreachActions: dto.onBreachActions as Prisma.InputJsonValue | undefined,
+        onEscalateActions: dto.onEscalateActions as Prisma.InputJsonValue | undefined,
       },
     });
   }
@@ -194,5 +196,7 @@ function createTargetData(dto: CreateSlaTargetDto) {
     escalateAfterMinutes: dto.escalateAfterMinutes,
     escalateToUserId: dto.escalateToUserId,
     escalateToTeamId: dto.escalateToTeamId,
+    onBreachActions: dto.onBreachActions as Prisma.InputJsonValue | undefined,
+    onEscalateActions: dto.onEscalateActions as Prisma.InputJsonValue | undefined,
   };
 }

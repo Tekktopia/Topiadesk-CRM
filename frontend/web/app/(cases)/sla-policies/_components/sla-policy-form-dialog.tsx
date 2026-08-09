@@ -36,6 +36,7 @@ import {
   useUpdateSlaPolicy,
 } from '../../_lib/hooks';
 import type { CaseManagementEntityType, CasePriority, CaseType, CreateSlaTargetInput, SlaMetricType } from '../../_lib/types';
+import { MacroActionsBuilder, actionSpecsToDraftActions, draftActionsToActionSpecs } from '../../macros/_components/macro-actions-builder';
 
 const UNSET = '__unset';
 
@@ -238,9 +239,9 @@ export function SlaPolicyFormDialog({
           <div className="space-y-2 rounded-md border border-border p-3">
             <p className="text-sm font-medium text-foreground">Targets</p>
             {isEdit ? (
-              <ExistingTargetsList policyId={policyId!} onAdd={addTarget.mutate} onDelete={(id) => deleteTarget.mutate(id)} />
+              <ExistingTargetsList policyId={policyId!} entityType={entityType} onAdd={addTarget.mutate} onDelete={(id) => deleteTarget.mutate(id)} />
             ) : (
-              <DraftTargetsList targets={draftTargets} onChange={setDraftTargets} />
+              <DraftTargetsList entityType={entityType} targets={draftTargets} onChange={setDraftTargets} />
             )}
           </div>
 
@@ -259,7 +260,15 @@ export function SlaPolicyFormDialog({
   );
 }
 
-function DraftTargetsList({ targets, onChange }: { targets: DraftTarget[]; onChange: (targets: DraftTarget[]) => void }) {
+function DraftTargetsList({
+  entityType,
+  targets,
+  onChange,
+}: {
+  entityType: CaseManagementEntityType;
+  targets: DraftTarget[];
+  onChange: (targets: DraftTarget[]) => void;
+}) {
   function update(key: string, patch: Partial<DraftTarget>) {
     onChange(targets.map((t) => (t.key === key ? { ...t, ...patch } : t)));
   }
@@ -268,6 +277,7 @@ function DraftTargetsList({ targets, onChange }: { targets: DraftTarget[]; onCha
       {targets.map((t) => (
         <TargetRow
           key={t.key}
+          entityType={entityType}
           target={t}
           onChange={(patch) => update(t.key, patch)}
           onRemove={() => onChange(targets.filter((x) => x.key !== t.key))}
@@ -281,64 +291,105 @@ function DraftTargetsList({ targets, onChange }: { targets: DraftTarget[]; onCha
 }
 
 function TargetRow({
+  entityType,
   target,
   onChange,
   onRemove,
 }: {
+  entityType: CaseManagementEntityType;
   target: CreateSlaTargetInput;
   onChange: (patch: Partial<CreateSlaTargetInput>) => void;
   onRemove: () => void;
 }) {
+  const hasConfiguredActions = Boolean(target.onBreachActions?.length || target.onEscalateActions?.length);
+  const [actionsOpen, setActionsOpen] = React.useState(hasConfiguredActions);
+  const breachDrafts = React.useMemo(() => actionSpecsToDraftActions(target.onBreachActions ?? []), [target.onBreachActions]);
+  const escalateDrafts = React.useMemo(() => actionSpecsToDraftActions(target.onEscalateActions ?? []), [target.onEscalateActions]);
+
   return (
-    <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2 rounded-md bg-secondary/40 p-2">
-      <div className="space-y-1">
-        <Label className="text-xs">Metric</Label>
-        <Select value={target.metricType} onValueChange={(v) => onChange({ metricType: v as SlaMetricType })}>
-          <SelectTrigger className="h-8">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SLA_METRIC_TYPES.map((m) => (
-              <SelectItem key={m} value={m}>
-                {humanize(m)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <div className="space-y-2 rounded-md bg-secondary/40 p-2">
+      <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
+        <div className="space-y-1">
+          <Label className="text-xs">Metric</Label>
+          <Select value={target.metricType} onValueChange={(v) => onChange({ metricType: v as SlaMetricType })}>
+            <SelectTrigger className="h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SLA_METRIC_TYPES.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {humanize(m)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Target (min)</Label>
+          <Input
+            className="h-8"
+            type="number"
+            min={1}
+            value={target.targetMinutes}
+            onChange={(e) => onChange({ targetMinutes: Number(e.target.value) })}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Escalate after (min)</Label>
+          <Input
+            className="h-8"
+            type="number"
+            min={1}
+            value={target.escalateAfterMinutes ?? ''}
+            onChange={(e) => onChange({ escalateAfterMinutes: e.target.value ? Number(e.target.value) : undefined })}
+          />
+        </div>
+        <Button type="button" variant="ghost" size="icon" onClick={onRemove} aria-label="Remove target">
+          <Trash2 className="h-3.5 w-3.5" aria-hidden />
+        </Button>
       </div>
-      <div className="space-y-1">
-        <Label className="text-xs">Target (min)</Label>
-        <Input
-          className="h-8"
-          type="number"
-          min={1}
-          value={target.targetMinutes}
-          onChange={(e) => onChange({ targetMinutes: Number(e.target.value) })}
-        />
-      </div>
-      <div className="space-y-1">
-        <Label className="text-xs">Escalate after (min)</Label>
-        <Input
-          className="h-8"
-          type="number"
-          min={1}
-          value={target.escalateAfterMinutes ?? ''}
-          onChange={(e) => onChange({ escalateAfterMinutes: e.target.value ? Number(e.target.value) : undefined })}
-        />
-      </div>
-      <Button type="button" variant="ghost" size="icon" onClick={onRemove} aria-label="Remove target">
-        <Trash2 className="h-3.5 w-3.5" aria-hidden />
-      </Button>
+
+      <button
+        type="button"
+        onClick={() => setActionsOpen((v) => !v)}
+        className="text-xs font-medium text-primary hover:underline"
+      >
+        {actionsOpen ? 'Hide' : hasConfiguredActions ? 'Edit' : 'Configure'} breach/escalation actions
+        {hasConfiguredActions ? ` (${(target.onBreachActions?.length ?? 0) + (target.onEscalateActions?.length ?? 0)} configured)` : ''}
+      </button>
+
+      {actionsOpen ? (
+        <div className="grid grid-cols-1 gap-3 border-t border-border pt-2 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs">On breach — leave empty to just notify the assignee</Label>
+            <MacroActionsBuilder
+              entityType={entityType}
+              actions={breachDrafts}
+              onChange={(next) => onChange({ onBreachActions: draftActionsToActionSpecs(next) })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">On escalate — leave empty to just notify the escalation target</Label>
+            <MacroActionsBuilder
+              entityType={entityType}
+              actions={escalateDrafts}
+              onChange={(next) => onChange({ onEscalateActions: draftActionsToActionSpecs(next) })}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function ExistingTargetsList({
   policyId,
+  entityType,
   onAdd,
   onDelete,
 }: {
   policyId: string;
+  entityType: CaseManagementEntityType;
   onAdd: (target: CreateSlaTargetInput) => void;
   onDelete: (targetId: string) => void;
 }) {
@@ -347,18 +398,27 @@ function ExistingTargetsList({
 
   return (
     <div className="space-y-2">
-      {(policy?.targets ?? []).map((t) => (
-        <div key={t.id} className="flex items-center justify-between rounded-md bg-secondary/40 p-2 text-sm">
-          <span>
-            {humanize(t.metricType)} · {t.targetMinutes} min
-            {t.escalateAfterMinutes ? ` · escalates after ${t.escalateAfterMinutes} min` : ''}
-          </span>
-          <Button type="button" variant="ghost" size="icon" onClick={() => onDelete(t.id)} aria-label="Remove target">
-            <Trash2 className="h-3.5 w-3.5" aria-hidden />
-          </Button>
-        </div>
-      ))}
-      <TargetRow target={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} onRemove={() => setDraft({ metricType: 'RESOLUTION', targetMinutes: 480 })} />
+      {(policy?.targets ?? []).map((t) => {
+        const actionCount = (t.onBreachActions?.length ?? 0) + (t.onEscalateActions?.length ?? 0);
+        return (
+          <div key={t.id} className="flex items-center justify-between rounded-md bg-secondary/40 p-2 text-sm">
+            <span>
+              {humanize(t.metricType)} · {t.targetMinutes} min
+              {t.escalateAfterMinutes ? ` · escalates after ${t.escalateAfterMinutes} min` : ''}
+              {actionCount > 0 ? ` · ${actionCount} configured action${actionCount === 1 ? '' : 's'}` : ''}
+            </span>
+            <Button type="button" variant="ghost" size="icon" onClick={() => onDelete(t.id)} aria-label="Remove target">
+              <Trash2 className="h-3.5 w-3.5" aria-hidden />
+            </Button>
+          </div>
+        );
+      })}
+      <TargetRow
+        entityType={entityType}
+        target={draft}
+        onChange={(patch) => setDraft({ ...draft, ...patch })}
+        onRemove={() => setDraft({ metricType: 'RESOLUTION', targetMinutes: 480 })}
+      />
       <Button
         type="button"
         variant="outline"

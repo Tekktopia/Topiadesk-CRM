@@ -1823,6 +1823,17 @@ model SlaTarget {
   escalateToUser       User?         @relation("SlaEscalationUser", fields: [escalateToUserId], references: [id])
   escalateToTeamId     String?       @map("escalate_to_team_id") @db.Uuid
   escalateToTeam       Team?         @relation(fields: [escalateToTeamId], references: [id])
+  /// Array of {actionType, params} — the exact same shape AutomationRule's
+  /// ACTION steps already use (backend/worker/src/automation/
+  /// action-handler.ts's registry: SEND_NOTIFICATION, SEND_EMAIL,
+  /// ASSIGN_TO_USER, ASSIGN_TO_TEAM, ...), reused here instead of a second
+  /// action vocabulary. Null/empty on both = today's exact hardcoded
+  /// behavior (notify assignee on breach, notify escalateTo on escalate) —
+  /// breach-scan.job.ts only switches to the configurable path when a
+  /// target actually has one set, so every existing SlaTarget row is
+  /// unaffected until an admin opts in.
+  onBreachActions   Json? @map("on_breach_actions")
+  onEscalateActions Json? @map("on_escalate_actions")
 
   clocks SlaClock[]
 

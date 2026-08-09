@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID, Min, MinLength, ValidateNested } from 'class-validator';
 import { CaseManagementEntityType, CasePriority, CaseType, SlaMetricType } from '@topiadesk/db';
+import { ActionSpecDto } from './macro.dto';
 
 export class CreateSlaTargetDto {
   @ApiProperty({ enum: SlaMetricType }) @IsEnum(SlaMetricType) metricType!: SlaMetricType;
@@ -17,6 +18,21 @@ export class CreateSlaTargetDto {
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) escalateAfterMinutes?: number;
   @ApiPropertyOptional() @IsOptional() @IsUUID() escalateToUserId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() escalateToTeamId?: string;
+  @ApiPropertyOptional({
+    type: [ActionSpecDto],
+    description: 'Reuses the same ActionSpec vocabulary Macro/AutomationRule actions use (action-handler.ts). Empty/omitted = the hardcoded "notify the assignee" behavior.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ActionSpecDto)
+  onBreachActions?: ActionSpecDto[];
+  @ApiPropertyOptional({ type: [ActionSpecDto], description: 'Same vocabulary as onBreachActions. Empty/omitted = the hardcoded "notify escalateTo" behavior.' })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ActionSpecDto)
+  onEscalateActions?: ActionSpecDto[];
 }
 
 export class UpdateSlaTargetDto extends PartialType(CreateSlaTargetDto) {}
@@ -31,6 +47,8 @@ export class SlaTargetResponseDto {
   @ApiProperty({ nullable: true }) escalateAfterMinutes!: number | null;
   @ApiProperty({ nullable: true }) escalateToUserId!: string | null;
   @ApiProperty({ nullable: true }) escalateToTeamId!: string | null;
+  @ApiPropertyOptional({ type: [ActionSpecDto], nullable: true }) onBreachActions?: unknown;
+  @ApiPropertyOptional({ type: [ActionSpecDto], nullable: true }) onEscalateActions?: unknown;
 }
 
 export class CreateSlaPolicyDto {

@@ -23,6 +23,15 @@
 import { Queue, Worker, type Job } from 'bullmq';
 import type Redis from 'ioredis';
 import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, type SlaClock, type SlaTarget } from '@topiadesk/db';
+import { executeActions, type ActionSpec, type CaseManagementEntityRef } from '../../automation/action-handler';
+// Side-effect import — registers every actionType (SEND_NOTIFICATION,
+// SEND_EMAIL, ASSIGN_TO_USER, ...) into action-handler.ts's module-level
+// registry. Already happens as a side effect of automation-events.queue.ts
+// being imported elsewhere in this same worker process, but importing it
+// here too makes this file correct in isolation rather than depending on
+// import order elsewhere — Node caches the module, so this is a no-op if
+// it already ran.
+import '../../automation/handlers';
 
 export const SLA_BREACH_SCAN_QUEUE_NAME = 'sla-breach-scan';
 const SLA_BREACH_SCAN_SCHEDULER_ID = 'sla-breach-scan-scheduler';
@@ -39,6 +48,24 @@ export interface SlaBreachScanResult {
 
 function isUniqueConstraintViolation(err: unknown): boolean {
   return typeof err === 'object' && err !== null && 'code' in err && (err as { code?: unknown }).code === 'P2002';
+}
+
+/** SlaTarget.onBreachActions/onEscalateActions — null/empty means "use the
+ * hardcoded notify() path below", the exact pre-existing behavior for
+ * every SlaTarget that hasn't opted into configurable actions. A light
+ * runtime filter (not full schema validation — same trust level the admin
+ * UI's own save already applies) guards against a malformed stored value
+ * silently doing nothing instead of throwing mid-scan. */
+function parseActionSpecs(json: unknown): ActionSpec[] | null {
+  if (!Array.isArray(json) || json.length === 0) return null;
+  const specs = json.filter(
+    (item): item is ActionSpec => typeof item === 'object' && item !== null && typeof (item as { actionType?: unknown }).actionType === 'string',
+  );
+  return specs.length > 0 ? specs : null;
+}
+
+function toEntityRef(clock: Pick<SlaClock, 'claimId' | 'caseId'>): CaseManagementEntityRef {
+  return clock.claimId ? { entityType: 'CLAIM', claimId: clock.claimId } : { entityType: 'CASE', caseId: clock.caseId! };
 }
 
 async function notify(
@@ -95,6 +122,17 @@ export async function runSlaBreachScan(now: Date = new Date()): Promise<SlaBreac
 
       const entityType: 'CLAIM' | 'CASE' = clock.claimId ? 'CLAIM' : 'CASE';
       const entityId = (clock.claimId ?? clock.caseId)!;
+
+      const configuredActions = parseActionSpecs(clock.slaTarget.onBreachActions);
+      if (configuredActions) {
+        const outcomes = await executeActions(configuredActions, { entity: toEntityRef(clock), actingUserId: null, systemJobName: 'sla-breach-scan' });
+        for (const outcome of outcomes) {
+          if (outcome.ok) result.breachNotificationsCreated++;
+          else console.error(`[sla-breach-scan] configured onBreachActions "${outcome.actionType}" failed for SlaClock ${clock.id}: ${outcome.error}`);
+        }
+        continue;
+      }
+
       const recipientUserId = await resolveAssigneeUserId(clock);
       if (!recipientUserId) {
         console.warn(`[sla-breach-scan] SlaClock ${clock.id} (${entityType} ${entityId}) breached with no assignee to notify`);
@@ -122,13 +160,28 @@ export async function runSlaBreachScan(now: Date = new Date()): Promise<SlaBreac
     for (const clock of breachedClocks) {
       const target = clock.slaTarget;
       if (target.escalateAfterMinutes == null) continue;
-      if (!target.escalateToUserId && !target.escalateToTeamId) continue;
+      const configuredActions = parseActionSpecs(target.onEscalateActions);
+      // Configured actions don't need the legacy escalateToUserId/TeamId
+      // fields at all — that guard only makes sense for the hardcoded
+      // notify() path below.
+      if (!configuredActions && !target.escalateToUserId && !target.escalateToTeamId) continue;
 
       const escalateAt = new Date(clock.breachedAt!.getTime() + target.escalateAfterMinutes * 60_000);
       if (escalateAt > now) continue;
 
       const entityType: 'CLAIM' | 'CASE' = clock.claimId ? 'CLAIM' : 'CASE';
       const entityId = (clock.claimId ?? clock.caseId)!;
+
+      if (configuredActions) {
+        const outcomes = await executeActions(configuredActions, { entity: toEntityRef(clock), actingUserId: null, systemJobName: 'sla-breach-scan' });
+        for (const outcome of outcomes) {
+          if (outcome.ok) result.escalationNotificationsCreated++;
+          else console.error(`[sla-breach-scan] configured onEscalateActions "${outcome.actionType}" failed for SlaClock ${clock.id}: ${outcome.error}`);
+        }
+        await prisma.slaClock.update({ where: { id: clock.id }, data: { escalatedAt: now } });
+        result.escalatedCount++;
+        continue;
+      }
 
       const recipients = new Set<string>();
       if (target.escalateToUserId) recipients.add(target.escalateToUserId);
