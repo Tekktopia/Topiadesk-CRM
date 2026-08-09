@@ -6,7 +6,7 @@ import { ENV_TOKEN, type Env } from '../../common/config/config.module';
 // NOT a type-only import: KeycloakAdminService is constructor-injected below.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { KeycloakAdminService } from '../identity/keycloak-admin.service';
-import { CreateTenantAdminUserDto, ResetTenantUserPasswordResponseDto, TenantUserResponseDto } from './dto/tenant-user.dto';
+import { CreateTenantAdminUserDto, ResetTenantUserPasswordDto, ResetTenantUserPasswordResponseDto, TenantUserResponseDto } from './dto/tenant-user.dto';
 import { enqueueCreateTenantAdmin } from './create-tenant-admin-queue';
 import { PlatformAuditService } from './platform-audit.service';
 import { CurrentPlatformAdmin } from './current-platform-admin.decorator';
@@ -108,7 +108,7 @@ export class TenantUsersController {
     const existing = await this.withTenantSchema(tenant.keycloakRealm, () => getPrismaClient().user.findUnique({ where: { email: dto.email } }));
     if (existing) throw new BadRequestException(`A user with email "${dto.email}" already exists in this tenant`);
 
-    await enqueueCreateTenantAdmin({ tenantId: tenant.id, email: dto.email, fullName: dto.fullName });
+    await enqueueCreateTenantAdmin({ tenantId: tenant.id, email: dto.email, fullName: dto.fullName, password: dto.password });
     await this.auditService.recordEvent({
       actorPlatformAdminId: actor.id,
       action: 'CREATE_TENANT_ADMIN',
@@ -124,15 +124,25 @@ export class TenantUsersController {
   async resetPassword(
     @Param('tenantId') tenantId: string,
     @Param('userId') userId: string,
+    @Body() dto: ResetTenantUserPasswordDto,
     @CurrentPlatformAdmin() actor: PlatformAdminContext,
   ): Promise<ResetTenantUserPasswordResponseDto> {
     const tenant = await this.requireTenant(tenantId);
     const user = await this.withTenantSchema(tenant.keycloakRealm, () => getPrismaClient().user.findUnique({ where: { id: userId } }));
     if (!user) throw new NotFoundException(`User ${userId} not found in this tenant`);
 
-    const temporaryPassword = generateTemporaryPassword();
+    const manualPassword = !!dto.password;
+    const temporaryPassword = dto.password ?? generateTemporaryPassword();
     try {
-      await this.withTenantSchema(tenant.keycloakRealm, () => this.keycloakAdmin.resetPassword(user.keycloakSubjectId, temporaryPassword));
+      await this.withTenantSchema(tenant.keycloakRealm, () => this.keycloakAdmin.resetPassword(user.keycloakSubjectId, temporaryPassword, !manualPassword));
+      if (manualPassword) {
+        // resetPassword's temporary:false only affects the NEW credential
+        // — it doesn't clear an UPDATE_PASSWORD requiredAction left over
+        // from account creation (or a prior generated-password reset),
+        // which would otherwise still force a change despite this being
+        // a deliberately-set password. CONFIGURE_TOTP (MFA) stays required.
+        await this.withTenantSchema(tenant.keycloakRealm, () => this.keycloakAdmin.updateUser(user.keycloakSubjectId, { requiredActions: ['CONFIGURE_TOTP'] }));
+      }
     } catch (err) {
       throw new BadGatewayException(`Keycloak password reset failed: ${err instanceof Error ? err.message : String(err)}`);
     }

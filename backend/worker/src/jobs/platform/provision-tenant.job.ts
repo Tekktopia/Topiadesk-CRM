@@ -51,6 +51,18 @@ export async function provisionTenant(data: ProvisionTenantJobData): Promise<{ s
       console.error(`[provision-tenant] tenant ${tenant.id} (${tenant.slug}) failed at ${step}:`, err);
       await logEvent(step, 'FAILED', detail);
       await platformPrisma.tenant.update({ where: { id: tenant.id }, data: { status: 'FAILED' as TenantStatus } });
+      // One insertion point covers every catch site in this function — see
+      // the "Deliberately NOT auto-retried" header comment above for why
+      // there are several distinct failure points that all funnel here.
+      await platformPrisma.platformNotification.create({
+        data: {
+          type: 'TENANT_PROVISIONING_FAILED',
+          title: `Tenant "${tenant.name}" provisioning failed`,
+          body: `Failed at step: ${step}`,
+          entityType: 'tenants',
+          entityId: tenant.id,
+        },
+      });
     };
 
     try {
@@ -150,6 +162,9 @@ export async function provisionTenant(data: ProvisionTenantJobData): Promise<{ s
 
     await platformPrisma.tenant.update({ where: { id: tenant.id }, data: { status: 'ACTIVE' as TenantStatus } });
     await logEvent('MARK_ACTIVE', 'COMPLETED');
+    await platformPrisma.platformNotification.create({
+      data: { type: 'TENANT_PROVISIONED', title: `Tenant "${tenant.name}" provisioned`, entityType: 'tenants', entityId: tenant.id },
+    });
 
     // Invite email failure doesn't roll back an otherwise-successfully-
     // provisioned tenant — the admin can always be sent their credentials

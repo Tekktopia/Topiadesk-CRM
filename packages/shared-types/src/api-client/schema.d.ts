@@ -100,6 +100,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/identity/users/bulk-invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UsersController_bulkInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/identity/users/{id}": {
         parameters: {
             query?: never;
@@ -689,7 +705,7 @@ export interface paths {
         delete: operations["ScimTokensController_remove"];
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["ScimTokensController_update"];
         trace?: never;
     };
     "/identity/scim-tokens/{id}/deactivate": {
@@ -2173,11 +2189,27 @@ export interface paths {
         };
         get: operations["IntegrationsController_list"];
         put?: never;
-        post?: never;
+        post: operations["IntegrationsController_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/integrations/connectors/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["IntegrationsController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["IntegrationsController_update"];
         trace?: never;
     };
     "/integrations/connectors/{id}/sync": {
@@ -2354,6 +2386,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["NotificationsController_markRead"];
+        trace?: never;
+    };
+    "/notifications/admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["NotificationsController_listAdmin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/{id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["NotificationsController_resend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/ai/summarize": {
@@ -3538,6 +3602,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/business-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BusinessRulesController_list"];
+        put?: never;
+        post: operations["BusinessRulesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/business-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BusinessRulesController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["BusinessRulesController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["BusinessRulesController_update"];
         trace?: never;
     };
     "/knowledge/categories": {
@@ -4820,6 +4916,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/platform/tenants/admin-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TenantsController_adminSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/tenants/{id}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TenantsController_usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/platform/tenants/{id}": {
         parameters: {
             query?: never;
@@ -4916,6 +5044,278 @@ export interface paths {
         patch: operations["PlansController_update"];
         trace?: never;
     };
+    "/platform/admins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlatformAdminsController_list"];
+        put?: never;
+        post: operations["PlatformAdminsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/admins/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformAdminsController_deactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/admins/{id}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformAdminsController_reactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/admins/{id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["PlatformAdminsController_updateRole"];
+        trace?: never;
+    };
+    "/platform/tenants/{tenantId}/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TenantUsersController_list"];
+        put?: never;
+        post: operations["TenantUsersController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/tenants/{tenantId}/users/{userId}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TenantUsersController_resetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/tenants/{tenantId}/users/{userId}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TenantUsersController_deactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/tenants/{tenantId}/users/{userId}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TenantUsersController_reactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/support-tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlatformSupportTicketsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/support-tickets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlatformSupportTicketsController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["PlatformSupportTicketsController_update"];
+        trace?: never;
+    };
+    "/platform/support-tickets/{id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformSupportTicketsController_addComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlatformAuditLogController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlatformNotificationsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["PlatformNotificationsController_markRead"];
+        trace?: never;
+    };
+    "/support-tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SupportTicketsController_list"];
+        put?: never;
+        post: operations["SupportTicketsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/support-tickets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SupportTicketsController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/support-tickets/{id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SupportTicketsController_addComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4969,6 +5369,23 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        BulkInviteUserRowDto: {
+            email: string;
+            fullName: string;
+            /** @description Department code (e.g. CORP-BROK) — silently unset if the code is unknown, same lenient behavior as SCIM provisioning */
+            departmentCode?: string;
+            /** @description Branch code (e.g. ABV) — silently unset if the code is unknown */
+            branchCode?: string;
+        };
+        BulkInviteUsersDto: {
+            rows: components["schemas"]["BulkInviteUserRowDto"][];
+        };
+        BulkInviteResultRowDto: {
+            email: string;
+            /** @enum {string} */
+            status: "created" | "skipped" | "failed";
+            reason?: string;
         };
         UpdateUserDto: {
             fullName?: string;
@@ -5050,6 +5467,8 @@ export interface components {
             id: string;
             name: string;
             code: string;
+            email: Record<string, never> | null;
+            phone: Record<string, never> | null;
             parentDepartmentId: Record<string, never> | null;
             /** Format: date-time */
             createdAt: string;
@@ -5059,11 +5478,15 @@ export interface components {
         CreateDepartmentDto: {
             name: string;
             code: string;
+            email?: Record<string, never> | null;
+            phone?: Record<string, never> | null;
             parentDepartmentId?: Record<string, never> | null;
         };
         UpdateDepartmentDto: {
             name?: string;
             code?: string;
+            email?: Record<string, never> | null;
+            phone?: Record<string, never> | null;
             parentDepartmentId?: Record<string, never> | null;
         };
         BranchResponseDto: {
@@ -5274,6 +5697,9 @@ export interface components {
             lastUsedAt: Record<string, never> | null;
             /** @description The raw bearer token — shown once, store it now. Use as `Authorization: Bearer <token>` against /scim/v2/*. */
             token: string;
+        };
+        UpdateScimTokenDto: {
+            description: string;
         };
         AccountResponseDto: {
             id: string;
@@ -6027,7 +6453,7 @@ export interface components {
         SavedViewResponseDto: {
             id: string;
             /** @enum {string} */
-            entityType: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY" | "TASK";
+            entityType: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY" | "TASK" | "CASE";
             name: string;
             ownerId: string;
             /** @enum {string} */
@@ -6048,7 +6474,7 @@ export interface components {
         };
         CreateSavedViewDto: {
             /** @enum {string} */
-            entityType: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY" | "TASK";
+            entityType: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY" | "TASK" | "CASE";
             name: string;
             /**
              * @default PRIVATE
@@ -6071,7 +6497,7 @@ export interface components {
         };
         UpdateSavedViewDto: {
             /** @enum {string} */
-            entityType?: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY" | "TASK";
+            entityType?: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY" | "TASK" | "CASE";
             name?: string;
             /**
              * @default PRIVATE
@@ -6541,7 +6967,49 @@ export interface components {
             name: string;
             connectorType: string;
             isEnabled: boolean;
+            syncDirection: string;
+            pollingIntervalMinutes?: Record<string, never> | null;
+            webhookPath?: Record<string, never> | null;
+            config: {
+                [key: string]: unknown;
+            };
             lastSuccessfulSyncAt: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateConnectorDto: {
+            name: string;
+            /** @enum {string} */
+            connectorType: "CORE_BROKING_SYSTEM" | "ERP" | "MOCK_STUB" | "TEAMS_WEBHOOK" | "SEAMLESSHR";
+            /** @enum {string} */
+            syncDirection: "INBOUND" | "OUTBOUND" | "BIDIRECTIONAL";
+            /** @default true */
+            isEnabled: boolean;
+            pollingIntervalMinutes?: number;
+            /** @description Only set this if the connector receives inbound webhooks — must be unique. */
+            webhookPath?: string;
+            /** @description Shape varies by connectorType. TEAMS_WEBHOOK: { webhookUrl }. SEAMLESSHR: { seamlessHR: { apiBaseUrl, apiKey } }. MOCK_STUB: { fixtureEndpoint }. Inbound-webhook-receiving connectors also need { webhookSecret } to match webhookPath. */
+            config: {
+                [key: string]: unknown;
+            };
+        };
+        UpdateConnectorDto: {
+            name?: string;
+            /** @enum {string} */
+            connectorType?: "CORE_BROKING_SYSTEM" | "ERP" | "MOCK_STUB" | "TEAMS_WEBHOOK" | "SEAMLESSHR";
+            /** @enum {string} */
+            syncDirection?: "INBOUND" | "OUTBOUND" | "BIDIRECTIONAL";
+            /** @default true */
+            isEnabled: boolean;
+            pollingIntervalMinutes?: number;
+            /** @description Only set this if the connector receives inbound webhooks — must be unique. */
+            webhookPath?: string;
+            /** @description Shape varies by connectorType. TEAMS_WEBHOOK: { webhookUrl }. SEAMLESSHR: { seamlessHR: { apiBaseUrl, apiKey } }. MOCK_STUB: { fixtureEndpoint }. Inbound-webhook-receiving connectors also need { webhookSecret } to match webhookPath. */
+            config?: {
+                [key: string]: unknown;
+            };
         };
         SyncJobResponseDto: {
             id: string;
@@ -6631,6 +7099,27 @@ export interface components {
             title: string;
             body: string;
             status: string;
+            readAt: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AdminNotificationRecipientDto: {
+            id: string;
+            fullName: string;
+            email: string;
+        };
+        AdminNotificationResponseDto: {
+            id: string;
+            recipientUserId: string;
+            recipient: components["schemas"]["AdminNotificationRecipientDto"];
+            type: string;
+            title: string;
+            body: string;
+            channel: string;
+            status: string;
+            relatedEntityType: Record<string, never> | null;
+            relatedEntityId: Record<string, never> | null;
+            sentAt: Record<string, never> | null;
             readAt: Record<string, never> | null;
             /** Format: date-time */
             createdAt: string;
@@ -7054,6 +7543,13 @@ export interface components {
             /** @description The case that survives — the case in the URL becomes its (non-destructive) MERGED child */
             targetCaseId: string;
         };
+        ActionSpecDto: {
+            /** @enum {string} */
+            actionType: "SET_STATUS" | "ASSIGN_TO_USER" | "ASSIGN_TO_TEAM" | "SET_PRIORITY" | "ADD_INTERNAL_NOTE" | "SEND_NOTIFICATION";
+            params: {
+                [key: string]: unknown;
+            };
+        };
         SlaTargetResponseDto: {
             id: string;
             slaPolicyId: string;
@@ -7064,6 +7560,8 @@ export interface components {
             escalateAfterMinutes: Record<string, never> | null;
             escalateToUserId: Record<string, never> | null;
             escalateToTeamId: Record<string, never> | null;
+            onBreachActions?: components["schemas"]["ActionSpecDto"][] | null;
+            onEscalateActions?: components["schemas"]["ActionSpecDto"][] | null;
         };
         SlaPolicyResponseDto: {
             id: string;
@@ -7120,6 +7618,10 @@ export interface components {
             escalateAfterMinutes?: number;
             escalateToUserId?: string;
             escalateToTeamId?: string;
+            /** @description Reuses the same ActionSpec vocabulary Macro/AutomationRule actions use (action-handler.ts). Empty/omitted = the hardcoded "notify the assignee" behavior. */
+            onBreachActions?: components["schemas"]["ActionSpecDto"][];
+            /** @description Same vocabulary as onBreachActions. Empty/omitted = the hardcoded "notify escalateTo" behavior. */
+            onEscalateActions?: components["schemas"]["ActionSpecDto"][];
         };
         CreateSlaPolicyDto: {
             name: string;
@@ -7162,6 +7664,10 @@ export interface components {
             escalateAfterMinutes?: number;
             escalateToUserId?: string;
             escalateToTeamId?: string;
+            /** @description Reuses the same ActionSpec vocabulary Macro/AutomationRule actions use (action-handler.ts). Empty/omitted = the hardcoded "notify the assignee" behavior. */
+            onBreachActions?: components["schemas"]["ActionSpecDto"][];
+            /** @description Same vocabulary as onBreachActions. Empty/omitted = the hardcoded "notify escalateTo" behavior. */
+            onEscalateActions?: components["schemas"]["ActionSpecDto"][];
         };
         BusinessHoursCalendarResponseDto: {
             id: string;
@@ -7206,13 +7712,6 @@ export interface components {
         UpdateBusinessHolidayDto: {
             date?: string;
             name?: string;
-        };
-        ActionSpecDto: {
-            /** @enum {string} */
-            actionType: "SET_STATUS" | "ASSIGN_TO_USER" | "ASSIGN_TO_TEAM" | "SET_PRIORITY" | "ADD_INTERNAL_NOTE" | "SEND_NOTIFICATION";
-            params: {
-                [key: string]: unknown;
-            };
         };
         MacroResponseDto: {
             id: string;
@@ -7406,6 +7905,62 @@ export interface components {
             decision: "APPROVED" | "REJECTED";
             /** @description Required when decision is REJECTED. */
             note?: string;
+        };
+        BusinessRuleActionDto: {
+            /** @description Must be an allow-listed action field for the rule's entityType — see ACTION_FIELDS in business-rules.validator.ts */
+            field: string;
+            /** @enum {string} */
+            effect: "REQUIRE" | "HIDE" | "READONLY" | "SET_VALUE";
+            /** @description Only used when effect is SET_VALUE */
+            value?: string;
+        };
+        BusinessRuleResponseDto: {
+            id: string;
+            /** @enum {string} */
+            entityType: "CLAIM" | "CASE";
+            name: string;
+            description: Record<string, never> | null;
+            conditionField: string;
+            /** @enum {string} */
+            conditionOperator: "EQUALS" | "NOT_EQUALS";
+            conditionValue: string;
+            actions: components["schemas"]["BusinessRuleActionDto"][];
+            isActive: boolean;
+            displayOrder: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateBusinessRuleDto: {
+            /**
+             * @description CASE only in v1 — see BusinessRule model doc comment
+             * @enum {string}
+             */
+            entityType: "CLAIM" | "CASE";
+            name: string;
+            description?: string;
+            /** @description Must be an allow-listed condition field for entityType — see CONDITION_FIELDS in business-rules.validator.ts */
+            conditionField: string;
+            /** @enum {string} */
+            conditionOperator: "EQUALS" | "NOT_EQUALS";
+            conditionValue: string;
+            actions: components["schemas"]["BusinessRuleActionDto"][];
+            /** @default true */
+            isActive: boolean;
+            /** @default 0 */
+            displayOrder: number;
+        };
+        UpdateBusinessRuleDto: {
+            name?: string;
+            description?: string;
+            conditionField?: string;
+            /** @enum {string} */
+            conditionOperator?: "EQUALS" | "NOT_EQUALS";
+            conditionValue?: string;
+            actions?: components["schemas"]["BusinessRuleActionDto"][];
+            isActive?: boolean;
+            displayOrder?: number;
         };
         KnowledgeCategoryResponseDto: {
             id: string;
@@ -8259,10 +8814,30 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        TenantAdminSummaryDto: {
+            tenantId: string;
+            tenantName: string;
+            status: string;
+            totalUsers: number;
+            adminCount: number;
+            /** @description Null if the tenant has no subscription (shouldn't happen in practice — every tenant gets one at creation — but not enforced at the DB level). */
+            seatLimit?: Record<string, never>;
+        };
+        TenantUsageDto: {
+            totalUsers: number;
+            activeUsers: number;
+            deactivatedUsers: number;
+            suspendedUsers: number;
+            adminCount: number;
+            planName?: Record<string, never>;
+            seatLimit?: Record<string, never>;
+        };
         UpdateTenantSubscriptionDto: {
             planId?: string;
             /** @enum {string} */
             status?: "TRIALING" | "ACTIVE" | "PAST_DUE" | "CANCELED";
+            /** @description When provided, sets currentPeriodEnd to now + this many months — "generating/renewing a license" is this field plus a plan/status change, not a separate artifact. Omit to leave currentPeriodEnd untouched. */
+            durationMonths?: number;
         };
         PlanResponseDto: {
             id: string;
@@ -8283,6 +8858,139 @@ export interface components {
             seatLimit?: number;
             description?: string;
             isActive?: boolean;
+        };
+        PlatformAdminResponseDto: {
+            id: string;
+            email: string;
+            fullName: string;
+            status: string;
+            /** @enum {string} */
+            role: "SUPPORT" | "SUPER_ADMIN";
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreatePlatformAdminDto: {
+            /** @description Signs into the "topiadesk-platform" Keycloak realm with this address and receives the invite email. */
+            email: string;
+            fullName: string;
+        };
+        UpdatePlatformAdminRoleDto: {
+            /** @enum {string} */
+            role: "SUPPORT" | "SUPER_ADMIN";
+        };
+        TenantUserResponseDto: {
+            id: string;
+            keycloakSubjectId: string;
+            email: string;
+            fullName: string;
+            status: string;
+            roles: string[];
+            lastSyncedAt?: Record<string, never>;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreateTenantAdminUserDto: {
+            /** @description The new admin's sign-in email — created in the tenant's own Keycloak realm and receives the invite email. */
+            email: string;
+            fullName: string;
+        };
+        ResetTenantUserPasswordResponseDto: {
+            /** @description One-time temporary password — shown once, never stored or logged. The account is forced to change it on next sign-in. */
+            temporaryPassword: string;
+        };
+        PlatformSupportTicketCommentResponseDto: {
+            id: string;
+            authorName: string;
+            authorPlatformAdminId?: Record<string, never>;
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PlatformSupportTicketResponseDto: {
+            id: string;
+            tenantId: string;
+            tenantName: string;
+            subject: string;
+            description: string;
+            status: string;
+            priority: string;
+            raisedByName: string;
+            raisedByEmail: string;
+            assignedToId?: Record<string, never>;
+            assignedToName?: Record<string, never>;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            resolvedAt?: Record<string, never>;
+            closedAt?: Record<string, never>;
+            comments?: components["schemas"]["PlatformSupportTicketCommentResponseDto"][];
+        };
+        UpdateSupportTicketDto: {
+            /** @enum {string} */
+            status?: "OPEN" | "IN_PROGRESS" | "WAITING_ON_TENANT" | "RESOLVED" | "CLOSED";
+            /** @enum {string} */
+            priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+            /** @description A PlatformAdminUser id, or null to unassign. */
+            assignedToId?: Record<string, never>;
+        };
+        CreatePlatformTicketCommentDto: {
+            body: string;
+        };
+        PlatformAuditLogResponseDto: {
+            id: string;
+            actorPlatformAdminId?: Record<string, never>;
+            actorName?: Record<string, never>;
+            action: string;
+            entityType: string;
+            entityId: string;
+            detail?: Record<string, never>;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PlatformNotificationResponseDto: {
+            id: string;
+            type: string;
+            title: string;
+            body?: Record<string, never>;
+            entityType?: Record<string, never>;
+            entityId?: Record<string, never>;
+            readAt?: Record<string, never>;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SupportTicketCommentResponseDto: {
+            id: string;
+            authorName: string;
+            authorPlatformAdminId?: Record<string, never>;
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SupportTicketResponseDto: {
+            id: string;
+            subject: string;
+            description: string;
+            status: string;
+            priority: string;
+            raisedByName: string;
+            raisedByEmail: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            comments?: components["schemas"]["SupportTicketCommentResponseDto"][];
+        };
+        CreateSupportTicketDto: {
+            subject: string;
+            description: string;
+            /** @enum {string} */
+            priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+        };
+        CreateSupportTicketCommentDto: {
+            body: string;
         };
     };
     responses: never;
@@ -8672,6 +9380,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponseDto"][];
+                };
+            };
+        };
+    };
+    UsersController_bulkInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkInviteUsersDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkInviteResultRowDto"][];
                 };
             };
         };
@@ -10045,6 +10776,31 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    ScimTokensController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateScimTokenDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScimTokenResponseDto"];
+                };
             };
         };
     };
@@ -12068,7 +12824,7 @@ export interface operations {
     SavedViewsController_list: {
         parameters: {
             query?: {
-                entityType?: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY" | "TASK";
+                entityType?: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY" | "TASK" | "CASE";
             };
             header?: never;
             path?: never;
@@ -13316,6 +14072,73 @@ export interface operations {
             };
         };
     };
+    IntegrationsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateConnectorDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectorResponseDto"];
+                };
+            };
+        };
+    };
+    IntegrationsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    IntegrationsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateConnectorDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectorResponseDto"];
+                };
+            };
+        };
+    };
     IntegrationsController_triggerSync: {
         parameters: {
             query?: never;
@@ -13604,6 +14427,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotificationResponseDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_listAdmin: {
+        parameters: {
+            query?: {
+                recipientUserId?: string;
+                type?: string;
+                channel?: "IN_APP" | "EMAIL" | "SMS";
+                status?: "PENDING" | "SENT" | "FAILED" | "READ";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminNotificationResponseDto"][];
+                };
+            };
+        };
+    };
+    NotificationsController_resend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminNotificationResponseDto"];
                 };
             };
         };
@@ -16131,6 +16999,115 @@ export interface operations {
             };
         };
     };
+    BusinessRulesController_list: {
+        parameters: {
+            query?: {
+                entityType?: "CLAIM" | "CASE";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessRuleResponseDto"][];
+                };
+            };
+        };
+    };
+    BusinessRulesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBusinessRuleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessRuleResponseDto"];
+                };
+            };
+        };
+    };
+    BusinessRulesController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessRuleResponseDto"];
+                };
+            };
+        };
+    };
+    BusinessRulesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BusinessRulesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBusinessRuleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessRuleResponseDto"];
+                };
+            };
+        };
+    };
     KnowledgeCategoriesController_list: {
         parameters: {
             query?: never;
@@ -18403,6 +19380,46 @@ export interface operations {
             };
         };
     };
+    TenantsController_adminSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantAdminSummaryDto"][];
+                };
+            };
+        };
+    };
+    TenantsController_usage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantUsageDto"];
+                };
+            };
+        };
+    };
     TenantsController_get: {
         parameters: {
             query?: never;
@@ -18572,6 +19589,476 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PlanResponseDto"];
                 };
+            };
+        };
+    };
+    PlatformAdminsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformAdminResponseDto"][];
+                };
+            };
+        };
+    };
+    PlatformAdminsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePlatformAdminDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status?: string;
+                    };
+                };
+            };
+        };
+    };
+    PlatformAdminsController_deactivate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformAdminResponseDto"];
+                };
+            };
+        };
+    };
+    PlatformAdminsController_reactivate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformAdminResponseDto"];
+                };
+            };
+        };
+    };
+    PlatformAdminsController_updateRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePlatformAdminRoleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformAdminResponseDto"];
+                };
+            };
+        };
+    };
+    TenantUsersController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantUserResponseDto"][];
+                };
+            };
+        };
+    };
+    TenantUsersController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTenantAdminUserDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status?: string;
+                    };
+                };
+            };
+        };
+    };
+    TenantUsersController_resetPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetTenantUserPasswordResponseDto"];
+                };
+            };
+        };
+    };
+    TenantUsersController_deactivate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantUserResponseDto"];
+                };
+            };
+        };
+    };
+    TenantUsersController_reactivate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantUserResponseDto"];
+                };
+            };
+        };
+    };
+    PlatformSupportTicketsController_list: {
+        parameters: {
+            query: {
+                tenantId: string;
+                status: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformSupportTicketResponseDto"][];
+                };
+            };
+        };
+    };
+    PlatformSupportTicketsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformSupportTicketResponseDto"];
+                };
+            };
+        };
+    };
+    PlatformSupportTicketsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSupportTicketDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformSupportTicketResponseDto"];
+                };
+            };
+        };
+    };
+    PlatformSupportTicketsController_addComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePlatformTicketCommentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformAuditLogController_list: {
+        parameters: {
+            query: {
+                entityType: string;
+                entityId: string;
+                limit: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformAuditLogResponseDto"][];
+                };
+            };
+        };
+    };
+    PlatformNotificationsController_list: {
+        parameters: {
+            query: {
+                unreadOnly: string;
+                limit: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformNotificationResponseDto"][];
+                };
+            };
+        };
+    };
+    PlatformNotificationsController_markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformNotificationResponseDto"];
+                };
+            };
+        };
+    };
+    SupportTicketsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportTicketResponseDto"][];
+                };
+            };
+        };
+    };
+    SupportTicketsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSupportTicketDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        status?: string;
+                    };
+                };
+            };
+        };
+    };
+    SupportTicketsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportTicketResponseDto"];
+                };
+            };
+        };
+    };
+    SupportTicketsController_addComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSupportTicketCommentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

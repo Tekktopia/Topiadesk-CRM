@@ -26,6 +26,9 @@ export interface CreateTenantAdminJobData {
   tenantId: string;
   email: string;
   fullName: string;
+  /** When set, used as-is instead of generating + emailing a temporary
+   * one — see tenant-user.dto.ts's CreateTenantAdminUserDto.password. */
+  password?: string;
 }
 
 export async function enqueueCreateTenantAdmin(data: CreateTenantAdminJobData): Promise<void> {

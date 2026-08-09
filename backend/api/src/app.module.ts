@@ -38,6 +38,8 @@ import { PlatformAdminsController } from './modules/platform/platform-admins.con
 import { TenantUsersController } from './modules/platform/tenant-users.controller';
 import { PlatformSupportTicketsController } from './modules/platform/support-tickets.controller';
 import { PlatformAuditLogController } from './modules/platform/platform-audit-log.controller';
+import { PlatformNotificationsController } from './modules/platform/notifications.controller';
+import { PlatformSearchController } from './modules/platform/platform-search.controller';
 
 @Module({
   imports: [
@@ -149,6 +151,10 @@ export class AppModule implements NestModule {
         { path: 'public/knowledge/articles', method: RequestMethod.GET },
         { path: 'public/knowledge/articles/:slug', method: RequestMethod.GET },
         { path: 'public/knowledge/categories', method: RequestMethod.GET },
+        // Subdomain -> Keycloak realm lookup, called by frontend/web BEFORE
+        // a visitor has logged in (no TopiaDesk-issued JWT could exist
+        // yet). See public-tenant-lookup.controller.ts's header comment.
+        { path: 'public/tenant-lookup', method: RequestMethod.GET },
         // Customer portal — external Contacts, never a Keycloak bearer
         // token. PortalContextMiddleware (registered below) is this
         // surface's own equivalent, applied to portal/* except portal/auth/*
@@ -203,6 +209,8 @@ export class AppModule implements NestModule {
         TenantUsersController,
         PlatformSupportTicketsController,
         PlatformAuditLogController,
+        PlatformNotificationsController,
+        PlatformSearchController,
       );
   }
 }

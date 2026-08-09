@@ -2,6 +2,7 @@ export interface PlatformAdminContext {
   id: string;
   email: string;
   fullName: string;
+  role: 'SUPPORT' | 'SUPER_ADMIN';
 }
 
 declare global {

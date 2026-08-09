@@ -83,6 +83,17 @@ export async function seedBaseline(prisma: PrismaClient, opts: { adminUserId?: s
   const resources = [
     'account', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document', 'approval', 'ai_usage', 'audit_log', 'integration', 'identity',
     'claim', 'case', 'sla_config', 'macro',
+    // 'business_rule' deliberately does NOT follow the case_categories/
+    // loss_cause_categories reuse-'case' convention noted above, even
+    // though BusinessRule has no RLS either (same open-config tier).
+    // Reusing 'case:write' would mean every role with case-write —
+    // MANAGER (DEPARTMENT), ACCOUNT_HANDLER (OWN), COMPLIANCE_OFFICER
+    // (ALL) — could create/edit rules that reshape required/hidden/
+    // auto-set fields on every user's Case form org-wide. That's a much
+    // bigger blast radius than a config table just adding fields, so it
+    // gets its own resource and (see grantRole calls below) is never
+    // granted to any role but ADMIN.
+    'business_rule',
     'knowledge_category', 'knowledge_article', 'survey', 'survey_response',
     'report', 'scheduled_report',
     // Phase 2 Campaigns — gates campaigns_rw/campaign_templates_rw/

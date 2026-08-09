@@ -1,10 +1,12 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPlatformPrismaClient, Prisma } from '@topiadesk/db-platform';
 import { CreatePlanDto, PlanResponseDto, UpdatePlanDto } from './dto/plan.dto';
 import { PlatformAuditService } from './platform-audit.service';
 import { CurrentPlatformAdmin } from './current-platform-admin.decorator';
 import type { PlatformAdminContext } from './platform-context';
+import { PlatformRoleGuard } from './platform-role.guard';
+import { RequirePlatformRole } from './require-platform-role.decorator';
 
 function isUniqueConstraintViolation(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
@@ -12,6 +14,7 @@ function isUniqueConstraintViolation(err: unknown): boolean {
 
 @ApiTags('platform')
 @ApiBearerAuth()
+@UseGuards(PlatformRoleGuard)
 @Controller('platform/plans')
 export class PlansController {
   constructor(private readonly auditService: PlatformAuditService) {}
@@ -23,6 +26,7 @@ export class PlansController {
   }
 
   @Post()
+  @RequirePlatformRole('SUPER_ADMIN')
   @ApiOkResponse({ type: PlanResponseDto })
   async create(@Body() dto: CreatePlanDto, @CurrentPlatformAdmin() actor: PlatformAdminContext): Promise<PlanResponseDto> {
     try {
@@ -42,6 +46,7 @@ export class PlansController {
   }
 
   @Patch(':id')
+  @RequirePlatformRole('SUPER_ADMIN')
   @ApiOkResponse({ type: PlanResponseDto })
   async update(@Param('id') id: string, @Body() dto: UpdatePlanDto, @CurrentPlatformAdmin() actor: PlatformAdminContext): Promise<PlanResponseDto> {
     const plan = await getPlatformPrismaClient().plan.update({ where: { id }, data: dto });

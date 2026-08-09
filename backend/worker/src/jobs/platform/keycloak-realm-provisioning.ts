@@ -222,12 +222,19 @@ export async function createTenantAdminUser(opts: {
   realmName: string;
   email: string;
   fullName: string;
+  /** When set, used as the account's real password (permanent, no forced
+   * change) instead of a generated one-time value — the caller (a
+   * platform admin) is deliberately choosing it, e.g. to hand off login
+   * immediately without waiting on email delivery. MFA setup
+   * (CONFIGURE_TOTP) is still required either way. */
+  password?: string;
 }): Promise<{ keycloakSubjectId: string; temporaryPassword: string }> {
   if (!TENANT_REALM_NAME_PATTERN.test(opts.realmName)) {
     throw new Error(`Refusing to create user in Keycloak realm: "${opts.realmName}" is not a valid tenant realm name.`);
   }
   const { firstName, lastName } = splitName(opts.fullName);
-  const temporaryPassword = generateTemporaryPassword();
+  const isManualPassword = !!opts.password;
+  const temporaryPassword = opts.password ?? generateTemporaryPassword();
 
   const createRes = await masterFetch(`/admin/realms/${encodeURIComponent(opts.realmName)}/users`, {
     method: 'POST',
@@ -238,8 +245,8 @@ export async function createTenantAdminUser(opts: {
       enabled: true,
       firstName,
       lastName,
-      credentials: [{ type: 'password', value: temporaryPassword, temporary: true }],
-      requiredActions: ['UPDATE_PASSWORD', 'CONFIGURE_TOTP'],
+      credentials: [{ type: 'password', value: temporaryPassword, temporary: !isManualPassword }],
+      requiredActions: isManualPassword ? ['CONFIGURE_TOTP'] : ['UPDATE_PASSWORD', 'CONFIGURE_TOTP'],
     }),
   });
   if (createRes.status !== 201) {

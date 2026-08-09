@@ -9,6 +9,7 @@ import { AgentSkillsController } from './agent-skills.controller';
 import { CaseCategoriesController } from './case-categories.controller';
 import { LossCauseCategoriesController } from './loss-cause-categories.controller';
 import { AutomationRunStatesController } from './automation-run-states.controller';
+import { BusinessRulesController } from './business-rules.controller';
 import { CommentsService } from './comments.service';
 import { WatchersService } from './watchers.service';
 import { MacrosService } from './macros.service';
@@ -34,6 +35,7 @@ import { MacrosService } from './macros.service';
     CaseCategoriesController,
     LossCauseCategoriesController,
     AutomationRunStatesController,
+    BusinessRulesController,
   ],
   providers: [CommentsService, WatchersService, MacrosService],
 })

@@ -22,6 +22,9 @@ export interface CreateTenantAdminJobData {
   tenantId: string;
   email: string;
   fullName: string;
+  /** When set, used as-is instead of generating + emailing a temporary
+   * one — see tenant-user.dto.ts's CreateTenantAdminUserDto.password. */
+  password?: string;
 }
 
 type CreateResult = { status: 'created' | 'failed'; reason?: string };
@@ -38,7 +41,7 @@ export async function createTenantAdmin(data: CreateTenantAdminJobData): Promise
 
     let keycloakUser: { keycloakSubjectId: string; temporaryPassword: string };
     try {
-      keycloakUser = await createTenantAdminUser({ realmName: tenant.keycloakRealm, email: data.email, fullName: data.fullName });
+      keycloakUser = await createTenantAdminUser({ realmName: tenant.keycloakRealm, email: data.email, fullName: data.fullName, password: data.password });
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       console.error(`[create-tenant-admin] Keycloak user creation failed for tenant ${tenant.id}/"${data.email}":`, err);
@@ -60,10 +63,15 @@ export async function createTenantAdmin(data: CreateTenantAdminJobData): Promise
     }
 
     try {
+      // No password line when the caller set one manually — they already
+      // know it, and this email otherwise reads like a leaked credential.
+      const credentialLine = data.password
+        ? "You'll be asked to configure two-factor authentication on first sign-in."
+        : `Temporary password: ${keycloakUser.temporaryPassword}\n\nYou'll be asked to set a new password and configure two-factor authentication on first sign-in.`;
       await sendMail({
         to: data.email,
         subject: `Your TopiaDesk account for ${tenant.name} is ready`,
-        text: `Hi ${data.fullName},\n\nAn admin account for "${tenant.name}" has been created for you.\n\nSign-in username: ${data.email}\nTemporary password: ${keycloakUser.temporaryPassword}\n\nYou'll be asked to set a new password and configure two-factor authentication on first sign-in.`,
+        text: `Hi ${data.fullName},\n\nAn admin account for "${tenant.name}" has been created for you.\n\nSign-in username: ${data.email}\n${credentialLine}`,
       });
     } catch (err) {
       console.error(`[create-tenant-admin] invite email failed for tenant ${tenant.id}/"${data.email}" (account still created):`, err);

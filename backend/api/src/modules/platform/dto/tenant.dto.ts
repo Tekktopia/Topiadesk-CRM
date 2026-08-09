@@ -46,6 +46,9 @@ export class TenantResponseDto {
   @ApiProperty() slug!: string;
   @ApiProperty() schemaName!: string;
   @ApiProperty() keycloakRealm!: string;
+  @ApiPropertyOptional() subdomain?: string | null;
+  @ApiPropertyOptional({ description: 'Full https:// URL for this tenant\'s subdomain, or null for a tenant with no subdomain (falls back to the default app.<domain> entry point).' })
+  tenantUrl?: string | null;
   @ApiProperty() status!: string;
   @ApiProperty() primaryContactEmail!: string;
   @ApiProperty() createdAt!: Date;

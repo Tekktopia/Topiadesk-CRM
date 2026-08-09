@@ -38,6 +38,7 @@ import { enqueueTeamAssignmentNotification } from './notify-team-assignment-queu
 import { findMatchingAssignmentRule, resolveNextAssignee } from './assignment-resolver.util';
 import { buildCaseOrderBy, buildCaseWhere } from './case-query.util';
 import { diffBulkIds } from './bulk-actions';
+import { validateBusinessRules } from './business-rules.validator';
 
 function generateCaseNumber(): string {
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -201,25 +202,35 @@ export class CasesController {
   async create(@Body() dto: CreateCaseDto, @CurrentUser() user: AuthenticatedUser): Promise<Case> {
     const prisma = getPrismaClient();
 
+    // Record<string, unknown> here (not Prisma's generated create-input
+    // type) is deliberate — validateBusinessRules mutates this object in
+    // place for SET_VALUE actions before it's used as the create payload,
+    // and needs a plain indexable shape to do that against an admin-
+    // configured field name it can't know statically.
+    const data: Record<string, unknown> = {
+      caseType: dto.caseType,
+      categoryId: dto.categoryId,
+      subject: dto.subject,
+      description: dto.description,
+      priority: dto.priority,
+      accountId: dto.accountId,
+      contactId: dto.contactId,
+      policyId: dto.policyId,
+      assignedToId: dto.assignedToId,
+      assignedTeamId: dto.assignedTeamId,
+      slaPolicyId: dto.slaPolicyId,
+      sourceChannel: dto.sourceChannel,
+    };
+    await validateBusinessRules('CASE', undefined, data);
+
     let created: Case | undefined;
     for (let attempt = 0; attempt < 3 && !created; attempt++) {
       try {
         created = await prisma.case.create({
           data: {
+            ...(data as Prisma.CaseUncheckedCreateInput),
             caseNumber: generateCaseNumber(),
-            caseType: dto.caseType,
-            categoryId: dto.categoryId,
-            subject: dto.subject,
-            description: dto.description,
-            priority: dto.priority,
-            accountId: dto.accountId,
-            contactId: dto.contactId,
-            policyId: dto.policyId,
-            assignedToId: dto.assignedToId,
-            assignedTeamId: dto.assignedTeamId,
             createdById: user.id,
-            slaPolicyId: dto.slaPolicyId,
-            sourceChannel: dto.sourceChannel,
           },
         });
       } catch (err) {
@@ -278,21 +289,23 @@ export class CasesController {
     const prisma = getPrismaClient();
     const existing = await prisma.case.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Case not found');
+    const data: Record<string, unknown> = {
+      categoryId: dto.categoryId,
+      subject: dto.subject,
+      description: dto.description,
+      priority: dto.priority,
+      accountId: dto.accountId,
+      contactId: dto.contactId,
+      policyId: dto.policyId,
+      assignedToId: dto.assignedToId,
+      assignedTeamId: dto.assignedTeamId,
+      slaPolicyId: dto.slaPolicyId,
+      sourceChannel: dto.sourceChannel,
+    };
+    await validateBusinessRules('CASE', existing as unknown as Record<string, unknown>, data);
     const updated = await prisma.case.update({
       where: { id },
-      data: {
-        categoryId: dto.categoryId,
-        subject: dto.subject,
-        description: dto.description,
-        priority: dto.priority,
-        accountId: dto.accountId,
-        contactId: dto.contactId,
-        policyId: dto.policyId,
-        assignedToId: dto.assignedToId,
-        assignedTeamId: dto.assignedTeamId,
-        slaPolicyId: dto.slaPolicyId,
-        sourceChannel: dto.sourceChannel,
-      },
+      data: data as Prisma.CaseUncheckedUpdateInput,
     });
     await enqueueEntityEvent({ entityType: 'CASE', entityId: id, eventType: 'UPDATED', occurredAt: updated.updatedAt.toISOString() }).catch(() => undefined);
     if (dto.assignedTeamId && dto.assignedTeamId !== existing.assignedTeamId) {
@@ -332,13 +345,32 @@ export class CasesController {
   @RequirePermission('case', 'write')
   @ApiOkResponse({ type: CaseResponseDto })
   async changeStatus(@Param('id') id: string, @Body() dto: ChangeCaseStatusDto): Promise<CaseResponseDto> {
-    if (dto.status === 'CLOSED') {
-      const existing = await getPrismaClient().case.findUnique({ where: { id }, select: { caseType: true } });
-      if (existing?.caseType === 'COMPLAINT') {
-        throw new BadRequestException('Closing a COMPLAINT case requires approval — use POST /cases/:id/request-closure');
-      }
+    const prisma = getPrismaClient();
+    const existing = await prisma.case.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Case not found');
+    if (dto.status === 'CLOSED' && existing.caseType === 'COMPLAINT') {
+      throw new BadRequestException('Closing a COMPLAINT case requires approval — use POST /cases/:id/request-closure');
     }
-    const kase = await applyCaseStatusTransition(id, dto.status, dto.reason);
+
+    // Deliberately NOT passed into/called from applyCaseStatusTransition
+    // itself — that function is shared with the automation engine's
+    // SET_STATUS action handler (see status-transition.util.ts), and an
+    // unattended automation run has no way to recover from a thrown
+    // BadRequestException. Business rule enforcement stays scoped to this
+    // user-initiated controller call. `extra` starts as just the
+    // candidate new status (so a rule's condition can react to "the
+    // status this case is about to have", merged against the case's
+    // current — pre-transition — other fields); validateBusinessRules may
+    // add further keys via SET_VALUE, applied below via a second update
+    // once the transition itself has landed.
+    const extra: Record<string, unknown> = { status: dto.status };
+    await validateBusinessRules('CASE', existing as unknown as Record<string, unknown>, extra);
+    delete extra.status;
+
+    let kase = await applyCaseStatusTransition(id, dto.status, dto.reason);
+    if (Object.keys(extra).length > 0) {
+      kase = await prisma.case.update({ where: { id }, data: extra as Prisma.CaseUncheckedUpdateInput });
+    }
     await enqueueEntityEvent({ entityType: 'CASE', entityId: id, eventType: 'STATUS_CHANGED', occurredAt: kase.updatedAt.toISOString() }).catch(() => undefined);
     return kase;
   }

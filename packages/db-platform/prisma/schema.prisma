@@ -85,6 +85,12 @@ model Tenant {
   slug                String       @unique
   schemaName          String       @unique @map("schema_name")
   keycloakRealm       String       @unique @map("keycloak_realm")
+  /// DNS-safe subdomain label (`slug` with `_` -> `-`), reachable at
+  /// `<subdomain>.<root domain>`. Nullable: legacy/irregular rows (e.g. a
+  /// tenant whose keycloakRealm doesn't follow the tenant_<slug>
+  /// convention) simply have no working tenant-subdomain and fall back to
+  /// the default app.<root domain> entry point — no backfill required.
+  subdomain           String?      @unique
   status              TenantStatus @default(PROVISIONING)
   primaryContactEmail String       @map("primary_contact_email")
   createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -135,14 +141,30 @@ model Subscription {
 /// Global Admin's OWN operator accounts (TopiaDesk company staff) —
 /// completely separate from any tenant's `users` table, authenticated
 /// against the "topiadesk-platform" Keycloak realm, never a tenant realm.
+enum PlatformAdminRole {
+  SUPPORT
+  SUPER_ADMIN
+}
+
 model PlatformAdminUser {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  keycloakSubjectId String   @unique @map("keycloak_subject_id")
-  email             String   @unique
-  fullName          String   @map("full_name")
-  status            String   @default("ACTIVE")
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  keycloakSubjectId String            @unique @map("keycloak_subject_id")
+  email             String            @unique
+  fullName          String            @map("full_name")
+  status            String            @default("ACTIVE")
+  /// App-layer privilege tier, checked by PlatformRoleGuard — deliberately
+  /// DB-only, not a Keycloak realm role (KeycloakAdminService has no role/
+  /// group-assignment methods at all; same "RBAC lives in Postgres, never
+  /// realm_access.roles" principle infra/keycloak/README.md documents for
+  /// the tenant realm applies here too). Default SUPPORT governs admins
+  /// created from here on — every row that existed before this field was
+  /// added was promoted to SUPER_ADMIN by this migration's own data-fix
+  /// (see prisma/migrations/20260809040000_add_platform_admin_role), not
+  /// by this default, since nobody's access should silently shrink for
+  /// having existed first.
+  role              PlatformAdminRole @default(SUPPORT)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   assignedTickets SupportTicket[]
   ticketComments  SupportTicketComment[]
@@ -244,4 +266,36 @@ model PlatformAuditLog {
   @@index([createdAt])
   @@index([entityType, entityId])
   @@map("platform_audit_log")
+}
+
+enum PlatformNotificationType {
+  TENANT_PROVISIONED
+  TENANT_PROVISIONING_FAILED
+  TENANT_SUSPENDED
+  TENANT_REACTIVATED
+  SUPPORT_TICKET_CREATED
+}
+
+/// Broadcast to every platform admin, with a SHARED read state — any admin
+/// marking a row read marks it read for everyone, not per-recipient like
+/// the tenant schema's own `Notification` model
+/// (packages/db/prisma/schema.prisma). Deliberate simplification for team
+/// scale (a handful of platform admins today); a per-recipient/per-read
+/// design is the natural next step if that stops being true. No FK on
+/// entityType/entityId (display-only feed, same "no cross-schema FK"
+/// reasoning as SupportTicketComment's actor field below) — a stale
+/// entityId (e.g. a deleted tenant) can silently dangle, which is
+/// acceptable since nothing consults this table for referential logic.
+model PlatformNotification {
+  id         String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type       PlatformNotificationType
+  title      String
+  body       String?
+  entityType String?                  @map("entity_type")
+  entityId   String?                  @map("entity_id")
+  readAt     DateTime?                @map("read_at") @db.Timestamptz(6)
+  createdAt  DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@map("platform_notifications")
 }

@@ -46,6 +46,7 @@ async function main() {
       email: 'platform-admin@topiadesk.local',
       fullName: 'TopiaDesk Platform Admin',
       status: 'ACTIVE',
+      role: 'SUPER_ADMIN',
     },
   });
 

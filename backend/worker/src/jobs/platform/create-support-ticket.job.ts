@@ -30,7 +30,7 @@ export async function createSupportTicket(data: CreateSupportTicketJobData): Pro
     if (!tenant) {
       return { status: 'failed', reason: `No tenant found for schema "${data.tenantSchema}"` };
     }
-    await platformPrisma.supportTicket.create({
+    const ticket = await platformPrisma.supportTicket.create({
       data: {
         tenantId: tenant.id,
         subject: data.subject,
@@ -38,6 +38,15 @@ export async function createSupportTicket(data: CreateSupportTicketJobData): Pro
         priority: data.priority,
         raisedByEmail: data.raisedByEmail,
         raisedByName: data.raisedByName,
+      },
+    });
+    await platformPrisma.platformNotification.create({
+      data: {
+        type: 'SUPPORT_TICKET_CREATED',
+        title: `New support ticket from ${tenant.name}`,
+        body: data.subject,
+        entityType: 'support_tickets',
+        entityId: ticket.id,
       },
     });
     return { status: 'created' };

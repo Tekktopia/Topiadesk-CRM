@@ -2223,6 +2223,44 @@ model CustomFieldDefinition {
   @@map("custom_field_definitions")
 }
 
+enum BusinessRuleOperator {
+  EQUALS
+  NOT_EQUALS
+}
+
+/// No-code field-behavior engine ("if condition, then require/hide/readonly/
+/// set-value on these fields") — Case only for v1 (see CONDITION_FIELDS/
+/// ACTION_FIELDS in business-rules.validator.ts; CLAIM is representable via
+/// CaseManagementEntityType but has no evaluating code path yet, since
+/// there's no claim-form-dialog.tsx for live UX regardless). Single flat
+/// condition per rule, same scope as AutomationRule's own CONDITION step
+/// (run-engine.ts) — deliberately no AND/OR groups in v1. Org-wide config,
+/// no RLS — same tier as CustomFieldDefinition/Carrier/Pipeline. Reuses
+/// CaseManagementEntityType rather than a new enum since the two domains
+/// (SLA config, business rules) already share the same Case/Claim split.
+model BusinessRule {
+  id                String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType        CaseManagementEntityType @map("entity_type")
+  name              String
+  description       String?
+  conditionField    String                   @map("condition_field")
+  conditionOperator BusinessRuleOperator     @map("condition_operator")
+  conditionValue    String                   @map("condition_value")
+  /// Array of {field, effect, value?} — effect: REQUIRE|HIDE|READONLY|
+  /// SET_VALUE. value is only used by SET_VALUE. See
+  /// business-rules.validator.ts for the evaluation semantics this shape
+  /// is interpreted with (and evaluate-business-rules.ts on the frontend,
+  /// which mirrors it for live form UX).
+  actions           Json
+  isActive          Boolean                  @default(true) @map("is_active")
+  displayOrder      Int                      @default(0) @map("display_order")
+  createdAt         DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([entityType, isActive])
+  @@map("business_rules")
+}
+
 enum SavedViewEntityType {
   ACCOUNT
   CONTACT

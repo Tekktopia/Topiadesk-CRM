@@ -80,6 +80,10 @@ BEGIN
     'claims', 'claim_status_history', 'cases',
     'sla_policies', 'sla_targets', 'business_hours_calendars', 'business_holidays',
     'macros', 'assignment_rules', 'agent_skills',
+    -- Business rule engine — admin-editable config that reshapes required/
+    -- visible fields org-wide, same compliance tier as custom_field_definitions
+    -- below (both are structural config changes, not personal preference).
+    'business_rules',
     -- Phase 2 — knowledge base & surveys. knowledge_article_feedback
     -- excluded (high-volume, low compliance value, same reasoning as
     -- notifications). survey_responses IS included on purpose — this is

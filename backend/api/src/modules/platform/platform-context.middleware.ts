@@ -20,11 +20,17 @@ import './platform-context';
  * that sharing is safe (a request only ever touches one of {tenant schema,
  * platform schema}).
  *
- * No PermissionGuard-equivalent here: Phase 1's platform RLS is
- * deliberately coarse ("any authenticated platform-admin session, no
- * OWN/DEPARTMENT/BRANCH tiering" — see the plan's own scoping decision),
- * so any PlatformAdminUser with status ACTIVE can operate on any
- * `/platform/*` endpoint.
+ * RLS itself stays coarse on purpose ("any authenticated platform-admin
+ * session, no OWN/DEPARTMENT/BRANCH tiering" — see the plan's own scoping
+ * decision) — but as of PlatformAdminUser.role, this middleware is no
+ * longer the only gate: PlatformRoleGuard (platform-role.guard.ts) reads
+ * `req.platformAdmin.role` (set below, zero extra queries — this
+ * middleware already fetched the full row) to block SUPPORT-tier callers
+ * from the sensitive endpoints that opt in via @RequirePlatformRole. Same
+ * "two independent layers" split as RlsContextMiddleware/PermissionGuard
+ * on the tenant side — this middleware answers "is this a legitimate
+ * active platform admin at all", the guard answers "is their tier high
+ * enough for this specific action".
  */
 @Injectable()
 export class PlatformContextMiddleware implements NestMiddleware {
@@ -67,7 +73,7 @@ export class PlatformContextMiddleware implements NestMiddleware {
       return;
     }
 
-    req.platformAdmin = { id: admin.id, email: admin.email, fullName: admin.fullName };
+    req.platformAdmin = { id: admin.id, email: admin.email, fullName: admin.fullName, role: admin.role as 'SUPPORT' | 'SUPER_ADMIN' };
 
     // tenantSchema: null — a platform-admin session never touches a tenant
     // schema at all (only getPlatformPrismaClient(), which doesn't read
