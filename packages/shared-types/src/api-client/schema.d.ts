@@ -93,7 +93,7 @@ export interface paths {
         };
         get: operations["UsersController_list"];
         put?: never;
-        post?: never;
+        post: operations["UsersController_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -756,6 +756,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/identity/sso/microsoft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MicrosoftSsoController_get"];
+        put: operations["MicrosoftSsoController_upsert"];
+        post?: never;
+        delete: operations["MicrosoftSsoController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/crm/accounts": {
         parameters: {
             query?: never;
@@ -804,6 +820,22 @@ export interface paths {
         patch: operations["AccountsController_update"];
         trace?: never;
     };
+    "/crm/accounts/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AccountsController_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/crm/accounts/{id}/renewals": {
         parameters: {
             query?: never;
@@ -814,6 +846,38 @@ export interface paths {
         get: operations["AccountsController_listRenewals"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/accounts/{id}/group-rollup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AccountsController_groupRollup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/accounts/{id}/kyc/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AccountsController_verifyKyc"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1284,6 +1348,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/crm/lead-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LeadSourcesController_list"];
+        put?: never;
+        post: operations["LeadSourcesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/lead-sources/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LeadSourcesController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["LeadSourcesController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["LeadSourcesController_update"];
+        trace?: never;
+    };
     "/crm/pipelines": {
         parameters: {
             query?: never;
@@ -1326,6 +1422,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["PipelinesController_createStage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/pipelines/{id}/stages/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PipelinesController_reorderStages"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1378,6 +1490,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["OpportunitiesController_update"];
+        trace?: never;
+    };
+    "/crm/opportunities/{id}/stage-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OpportunitiesController_stageHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/crm/opportunities/bulk/assign": {
@@ -1710,7 +1838,7 @@ export interface paths {
         get: operations["SalesQuotasController_getOne"];
         put?: never;
         post?: never;
-        delete?: never;
+        delete: operations["SalesQuotasController_remove"];
         options?: never;
         head?: never;
         patch: operations["SalesQuotasController_update"];
@@ -1892,6 +2020,22 @@ export interface paths {
         patch: operations["PolicyController_update"];
         trace?: never;
     };
+    "/policies/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PolicyController_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/policies/{policyId}/versions": {
         parameters: {
             query?: never;
@@ -2004,6 +2148,22 @@ export interface paths {
         patch: operations["PremiumController_update"];
         trace?: never;
     };
+    "/premiums/{id}/paystack/initialize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PremiumController_initializePaystackPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/policies/{policyId}/renewal-schedule": {
         parameters: {
             query?: never;
@@ -2018,6 +2178,198 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["RenewalScheduleController_update"];
+        trace?: never;
+    };
+    "/policies/{policyId}/producers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PolicyProducerAssignmentController_list"];
+        put?: never;
+        post: operations["PolicyProducerAssignmentController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/policies/{policyId}/producers/{assignmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["PolicyProducerAssignmentController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/producers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProducersController_list"];
+        put?: never;
+        post: operations["ProducersController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/producers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProducersController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["ProducersController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["ProducersController_update"];
+        trace?: never;
+    };
+    "/producer-commissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProducerCommissionsController_list"];
+        put?: never;
+        post: operations["ProducerCommissionsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/producer-commissions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProducerCommissionsController_getOne"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ProducerCommissionsController_update"];
+        trace?: never;
+    };
+    "/policies/{policyId}/coverages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PolicyCoverageController_list"];
+        put?: never;
+        post: operations["PolicyCoverageController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/policies/{policyId}/coverages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["PolicyCoverageController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["PolicyCoverageController_update"];
+        trace?: never;
+    };
+    "/policies/{policyId}/participants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PolicyParticipantController_list"];
+        put?: never;
+        post: operations["PolicyParticipantController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/policies/{policyId}/participants/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["PolicyParticipantController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["PolicyParticipantController_update"];
+        trace?: never;
+    };
+    "/policies/{policyId}/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PolicyAssetController_list"];
+        put?: never;
+        post: operations["PolicyAssetController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/policies/{policyId}/assets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["PolicyAssetController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["PolicyAssetController_update"];
         trace?: never;
     };
     "/documents/categories": {
@@ -2254,6 +2606,22 @@ export interface paths {
         get: operations["IntegrationsController_listSyncJobLogs"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations/whatsapp/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["IntegrationsController_testWhatsApp"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2580,6 +2948,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboards/operational-kpis/deals-trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DashboardsController_getDealsTrend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dashboards/executive": {
         parameters: {
             query?: never;
@@ -2692,6 +3076,22 @@ export interface paths {
         patch: operations["SavedDashboardsController_update"];
         trace?: never;
     };
+    "/saved-dashboards/render-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SavedDashboardsController_renderPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/saved-dashboards/{id}/render": {
         parameters: {
             query?: never;
@@ -2802,6 +3202,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["ClaimsController_update"];
+        trace?: never;
+    };
+    "/claims/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClaimsController_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/claims/{id}/status-history": {
@@ -3026,6 +3442,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["CasesController_update"];
+        trace?: never;
+    };
+    "/cases/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CasesController_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/cases/{id}/claim": {
@@ -3854,6 +4286,22 @@ export interface paths {
         get: operations["PublicKnowledgeController_findBySlug"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/knowledge/articles/{slug}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PublicKnowledgeController_feedback"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4692,6 +5140,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ApprovalsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/approvals/delegations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ApprovalDelegationsController_list"];
+        put?: never;
+        post: operations["ApprovalDelegationsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/approvals/delegations/colleagues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ApprovalDelegationsController_colleagues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/approvals/delegations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ApprovalDelegationsController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portal/auth/request-link": {
         parameters: {
             query?: never;
@@ -4940,6 +5452,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["TenantsController_usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/tenants/{id}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TenantsController_health"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5268,6 +5796,38 @@ export interface paths {
         patch: operations["PlatformNotificationsController_markRead"];
         trace?: never;
     };
+    "/public/tenant-lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicTenantLookupController_lookup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlatformSearchController_search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/support-tickets": {
         parameters: {
             query?: never;
@@ -5362,6 +5922,8 @@ export interface components {
             phone: Record<string, never> | null;
             departmentId: Record<string, never> | null;
             branchId: Record<string, never> | null;
+            managerId: Record<string, never> | null;
+            positionTitle: Record<string, never> | null;
             status: string;
             roles: components["schemas"]["UserRoleSummaryDto"][];
             lastSyncedAt: Record<string, never> | null;
@@ -5369,6 +5931,21 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        CreateUserDto: {
+            email: string;
+            fullName: string;
+            phone?: string;
+            departmentId?: string;
+            branchId?: string;
+            managerId?: string;
+            /** @description Free text — e.g. "Team Lead", "Supervisor" */
+            positionTitle?: string;
+        };
+        CreateUserResponseDto: {
+            user: components["schemas"]["UserResponseDto"];
+            /** @description One-time temporary password — shown once, never stored or logged. Also emailed to the new user. The account is forced to change it on next sign-in. */
+            temporaryPassword: string;
         };
         BulkInviteUserRowDto: {
             email: string;
@@ -5394,6 +5971,10 @@ export interface components {
             departmentId?: Record<string, never> | null;
             /** @description Pass null to unassign */
             branchId?: Record<string, never> | null;
+            /** @description Pass null to unassign */
+            managerId?: Record<string, never> | null;
+            /** @description Free text — e.g. "Team Lead", "Supervisor". Pass null to clear. */
+            positionTitle?: Record<string, never> | null;
         };
         AssignRoleDto: {
             roleId: string;
@@ -5701,6 +6282,24 @@ export interface components {
         UpdateScimTokenDto: {
             description: string;
         };
+        MicrosoftSsoResponseDto: {
+            configured: boolean;
+            azureTenantId: Record<string, never> | null;
+            azureClientId: Record<string, never> | null;
+            isEnabled: boolean;
+            /** @description The Azure App Registration redirect URI to configure — derived from this tenant's own Keycloak realm, valid even before anything is saved. */
+            redirectUri: string;
+        };
+        UpsertMicrosoftSsoDto: {
+            /** @description Azure AD (Entra ID) Directory (tenant) ID */
+            azureTenantId: string;
+            /** @description Azure App Registration Application (client) ID */
+            azureClientId: string;
+            /** @description Omit to keep the currently stored secret unchanged (e.g. toggling isEnabled without retyping it) */
+            azureClientSecret?: string;
+            /** @default true */
+            isEnabled: boolean;
+        };
         AccountResponseDto: {
             id: string;
             name: string;
@@ -5712,6 +6311,9 @@ export interface components {
             parentAccountId: Record<string, never> | null;
             city: Record<string, never> | null;
             country: Record<string, never> | null;
+            kycStatus: string;
+            kycExpiryDate: Record<string, never> | null;
+            naicomId: Record<string, never> | null;
             customFields: {
                 [key: string]: unknown;
             };
@@ -5768,6 +6370,9 @@ export interface components {
             parentAccountId: Record<string, never> | null;
             city: Record<string, never> | null;
             country: Record<string, never> | null;
+            kycStatus: string;
+            kycExpiryDate: Record<string, never> | null;
+            naicomId: Record<string, never> | null;
             customFields: {
                 [key: string]: unknown;
             };
@@ -5781,6 +6386,30 @@ export interface components {
             parentAccount: components["schemas"]["AccountRefDto"] | null;
             subAccounts: components["schemas"]["AccountRefDto"][];
         };
+        AuditLogActorDto: {
+            id: string;
+            fullName: string;
+            email: string;
+        };
+        AuditLogResponseDto: {
+            /** @description BigInt chain sequence id, serialized as string */
+            id: string;
+            entityType: string;
+            entityId: string;
+            /** @enum {string} */
+            action: "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGIN_FAILED" | "PERMISSION_CHANGE" | "EXPORT" | "VIEW_SENSITIVE" | "FORCE_LOGOUT";
+            actorUserId: Record<string, never> | null;
+            actorUser: components["schemas"]["AuditLogActorDto"] | null;
+            actorSystemJob: Record<string, never> | null;
+            actorIp: Record<string, never> | null;
+            /** @description Trigger-captured column diff — shape varies by entityType */
+            changedFields: Record<string, never> | null;
+            chainLane: number;
+            prevHash: Record<string, never> | null;
+            currentHash: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
         AccountRenewalRowDto: {
             policyId: string;
             policyNumber: string;
@@ -5792,23 +6421,32 @@ export interface components {
             nextAlertDueAt: Record<string, never> | null;
             assignedToId: Record<string, never> | null;
         };
+        AccountGroupRollupDto: {
+            accountCount: number;
+            memberCount: number;
+            totalPolicies: number;
+            openClaims: number;
+            totalSumInsured: Record<string, never> | null;
+            totalGrossPremium: Record<string, never> | null;
+            subsidiaries: components["schemas"]["AccountRefDto"][];
+        };
         AccountSlaOverrideResponseDto: {
             id: string;
             accountId: string;
             /** @enum {string} */
-            entityType: "CLAIM" | "CASE";
+            entityType: "CLAIM" | "CASE" | "LEAD";
             slaPolicyId: string;
             slaPolicyName: string;
         };
         UpsertAccountSlaOverrideDto: {
             /** @enum {string} */
-            entityType: "CLAIM" | "CASE";
+            entityType: "CLAIM" | "CASE" | "LEAD";
             slaPolicyId: string;
         };
         CreateAccountDto: {
             name: string;
             /** @enum {string} */
-            accountType: "INDIVIDUAL" | "CORPORATE";
+            accountType: "INDIVIDUAL" | "CORPORATE" | "HOUSEHOLD";
             /** @enum {string} */
             status?: "PROSPECT" | "CLIENT" | "FORMER_CLIENT";
             industryId?: string;
@@ -5821,6 +6459,10 @@ export interface components {
             state?: string;
             country?: string;
             postalCode?: string;
+            /** @enum {string} */
+            kycStatus?: "NOT_STARTED" | "PENDING" | "VERIFIED" | "EXPIRED" | "REJECTED";
+            kycExpiryDate?: string;
+            naicomId?: string;
             parentAccountId?: string;
             ownerId?: string;
             source?: string;
@@ -5832,7 +6474,7 @@ export interface components {
         UpdateAccountDto: {
             name?: string;
             /** @enum {string} */
-            accountType?: "INDIVIDUAL" | "CORPORATE";
+            accountType?: "INDIVIDUAL" | "CORPORATE" | "HOUSEHOLD";
             /** @enum {string} */
             status?: "PROSPECT" | "CLIENT" | "FORMER_CLIENT";
             industryId?: string;
@@ -5845,6 +6487,10 @@ export interface components {
             state?: string;
             country?: string;
             postalCode?: string;
+            /** @enum {string} */
+            kycStatus?: "NOT_STARTED" | "PENDING" | "VERIFIED" | "EXPIRED" | "REJECTED";
+            kycExpiryDate?: string;
+            naicomId?: string;
             parentAccountId?: string;
             ownerId?: string;
             source?: string;
@@ -5917,6 +6563,9 @@ export interface components {
             email: Record<string, never> | null;
             phone: Record<string, never> | null;
             title: Record<string, never> | null;
+            householdRole: Record<string, never> | null;
+            idType: Record<string, never> | null;
+            idNumber: Record<string, never> | null;
             isPrimary: boolean;
             customFields: {
                 [key: string]: unknown;
@@ -5934,6 +6583,11 @@ export interface components {
             email?: string;
             phone?: string;
             title?: string;
+            /** @description Only meaningful when the parent account is HOUSEHOLD — Spouse/Child/Dependent/etc. */
+            householdRole?: string;
+            /** @description National ID, Passport, Driver's License, Utility Bill, CAC, etc. */
+            idType?: string;
+            idNumber?: string;
             /** @default false */
             isPrimary: boolean;
             customFields?: {
@@ -5950,6 +6604,11 @@ export interface components {
             email?: string;
             phone?: string;
             title?: string;
+            /** @description Only meaningful when the parent account is HOUSEHOLD — Spouse/Child/Dependent/etc. */
+            householdRole?: string;
+            /** @description National ID, Passport, Driver's License, Utility Bill, CAC, etc. */
+            idType?: string;
+            idNumber?: string;
             /** @default false */
             isPrimary: boolean;
             customFields?: {
@@ -6056,8 +6715,8 @@ export interface components {
             createdAt: string;
         };
         CreateLeadDto: {
-            /** @enum {string} */
-            source: "WEB" | "EMAIL" | "REFERRAL" | "PARTNER" | "SOCIAL" | "PHONE" | "EVENT" | "OTHER";
+            /** @description A LeadSource.code — see GET /crm/lead-sources for the admin-managed list */
+            source: string;
             sourceCampaign?: string;
             firstName: string;
             lastName: string;
@@ -6075,8 +6734,8 @@ export interface components {
             };
         };
         UpdateLeadDto: {
-            /** @enum {string} */
-            source?: "WEB" | "EMAIL" | "REFERRAL" | "PARTNER" | "SOCIAL" | "PHONE" | "EVENT" | "OTHER";
+            /** @description A LeadSource.code — see GET /crm/lead-sources for the admin-managed list */
+            source?: string;
             sourceCampaign?: string;
             firstName?: string;
             lastName?: string;
@@ -6104,8 +6763,8 @@ export interface components {
             ids: string[];
             /** @enum {string} */
             status?: "NEW" | "CONTACTED" | "QUALIFIED" | "DISQUALIFIED" | "CONVERTED";
-            /** @enum {string} */
-            source?: "WEB" | "EMAIL" | "REFERRAL" | "PARTNER" | "SOCIAL" | "PHONE" | "EVENT" | "OTHER";
+            /** @description A LeadSource.code */
+            source?: string;
             score?: number;
         };
         BulkDeleteLeadsDto: {
@@ -6115,7 +6774,7 @@ export interface components {
             existingAccountId?: string;
             accountName?: string;
             /** @enum {string} */
-            accountType?: "INDIVIDUAL" | "CORPORATE";
+            accountType?: "INDIVIDUAL" | "CORPORATE" | "HOUSEHOLD";
             industryId?: string;
             /** @description Defaults to the lead assignee, then the calling user */
             accountOwnerId?: string;
@@ -6134,6 +6793,31 @@ export interface components {
             lead: components["schemas"]["LeadResponseDto"];
             accountId: string;
             opportunityId: string;
+        };
+        LeadSourceResponseDto: {
+            id: string;
+            name: string;
+            code: string;
+            isActive: boolean;
+            sortOrder: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateLeadSourceDto: {
+            name: string;
+            /** @description Stable machine value — this is what Lead.source actually stores, e.g. "TRADE_SHOW" */
+            code: string;
+            /** @default true */
+            isActive: boolean;
+            /** @default 0 */
+            sortOrder: number;
+        };
+        UpdateLeadSourceDto: {
+            name?: string;
+            isActive?: boolean;
+            sortOrder?: number;
         };
         PipelineResponseDto: {
             id: string;
@@ -6182,6 +6866,9 @@ export interface components {
             /** @default false */
             isLost: boolean;
         };
+        ReorderPipelineStagesDto: {
+            stageIds: string[];
+        };
         UpdatePipelineStageDto: {
             name?: string;
             order?: number;
@@ -6213,6 +6900,15 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        StageHistoryEntryDto: {
+            /** Format: date-time */
+            changedAt: string;
+            actorName: Record<string, never> | null;
+            fromStageId: Record<string, never> | null;
+            fromStageName: Record<string, never> | null;
+            toStageId: Record<string, never> | null;
+            toStageName: Record<string, never> | null;
         };
         CreateOpportunityDto: {
             accountId: string;
@@ -6850,6 +7546,10 @@ export interface components {
         BulkMarkPremiumsPaidDto: {
             ids: string[];
         };
+        PaystackInitializeResponseDto: {
+            reference: string;
+            authorizationUrl: string;
+        };
         UpdatePremiumDto: {
             grossPremium?: string;
             netPremium?: string;
@@ -6892,6 +7592,226 @@ export interface components {
             renewalMeetingDate?: string;
             /** @enum {string} */
             status?: "ON_TRACK" | "AT_RISK" | "IN_PROGRESS" | "RENEWED" | "LAPSED" | "DECLINED_TO_RENEW";
+        };
+        ProducerPolicyAssignmentResponseDto: {
+            id: string;
+            policyId: string;
+            producerId: string;
+            /** @enum {string} */
+            role: "PRIMARY" | "SUB_PRODUCER" | "SERVICING";
+            commissionSplitPercent: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreateProducerPolicyAssignmentDto: {
+            producerId: string;
+            /** @enum {string} */
+            role?: "PRIMARY" | "SUB_PRODUCER" | "SERVICING";
+            commissionSplitPercent: string;
+        };
+        ProducerResponseDto: {
+            id: string;
+            producerCode: string;
+            name: string;
+            /** @enum {string} */
+            type: "INTERNAL_BROKER" | "EXTERNAL_SUB_BROKER" | "CORRESPONDENT";
+            /** @enum {string} */
+            status: "ACTIVE" | "SUSPENDED";
+            licenseNumber: Record<string, never> | null;
+            licenseExpiry: Record<string, never> | null;
+            phone: Record<string, never> | null;
+            email: Record<string, never> | null;
+            parentProducerId: Record<string, never> | null;
+            linkedUserId: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateProducerDto: {
+            producerCode: string;
+            name: string;
+            /** @enum {string} */
+            type: "INTERNAL_BROKER" | "EXTERNAL_SUB_BROKER" | "CORRESPONDENT";
+            /** @enum {string} */
+            status?: "ACTIVE" | "SUSPENDED";
+            licenseNumber?: string;
+            licenseExpiry?: string;
+            phone?: string;
+            email?: string;
+            parentProducerId?: string;
+            linkedUserId?: string;
+        };
+        UpdateProducerDto: {
+            producerCode?: string;
+            name?: string;
+            /** @enum {string} */
+            type?: "INTERNAL_BROKER" | "EXTERNAL_SUB_BROKER" | "CORRESPONDENT";
+            /** @enum {string} */
+            status?: "ACTIVE" | "SUSPENDED";
+            licenseNumber?: string;
+            licenseExpiry?: string;
+            phone?: string;
+            email?: string;
+            parentProducerId?: string;
+            linkedUserId?: string;
+        };
+        ProducerCommissionResponseDto: {
+            id: string;
+            commissionNumber: string;
+            policyId: string;
+            producerId: string;
+            premiumId: Record<string, never> | null;
+            premiumBase: string;
+            commissionPercent: string;
+            commissionAmount: string;
+            vatAmount: string;
+            whtAmount: string;
+            netPayable: string;
+            /** @enum {string} */
+            status: "PENDING" | "APPROVED" | "PAID";
+            period: string;
+            paymentDate: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateProducerCommissionDto: {
+            commissionNumber: string;
+            policyId: string;
+            producerId: string;
+            premiumId?: string;
+            premiumBase: string;
+            commissionPercent: string;
+            commissionAmount: string;
+            vatAmount?: string;
+            whtAmount?: string;
+            netPayable: string;
+            period: string;
+        };
+        UpdateProducerCommissionDto: {
+            premiumBase?: string;
+            commissionPercent?: string;
+            commissionAmount?: string;
+            vatAmount?: string;
+            whtAmount?: string;
+            netPayable?: string;
+            period?: string;
+            /** @enum {string} */
+            status?: "PENDING" | "APPROVED" | "PAID";
+            paymentDate?: string;
+        };
+        PolicyCoverageResponseDto: {
+            id: string;
+            policyId: string;
+            coverageName: string;
+            coverageType: string;
+            sumInsured: Record<string, never> | null;
+            premium: Record<string, never> | null;
+            deductible: Record<string, never> | null;
+            limits: Record<string, never> | null;
+            subLimits: Record<string, never> | null;
+            conditions: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreatePolicyCoverageDto: {
+            coverageName: string;
+            coverageType: string;
+            sumInsured?: string;
+            premium?: string;
+            deductible?: string;
+            limits?: string;
+            subLimits?: string;
+            conditions?: string;
+        };
+        UpdatePolicyCoverageDto: {
+            coverageName?: string;
+            coverageType?: string;
+            sumInsured?: string;
+            premium?: string;
+            deductible?: string;
+            limits?: string;
+            subLimits?: string;
+            conditions?: string;
+        };
+        PolicyParticipantResponseDto: {
+            id: string;
+            policyId: string;
+            /** @enum {string} */
+            participantType: "INSURED" | "BENEFICIARY" | "NOMINEE" | "DRIVER" | "ADDITIONAL_INSURED";
+            name: string;
+            contactId: Record<string, never> | null;
+            relationship: Record<string, never> | null;
+            percentage: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreatePolicyParticipantDto: {
+            /** @enum {string} */
+            participantType: "INSURED" | "BENEFICIARY" | "NOMINEE" | "DRIVER" | "ADDITIONAL_INSURED";
+            name: string;
+            contactId?: string;
+            relationship?: string;
+            percentage?: string;
+        };
+        UpdatePolicyParticipantDto: {
+            /** @enum {string} */
+            participantType?: "INSURED" | "BENEFICIARY" | "NOMINEE" | "DRIVER" | "ADDITIONAL_INSURED";
+            name?: string;
+            contactId?: string;
+            relationship?: string;
+            percentage?: string;
+        };
+        PolicyAssetResponseDto: {
+            id: string;
+            policyId: string;
+            /** @enum {string} */
+            assetType: "VEHICLE" | "PROPERTY" | "CARGO" | "VESSEL";
+            assetName: string;
+            registrationNo: Record<string, never> | null;
+            chassisNo: Record<string, never> | null;
+            address: Record<string, never> | null;
+            valuation: Record<string, never> | null;
+            year: Record<string, never> | null;
+            makeModel: Record<string, never> | null;
+            latitude: Record<string, never> | null;
+            longitude: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreatePolicyAssetDto: {
+            /** @enum {string} */
+            assetType: "VEHICLE" | "PROPERTY" | "CARGO" | "VESSEL";
+            assetName: string;
+            registrationNo?: string;
+            chassisNo?: string;
+            address?: string;
+            valuation?: string;
+            year?: number;
+            makeModel?: string;
+            latitude?: string;
+            longitude?: string;
+        };
+        UpdatePolicyAssetDto: {
+            /** @enum {string} */
+            assetType?: "VEHICLE" | "PROPERTY" | "CARGO" | "VESSEL";
+            assetName?: string;
+            registrationNo?: string;
+            chassisNo?: string;
+            address?: string;
+            valuation?: string;
+            year?: number;
+            makeModel?: string;
+            latitude?: string;
+            longitude?: string;
         };
         DocumentCategoryResponseDto: {
             id: string;
@@ -6982,7 +7902,7 @@ export interface components {
         CreateConnectorDto: {
             name: string;
             /** @enum {string} */
-            connectorType: "CORE_BROKING_SYSTEM" | "ERP" | "MOCK_STUB" | "TEAMS_WEBHOOK" | "SEAMLESSHR";
+            connectorType: "CORE_BROKING_SYSTEM" | "ERP" | "MOCK_STUB" | "TEAMS_WEBHOOK" | "SEAMLESSHR" | "PAYSTACK" | "DOJAH" | "WHATSAPP_CLOUD";
             /** @enum {string} */
             syncDirection: "INBOUND" | "OUTBOUND" | "BIDIRECTIONAL";
             /** @default true */
@@ -6998,7 +7918,7 @@ export interface components {
         UpdateConnectorDto: {
             name?: string;
             /** @enum {string} */
-            connectorType?: "CORE_BROKING_SYSTEM" | "ERP" | "MOCK_STUB" | "TEAMS_WEBHOOK" | "SEAMLESSHR";
+            connectorType?: "CORE_BROKING_SYSTEM" | "ERP" | "MOCK_STUB" | "TEAMS_WEBHOOK" | "SEAMLESSHR" | "PAYSTACK" | "DOJAH" | "WHATSAPP_CLOUD";
             /** @enum {string} */
             syncDirection?: "INBOUND" | "OUTBOUND" | "BIDIRECTIONAL";
             /** @default true */
@@ -7038,6 +7958,14 @@ export interface components {
             message: string;
             /** Format: date-time */
             createdAt: string;
+        };
+        WhatsAppTestDto: {
+            to: string;
+            templateName: string;
+            params?: string[];
+        };
+        WhatsAppTestResponseDto: {
+            messageId: string;
         };
         WebhookSubscriptionResponseDto: {
             id: string;
@@ -7162,6 +8090,20 @@ export interface components {
             /** @default 10 */
             limit: number;
         };
+        DepartmentPipelineBreakdownDto: {
+            departmentId: string;
+            departmentName: string;
+            openOpportunityCount: number;
+            /** @description Sum of amount for this department's open opportunities */
+            pipelineValue: string;
+            wonThisMonthCount: number;
+            /** @description Sum of amount for this department's wonThisMonthCount */
+            wonThisMonthValue: string;
+        };
+        LossReasonBreakdownDto: {
+            reason: string;
+            count: number;
+        };
         OperationalKpiResponseDto: {
             openOpportunities: number;
             pipelineValue: string;
@@ -7173,6 +8115,9 @@ export interface components {
             wonThisMonthValue: string;
             /** @description won / (won + lost) among all opportunities with a non-null actualCloseDate, all-time. Null when there are none yet. */
             winRate: Record<string, never> | null;
+            byDepartment: components["schemas"]["DepartmentPipelineBreakdownDto"][];
+            /** @description Top 5 lost reasons by count, all-time, plus an "Other" bucket for the rest */
+            lossReasonBreakdown: components["schemas"]["LossReasonBreakdownDto"][];
         };
         SalesForecastGroupDto: {
             key: string;
@@ -7191,6 +8136,30 @@ export interface components {
             groups: components["schemas"]["SalesForecastGroupDto"][];
             totalWeightedAmount: string;
             totalUnweightedAmount: string;
+        };
+        DealsTrendMonthDto: {
+            /** @description e.g. "2026-01" */
+            month: string;
+            /** @description Opportunities won (actualCloseDate falling in this month) */
+            wonCount: number;
+            /** @description sum(amount) for wonCount, decimal serialized as string */
+            wonAmount: string;
+        };
+        DealsProjectionMonthDto: {
+            /** @description e.g. "2026-01" */
+            month: string;
+            /** @description Open opportunities expected to close in this month */
+            count: number;
+            /** @description sum(amount * probability/100), decimal serialized as string */
+            weightedAmount: string;
+            /** @description sum(amount), decimal serialized as string */
+            unweightedAmount: string;
+        };
+        DealsTrendResponseDto: {
+            /** @description Trailing 12 months, oldest first, ending this month */
+            trailing: components["schemas"]["DealsTrendMonthDto"][];
+            /** @description Forward 12 months, starting this month */
+            forward: components["schemas"]["DealsProjectionMonthDto"][];
         };
         RenderedDashboardWidgetDto: {
             id: string;
@@ -7221,6 +8190,18 @@ export interface components {
             userName: string;
             openCaseCount: number;
         };
+        DepartmentCaseBreakdownDto: {
+            departmentId: string;
+            departmentName: string;
+            openCaseCount: number;
+            slaBreachRatePercent?: Record<string, never> | null;
+        };
+        TeamCaseBreakdownDto: {
+            teamId: string;
+            teamName: string;
+            openCaseCount: number;
+            slaBreachRatePercent?: Record<string, never> | null;
+        };
         CaseKpiResponseDto: {
             days: number;
             avgFirstResponseHours?: Record<string, never> | null;
@@ -7229,6 +8210,8 @@ export interface components {
             openCaseCountByStatus: components["schemas"]["CaseStatusCountDto"][];
             caseVolumeTrend: components["schemas"]["CaseVolumeTrendPointDto"][];
             agentWorkload: components["schemas"]["AgentWorkloadDto"][];
+            byDepartment: components["schemas"]["DepartmentCaseBreakdownDto"][];
+            byTeam: components["schemas"]["TeamCaseBreakdownDto"][];
         };
         SavedDashboardResponseDto: {
             id: string;
@@ -7261,6 +8244,11 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        RenderPreviewDto: {
+            widgets: {
+                [key: string]: unknown;
+            }[];
+        };
         UpdateSavedDashboardDto: {
             name?: string;
             /** @enum {string} */
@@ -7271,30 +8259,6 @@ export interface components {
             layoutConfig?: {
                 [key: string]: unknown;
             };
-        };
-        AuditLogActorDto: {
-            id: string;
-            fullName: string;
-            email: string;
-        };
-        AuditLogResponseDto: {
-            /** @description BigInt chain sequence id, serialized as string */
-            id: string;
-            entityType: string;
-            entityId: string;
-            /** @enum {string} */
-            action: "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGIN_FAILED" | "PERMISSION_CHANGE" | "EXPORT" | "VIEW_SENSITIVE" | "FORCE_LOGOUT";
-            actorUserId: Record<string, never> | null;
-            actorUser: components["schemas"]["AuditLogActorDto"] | null;
-            actorSystemJob: Record<string, never> | null;
-            actorIp: Record<string, never> | null;
-            /** @description Trigger-captured column diff — shape varies by entityType */
-            changedFields: Record<string, never> | null;
-            chainLane: number;
-            prevHash: Record<string, never> | null;
-            currentHash: string;
-            /** Format: date-time */
-            createdAt: string;
         };
         ClaimResponseDto: {
             id: string;
@@ -7626,7 +8590,7 @@ export interface components {
         CreateSlaPolicyDto: {
             name: string;
             /** @enum {string} */
-            entityType: "CLAIM" | "CASE";
+            entityType: "CLAIM" | "CASE" | "LEAD";
             /** @enum {string} */
             caseType?: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
             /** @enum {string} */
@@ -7734,7 +8698,7 @@ export interface components {
             /** @description Free-text grouping label, e.g. "Renewals", "Escalations" — purely organizational */
             category?: string;
             /** @enum {string} */
-            entityType?: "CLAIM" | "CASE";
+            entityType?: "CLAIM" | "CASE" | "LEAD";
             actions: components["schemas"]["ActionSpecDto"][];
             /** @default true */
             isActive: boolean;
@@ -7744,7 +8708,7 @@ export interface components {
             description?: string;
             category?: string;
             /** @enum {string} */
-            entityType?: "CLAIM" | "CASE";
+            entityType?: "CLAIM" | "CASE" | "LEAD";
             actions?: components["schemas"]["ActionSpecDto"][];
             isActive?: boolean;
         };
@@ -7786,7 +8750,7 @@ export interface components {
         CreateAssignmentRuleDto: {
             name: string;
             /** @enum {string} */
-            entityType: "CLAIM" | "CASE";
+            entityType: "CLAIM" | "CASE" | "LEAD";
             /** @enum {string} */
             strategy: "ROUND_ROBIN" | "LOAD_BASED" | "SKILL_BASED";
             /** @default {} */
@@ -7843,6 +8807,7 @@ export interface components {
             code: string;
             caseType: Record<string, never> | null;
             parentId: Record<string, never> | null;
+            defaultWorkflowId: Record<string, never> | null;
         };
         CreateCaseCategoryDto: {
             name: string;
@@ -7854,6 +8819,8 @@ export interface components {
             caseType?: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
             /** @description Parent category id, for a nested hierarchy — omit/null for a top-level category. Must not be the category itself or one of its own descendants (cycle check is client-side; see case-categories-list-view.tsx / case-category-form-dialog.tsx). The controller rejects self-parenting. */
             parentId?: Record<string, never> | null;
+            /** @description Guaranteed to run on CASE CREATED for this category, independent of the rule's own stored conditions. Omit/null to unset. */
+            defaultWorkflowId?: Record<string, never> | null;
         };
         UpdateCaseCategoryDto: {
             name?: string;
@@ -7865,6 +8832,8 @@ export interface components {
             caseType?: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
             /** @description Parent category id, for a nested hierarchy — omit/null for a top-level category. Must not be the category itself or one of its own descendants (cycle check is client-side; see case-categories-list-view.tsx / case-category-form-dialog.tsx). The controller rejects self-parenting. */
             parentId?: Record<string, never> | null;
+            /** @description Guaranteed to run on CASE CREATED for this category, independent of the rule's own stored conditions. Omit/null to unset. */
+            defaultWorkflowId?: Record<string, never> | null;
         };
         LossCauseCategoryResponseDto: {
             id: string;
@@ -7917,7 +8886,7 @@ export interface components {
         BusinessRuleResponseDto: {
             id: string;
             /** @enum {string} */
-            entityType: "CLAIM" | "CASE";
+            entityType: "CLAIM" | "CASE" | "LEAD";
             name: string;
             description: Record<string, never> | null;
             conditionField: string;
@@ -7937,7 +8906,7 @@ export interface components {
              * @description CASE only in v1 — see BusinessRule model doc comment
              * @enum {string}
              */
-            entityType: "CLAIM" | "CASE";
+            entityType: "CLAIM" | "CASE" | "LEAD";
             name: string;
             description?: string;
             /** @description Must be an allow-listed condition field for entityType — see CONDITION_FIELDS in business-rules.validator.ts */
@@ -8097,6 +9066,13 @@ export interface components {
             bodyMarkdown: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        PublicKnowledgeArticleFeedbackDto: {
+            /** @enum {string} */
+            vote: "HELPFUL" | "NOT_HELPFUL";
+        };
+        PublicKnowledgeArticleFeedbackResponseDto: {
+            helpfulCount: number;
         };
         SurveyDto: {
             id: string;
@@ -8728,6 +9704,48 @@ export interface components {
             points: number;
             reason: string;
         };
+        PendingApprovalDto: {
+            id: string;
+            entityType: string;
+            status: string;
+            reason: Record<string, never> | null;
+            requestedById: string;
+            requestedByName: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            label: string;
+            linkPath: Record<string, never> | null;
+            isMine: boolean;
+        };
+        ApprovalDelegationResponseDto: {
+            id: string;
+            delegatorId: string;
+            delegatorName: Record<string, never> | null;
+            delegateId: string;
+            delegateName: Record<string, never> | null;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            note: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            isActive: boolean;
+            isMine: boolean;
+            /** @example CASE_AUTOMATION_GATE */
+            standsInFor: string;
+        };
+        ColleagueOptionDto: {
+            id: string;
+            fullName: string;
+        };
+        CreateApprovalDelegationDto: {
+            /** @description The colleague who should also be able to decide your named-approver workflow gates while this is active. */
+            delegateId: string;
+            startsAt: string;
+            endsAt: string;
+            note?: string;
+        };
         RequestPortalLoginLinkDto: {
             email: string;
         };
@@ -8807,6 +9825,9 @@ export interface components {
             slug: string;
             schemaName: string;
             keycloakRealm: string;
+            subdomain?: Record<string, never>;
+            /** @description Full https:// URL for this tenant's subdomain, or null for a tenant with no subdomain (falls back to the default app.<domain> entry point). */
+            tenantUrl?: Record<string, never>;
             status: string;
             primaryContactEmail: string;
             /** Format: date-time */
@@ -8822,6 +9843,9 @@ export interface components {
             adminCount: number;
             /** @description Null if the tenant has no subscription (shouldn't happen in practice — every tenant gets one at creation — but not enforced at the DB level). */
             seatLimit?: Record<string, never>;
+            /** @enum {string} */
+            health: "HEALTHY" | "AT_RISK" | "CRITICAL";
+            healthReasons: string[];
         };
         TenantUsageDto: {
             totalUsers: number;
@@ -8831,6 +9855,12 @@ export interface components {
             adminCount: number;
             planName?: Record<string, never>;
             seatLimit?: Record<string, never>;
+        };
+        TenantHealthDto: {
+            /** @enum {string} */
+            health: "HEALTHY" | "AT_RISK" | "CRITICAL";
+            /** @description Human-readable factors that contributed to the health verdict, empty when HEALTHY. */
+            healthReasons: string[];
         };
         UpdateTenantSubscriptionDto: {
             planId?: string;
@@ -8895,9 +9925,15 @@ export interface components {
             /** @description The new admin's sign-in email — created in the tenant's own Keycloak realm and receives the invite email. */
             email: string;
             fullName: string;
+            /** @description Set a specific sign-in password instead of generating one and emailing it. When set, the account is not forced to change its password on first sign-in (MFA setup is still required). */
+            password?: string;
+        };
+        ResetTenantUserPasswordDto: {
+            /** @description Same as CreateTenantAdminUserDto.password — set a specific password instead of generating one. */
+            password?: string;
         };
         ResetTenantUserPasswordResponseDto: {
-            /** @description One-time temporary password — shown once, never stored or logged. The account is forced to change it on next sign-in. */
+            /** @description The password now in effect — never stored or logged beyond this response. Generated + forces a change on next sign-in unless the caller supplied their own via ResetTenantUserPasswordDto. */
             temporaryPassword: string;
         };
         PlatformSupportTicketCommentResponseDto: {
@@ -8960,6 +9996,20 @@ export interface components {
             readAt?: Record<string, never>;
             /** Format: date-time */
             createdAt: string;
+        };
+        PublicTenantLookupResponseDto: {
+            keycloakRealm: string;
+        };
+        PlatformSearchResultDto: {
+            id: string;
+            /** @enum {string} */
+            type: "TENANT" | "PLAN" | "PLATFORM_ADMIN" | "SUPPORT_TICKET";
+            title: string;
+            subtitle: Record<string, never> | null;
+            href: string;
+        };
+        PlatformSearchResponseDto: {
+            results: components["schemas"]["PlatformSearchResultDto"][];
         };
         SupportTicketCommentResponseDto: {
             id: string;
@@ -9380,6 +10430,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponseDto"][];
+                };
+            };
+        };
+    };
+    UsersController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateUserResponseDto"];
                 };
             };
         };
@@ -10872,6 +11945,65 @@ export interface operations {
             };
         };
     };
+    MicrosoftSsoController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MicrosoftSsoResponseDto"];
+                };
+            };
+        };
+    };
+    MicrosoftSsoController_upsert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertMicrosoftSsoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MicrosoftSsoResponseDto"];
+                };
+            };
+        };
+    };
+    MicrosoftSsoController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AccountsController_list: {
         parameters: {
             query?: {
@@ -11011,6 +12143,27 @@ export interface operations {
             };
         };
     };
+    AccountsController_history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogResponseDto"][];
+                };
+            };
+        };
+    };
     AccountsController_listRenewals: {
         parameters: {
             query?: never;
@@ -11028,6 +12181,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountRenewalRowDto"][];
+                };
+            };
+        };
+    };
+    AccountsController_groupRollup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountGroupRollupDto"];
+                };
+            };
+        };
+    };
+    AccountsController_verifyKyc: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponseDto"];
                 };
             };
         };
@@ -11684,7 +12879,8 @@ export interface operations {
         parameters: {
             query?: {
                 status?: "NEW" | "CONTACTED" | "QUALIFIED" | "DISQUALIFIED" | "CONVERTED";
-                source?: "WEB" | "EMAIL" | "REFERRAL" | "PARTNER" | "SOCIAL" | "PHONE" | "EVENT" | "OTHER";
+                /** @description A LeadSource.code */
+                source?: string;
                 assignedToId?: string;
                 minScore?: number;
             };
@@ -11961,6 +13157,113 @@ export interface operations {
             };
         };
     };
+    LeadSourcesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadSourceResponseDto"][];
+                };
+            };
+        };
+    };
+    LeadSourcesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLeadSourceDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadSourceResponseDto"];
+                };
+            };
+        };
+    };
+    LeadSourcesController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadSourceResponseDto"];
+                };
+            };
+        };
+    };
+    LeadSourcesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LeadSourcesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLeadSourceDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadSourceResponseDto"];
+                };
+            };
+        };
+    };
     PipelinesController_list: {
         parameters: {
             query?: never;
@@ -12089,6 +13392,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PipelineStageResponseDto"];
+                };
+            };
+        };
+    };
+    PipelinesController_reorderStages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderPipelineStagesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineStageResponseDto"][];
                 };
             };
         };
@@ -12248,6 +13576,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OpportunityResponseDto"];
+                };
+            };
+        };
+    };
+    OpportunitiesController_stageHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StageHistoryEntryDto"][];
                 };
             };
         };
@@ -13020,6 +14369,25 @@ export interface operations {
             };
         };
     };
+    SalesQuotasController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     SalesQuotasController_update: {
         parameters: {
             query?: never;
@@ -13491,6 +14859,27 @@ export interface operations {
             };
         };
     };
+    PolicyController_history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogResponseDto"][];
+                };
+            };
+        };
+    };
     PolicyVersionController_list: {
         parameters: {
             query?: never;
@@ -13723,6 +15112,27 @@ export interface operations {
             };
         };
     };
+    PremiumController_initializePaystackPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaystackInitializeResponseDto"];
+                };
+            };
+        };
+    };
     RenewalScheduleController_findOne: {
         parameters: {
             query?: never;
@@ -13790,6 +15200,548 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RenewalScheduleResponseDto"];
+                };
+            };
+        };
+    };
+    PolicyProducerAssignmentController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProducerPolicyAssignmentResponseDto"][];
+                };
+            };
+        };
+    };
+    PolicyProducerAssignmentController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProducerPolicyAssignmentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProducerPolicyAssignmentResponseDto"];
+                };
+            };
+        };
+    };
+    PolicyProducerAssignmentController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+                assignmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProducersController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProducerResponseDto"][];
+                };
+            };
+        };
+    };
+    ProducersController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProducerDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProducerResponseDto"];
+                };
+            };
+        };
+    };
+    ProducersController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProducerResponseDto"];
+                };
+            };
+        };
+    };
+    ProducersController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProducersController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProducerDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProducerResponseDto"];
+                };
+            };
+        };
+    };
+    ProducerCommissionsController_list: {
+        parameters: {
+            query: {
+                producerId: string;
+                policyId: string;
+                status: string;
+                period: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProducerCommissionResponseDto"][];
+                };
+            };
+        };
+    };
+    ProducerCommissionsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProducerCommissionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProducerCommissionResponseDto"];
+                };
+            };
+        };
+    };
+    ProducerCommissionsController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProducerCommissionResponseDto"];
+                };
+            };
+        };
+    };
+    ProducerCommissionsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProducerCommissionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProducerCommissionResponseDto"];
+                };
+            };
+        };
+    };
+    PolicyCoverageController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyCoverageResponseDto"][];
+                };
+            };
+        };
+    };
+    PolicyCoverageController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePolicyCoverageDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyCoverageResponseDto"];
+                };
+            };
+        };
+    };
+    PolicyCoverageController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PolicyCoverageController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePolicyCoverageDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyCoverageResponseDto"];
+                };
+            };
+        };
+    };
+    PolicyParticipantController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyParticipantResponseDto"][];
+                };
+            };
+        };
+    };
+    PolicyParticipantController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePolicyParticipantDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyParticipantResponseDto"];
+                };
+            };
+        };
+    };
+    PolicyParticipantController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PolicyParticipantController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePolicyParticipantDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyParticipantResponseDto"];
+                };
+            };
+        };
+    };
+    PolicyAssetController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyAssetResponseDto"][];
+                };
+            };
+        };
+    };
+    PolicyAssetController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePolicyAssetDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyAssetResponseDto"];
+                };
+            };
+        };
+    };
+    PolicyAssetController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PolicyAssetController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePolicyAssetDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyAssetResponseDto"];
                 };
             };
         };
@@ -14198,6 +16150,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IntegrationLogResponseDto"][];
+                };
+            };
+        };
+    };
+    IntegrationsController_testWhatsApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WhatsAppTestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatsAppTestResponseDto"];
                 };
             };
         };
@@ -14642,7 +16617,10 @@ export interface operations {
     };
     DashboardsController_getOperationalKpis: {
         parameters: {
-            query?: never;
+            query?: {
+                ownerId?: string;
+                lineOfBusiness?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -14666,6 +16644,8 @@ export interface operations {
                 period?: "month" | "quarter";
                 pipelineId?: string;
                 ownerId?: string;
+                /** @description Filters to one line of business — independent of groupBy, which pivots the results instead of narrowing them */
+                lineOfBusiness?: string;
                 groupBy?: "owner" | "stage" | "lineOfBusiness";
             };
             header?: never;
@@ -14680,6 +16660,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesForecastResponseDto"];
+                };
+            };
+        };
+    };
+    DashboardsController_getDealsTrend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DealsTrendResponseDto"];
                 };
             };
         };
@@ -14884,6 +16883,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SavedDashboardResponseDto"];
+                };
+            };
+        };
+    };
+    SavedDashboardsController_renderPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenderPreviewDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderedDashboardWidgetDto"][];
                 };
             };
         };
@@ -15100,6 +17122,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClaimResponseDto"];
+                };
+            };
+        };
+    };
+    ClaimsController_history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogResponseDto"][];
                 };
             };
         };
@@ -15624,6 +17667,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CaseResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogResponseDto"][];
                 };
             };
         };
@@ -17002,7 +19066,7 @@ export interface operations {
     BusinessRulesController_list: {
         parameters: {
             query?: {
-                entityType?: "CLAIM" | "CASE";
+                entityType?: "CLAIM" | "CASE" | "LEAD";
             };
             header?: never;
             path?: never;
@@ -17527,6 +19591,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicKnowledgeArticleDetailDto"];
+                };
+            };
+        };
+    };
+    PublicKnowledgeController_feedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicKnowledgeArticleFeedbackDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicKnowledgeArticleFeedbackResponseDto"];
                 };
             };
         };
@@ -19033,6 +21122,111 @@ export interface operations {
             };
         };
     };
+    ApprovalsController_list: {
+        parameters: {
+            query?: {
+                status?: "PENDING" | "APPROVED" | "REJECTED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingApprovalDto"][];
+                };
+            };
+        };
+    };
+    ApprovalDelegationsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalDelegationResponseDto"][];
+                };
+            };
+        };
+    };
+    ApprovalDelegationsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateApprovalDelegationDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalDelegationResponseDto"];
+                };
+            };
+        };
+    };
+    ApprovalDelegationsController_colleagues: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColleagueOptionDto"][];
+                };
+            };
+        };
+    };
+    ApprovalDelegationsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        deleted?: boolean;
+                    };
+                };
+            };
+        };
+    };
     PortalAuthController_requestLink: {
         parameters: {
             query?: never;
@@ -19420,6 +21614,27 @@ export interface operations {
             };
         };
     };
+    TenantsController_health: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantHealthDto"];
+                };
+            };
+        };
+    };
     TenantsController_get: {
         parameters: {
             query?: never;
@@ -19761,7 +21976,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetTenantUserPasswordDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -19970,6 +22189,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlatformNotificationResponseDto"];
+                };
+            };
+        };
+    };
+    PublicTenantLookupController_lookup: {
+        parameters: {
+            query: {
+                subdomain: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicTenantLookupResponseDto"];
+                };
+            };
+        };
+    };
+    PlatformSearchController_search: {
+        parameters: {
+            query: {
+                /** @description Search term — matched case-insensitively against each entity type's natural-language identifier (name, slug, email, subject, etc). */
+                q: string;
+                /** @description Max results returned per entity type, not a total cap. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformSearchResponseDto"];
                 };
             };
         };

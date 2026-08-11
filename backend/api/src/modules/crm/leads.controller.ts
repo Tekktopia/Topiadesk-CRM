@@ -1,6 +1,6 @@
 import { BadRequestException, Body, ConflictException, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { getPrismaClient, getRlsContext, type Prisma } from '@topiadesk/db';
+import { getPrismaClient, getRlsContext, runWithRlsContext, SYSTEM_JOB_CONTEXT, type Prisma } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import {
@@ -22,6 +22,7 @@ import { validateCustomFields } from './custom-fields.validator';
 import { diffBulkIds } from './bulk-actions';
 import { checkLeadDuplicates } from './duplicate-detection';
 import { mergeLeads } from './merge';
+import { findMatchingLeadAssignmentRule, resolveNextAssignee } from '../case-management/assignment-resolver.util';
 
 @ApiTags('crm')
 @ApiBearerAuth()
@@ -66,9 +67,43 @@ export class LeadsController {
   @ApiOkResponse({ type: LeadResponseDto })
   async create(@Body() dto: CreateLeadDto): Promise<LeadResponseDto> {
     await validateCustomFields('LEAD', dto.customFields, { isCreate: true });
-    return getPrismaClient().lead.create({
+    const prisma = getPrismaClient();
+    const lead = await prisma.lead.create({
       data: { ...dto, customFields: dto.customFields as Prisma.InputJsonValue | undefined },
     });
+
+    // Auto-assignment only kicks in when the caller left assignedToId unset —
+    // an explicit value on the request always wins. Never lets a resolver
+    // failure fail lead creation itself: an unresolved lead simply lands
+    // unassigned, same resilience contract as CasesController's identical
+    // block (cases.controller.ts).
+    if (!dto.assignedToId) {
+      const rule = await findMatchingLeadAssignmentRule(lead.source, lead.score).catch((err: unknown) => {
+        console.error(`[leads] auto-assignment rule lookup failed for lead ${lead.id}`, err);
+        return null;
+      });
+      if (rule) {
+        const resolution = await resolveNextAssignee(rule, true).catch((err: unknown) => {
+          console.error(`[leads] auto-assignment resolution failed for lead ${lead.id}`, err);
+          return null;
+        });
+        if (resolution?.userId) {
+          // leads_rw's WITH CHECK validates assigned_to_id against the
+          // CALLER's own app_can_access_owner('lead','write', ...) reach —
+          // fine for a broker manually reassigning within their own
+          // scope, wrong here: the resolved assignee is the round-robin/
+          // load-based pool's choice, not the creating broker's, and can
+          // easily fall outside their write reach (found live: a broker
+          // creating a WEB lead that round-robins to a teammate in another
+          // department 403'd this exact update). Same "bookkeeping on
+          // data the caller doesn't own" reasoning as resolveNextAssignee's
+          // own cursor-persist wrap (assignment-resolver.util.ts).
+          return runWithRlsContext(SYSTEM_JOB_CONTEXT, () => prisma.lead.update({ where: { id: lead.id }, data: { assignedToId: resolution.userId } }));
+        }
+      }
+    }
+
+    return lead;
   }
 
   @Patch(':id')

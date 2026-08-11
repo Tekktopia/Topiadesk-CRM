@@ -6,6 +6,7 @@ import { RequirePermission } from '../../common/auth/require-permission.decorato
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
 import {
+  AutomationExecutionLogResponseDto,
   AutomationRuleQueryDto,
   AutomationRuleResponseDto,
   CreateAutomationRuleDto,
@@ -45,6 +46,25 @@ export class AutomationRulesController {
     const rule = await getPrismaClient().automationRule.findUnique({ where: { id } });
     if (!rule) throw new NotFoundException('AutomationRule not found');
     return rule;
+  }
+
+  /**
+   * Firings of this rule's flat `actions` list, newest first — see
+   * AutomationExecutionLog's schema comment. Only ever populated for a
+   * rule whose `steps` is empty (the "simple/flat" path); a rule that's
+   * always used `steps` will just return an empty array here — its history
+   * lives in AutomationRunState (GET /automation-run-states) instead.
+   */
+  @Get(':id/execution-log')
+  @ApiOkResponse({ type: [AutomationExecutionLogResponseDto] })
+  async executionLog(@Param('id') id: string): Promise<AutomationExecutionLogResponseDto[]> {
+    const rule = await getPrismaClient().automationRule.findUnique({ where: { id }, select: { id: true } });
+    if (!rule) throw new NotFoundException('AutomationRule not found');
+    return getPrismaClient().automationExecutionLog.findMany({
+      where: { ruleId: id },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
   }
 
   @Post()

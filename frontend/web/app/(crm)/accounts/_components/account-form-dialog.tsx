@@ -29,7 +29,7 @@ import {
   toast,
 } from '@topiadesk/ui';
 import { CustomFieldsSection, validateCustomFieldValues, type CustomFieldValues } from '../../_components/custom-fields-section';
-import { ACCOUNT_STATUSES, ACCOUNT_TYPES, RISK_RATINGS, accountStatusLabel, riskRatingLabel } from '../../_lib/constants';
+import { ACCOUNT_STATUSES, ACCOUNT_TYPES, KYC_STATUSES, RISK_RATINGS, accountStatusLabel, accountTypeLabel, kycStatusLabel, riskRatingLabel } from '../../_lib/constants';
 import { useCreateAccount, useCustomFieldDefinitions, useUpdateAccount } from '../../_lib/hooks';
 import type { Account } from '../../_lib/types';
 
@@ -44,6 +44,9 @@ const accountFormSchema = z.object({
   source: z.string(),
   industryId: z.string(),
   notes: z.string(),
+  kycStatus: z.enum(KYC_STATUSES),
+  kycExpiryDate: z.string(),
+  naicomId: z.string(),
 });
 
 type AccountFormValues = z.infer<typeof accountFormSchema>;
@@ -60,6 +63,9 @@ function defaultsFor(account?: Account): AccountFormValues {
     source: '',
     industryId: account?.industryId ?? '',
     notes: '',
+    kycStatus: account?.kycStatus ?? 'NOT_STARTED',
+    kycExpiryDate: account?.kycExpiryDate ? account.kycExpiryDate.slice(0, 10) : '',
+    naicomId: account?.naicomId ?? '',
   };
 }
 
@@ -106,6 +112,9 @@ export function AccountFormDialog({
       source: values.source || undefined,
       industryId: values.industryId || undefined,
       notes: values.notes || undefined,
+      kycStatus: values.kycStatus,
+      kycExpiryDate: values.kycExpiryDate || undefined,
+      naicomId: values.naicomId || undefined,
       customFields: hasActiveCustomFields ? customFields : undefined,
     };
     if (isEdit && account) {
@@ -160,7 +169,7 @@ export function AccountFormDialog({
                       <SelectContent>
                         {ACCOUNT_TYPES.map((type) => (
                           <SelectItem key={type} value={type}>
-                            {type === 'CORPORATE' ? 'Corporate' : 'Individual'}
+                            {accountTypeLabel(type)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -216,6 +225,60 @@ export function AccountFormDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="kycStatus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>KYC status</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {KYC_STATUSES.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {kycStatusLabel(status)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="kycExpiryDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>KYC expiry</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="naicomId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>NAICOM ID</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Optional" {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

@@ -107,121 +107,41 @@ export function getGaugeShape(result: ReportResult): GaugeShape | null {
   return { measureColumn, valuePercent: Math.min(100, Math.max(0, avg)), sampleSize: values.length };
 }
 
-// ---------------------------------------------------------------------------
-// Treemap layout
-// ---------------------------------------------------------------------------
-
-export interface TreemapTile {
-  label: string;
-  value: number;
-  /** All four in percent (0-100) of the container, ready for CSS `left/top/width/height`. */
-  xPct: number;
-  yPct: number;
-  wPct: number;
-  hPct: number;
-}
-
-interface TreemapAreaItem {
-  label: string;
-  value: number;
-  area: number;
-}
-
-function treemapRowWorstRatio(row: TreemapAreaItem[], bandLength: number): number {
-  const sum = row.reduce((s, item) => s + item.area, 0);
-  if (sum === 0 || bandLength === 0) return Infinity;
-  const bandThickness = sum / bandLength;
-  let worst = 0;
-  for (const item of row) {
-    if (item.area <= 0) continue;
-    const ratio = Math.max((bandThickness * bandThickness) / item.area, item.area / (bandThickness * bandThickness));
-    if (ratio > worst) worst = ratio;
-  }
-  return worst;
+export interface KpiShape extends ChartableShape {
+  /** Full ordered series (by dimension's raw string sort — same "YYYY-MM sorts chronologically" convention getChartableShape's line-chart consumers rely on), for the sparkline + period-over-period delta. */
+  series: Array<{ label: string; value: number }>;
 }
 
 /**
- * Classic Bruls/Huizing/van Wijk "squarified" treemap: lay out rows across
- * whichever side of the remaining rectangle is currently shorter, growing
- * each row while doing so doesn't worsen its worst aspect ratio, so tiles
- * stay close to square instead of degenerating into slivers (a plain
- * single-axis "slice" layout). Operates in a normalized `W x H` box (area
- * `W*H === 10000`, i.e. percentage-of-container units) sized to
- * `aspectRatio`, so callers can place tiles with plain CSS percentages —
- * no pixel measurement or ResizeObserver needed. Verified against a
- * standalone harness (total tile area sums to 10000, no negative/
- * out-of-bounds rects, single-item and equal-weight cases layout exactly
- * as expected) before wiring into report-treemap-chart.tsx.
+ * A KPI card needs the same one-dimension/one-measure shape as bar/line/
+ * funnel (getChartableShape) — it's a *display* difference (headline
+ * number + sparkline instead of a full chart), not a different data
+ * requirement, so this reuses that detector rather than inventing a
+ * parallel one.
  */
-export function computeTreemapLayout(items: Array<{ label: string; value: number }>, aspectRatio = 2): TreemapTile[] {
-  const positive = items.filter((item) => item.value > 0);
-  if (positive.length === 0) return [];
-  const total = positive.reduce((sum, item) => sum + item.value, 0);
-  const H = Math.sqrt(10000 / aspectRatio);
-  const W = 10000 / H;
-  const sorted = [...positive].sort((a, b) => b.value - a.value);
-  let remaining: TreemapAreaItem[] = sorted.map((item) => ({ ...item, area: (item.value / total) * (W * H) }));
+export function getKpiShape(result: ReportResult): KpiShape | null {
+  const base = getChartableShape(result);
+  if (!base) return null;
+  const sortedRows = [...result.rows].sort((a, b) => String(a[base.dimensionColumn.key] ?? '').localeCompare(String(b[base.dimensionColumn.key] ?? '')));
+  const series = sortedRows.map((row) => ({
+    label: String(row[base.dimensionColumn.key] ?? 'Unknown'),
+    value: Number(row[base.measureColumn.key] ?? 0),
+  }));
+  return { ...base, series };
+}
 
-  const tiles: TreemapTile[] = [];
-  let x = 0;
-  let y = 0;
-  let w = W;
-  let h = H;
+export interface ComboShape {
+  dimensionColumn: ReportColumn;
+  barMeasure: ReportColumn;
+  lineMeasure: ReportColumn;
+}
 
-  while (remaining.length > 0) {
-    const bandLength = Math.min(w, h);
-    let row: TreemapAreaItem[] = [remaining[0]!];
-    let consumed = 1;
-    while (consumed < remaining.length) {
-      const candidate = [...row, remaining[consumed]!];
-      if (treemapRowWorstRatio(candidate, bandLength) <= treemapRowWorstRatio(row, bandLength)) {
-        row = candidate;
-        consumed += 1;
-      } else {
-        break;
-      }
-    }
-    remaining = remaining.slice(consumed);
-
-    const rowSum = row.reduce((sum, item) => sum + item.area, 0);
-    const bandThickness = bandLength > 0 ? rowSum / bandLength : 0;
-
-    if (w <= h) {
-      // Shorter side is the width — lay a horizontal band across the top, full width, `bandThickness` tall.
-      let offsetX = x;
-      for (const item of row) {
-        const itemWidth = bandThickness > 0 ? item.area / bandThickness : 0;
-        tiles.push({
-          label: item.label,
-          value: item.value,
-          xPct: (offsetX / W) * 100,
-          yPct: (y / H) * 100,
-          wPct: (itemWidth / W) * 100,
-          hPct: (bandThickness / H) * 100,
-        });
-        offsetX += itemWidth;
-      }
-      y += bandThickness;
-      h -= bandThickness;
-    } else {
-      // Shorter side is the height — lay a vertical band down the left, full height, `bandThickness` wide.
-      let offsetY = y;
-      for (const item of row) {
-        const itemHeight = bandThickness > 0 ? item.area / bandThickness : 0;
-        tiles.push({
-          label: item.label,
-          value: item.value,
-          xPct: (x / W) * 100,
-          yPct: (offsetY / H) * 100,
-          wPct: (bandThickness / W) * 100,
-          hPct: (itemHeight / H) * 100,
-        });
-        offsetY += itemHeight;
-      }
-      x += bandThickness;
-      w -= bandThickness;
-    }
-  }
-
-  return tiles;
+/** A combo (dual-axis bar+line) needs one dimension plus *two* independent numeric measures against it — e.g. premium written (bar) vs. loss ratio (line) by month. The first two numeric measures declared on the result become bar/line respectively; reports with only one measure simply aren't combo-chartable (NotChartable fallback). */
+export function getComboShape(result: ReportResult): ComboShape | null {
+  if (result.rows.length === 0 || result.rows.length > MAX_CHARTABLE_ROWS) return null;
+  const dimensionColumns = result.columns.filter((c) => c.format === 'text');
+  if (dimensionColumns.length !== 1) return null;
+  const measureColumns = result.columns.filter((c) => NUMERIC_FORMATS.has(c.format));
+  if (measureColumns.length < 2) return null;
+  return { dimensionColumn: dimensionColumns[0]!, barMeasure: measureColumns[0]!, lineMeasure: measureColumns[1]! };
 }

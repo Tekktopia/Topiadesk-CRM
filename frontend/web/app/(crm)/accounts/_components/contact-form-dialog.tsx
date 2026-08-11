@@ -39,6 +39,9 @@ const contactFormSchema = z.object({
   email: z.union([z.string().email('Enter a valid email'), z.literal('')]),
   phone: z.string(),
   title: z.string(),
+  householdRole: z.string(),
+  idType: z.string(),
+  idNumber: z.string(),
   isPrimary: z.boolean(),
   siteId: z.string(),
 });
@@ -52,6 +55,9 @@ function defaultsFor(contact?: Contact): ContactFormValues {
     email: contact?.email ?? '',
     phone: contact?.phone ?? '',
     title: contact?.title ?? '',
+    householdRole: contact?.householdRole ?? '',
+    idType: contact?.idType ?? '',
+    idNumber: contact?.idNumber ?? '',
     isPrimary: contact?.isPrimary ?? false,
     siteId: contact?.siteId ?? NO_SITE,
   };
@@ -101,6 +107,9 @@ export function ContactFormDialog({
       email: values.email || undefined,
       phone: values.phone || undefined,
       title: values.title || undefined,
+      householdRole: values.householdRole || undefined,
+      idType: values.idType || undefined,
+      idNumber: values.idNumber || undefined,
       isPrimary: values.isPrimary,
       siteId: values.siteId === NO_SITE ? undefined : values.siteId,
       customFields: hasActiveCustomFields ? customFields : undefined,
@@ -165,6 +174,47 @@ export function ContactFormDialog({
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="householdRole"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Household role</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. Spouse, Child (household accounts only)" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="idType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>ID type</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. National ID, Passport" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="idNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>ID number</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="email"

@@ -6,11 +6,14 @@ const currencyFormatter = new Intl.NumberFormat('en-NG', {
   maximumFractionDigits: 0,
 });
 
-/** Backend decimals are serialized as strings (e.g. "45000000.00"). */
-export function formatCurrency(amount: string | number | null | undefined): string {
+/** Backend decimals are serialized as strings (e.g. "45000000.00"). `currency` defaults to NGN — pass e.g. `opportunity.currency` for a non-NGN amount (see Opportunity.currency's schema comment). */
+export function formatCurrency(amount: string | number | null | undefined, currency = 'NGN'): string {
   if (amount === null || amount === undefined || amount === '') return '—';
   const value = typeof amount === 'string' ? Number.parseFloat(amount) : amount;
   if (Number.isNaN(value)) return '—';
+  if (currency !== 'NGN') {
+    return new Intl.NumberFormat('en-NG', { style: 'currency', currency, maximumFractionDigits: 0 }).format(value);
+  }
   return currencyFormatter.format(value);
 }
 

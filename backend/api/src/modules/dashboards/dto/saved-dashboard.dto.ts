@@ -34,6 +34,22 @@ export class UpdateSavedDashboardDto {
   @ApiPropertyOptional({ type: 'object', additionalProperties: true }) @IsOptional() @IsObject() layoutConfig?: Record<string, unknown>;
 }
 
+/**
+ * POST /saved-dashboards/render-preview — lets the Customize-mode editor
+ * show real rendered tiles for a draft widget set that hasn't been saved
+ * (and may never be, if the edit is cancelled) yet, instead of the blank/
+ * title-only placeholder the editor showed before. Same permissive
+ * `@Type(() => Object)` widgets shape as Create/UpdateSavedDashboardDto —
+ * this never touches the database, it's a stateless pass-through into the
+ * same `renderDashboardWidgets` the persisted `:id/render` route uses.
+ */
+export class RenderPreviewDto {
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true } })
+  @IsArray()
+  @Type(() => Object)
+  widgets!: unknown[];
+}
+
 export class SavedDashboardResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() name!: string;

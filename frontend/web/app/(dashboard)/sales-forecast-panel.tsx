@@ -1,12 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton } from '@topiadesk/ui';
+import { BarChart, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton } from '@topiadesk/ui';
 import { formatNaira } from '@/app/(policy)/lib/format';
-import { ReportBarChart } from '@/app/(reports)/_components/report-bar-chart';
+import { formatReportValue } from '@/app/(reports)/_lib/format';
 import { getChartableShape } from '@/app/(reports)/_lib/chart';
 import type { ReportResult } from '@/app/(reports)/_lib/types';
-import { useSalesForecast } from './dashboard-hooks';
+import { useSalesForecast, type DashboardScopeFilters } from './dashboard-hooks';
 
 const GROUP_BY_LABEL: Record<'owner' | 'stage' | 'lineOfBusiness', string> = {
   owner: 'Owner',
@@ -20,14 +20,14 @@ const GROUP_BY_LABEL: Record<'owner' | 'stage' | 'lineOfBusiness', string> = {
  * (DashboardsController.getSalesForecast), a fully-built endpoint that had
  * no frontend caller until this panel. Adapts the forecast response into
  * the same ReportResult shape the Reports module's own chart components
- * consume, so ReportBarChart is reused verbatim rather than building a new
- * chart — confirmed the shape (one text dimension + numeric measures)
- * satisfies getChartableShape's requirements.
+ * consume, so getChartableShape + @topiadesk/ui's BarChart are reused
+ * verbatim rather than building a new chart — confirmed the shape (one text
+ * dimension + numeric measures) satisfies getChartableShape's requirements.
  */
-export function SalesForecastPanel() {
+export function SalesForecastPanel({ filters }: { filters?: DashboardScopeFilters }) {
   const [period, setPeriod] = React.useState<'month' | 'quarter'>('quarter');
   const [groupBy, setGroupBy] = React.useState<'owner' | 'stage' | 'lineOfBusiness'>('owner');
-  const { data, isLoading, isError } = useSalesForecast(period, groupBy);
+  const { data, isLoading, isError } = useSalesForecast(period, groupBy, filters);
 
   const result: ReportResult | null = data
     ? {
@@ -46,6 +46,14 @@ export function SalesForecastPanel() {
       }
     : null;
   const shape = result ? getChartableShape(result) : null;
+  const chartData =
+    result && shape
+      ? result.rows.map((row) => ({
+          name: String(row[shape.dimensionColumn.key] ?? 'Unknown'),
+          value: Number(row[shape.measureColumn.key] ?? 0),
+          formattedValue: formatReportValue(shape.measureColumn.format, row[shape.measureColumn.key] ?? null),
+        }))
+      : null;
 
   return (
     <div className="space-y-4">
@@ -90,8 +98,8 @@ export function SalesForecastPanel() {
               <p className="text-lg font-semibold text-foreground">{formatNaira(data.totalUnweightedAmount)}</p>
             </div>
           </div>
-          {result && shape ? (
-            <ReportBarChart result={result} shape={shape} />
+          {chartData ? (
+            <BarChart data={chartData} />
           ) : (
             <p className="text-sm text-muted-foreground">No open opportunities expected to close in this period.</p>
           )}

@@ -3,6 +3,9 @@ import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient, type Prisma } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
+import { CurrentUser } from '../../common/auth/current-user.decorator';
+import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
+import { assertFieldsWritable, redactHiddenFields, redactHiddenFieldsMany, resolveFieldVisibilities } from '../../common/field-permissions/field-visibility.util';
 import {
   BulkAssignContactsDto,
   BulkDeleteContactsDto,
@@ -29,11 +32,12 @@ export class ContactsController {
   @Get()
   @RequirePermission('account', 'read')
   @ApiOkResponse({ type: [ContactResponseDto] })
-  async list(@Query() query: ContactQueryDto): Promise<ContactResponseDto[]> {
-    return getPrismaClient().contact.findMany({
+  async list(@Query() query: ContactQueryDto, @CurrentUser() user: AuthenticatedUser): Promise<ContactResponseDto[]> {
+    const contacts = await getPrismaClient().contact.findMany({
       where: { accountId: query.accountId, carrierId: query.carrierId },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     });
+    return redactHiddenFieldsMany(contacts, await resolveFieldVisibilities(user, 'contact'));
   }
 
   // Must precede ':id' — Nest matches literal segments in declaration order
@@ -48,18 +52,19 @@ export class ContactsController {
   @Get(':id')
   @RequirePermission('account', 'read')
   @ApiOkResponse({ type: ContactResponseDto })
-  async getOne(@Param('id') id: string): Promise<ContactResponseDto> {
+  async getOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser): Promise<ContactResponseDto> {
     const contact = await getPrismaClient().contact.findUnique({ where: { id } });
     if (!contact) throw new NotFoundException('Contact not found');
-    return contact;
+    return redactHiddenFields(contact, await resolveFieldVisibilities(user, 'contact'));
   }
 
   @Post()
   @RequirePermission('account', 'write')
   @ApiOkResponse({ type: ContactResponseDto })
-  async create(@Body() dto: CreateContactDto): Promise<ContactResponseDto> {
+  async create(@Body() dto: CreateContactDto, @CurrentUser() user: AuthenticatedUser): Promise<ContactResponseDto> {
     assertExactlyOneParent(dto.accountId, dto.carrierId);
     await validateCustomFields('CONTACT', dto.customFields, { isCreate: true });
+    assertFieldsWritable(dto, await resolveFieldVisibilities(user, 'contact'));
     return getPrismaClient().contact.create({
       data: { ...dto, customFields: dto.customFields as Prisma.InputJsonValue | undefined },
     });
@@ -68,7 +73,7 @@ export class ContactsController {
   @Patch(':id')
   @RequirePermission('account', 'write')
   @ApiOkResponse({ type: ContactResponseDto })
-  async update(@Param('id') id: string, @Body() dto: UpdateContactDto): Promise<ContactResponseDto> {
+  async update(@Param('id') id: string, @Body() dto: UpdateContactDto, @CurrentUser() user: AuthenticatedUser): Promise<ContactResponseDto> {
     const prisma = getPrismaClient();
     const existing = await prisma.contact.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Contact not found');
@@ -76,6 +81,7 @@ export class ContactsController {
     const nextCarrierId = dto.carrierId !== undefined ? dto.carrierId : existing.carrierId;
     assertExactlyOneParent(nextAccountId ?? undefined, nextCarrierId ?? undefined);
     await validateCustomFields('CONTACT', dto.customFields, { isCreate: false });
+    assertFieldsWritable(dto, await resolveFieldVisibilities(user, 'contact'));
     return prisma.contact.update({
       where: { id },
       data: { ...dto, customFields: dto.customFields as Prisma.InputJsonValue | undefined },

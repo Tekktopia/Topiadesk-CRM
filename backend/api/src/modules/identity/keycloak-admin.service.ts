@@ -143,6 +143,57 @@ export class KeycloakAdminService {
     return (await res.json()) as KeycloakSessionRepresentation[];
   }
 
+  /** Public wrapper around the private realmName() resolution — lets a
+   * caller (e.g. microsoft-sso.controller.ts, computing the redirect URI
+   * to display before anything is saved) reuse the exact same
+   * keycloakRealm/tenantSchema/env.KEYCLOAK_REALM fallback chain instead
+   * of duplicating it. */
+  getCurrentRealmName(): string {
+    return this.realmName();
+  }
+
+  /**
+   * Creates or updates the realm's "microsoft" identity provider (Keycloak
+   * IdP federation — a login-time OAuth broker, NOT the same thing as
+   * IntegrationOAuthCredential's app-as-OAuth-client tokens). Mirrors
+   * infra/keycloak/enable-microsoft-sso.sh's exact JSON body/GET-then-PUT-
+   * or-POST logic, just per-realm via adminFetch()'s existing auto-
+   * targeting instead of one hardcoded realm.
+   */
+  async upsertMicrosoftIdentityProvider(config: { clientId: string; clientSecret: string; tenantId: string; enabled: boolean }): Promise<void> {
+    const existing = await this.adminFetch('/identity-provider/instances/microsoft', { method: 'GET' });
+    const body = JSON.stringify({
+      alias: 'microsoft',
+      displayName: 'Microsoft',
+      providerId: 'microsoft',
+      enabled: config.enabled,
+      trustEmail: true,
+      storeToken: false,
+      addReadTokenRoleOnCreate: false,
+      authenticateByDefault: false,
+      linkOnly: false,
+      firstBrokerLoginFlowAlias: 'first broker login',
+      config: {
+        clientId: config.clientId,
+        clientSecret: config.clientSecret,
+        tenantId: config.tenantId,
+        syncMode: 'IMPORT',
+        defaultScope: 'openid profile email User.Read',
+      },
+    });
+    const res =
+      existing.status === 200
+        ? await this.adminFetch('/identity-provider/instances/microsoft', { method: 'PUT', body })
+        : await this.adminFetch('/identity-provider/instances', { method: 'POST', body });
+    if (!res.ok) throw new Error(`Keycloak upsert-microsoft-identity-provider failed (${res.status}): ${await safeBody(res)}`);
+  }
+
+  /** Tolerates the identity provider already being gone (404) — DELETE is idempotent from this service's contract. */
+  async deleteMicrosoftIdentityProvider(): Promise<void> {
+    const res = await this.adminFetch('/identity-provider/instances/microsoft', { method: 'DELETE' });
+    if (!res.ok && res.status !== 404) throw new Error(`Keycloak delete-microsoft-identity-provider failed (${res.status}): ${await safeBody(res)}`);
+  }
+
   /** See this class's header comment for the keycloakRealm/tenantSchema/env.KEYCLOAK_REALM fallback order. */
   private realmName(): string {
     const ctx = getRlsContext();

@@ -136,6 +136,34 @@ export type UpdateRoleBody = JsonBody<'/identity/roles/{id}', 'patch'>;
 export type GrantPermissionBody = JsonBody<'/identity/roles/{id}/permissions', 'post'>;
 export type PermissionDto = Json200<'/identity/permissions', 'get'>[number];
 
+// -- Field-Level Security ---------------------------------------------------
+// Hand-written, not ApiPaths-derived — same reasoning as AutomationRuleDto
+// above (a new endpoint the generator hasn't seen yet, and even once
+// regenerated its bare-nullable-collapse issue would apply to none of these
+// fields anyway since they're all plain non-nullable strings).
+export type FieldPermissionVisibility = 'HIDDEN' | 'READ_ONLY';
+export interface FieldPermissionDto {
+  id: string;
+  roleId: string;
+  resource: string;
+  fieldName: string;
+  visibility: FieldPermissionVisibility;
+  createdAt: string;
+}
+/** resource -> gate-able field names, from FIELD_PERMISSION_CATALOG (backend/api/src/common/field-permissions/field-visibility.util.ts). */
+export type FieldPermissionCatalog = Record<string, string[]>;
+
+// -- Multi-currency ----------------------------------------------------------
+// Hand-written, not ApiPaths-derived — same reasoning as the other
+// additions in this file.
+export interface ExchangeRateDto {
+  id: string;
+  currencyCode: string;
+  rateToBase: string;
+  updatedById: string | null;
+  updatedAt: string;
+}
+
 // -- Departments / branches ------------------------------------------------
 type RawDepartmentDto = Json200<'/identity/departments', 'get'>[number];
 export type DepartmentDto = Omit<RawDepartmentDto, 'email' | 'phone' | 'parentDepartmentId'> & {
@@ -212,7 +240,15 @@ export type UpdateIpWhitelistBody = Omit<RawUpdateIpWhitelistBody, 'appliesToRol
 // updatedAt and ConnectorType grew TEAMS_WEBHOOK/SEAMLESSHR after this
 // file's last codegen cycle — same reasoning as AuditVerifyResponseDto/
 // AdminNotificationDto above.
-export type ConnectorType = 'CORE_BROKING_SYSTEM' | 'ERP' | 'MOCK_STUB' | 'TEAMS_WEBHOOK' | 'SEAMLESSHR';
+export type ConnectorType =
+  | 'CORE_BROKING_SYSTEM'
+  | 'ERP'
+  | 'MOCK_STUB'
+  | 'TEAMS_WEBHOOK'
+  | 'SEAMLESSHR'
+  | 'PAYSTACK'
+  | 'DOJAH'
+  | 'WHATSAPP_CLOUD';
 export type SyncDirection = 'INBOUND' | 'OUTBOUND' | 'BIDIRECTIONAL';
 export interface ConnectorDto {
   id: string;
@@ -237,6 +273,25 @@ export interface CreateConnectorBody {
   config: Record<string, unknown>;
 }
 export type UpdateConnectorBody = Partial<CreateConnectorBody>;
+
+/** GET/PUT /api/admin/sso/microsoft — hand-written, not derived from
+ * ApiPaths: this route landed after the last schema regeneration, same
+ * "hand-mirror when generation lags" convention this file's header
+ * comment documents. Keep in sync with backend/api/src/modules/identity/
+ * dto/microsoft-sso.dto.ts by hand. */
+export interface MicrosoftSsoDto {
+  configured: boolean;
+  azureTenantId: string | null;
+  azureClientId: string | null;
+  isEnabled: boolean;
+  redirectUri: string;
+}
+export interface UpsertMicrosoftSsoBody {
+  azureTenantId: string;
+  azureClientId: string;
+  azureClientSecret?: string;
+  isEnabled?: boolean;
+}
 
 type RawSyncJobDto = Json200<'/integrations/connectors/{id}/sync-jobs', 'get'>[number];
 export type SyncJobDto = Omit<RawSyncJobDto, 'startedAt' | 'completedAt' | 'triggeredBy'> & {
@@ -383,6 +438,26 @@ export type AutomationRuleDto = Omit<RawAutomationRuleDto, 'conditions' | 'actio
   actions: unknown[];
   steps?: unknown[] | null;
 };
+
+/**
+ * GET /crm/automation-rules/:id/execution-log — hand-written rather than
+ * derived from ApiPaths, same reasoning as AutomationRuleDto above: several
+ * bare-nullable fields (ruleId/entityId) would otherwise collapse to
+ * `{} | null` through the generator. One row per firing of the rule's flat
+ * `actions` list (see AutomationExecutionLog's schema comment) — a rule
+ * that's always used `steps` (branching) will just return `[]` here.
+ */
+export interface AutomationExecutionLogDto {
+  id: string;
+  ruleId: string | null;
+  ruleName: string;
+  entityType: string;
+  entityId: string | null;
+  triggerSource: string;
+  status: 'SUCCESS' | 'PARTIAL_FAILURE' | 'FAILED';
+  actionResults: { actionType: string; ok: boolean; error?: string }[];
+  createdAt: string;
+}
 
 type RawCreateAutomationRuleBody = JsonBody<'/crm/automation-rules', 'post'>;
 // KNOWN GENERATOR GAP: `isActive` carries `@IsOptional() isActive?: boolean`

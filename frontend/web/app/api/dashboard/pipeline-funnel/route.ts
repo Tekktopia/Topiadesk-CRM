@@ -1,3 +1,4 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { ApiUnauthenticatedError, fetchApi } from '@/lib/api/server-fetch';
 
@@ -48,10 +49,16 @@ export interface PipelineFunnelResponse {
  * /crm/opportunities?pipelineId=:id for every opportunity currently in it)
  * and returns one small aggregated payload — reading another module's API
  * (crm) is fine per the build brief; only that module's frontend directory
- * is off-limits, which this Route Handler is not part of.
+ * is off-limits, which this Route Handler is not part of. `ownerId`/
+ * `lineOfBusiness` forward onto the opportunities call — both already
+ * accepted by OpportunityQueryDto, no backend change needed.
  */
-export async function GET(): Promise<NextResponse<PipelineFunnelResponse>> {
+export async function GET(request: NextRequest): Promise<NextResponse<PipelineFunnelResponse>> {
   try {
+    const { searchParams } = new URL(request.url);
+    const ownerId = searchParams.get('ownerId');
+    const lineOfBusiness = searchParams.get('lineOfBusiness');
+
     const pipelinesRes = await fetchApi('/crm/pipelines');
     if (!pipelinesRes.ok) {
       return NextResponse.json({ pipelineId: null, pipelineName: null, stages: [] });
@@ -62,9 +69,13 @@ export async function GET(): Promise<NextResponse<PipelineFunnelResponse>> {
       return NextResponse.json({ pipelineId: null, pipelineName: null, stages: [] });
     }
 
+    const opportunitiesQs = new URLSearchParams({ pipelineId: pipeline.id });
+    if (ownerId) opportunitiesQs.set('ownerId', ownerId);
+    if (lineOfBusiness) opportunitiesQs.set('lineOfBusiness', lineOfBusiness);
+
     const [detailRes, opportunitiesRes] = await Promise.all([
       fetchApi(`/crm/pipelines/${pipeline.id}`),
-      fetchApi(`/crm/opportunities?pipelineId=${pipeline.id}`),
+      fetchApi(`/crm/opportunities?${opportunitiesQs.toString()}`),
     ]);
     const detail = detailRes.ok ? ((await detailRes.json()) as PipelineDetailRow) : { ...pipeline, stages: [] };
     const opportunities = opportunitiesRes.ok ? ((await opportunitiesRes.json()) as OpportunityRow[]) : [];

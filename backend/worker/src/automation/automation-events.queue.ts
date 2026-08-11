@@ -26,7 +26,7 @@ import { Queue, Worker, type Job } from 'bullmq';
 import type Redis from 'ioredis';
 import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, type Prisma } from '@topiadesk/db';
 import './handlers';
-import { executeActions, type ActionSpec, type CaseManagementEntityRef } from './action-handler';
+import { deriveExecutionStatus, executeActions, type ActionSpec, type CaseManagementEntityRef } from './action-handler';
 import { startRun } from './run-engine';
 
 export const AUTOMATION_EVENTS_QUEUE_NAME = 'automation-events';
@@ -117,6 +117,17 @@ export async function processEntityEvent(payload: EntityEventPayload): Promise<{
       const actions = Array.isArray(rule.actions) ? (rule.actions as unknown as ActionSpec[]) : [];
       const result = await executeActions(actions, { entity: entityRef, actingUserId: null, systemJobName: `automation-rule:${rule.name}` });
       results.push({ ruleId: rule.id, ruleName: rule.name, result });
+      await prisma.automationExecutionLog.create({
+        data: {
+          ruleId: rule.id,
+          ruleName: rule.name,
+          entityType: payload.entityType,
+          entityId: payload.entityId,
+          triggerSource: 'ENTITY_EVENT',
+          status: deriveExecutionStatus(result),
+          actionResults: result as unknown as Prisma.InputJsonValue,
+        },
+      });
     }
 
     return { matchedRules: matched.length, results };

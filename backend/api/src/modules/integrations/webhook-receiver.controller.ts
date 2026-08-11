@@ -2,6 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { BadRequestException, Body, Controller, Headers, NotFoundException, Param, Post, UnauthorizedException } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, type Prisma } from '@topiadesk/db';
+// NOT a type-only import: constructor-injected below — see the same
+// footgun documented on Reflector in permission.guard.ts.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import { PaystackService } from './paystack.service';
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import { ESignatureService } from './esignature.service';
 
 /**
  * Inbound receiver for IntegrationConnector.webhookPath — a schema field
@@ -28,6 +34,11 @@ import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, type Prisma } f
 @ApiTags('integrations')
 @Controller('integrations/webhooks')
 export class WebhookReceiverController {
+  constructor(
+    private readonly paystack: PaystackService,
+    private readonly esignature: ESignatureService,
+  ) {}
+
   @Post(':webhookPath')
   receive(
     @Param('webhookPath') webhookPath: string,
@@ -73,6 +84,16 @@ export class WebhookReceiverController {
     });
 
     await prisma.integrationConnector.update({ where: { id: connector.id }, data: { lastSuccessfulSyncAt: new Date() } });
+
+    // Type-specific business logic beyond the generic log-and-record above
+    // — DOJAH/WHATSAPP_CLOUD are action-triggered (verify-on-demand,
+    // send-on-demand), not webhook-triggered, so they have no dispatch
+    // branch here.
+    if (connector.connectorType === 'PAYSTACK') {
+      await this.paystack.handleWebhookPayload(connector.id, body);
+    } else if (connector.connectorType === 'DOCUSIGN') {
+      await this.esignature.handleWebhookPayload(connector.id, body);
+    }
 
     return { status: 'ok' };
   }

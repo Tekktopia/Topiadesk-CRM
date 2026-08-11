@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, X } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@topiadesk/ui';
 import { ReportChart } from '../(reports)/_components/report-chart';
 import { ReportResultTable } from '../(reports)/_components/report-result-table';
@@ -13,55 +13,20 @@ import type { RenderedDashboardWidget } from './types';
  * new charting code) or an inline error state when the widget's report key
  * is stale or its stored filters no longer validate (RenderedDashboard's
  * per-widget degrade-gracefully contract — see backend's
- * dashboard-render.util.ts).
+ * dashboard-render.util.ts). The header carries `.dashboard-grid-handle` —
+ * DashboardGrid (packages/ui) is configured to target that class as its
+ * drag handle, so dragging only starts from the header, leaving the remove
+ * button and any chart tooltip/legend interaction free to receive clicks.
  */
-export function DashboardWidgetTile({
-  widget,
-  editable = false,
-  isFirst = false,
-  isLast = false,
-  onRemove,
-  onMoveUp,
-  onMoveDown,
-  onMoveLeft,
-  onMoveRight,
-}: {
-  widget: RenderedDashboardWidget;
-  editable?: boolean;
-  isFirst?: boolean;
-  isLast?: boolean;
-  onRemove?: () => void;
-  onMoveUp?: () => void;
-  onMoveDown?: () => void;
-  onMoveLeft?: () => void;
-  onMoveRight?: () => void;
-}) {
+export function DashboardWidgetTile({ widget, editable = false, onRemove }: { widget: RenderedDashboardWidget; editable?: boolean; onRemove?: () => void }) {
   return (
     <Card className="flex h-full flex-col">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardHeader className={`flex flex-row items-center justify-between space-y-0 pb-2 ${editable ? 'dashboard-grid-handle cursor-move' : ''}`}>
         <CardTitle className="text-base">{widget.title}</CardTitle>
         {editable ? (
-          <div className="flex items-center gap-0.5">
-            {onMoveLeft ? (
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onMoveLeft} aria-label="Move widget left">
-                <ArrowLeft className="h-3 w-3" aria-hidden />
-              </Button>
-            ) : null}
-            {onMoveRight ? (
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onMoveRight} aria-label="Move widget right">
-                <ArrowRight className="h-3 w-3" aria-hidden />
-              </Button>
-            ) : null}
-            <Button variant="ghost" size="icon" className="h-6 w-6" disabled={isFirst} onClick={onMoveUp} aria-label="Move widget up">
-              <ArrowUp className="h-3 w-3" aria-hidden />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-6 w-6" disabled={isLast} onClick={onMoveDown} aria-label="Move widget down">
-              <ArrowDown className="h-3 w-3" aria-hidden />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={onRemove} aria-label="Remove widget">
-              <X className="h-3.5 w-3.5" aria-hidden />
-            </Button>
-          </div>
+          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={onRemove} aria-label="Remove widget">
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </Button>
         ) : null}
       </CardHeader>
       <CardContent className="flex-1">

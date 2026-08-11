@@ -53,7 +53,10 @@ const ALLOWLISTS: Record<SavedViewEntityType, Record<string, FieldKind>> = {
   },
   LEAD: {
     status: 'enum',
-    source: 'enum',
+    // Admin-managed lookup (lead_sources), not a fixed enum — see
+    // LeadSource's schema.prisma comment. 'string' still gets eq/neq/in
+    // via OPERATORS_BY_KIND, just adds 'contains' too.
+    source: 'string',
     assignedToId: 'uuid',
     score: 'number',
     companyName: 'string',

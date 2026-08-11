@@ -5,10 +5,12 @@ import { ACCOUNT_STATUSES, ACCOUNT_TYPES, LEAD_STATUSES, TASK_PRIORITIES, TASK_S
  *
  * `@topiadesk/shared-types`'s enums.ts already hand-mirrors a subset of
  * backend/api's Prisma enums (account/lead/task); the rest used by this
- * module (RiskRating, CarrierType, LeadSource, ActivityType,
- * ActivityDirection, MarketSubmissionStatus) aren't in that shared file, so
- * they're hand-mirrored here from packages/db/prisma/schema.prisma using
- * the same "keep in sync manually" convention documented in enums.ts.
+ * module (RiskRating, CarrierType, ActivityType, ActivityDirection,
+ * MarketSubmissionStatus) aren't in that shared file, so they're
+ * hand-mirrored here from packages/db/prisma/schema.prisma using the same
+ * "keep in sync manually" convention documented in enums.ts. Lead sources
+ * are NOT here — they're an admin-managed lookup (LeadSource model, GET
+ * /crm/lead-sources), not a fixed enum; see useLeadSources() in hooks.ts.
  */
 
 export { ACCOUNT_STATUSES, ACCOUNT_TYPES, LEAD_STATUSES, TASK_PRIORITIES, TASK_STATUSES };
@@ -16,14 +18,14 @@ export { ACCOUNT_STATUSES, ACCOUNT_TYPES, LEAD_STATUSES, TASK_PRIORITIES, TASK_S
 export const RISK_RATINGS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
 export type RiskRating = (typeof RISK_RATINGS)[number];
 
+export const KYC_STATUSES = ['NOT_STARTED', 'PENDING', 'VERIFIED', 'EXPIRED', 'REJECTED'] as const;
+export type KycStatus = (typeof KYC_STATUSES)[number];
+
 export const CARRIER_TYPES = ['INSURER', 'REINSURER', 'BOTH'] as const;
 export type CarrierType = (typeof CARRIER_TYPES)[number];
 
 export const CARRIER_PANEL_STATUSES = ['PROSPECTIVE', 'ACTIVE', 'SUSPENDED', 'TERMINATED'] as const;
 export type CarrierPanelStatus = (typeof CARRIER_PANEL_STATUSES)[number];
-
-export const LEAD_SOURCES = ['WEB', 'EMAIL', 'REFERRAL', 'PARTNER', 'SOCIAL', 'PHONE', 'EVENT', 'OTHER'] as const;
-export type LeadSource = (typeof LEAD_SOURCES)[number];
 
 export const MARKET_SUBMISSION_STATUSES = ['SUBMITTED', 'DECLINED', 'QUOTED', 'BOUND'] as const;
 export type MarketSubmissionStatus = (typeof MARKET_SUBMISSION_STATUSES)[number];
@@ -73,6 +75,10 @@ const humanize = (value: string): string =>
     .map((w) => w[0]?.toUpperCase() + w.slice(1))
     .join(' ');
 
+export function accountTypeLabel(type: string): string {
+  return humanize(type);
+}
+
 export function accountStatusLabel(status: string): string {
   return humanize(status);
 }
@@ -84,6 +90,23 @@ export function accountStatusVariant(status: string): BadgeVariant {
       return 'secondary';
     case 'FORMER_CLIENT':
       return 'outline';
+    default:
+      return 'outline';
+  }
+}
+
+export function kycStatusLabel(status: string): string {
+  return humanize(status);
+}
+export function kycStatusVariant(status: string): BadgeVariant {
+  switch (status) {
+    case 'VERIFIED':
+      return 'success';
+    case 'PENDING':
+      return 'secondary';
+    case 'EXPIRED':
+    case 'REJECTED':
+      return 'destructive';
     default:
       return 'outline';
   }
@@ -105,6 +128,28 @@ export function riskRatingVariant(rating: string | null): BadgeVariant {
     default:
       return 'outline';
   }
+}
+
+/** Account.healthScore — 0-100 relationship-health signal (see refresh-health-score.job.ts), distinct from riskRating above (manual underwriting risk). Same 3-band read as SLA/tenant-health elsewhere: >=70 healthy, >=40 watch, below that at risk. */
+export function healthScoreLabel(score: number | null): string {
+  return score === null ? 'Not yet scored' : `${score}`;
+}
+export function healthScoreVariant(score: number | null): BadgeVariant {
+  if (score === null) return 'outline';
+  if (score >= 70) return 'success';
+  if (score >= 40) return 'warning';
+  return 'destructive';
+}
+
+/** Opportunity.dealHealthScore — 0-100 "on track" signal (see refresh-deal-health.job.ts), null for closed deals. Same 3-band read as healthScoreVariant above. */
+export function dealHealthScoreLabel(score: number | null): string {
+  return score === null ? 'Not scored' : `${score}`;
+}
+export function dealHealthScoreVariant(score: number | null): BadgeVariant {
+  if (score === null) return 'outline';
+  if (score >= 70) return 'success';
+  if (score >= 40) return 'warning';
+  return 'destructive';
 }
 
 export function relationshipTypeLabel(type: string): string {

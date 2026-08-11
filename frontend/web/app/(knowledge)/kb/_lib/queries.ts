@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 // Reuses the route group's generic same-origin fetch helper — apiFetch()
 // attaches no Authorization header and only forwards same-origin cookies
 // (harmless for an anonymous GET with no session cookie present), so it
@@ -8,7 +8,13 @@ import { useQuery } from '@tanstack/react-query';
 // header comment for why it's a route-group-local copy rather than a
 // cross-group import.
 import { apiFetch, buildQuery } from '../../_lib/api';
-import type { PublicKnowledgeArticleDetail, PublicKnowledgeArticleListItem, PublicKnowledgeArticleQuery, PublicKnowledgeCategory } from './types';
+import type {
+  PublicKnowledgeArticleDetail,
+  PublicKnowledgeArticleListItem,
+  PublicKnowledgeArticleQuery,
+  PublicKnowledgeCategory,
+  PublicKnowledgeVote,
+} from './types';
 
 export function usePublicKnowledgeCategories() {
   return useQuery({
@@ -31,5 +37,16 @@ export function usePublicKnowledgeArticle(slug: string) {
     queryFn: () => apiFetch<PublicKnowledgeArticleDetail>(`/api/public/knowledge/articles/${encodeURIComponent(slug)}`),
     enabled: slug.length > 0,
     retry: false,
+  });
+}
+
+/** Anonymous "was this helpful?" vote — see PublicKnowledgeArticleFeedbackDto's header comment (backend) for why this is a bare increment, not tied to any identity. */
+export function useVotePublicKnowledgeArticle(slug: string) {
+  return useMutation({
+    mutationFn: (vote: PublicKnowledgeVote) =>
+      apiFetch<{ helpfulCount: number }>(`/api/public/knowledge/articles/${encodeURIComponent(slug)}/feedback`, {
+        method: 'POST',
+        body: JSON.stringify({ vote }),
+      }),
   });
 }

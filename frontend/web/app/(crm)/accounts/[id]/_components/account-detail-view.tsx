@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Activity as ActivityIcon,
+  AlertTriangle,
   Briefcase,
   Building2,
   CalendarClock,
@@ -61,6 +62,11 @@ import { PageHeader } from '../../../_components/page-header';
 import {
   accountStatusLabel,
   accountStatusVariant,
+  accountTypeLabel,
+  healthScoreLabel,
+  healthScoreVariant,
+  kycStatusLabel,
+  kycStatusVariant,
   relationshipTypeLabel,
   relationshipTypeVariant,
   riskRatingLabel,
@@ -76,11 +82,13 @@ import { useCan, useSlaPolicies } from '@/app/(cases)/_lib/hooks';
 import type { SlaPolicy } from '@/app/(cases)/_lib/types';
 import {
   useAccount,
+  useAccountGroupRollup,
   useAccountRelationships,
   useAccountRenewals,
   useAccountSlaOverrides,
   useAllPipelineStages,
   useContacts,
+  useCreateDataSubjectRequest,
   useCreateActivity,
   useActivities,
   useDeleteAccount,
@@ -98,6 +106,7 @@ import type { AccountDetail, AccountRelationship, Contact, Site } from '../../..
 import { AccountFormDialog } from '../../_components/account-form-dialog';
 import { AccountRelationshipFormDialog } from '../../_components/account-relationship-form-dialog';
 import { ContactFormDialog } from '../../_components/contact-form-dialog';
+import { ConsentDialog } from './consent-dialog';
 import { SiteFormDialog } from '../../_components/site-form-dialog';
 import { AccountRelationshipGraph } from './account-relationship-graph';
 import { AiInsightPanel } from './ai-insight-panel';
@@ -106,6 +115,7 @@ import { LoyaltyTab } from './loyalty-tab';
 export function AccountDetailView({ accountId }: { accountId: string }) {
   const router = useRouter();
   const { data: account, isLoading } = useAccount(accountId);
+  const { data: groupRollup } = useAccountGroupRollup(accountId);
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const deleteAccount = useDeleteAccount();
@@ -136,9 +146,11 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
             {account.name}
             <Badge variant={accountStatusVariant(account.status)}>{accountStatusLabel(account.status)}</Badge>
             <Badge variant={riskRatingVariant(account.riskRating)}>{riskRatingLabel(account.riskRating)} risk</Badge>
+            <Badge variant={kycStatusVariant(account.kycStatus)}>KYC {kycStatusLabel(account.kycStatus)}</Badge>
+            <Badge variant={healthScoreVariant(account.healthScore)}>Health {healthScoreLabel(account.healthScore)}</Badge>
           </span>
         }
-        description={`${account.accountType === 'CORPORATE' ? 'Corporate' : 'Individual'} account · ${[account.city, account.country].filter(Boolean).join(', ') || 'No location on file'}`}
+        description={`${accountTypeLabel(account.accountType)} account · ${[account.city, account.country].filter(Boolean).join(', ') || 'No location on file'}`}
         actions={
           <>
             <Button variant="outline" onClick={() => setEditOpen(true)}>
@@ -179,6 +191,29 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
         <StatTile label="Won opportunity value" value={formatCurrency(account.financials.wonOpportunityValue)} icon={<Trophy />} />
       </div>
 
+      {/* Group Premium Rollup — this account's parent/subsidiary tree
+          combined (FSC's "Corporate Client Page... Group Premium Rollup",
+          Household's "Total Premium"). Only shown once there's an actual
+          group beyond this single account — a leaf account with no parent
+          or subsidiaries would just duplicate the financials row above. */}
+      {groupRollup && groupRollup.accountCount > 1 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Group rollup</CardTitle>
+            <CardDescription>
+              Combined across this account and {groupRollup.accountCount - 1} {groupRollup.accountCount - 1 === 1 ? 'subsidiary' : 'subsidiaries'} in its hierarchy.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <StatTile label="Accounts in group" value={groupRollup.accountCount} icon={<Network />} />
+            <StatTile label="Group policies" value={groupRollup.totalPolicies} icon={<ShieldCheck />} />
+            <StatTile label="Group sum insured" value={formatCurrency(groupRollup.totalSumInsured)} icon={<Wallet />} />
+            <StatTile label="Group gross premium" value={formatCurrency(groupRollup.totalGrossPremium)} icon={<Receipt />} />
+            <StatTile label="Open claims" value={groupRollup.openClaims} icon={<AlertTriangle />} />
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -208,13 +243,20 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
               <CardTitle>Profile</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-              <Field label="Account type" value={account.accountType === 'CORPORATE' ? 'Corporate' : 'Individual'} />
+              <Field label="Account type" value={accountTypeLabel(account.accountType)} />
               <Field label="Status" value={accountStatusLabel(account.status)} />
               <Field label="Risk rating" value={riskRatingLabel(account.riskRating)} />
+              <Field
+                label="Health score"
+                value={account.healthScoreComputedAt ? `${healthScoreLabel(account.healthScore)} · as of ${formatDate(account.healthScoreComputedAt)}` : healthScoreLabel(account.healthScore)}
+              />
               <Field label="City" value={account.city ?? '—'} />
               <Field label="Country" value={account.country ?? '—'} />
               <Field label="Industry ID" value={account.industryId ?? '—'} mono />
               <Field label="Owner ID" value={account.ownerId} mono />
+              <Field label="KYC status" value={kycStatusLabel(account.kycStatus)} />
+              <Field label="KYC expiry" value={account.kycExpiryDate ? formatDate(account.kycExpiryDate) : '—'} />
+              <Field label="NAICOM ID" value={account.naicomId ?? '—'} />
               <Field label="Created" value={formatDate(account.createdAt)} />
               <Field label="Last updated" value={formatDate(account.updatedAt)} />
             </CardContent>
@@ -265,7 +307,7 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
               <CardTitle>History</CardTitle>
             </CardHeader>
             <CardContent>
-              <RecordHistory entityType="accounts" entityId={accountId} />
+              <RecordHistory entityType="accounts" entityId={accountId} fetchUrl={`/api/crm/accounts/${accountId}/history`} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -302,9 +344,12 @@ function Field({ label, value, mono = false }: { label: string; value: string; m
 function ContactsTab({ accountId }: { accountId: string }) {
   const { data, isLoading } = useContacts({ accountId });
   const deleteContact = useDeleteContact(accountId);
+  const createDsr = useCreateDataSubjectRequest();
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Contact | null>(null);
   const [deleting, setDeleting] = React.useState<Contact | null>(null);
+  const [dsrTarget, setDsrTarget] = React.useState<{ contact: Contact; requestType: 'EXPORT' | 'DELETE' } | null>(null);
+  const [consentTarget, setConsentTarget] = React.useState<Contact | null>(null);
 
   return (
     <Card>
@@ -334,7 +379,19 @@ function ContactsTab({ accountId }: { accountId: string }) {
             <TableBody>
               {data.map((contact) => (
                 <TableRow key={contact.id}>
-                  <TableCell className="font-medium text-foreground">{fullName(contact.firstName, contact.lastName)}</TableCell>
+                  <TableCell className="font-medium text-foreground">
+                    {fullName(contact.firstName, contact.lastName)}
+                    {contact.householdRole ? (
+                      <Badge variant="outline" className="ml-2 font-normal">
+                        {contact.householdRole}
+                      </Badge>
+                    ) : null}
+                    {contact.anonymizedAt ? (
+                      <Badge variant="secondary" className="ml-2 font-normal">
+                        Data erased
+                      </Badge>
+                    ) : null}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{contact.title ?? '—'}</TableCell>
                   <TableCell className="text-muted-foreground">{contact.email ?? '—'}</TableCell>
                   <TableCell className="text-muted-foreground">{contact.phone ?? '—'}</TableCell>
@@ -348,6 +405,17 @@ function ContactsTab({ accountId }: { accountId: string }) {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onSelect={() => setEditing(contact)}>Edit</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setConsentTarget(contact)}>Manage consent</DropdownMenuItem>
+                        {!contact.anonymizedAt ? (
+                          <>
+                            <DropdownMenuItem onSelect={() => setDsrTarget({ contact, requestType: 'EXPORT' })}>
+                              Request data export
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setDsrTarget({ contact, requestType: 'DELETE' })}>
+                              Request data deletion
+                            </DropdownMenuItem>
+                          </>
+                        ) : null}
                         <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleting(contact)}>
                           <Trash2 aria-hidden /> Delete
                         </DropdownMenuItem>
@@ -382,6 +450,31 @@ function ContactsTab({ accountId }: { accountId: string }) {
           deleteContact.mutate(deleting.id, { onSuccess: () => setDeleting(null) });
         }}
       />
+      <ConfirmDialog
+        open={Boolean(dsrTarget)}
+        onOpenChange={(open) => !open && setDsrTarget(null)}
+        title={
+          dsrTarget?.requestType === 'DELETE'
+            ? `Log a data deletion request for ${fullName(dsrTarget.contact.firstName, dsrTarget.contact.lastName)}?`
+            : `Log a data export request for ${dsrTarget ? fullName(dsrTarget.contact.firstName, dsrTarget.contact.lastName) : ''}?`
+        }
+        description={
+          dsrTarget?.requestType === 'DELETE'
+            ? "This only logs the request as PENDING — nothing is erased yet. A compliance reviewer fulfills it from Data Requests, which anonymizes this contact's name/email/phone/ID fields in place (their case/policy history stays intact)."
+            : 'This only logs the request as PENDING — a compliance reviewer fulfills it from Data Requests, producing a point-in-time export of everything on file for this contact.'
+        }
+        confirmLabel="Log request"
+        destructive={dsrTarget?.requestType === 'DELETE'}
+        isPending={createDsr.isPending}
+        onConfirm={() => {
+          if (!dsrTarget) return;
+          createDsr.mutate(
+            { contactId: dsrTarget.contact.id, requestType: dsrTarget.requestType },
+            { onSuccess: () => setDsrTarget(null) },
+          );
+        }}
+      />
+      {consentTarget ? <ConsentDialog contact={consentTarget} open={Boolean(consentTarget)} onOpenChange={(open) => !open && setConsentTarget(null)} /> : null}
     </Card>
   );
 }

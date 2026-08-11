@@ -45,7 +45,7 @@ export interface ReportResult {
 }
 
 export type ReportCategory = 'FINANCE' | 'SALES' | 'RENEWALS' | 'CLAIMS' | 'COMPLIANCE' | 'PRODUCTIVITY' | 'MARKETING';
-export type ReportChartType = 'bar' | 'stackedBar' | 'line' | 'funnel' | 'table' | 'treemap' | 'gauge';
+export type ReportChartType = 'bar' | 'stackedBar' | 'line' | 'area' | 'pie' | 'donut' | 'funnel' | 'table' | 'treemap' | 'gauge' | 'kpi' | 'combo';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface ReportDefinition<TFilters = any> {

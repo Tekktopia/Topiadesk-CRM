@@ -12,6 +12,7 @@ const LINKS = [
   { href: '/portal/policies', label: 'Policies' },
   { href: '/portal/documents', label: 'Documents' },
   { href: '/portal/cases', label: 'Support' },
+  { href: '/portal/knowledge', label: 'Help Center' },
 ];
 
 /** Top bar for every authenticated /portal/* page — a customer Contact's

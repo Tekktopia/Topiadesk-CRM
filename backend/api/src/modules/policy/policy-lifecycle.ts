@@ -1,5 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
-import { getPrismaClient, type ApprovalEntityType, type PolicyStatus, type PolicyVersionType } from '@topiadesk/db';
+import { getPrismaClient, type ApprovalEntityType, type KycStatus, type PolicyStatus, type PolicyVersionType } from '@topiadesk/db';
+
+/** FSC's "KYC Expiry Flow" (docs/Topiadesk_CRM_FSC_Insurance_Spec.md §5): a RENEWAL quote can't be created against an account whose KYC isn't verified and comfortably current. */
+export const KYC_RENEWAL_MIN_DAYS_REMAINING = 30;
 
 /**
  * QUOTED -> BOUND -> ISSUED -> ENDORSED/CANCELLED/LAPSED/RENEWED, per the
@@ -74,6 +77,30 @@ export function isApprovalGated(versionType: PolicyVersionType): boolean {
  * this versionType (the common case today) means `requiredApprovals` is
  * always 1 — byte-for-byte the pre-existing single-approver behavior.
  */
+/**
+ * FSC's KYC Expiry Flow: "If Contact KYC Expiry < 30 days -> Block renewal
+ * quote -> Send notification". The field actually lives on Account (per the
+ * spec's own field list under "A. Customer Model" — Contact only carries ID
+ * Type/ID Number supporting detail), so this checks the policy's Account.
+ * Blocks unless KYC is VERIFIED and still has more than
+ * KYC_RENEWAL_MIN_DAYS_REMAINING days before expiry — no KYC on file at all
+ * (kycExpiryDate null) is treated the same as expired, not as "not
+ * applicable".
+ */
+export function assertKycValidForRenewal(account: { kycStatus: KycStatus; kycExpiryDate: Date | null }): void {
+  const daysRemaining = account.kycExpiryDate
+    ? Math.floor((account.kycExpiryDate.getTime() - Date.now()) / 86_400_000)
+    : null;
+  const valid = account.kycStatus === 'VERIFIED' && daysRemaining !== null && daysRemaining > KYC_RENEWAL_MIN_DAYS_REMAINING;
+  if (!valid) {
+    throw new BadRequestException(
+      `Cannot create a renewal quote: this account's KYC is ${account.kycStatus.toLowerCase().replace('_', ' ')}` +
+        (daysRemaining !== null ? ` (expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'})` : ' (no KYC expiry on file)') +
+        `. KYC must be verified with more than ${KYC_RENEWAL_MIN_DAYS_REMAINING} days remaining before a renewal can be quoted.`,
+    );
+  }
+}
+
 export async function resolveApprovalThreshold(versionType: PolicyVersionType, amount: number | null): Promise<number> {
   const rules = await getPrismaClient().approvalThresholdRule.findMany({ where: { versionType } });
   if (rules.length === 0) return 1;

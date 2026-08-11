@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsEnum, IsObject, IsOptional, IsString, MinLength } from 'class-validator';
-import { AutomationRuleStatus, AutomationTriggerType } from '@topiadesk/db';
+import { AutomationExecutionStatus, AutomationRuleStatus, AutomationTriggerType } from '@topiadesk/db';
 
 /**
  * `@Type(() => Object)` on `actions`/`steps` below is load-bearing, not
@@ -78,4 +78,17 @@ export class AutomationRuleResponseDto {
   @ApiProperty() createdById!: string;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
+}
+
+/** One firing of a rule's flat `actions` list — see AutomationExecutionLog's schema comment. Branching (`steps`) runs have their own history via GET /automation-run-states, not this. */
+export class AutomationExecutionLogResponseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ nullable: true }) ruleId!: string | null;
+  @ApiProperty() ruleName!: string;
+  @ApiProperty() entityType!: string;
+  @ApiProperty({ nullable: true }) entityId!: string | null;
+  @ApiProperty() triggerSource!: string;
+  @ApiProperty({ enum: AutomationExecutionStatus }) status!: string;
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true } }) actionResults!: unknown;
+  @ApiProperty() createdAt!: Date;
 }

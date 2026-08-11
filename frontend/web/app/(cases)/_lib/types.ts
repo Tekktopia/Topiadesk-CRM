@@ -28,7 +28,7 @@ export type CaseStatus = (typeof CASE_STATUSES)[number];
 export const CASE_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
 export type CasePriority = (typeof CASE_PRIORITIES)[number];
 
-export const CASE_MANAGEMENT_ENTITY_TYPES = ['CLAIM', 'CASE'] as const;
+export const CASE_MANAGEMENT_ENTITY_TYPES = ['CLAIM', 'CASE', 'LEAD'] as const;
 export type CaseManagementEntityType = (typeof CASE_MANAGEMENT_ENTITY_TYPES)[number];
 
 export const SLA_METRIC_TYPES = ['FIRST_RESPONSE', 'RESOLUTION', 'STAGE_TRANSITION'] as const;
@@ -608,11 +608,16 @@ export type BusinessRuleActionEffect = (typeof BUSINESS_RULE_ACTION_EFFECTS)[num
 export const BUSINESS_RULE_CONDITION_FIELDS: Record<CaseManagementEntityType, readonly string[]> = {
   CASE: ['status', 'priority', 'caseType', 'categoryId', 'assignedTeamId'],
   CLAIM: ['status', 'priority', 'assignedTeamId'],
+  // Business rules don't support LEAD — present so this stays a total
+  // Record over the shared enum, same "empty but representable" precedent
+  // CLAIM's own action list already sets.
+  LEAD: [],
 };
 
 export const BUSINESS_RULE_ACTION_FIELDS: Record<CaseManagementEntityType, readonly string[]> = {
   CASE: ['caseType', 'subject', 'description', 'priority', 'categoryId', 'accountId', 'policyId', 'assignedToId'],
   CLAIM: [],
+  LEAD: [],
 };
 
 export interface BusinessRuleAction {
@@ -802,6 +807,14 @@ export interface LookupOption {
 export interface TeamOption {
   id: string;
   name: string;
+}
+
+/** Local copy of app/(crm)/_lib/types.ts's LeadSourceOption — used by the assignment rule form's LEAD "source" condition picker (see _components/assignment-rule-form-dialog.tsx). Admin-managed lookup, not a fixed enum — see LeadSource's schema.prisma comment. */
+export interface LeadSourceOption {
+  id: string;
+  name: string;
+  code: string;
+  isActive: boolean;
 }
 
 // ---------------------------------------------------------------------------

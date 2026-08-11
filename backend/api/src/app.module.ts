@@ -24,6 +24,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { SearchModule } from './modules/search/search.module';
 import { OmnichannelModule } from './modules/omnichannel/omnichannel.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
+import { ApprovalsModule } from './modules/approvals/approvals.module';
 import { IpWhitelistGuard } from './modules/identity/ip-whitelist.guard';
 import { PortalModule } from './modules/portal/portal.module';
 import { SupportModule } from './modules/support/support.module';
@@ -75,6 +76,7 @@ import { PlatformSearchController } from './modules/platform/platform-search.con
     SearchModule,
     OmnichannelModule,
     LoyaltyModule,
+    ApprovalsModule,
     PortalModule,
     PlatformModule,
     SupportModule,
@@ -150,6 +152,7 @@ export class AppModule implements NestModule {
         // under that context, not enforced by it).
         { path: 'public/knowledge/articles', method: RequestMethod.GET },
         { path: 'public/knowledge/articles/:slug', method: RequestMethod.GET },
+        { path: 'public/knowledge/articles/:slug/feedback', method: RequestMethod.POST },
         { path: 'public/knowledge/categories', method: RequestMethod.GET },
         // Subdomain -> Keycloak realm lookup, called by frontend/web BEFORE
         // a visitor has logged in (no TopiaDesk-issued JWT could exist
@@ -180,6 +183,12 @@ export class AppModule implements NestModule {
         // above.
         { path: 'integrations/oauth/:connectorId/callback', method: RequestMethod.GET },
         { path: 'integrations/webhooks/:webhookPath', method: RequestMethod.POST },
+        // Two-way Microsoft Teams — the inbound Approve/Reject button
+        // callback (see teams-actions.controller.ts). Secured by the
+        // single-use token itself (TeamsActionToken), not a JWT — same
+        // "no TopiaDesk-issued Keycloak JWT presented" reasoning as every
+        // other exclusion here.
+        { path: 'integrations/teams-actions/:token', method: RequestMethod.POST },
       )
       .forRoutes('*');
 

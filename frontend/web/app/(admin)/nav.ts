@@ -2,6 +2,7 @@ import {
   Bell,
   Building2,
   Clock,
+  Coins,
   GitBranch,
   KeyRound,
   MapPin,
@@ -50,4 +51,5 @@ export const adminNav: NavItem[] = [
   { label: 'Integrations', href: '/admin/integrations', icon: Network, section: 'System', adminOnly: true },
   { label: 'Webhooks', href: '/admin/webhooks', icon: Webhook, section: 'System', adminOnly: true },
   { label: 'Notifications', href: '/admin/notifications', icon: Bell, section: 'System', adminOnly: true },
+  { label: 'Exchange Rates', href: '/admin/exchange-rates', icon: Coins, section: 'System', adminOnly: true },
 ];

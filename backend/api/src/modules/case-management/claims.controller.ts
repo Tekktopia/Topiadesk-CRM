@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient, type Claim } from '@topiadesk/db';
+import { AuditLogResponseDto } from '../audit/dto/audit-log-response.dto';
+import { loadEntityHistory } from '../audit/entity-history';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -141,6 +143,16 @@ export class ClaimsController {
     const claim = await getPrismaClient().claim.findUnique({ where: { id } });
     if (!claim) throw new NotFoundException('Claim not found');
     return toClaimDto(claim);
+  }
+
+  /** Who changed what, and when — see entity-history.ts's header comment for why this needs its own endpoint rather than reusing GET /audit-log. */
+  @Get(':id/history')
+  @RequirePermission('claim', 'read')
+  @ApiOkResponse({ type: [AuditLogResponseDto] })
+  async history(@Param('id') id: string): Promise<AuditLogResponseDto[]> {
+    const claim = await getPrismaClient().claim.findUnique({ where: { id }, select: { id: true } });
+    if (!claim) throw new NotFoundException('Claim not found');
+    return loadEntityHistory('claims', id);
   }
 
   @Get(':id/status-history')

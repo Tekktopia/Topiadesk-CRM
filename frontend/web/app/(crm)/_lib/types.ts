@@ -30,7 +30,7 @@ type Paths = ApiPaths;
 export interface Account {
   id: string;
   name: string;
-  accountType: 'INDIVIDUAL' | 'CORPORATE';
+  accountType: 'INDIVIDUAL' | 'CORPORATE' | 'HOUSEHOLD';
   status: 'PROSPECT' | 'CLIENT' | 'FORMER_CLIENT';
   ownerId: string;
   riskRating: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | null;
@@ -38,6 +38,12 @@ export interface Account {
   parentAccountId: string | null;
   city: string | null;
   country: string | null;
+  kycStatus: 'NOT_STARTED' | 'PENDING' | 'VERIFIED' | 'EXPIRED' | 'REJECTED';
+  kycExpiryDate: string | null;
+  naicomId: string | null;
+  /** Composite relationship-health signal — see refresh-health-score.job.ts. Distinct from riskRating (manual underwriting risk). */
+  healthScore: number | null;
+  healthScoreComputedAt: string | null;
   /** Phase 2 — jsonb, keyed by active CustomFieldDefinition.key for entityType=ACCOUNT. */
   customFields: Record<string, unknown>;
   createdAt: string;
@@ -51,6 +57,9 @@ export interface ContactSummary {
   email: string | null;
   phone: string | null;
   title: string | null;
+  householdRole: string | null;
+  idType: string | null;
+  idNumber: string | null;
   isPrimary: boolean;
 }
 
@@ -81,6 +90,17 @@ export interface AccountDetail extends Account {
   financials: AccountFinancials;
   parentAccount: AccountRef | null;
   subAccounts: AccountRef[];
+}
+
+/** GET /crm/accounts/:id/group-rollup — this account's own figures (AccountFinancials) PLUS every descendant in its parentAccountId/subAccounts tree, recursively. */
+export interface AccountGroupRollup {
+  accountCount: number;
+  memberCount: number;
+  totalPolicies: number;
+  openClaims: number;
+  totalSumInsured: string | null;
+  totalGrossPremium: string | null;
+  subsidiaries: AccountRef[];
 }
 
 export interface AccountSlaOverride {
@@ -149,10 +169,65 @@ export interface Contact {
   email: string | null;
   phone: string | null;
   title: string | null;
+  householdRole: string | null;
+  idType: string | null;
+  idNumber: string | null;
   isPrimary: boolean;
+  /** Set once a DataSubjectRequest DELETE has been processed for this contact. */
+  anonymizedAt: string | null;
   /** Phase 2 — jsonb, keyed by active CustomFieldDefinition.key for entityType=CONTACT. */
   customFields: Record<string, unknown>;
   createdAt: string;
+}
+
+// -- Data Subject Requests (NDPR/GDPR) --------------------------------------
+// Hand-written, not ApiPaths-derived — new endpoints the generator hasn't
+// seen, same convention as this file's other Phase-2-and-later additions.
+export type DataSubjectRequestType = 'EXPORT' | 'DELETE';
+export type DataSubjectRequestStatus = 'PENDING' | 'COMPLETED' | 'REJECTED';
+export interface DataSubjectRequest {
+  id: string;
+  contactId: string;
+  requestType: DataSubjectRequestType;
+  status: DataSubjectRequestStatus;
+  notes: string | null;
+  requestedById: string;
+  exportData: unknown;
+  processedById: string | null;
+  processedAt: string | null;
+  createdAt: string;
+}
+export interface CreateDataSubjectRequestInput {
+  contactId: string;
+  requestType: DataSubjectRequestType;
+  notes?: string;
+}
+
+// -- Consent Records ---------------------------------------------------------
+// General-purpose consent log — consentType/source are free text
+// (see ConsentRecord's schema comment), so no enum here.
+export interface ConsentRecord {
+  id: string;
+  contactId: string;
+  consentType: string;
+  granted: boolean;
+  source: string;
+  notes: string | null;
+  recordedById: string | null;
+  createdAt: string;
+}
+export interface CreateConsentRecordInput {
+  contactId: string;
+  consentType: string;
+  granted: boolean;
+  source: string;
+  notes?: string;
+}
+export interface CurrentConsent {
+  consentType: string;
+  granted: boolean;
+  source: string;
+  recordedAt: string;
 }
 
 export type ContactQuery = NonNullable<Paths['/crm/contacts']['get']['parameters']['query']>;
@@ -312,6 +387,34 @@ export interface PipelineDetail extends Pipeline {
   stages: PipelineStage[];
 }
 
+export interface CreatePipelineInput {
+  name: string;
+  lineOfBusiness?: string;
+  isActive?: boolean;
+}
+
+export interface UpdatePipelineInput {
+  name?: string;
+  lineOfBusiness?: string;
+  isActive?: boolean;
+}
+
+export interface CreatePipelineStageInput {
+  name: string;
+  order: number;
+  defaultProbability: number;
+  isWon?: boolean;
+  isLost?: boolean;
+}
+
+export interface UpdatePipelineStageInput {
+  name?: string;
+  order?: number;
+  defaultProbability?: number;
+  isWon?: boolean;
+  isLost?: boolean;
+}
+
 // -- Opportunities ------------------------------------------------------------
 
 export interface Opportunity {
@@ -321,6 +424,8 @@ export interface Opportunity {
   pipelineStageId: string;
   /** Decimal amount serialized as a string, e.g. "45000000.00". */
   amount: string;
+  /** ISO 4217 code, defaults "NGN" — see ExchangeRate for how non-NGN amounts get normalized into dashboard/report totals. */
+  currency: string;
   probability: number;
   expectedCloseDate: string;
   actualCloseDate: string | null;
@@ -328,19 +433,35 @@ export interface Opportunity {
   lostReason: string | null;
   ownerId: string;
   lineOfBusiness: string | null;
+  /** Composite "on track" signal — see refresh-deal-health.job.ts. Null for closed deals or before the first scoring run. Distinct from `probability`. */
+  dealHealthScore: number | null;
+  dealHealthScoreComputedAt: string | null;
   /** Phase 2 — jsonb, keyed by active CustomFieldDefinition.key for entityType=OPPORTUNITY. */
   customFields: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
 
+export interface StageHistoryEntry {
+  changedAt: string;
+  actorName: string | null;
+  fromStageId: string | null;
+  fromStageName: string | null;
+  toStageId: string | null;
+  toStageName: string | null;
+}
+
 export type OpportunityQuery = NonNullable<Paths['/crm/opportunities']['get']['parameters']['query']>;
-// See CreateAccountInput's comment — ApiPaths hasn't been regenerated for Phase 2's customFields.
+// See CreateAccountInput's comment — ApiPaths hasn't been regenerated for
+// Phase 2's customFields, or (same reasoning) for `currency` (multi-currency
+// support, added directly to CreateOpportunityDto/UpdateOpportunityDto).
 export type CreateOpportunityInput = Paths['/crm/opportunities']['post']['requestBody']['content']['application/json'] & {
   customFields?: Record<string, unknown>;
+  currency?: string;
 };
 export type UpdateOpportunityInput = Paths['/crm/opportunities/{id}']['patch']['requestBody']['content']['application/json'] & {
   customFields?: Record<string, unknown>;
+  currency?: string;
 };
 export type UpdateOpportunityStageInput =
   Paths['/crm/opportunities/{id}/stage']['patch']['requestBody']['content']['application/json'];
@@ -438,6 +559,31 @@ export type CustomFieldType =
   | 'MULTI_SELECT'
   | 'USER_REFERENCE'
   | 'URL';
+
+/** Admin-managed lookup for Lead.source — replaces what used to be a fixed LeadSource enum. See LeadSource's schema.prisma comment. */
+export interface LeadSourceOption {
+  id: string;
+  name: string;
+  code: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateLeadSourceInput {
+  name: string;
+  code: string;
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
+// code excluded — see LeadSourcesController's own comment on why the admin UI doesn't offer renaming it.
+export interface UpdateLeadSourceInput {
+  name?: string;
+  isActive?: boolean;
+  sortOrder?: number;
+}
 
 export interface CustomFieldDefinition {
   id: string;

@@ -21,6 +21,16 @@
  * Values are HSL triplets ("H S% L%", no `hsl()` wrapper) so Tailwind's
  * `hsl(var(--x) / <alpha-value>)` pattern supports opacity modifiers like
  * `bg-primary/10`.
+ *
+ * `violet`/`navy`/`teal` (below) are a deliberate, curated exception to
+ * "one brand hue" — added specifically for dashboard KPI-tile gradients and
+ * pie/donut chart category identity (see chart-theme.ts's categoricalColor
+ * and CATEGORICAL_GRADIENTS), where a single hue can't distinguish 4+
+ * unordered categories. `brand` itself fills the "blue" slot in that
+ * 4-hue rotation rather than gaining a sibling — a distinct 4th blue hue
+ * validated as visually indistinguishable from brand's own petrol. These
+ * three stay reserved for that categorical/chart use, not general-purpose
+ * utility classes the way `brand`/`gold` are.
  */
 
 export const brand = {
@@ -49,6 +59,49 @@ export const gold = {
   800: '30 62% 25%',
   900: '28 55% 18%',
   950: '27 50% 10%',
+} as const;
+
+export const violet = {
+  50: '260 70% 97%',
+  100: '260 65% 93%',
+  200: '261 60% 86%',
+  300: '262 55% 76%',
+  400: '262 52% 66%',
+  500: '262 50% 56%',
+  600: '263 55% 46%',
+  700: '264 60% 38%',
+  800: '265 62% 29%',
+  900: '266 58% 20%',
+  950: '267 52% 12%',
+} as const;
+
+export const navy = {
+  50: '228 90% 97%',
+  100: '229 85% 93%',
+  200: '230 82% 87%',
+  300: '231 80% 78%',
+  400: '231 82% 66%',
+  500: '232 85% 54%',
+  600: '233 82% 46%',
+  700: '234 78% 38%',
+  800: '235 72% 29%',
+  900: '236 65% 20%',
+  950: '237 58% 12%',
+} as const;
+
+/** `700` (not `500`) is the step to use under white tile text — `500` fails white-text contrast. */
+export const teal = {
+  50: '162 65% 96%',
+  100: '163 60% 91%',
+  200: '163 58% 82%',
+  300: '164 58% 68%',
+  400: '164 60% 55%',
+  500: '164 60% 42%',
+  600: '164 62% 36%',
+  700: '164 62% 30%',
+  800: '165 60% 23%',
+  900: '166 55% 16%',
+  950: '167 50% 9%',
 } as const;
 
 /** Neutral grayscale with a faint cool undertone matching `brand`'s hue. */

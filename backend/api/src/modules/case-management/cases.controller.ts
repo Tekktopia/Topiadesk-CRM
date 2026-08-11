@@ -2,6 +2,8 @@ import { randomBytes } from 'node:crypto';
 import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, Prisma, type Case } from '@topiadesk/db';
+import { AuditLogResponseDto } from '../audit/dto/audit-log-response.dto';
+import { loadEntityHistory } from '../audit/entity-history';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -184,6 +186,16 @@ export class CasesController {
     const kase = await getPrismaClient().case.findUnique({ where: { id } });
     if (!kase) throw new NotFoundException('Case not found');
     return kase;
+  }
+
+  /** Who changed what, and when — see entity-history.ts's header comment for why this needs its own endpoint rather than reusing GET /audit-log. */
+  @Get(':id/history')
+  @RequirePermission('case', 'read')
+  @ApiOkResponse({ type: [AuditLogResponseDto] })
+  async history(@Param('id') id: string): Promise<AuditLogResponseDto[]> {
+    const kase = await getPrismaClient().case.findUnique({ where: { id }, select: { id: true } });
+    if (!kase) throw new NotFoundException('Case not found');
+    return loadEntityHistory('cases', id);
   }
 
   /**

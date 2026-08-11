@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { CopyX, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import {
   Badge,
@@ -30,7 +31,17 @@ import { BulkActionToolbar } from '../../_components/bulk-action-toolbar';
 import { EmptyState } from '../../_components/empty-state';
 import { PageHeader } from '../../_components/page-header';
 import { SavedViewBar } from '../../_components/saved-view-bar';
-import { ACCOUNT_STATUSES, RISK_RATINGS, accountStatusLabel, accountStatusVariant, riskRatingLabel, riskRatingVariant } from '../../_lib/constants';
+import {
+  ACCOUNT_STATUSES,
+  RISK_RATINGS,
+  accountStatusLabel,
+  accountStatusVariant,
+  accountTypeLabel,
+  healthScoreLabel,
+  healthScoreVariant,
+  riskRatingLabel,
+  riskRatingVariant,
+} from '../../_lib/constants';
 import { formatDate } from '../../_lib/format';
 import { useAccounts, useBulkAssignAccounts, useBulkDeleteAccounts, useDeleteAccount } from '../../_lib/hooks';
 import { useDebouncedValue } from '../../_lib/use-debounced-value';
@@ -42,8 +53,14 @@ const UNSET = '__any';
 
 export function AccountsListView() {
   const { user } = useCurrentUser();
+  const searchParams = useSearchParams();
+  // Dashboard drill-down entry point (e.g. the "Active clients" KPI tile
+  // linking to /accounts?status=CLIENT) — read once as the initial value,
+  // same as opportunities-kanban-view.tsx's accountIdFilter pattern, not a
+  // live-synced param: once here, status becomes a normal local filter the
+  // Select below can freely change.
   const [search, setSearch] = React.useState('');
-  const [status, setStatus] = React.useState<string>(UNSET);
+  const [status, setStatus] = React.useState<string>(() => searchParams.get('status') ?? UNSET);
   const [riskRating, setRiskRating] = React.useState<string>(UNSET);
   const [industryId, setIndustryId] = React.useState('');
   const [mineOnly, setMineOnly] = React.useState(false);
@@ -115,7 +132,7 @@ export function AccountsListView() {
         id: 'type',
         header: 'Type',
         meta: { label: 'Type' },
-        accessorFn: (a) => (a.accountType === 'CORPORATE' ? 'Corporate' : 'Individual'),
+        accessorFn: (a) => accountTypeLabel(a.accountType),
         cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
       },
       {
@@ -132,6 +149,14 @@ export function AccountsListView() {
         meta: { label: 'Risk' },
         cell: ({ row }) => (
           <Badge variant={riskRatingVariant(row.original.riskRating)}>{riskRatingLabel(row.original.riskRating)}</Badge>
+        ),
+      },
+      {
+        accessorKey: 'healthScore',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Health" />,
+        meta: { label: 'Health' },
+        cell: ({ row }) => (
+          <Badge variant={healthScoreVariant(row.original.healthScore)}>{healthScoreLabel(row.original.healthScore)}</Badge>
         ),
       },
       {

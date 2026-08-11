@@ -1,7 +1,10 @@
 import type Redis from 'ioredis';
 import type { Queue, Worker } from 'bullmq';
 import { createRenewalScanQueue, createRenewalScanWorker, scheduleRenewalScan } from './renewal-alerts/renewal-scan.job';
+import { createRenewalAtRiskScanQueue, createRenewalAtRiskScanWorker, scheduleRenewalAtRiskScan } from './renewal-at-risk/at-risk-scan.job';
 import { createPremiumAgingRefreshQueue, createPremiumAgingRefreshWorker, schedulePremiumAgingRefresh } from './premium-aging/refresh-aging.job';
+import { createAccountHealthRefreshQueue, createAccountHealthRefreshWorker, scheduleAccountHealthRefresh } from './account-health/refresh-health-score.job';
+import { createDealHealthRefreshQueue, createDealHealthRefreshWorker, scheduleDealHealthRefresh } from './deal-health/refresh-deal-health.job';
 import {
   createAgentSurveySummaryRefreshQueue,
   createAgentSurveySummaryRefreshWorker,
@@ -47,9 +50,21 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
   const renewalScanWorker = createRenewalScanWorker(connection);
   await scheduleRenewalScan(renewalScanQueue);
 
+  const renewalAtRiskScanQueue = createRenewalAtRiskScanQueue(connection);
+  const renewalAtRiskScanWorker = createRenewalAtRiskScanWorker(connection);
+  await scheduleRenewalAtRiskScan(renewalAtRiskScanQueue);
+
   const premiumAgingQueue = createPremiumAgingRefreshQueue(connection);
   const premiumAgingWorker = createPremiumAgingRefreshWorker(connection);
   await schedulePremiumAgingRefresh(premiumAgingQueue);
+
+  const accountHealthQueue = createAccountHealthRefreshQueue(connection);
+  const accountHealthWorker = createAccountHealthRefreshWorker(connection);
+  await scheduleAccountHealthRefresh(accountHealthQueue);
+
+  const dealHealthQueue = createDealHealthRefreshQueue(connection);
+  const dealHealthWorker = createDealHealthRefreshWorker(connection);
+  await scheduleDealHealthRefresh(dealHealthQueue);
 
   const agentSurveySummaryQueue = createAgentSurveySummaryRefreshQueue(connection);
   const agentSurveySummaryWorker = createAgentSurveySummaryRefreshWorker(connection);
@@ -171,7 +186,10 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
   return {
     queues: [
       renewalScanQueue,
+      renewalAtRiskScanQueue,
       premiumAgingQueue,
+      accountHealthQueue,
+      dealHealthQueue,
       agentSurveySummaryQueue,
       scheduledReportGenerateQueue,
       scheduledReportDispatchQueue,
@@ -195,7 +213,10 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
     ],
     workers: [
       renewalScanWorker,
+      renewalAtRiskScanWorker,
       premiumAgingWorker,
+      accountHealthWorker,
+      dealHealthWorker,
       agentSurveySummaryWorker,
       scheduledReportGenerateWorker,
       scheduledReportDispatchWorker,

@@ -37,7 +37,22 @@ export * from './primitives/tooltip';
 
 // -- Composite components -----------------------------------------------------
 export * from './composite/stat-tile';
+export * from './composite/gradient-stat-tile';
 export * from './composite/activity-timeline';
 export * from './composite/data-table';
 export * from './composite/record-history';
 export * from './composite/unified-timeline';
+
+// -- Charts (Recharts-based) + dashboard grid (react-grid-layout-based) -----
+export * from './composite/charts/chart-theme';
+export * from './composite/charts/bar-chart';
+export * from './composite/charts/stacked-bar-chart';
+export * from './composite/charts/line-chart';
+export * from './composite/charts/area-chart';
+export * from './composite/charts/pie-chart';
+export * from './composite/charts/funnel-chart';
+export * from './composite/charts/treemap-chart';
+export * from './composite/charts/gauge-chart';
+export * from './composite/charts/kpi-chart';
+export * from './composite/charts/combo-chart';
+export * from './composite/charts/dashboard-grid';

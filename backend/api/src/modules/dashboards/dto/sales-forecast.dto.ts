@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsUUID } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class SalesForecastQueryDto {
   @ApiProperty({ enum: ['month', 'quarter'], required: false, default: 'quarter', description: 'The current month/quarter containing today' })
@@ -8,6 +8,10 @@ export class SalesForecastQueryDto {
   period?: 'month' | 'quarter';
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() pipelineId?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() ownerId?: string;
+  @ApiProperty({ required: false, description: 'Filters to one line of business — independent of groupBy, which pivots the results instead of narrowing them' })
+  @IsOptional()
+  @IsString()
+  lineOfBusiness?: string;
   @ApiProperty({ enum: ['owner', 'stage', 'lineOfBusiness'], required: false, default: 'owner' })
   @IsOptional()
   @IsIn(['owner', 'stage', 'lineOfBusiness'])

@@ -37,9 +37,17 @@ import { OpportunitiesTableView } from './opportunities-table-view';
 export function OpportunitiesKanbanView() {
   const searchParams = useSearchParams();
   const accountIdFilter = searchParams.get('accountId') ?? undefined;
+  // Dashboard drill-down entry points: the pipeline-funnel chart links here
+  // with pipelineId+stageId (a specific stage bar), the KPI tiles link with
+  // isOpen=true (open-opportunities/pipeline-value tiles). Read once as
+  // initial values, same pattern as accountIdFilter above.
+  const stageIdFilter = searchParams.get('stageId') ?? undefined;
+  const isOpenFilter = searchParams.get('isOpen') === 'true' ? true : undefined;
+  const urlPipelineId = searchParams.get('pipelineId') ?? undefined;
+  const ownerIdFilter = searchParams.get('ownerId') ?? undefined;
 
   const { data: pipelines, isLoading: pipelinesLoading } = usePipelines();
-  const [pipelineId, setPipelineId] = React.useState<string | undefined>(undefined);
+  const [pipelineId, setPipelineId] = React.useState<string | undefined>(urlPipelineId);
   const [viewMode, setViewMode] = React.useState<'kanban' | 'table'>('kanban');
   const [createOpen, setCreateOpen] = React.useState(false);
   const [movingId, setMovingId] = React.useState<string | null>(null);
@@ -58,6 +66,8 @@ export function OpportunitiesKanbanView() {
   const { data: liveOpportunities, isLoading: oppsLoading } = useOpportunities({
     pipelineId,
     accountId: accountIdFilter,
+    isOpen: isOpenFilter,
+    ownerId: ownerIdFilter,
   });
   const opportunities = savedViewRows ?? liveOpportunities;
   const { accountsById } = useAccountsLookup();
@@ -78,8 +88,10 @@ export function OpportunitiesKanbanView() {
   // loop below only ever iterates `stages`); now it's excluded up front
   // and surfaced via the count below instead of vanishing.
   const allOpportunities = opportunities ?? [];
-  const visibleOpportunities = allOpportunities.filter((o) => stageIds.has(o.pipelineStageId));
-  const excludedFromOtherPipelinesCount = allOpportunities.length - visibleOpportunities.length;
+  const pipelineVisibleOpportunities = allOpportunities.filter((o) => stageIds.has(o.pipelineStageId));
+  const visibleOpportunities = stageIdFilter ? pipelineVisibleOpportunities.filter((o) => o.pipelineStageId === stageIdFilter) : pipelineVisibleOpportunities;
+  const excludedFromOtherPipelinesCount = allOpportunities.length - pipelineVisibleOpportunities.length;
+  const stageFilterName = stageIdFilter ? stages.find((s) => s.id === stageIdFilter)?.name : undefined;
   const byStage = new Map<string, Opportunity[]>();
   for (const stage of stages) byStage.set(stage.id, []);
   for (const opp of visibleOpportunities) {
@@ -160,6 +172,17 @@ export function OpportunitiesKanbanView() {
         </div>
       ) : null}
 
+      {stageFilterName || isOpenFilter ? (
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Filtered from dashboard:</span>
+          {stageFilterName ? <Badge variant="secondary">Stage: {stageFilterName}</Badge> : null}
+          {isOpenFilter ? <Badge variant="secondary">Open only</Badge> : null}
+          <Link href="/opportunities" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <X className="h-3 w-3" aria-hidden /> Clear
+          </Link>
+        </div>
+      ) : null}
+
       {excludedFromOtherPipelinesCount > 0 ? (
         <p className="text-sm text-muted-foreground">
           {excludedFromOtherPipelinesCount} opportunit{excludedFromOtherPipelinesCount === 1 ? 'y' : 'ies'} from other pipelines aren&apos;t shown on
@@ -203,6 +226,15 @@ export function OpportunitiesKanbanView() {
               {stages.map((stage) => {
                 const items = byStage.get(stage.id) ?? [];
                 const total = items.reduce((sum, o) => sum + Number.parseFloat(o.amount || '0'), 0);
+                // A raw sum only means anything if every deal in the stage
+                // shares one currency — otherwise (mixed NGN/USD/etc.)
+                // labeling a combined number as one currency would be
+                // actively wrong, not just imprecise. The real
+                // currency-normalized total lives on the dashboard's own
+                // KPIs (dashboards.controller.ts, via ExchangeRate); this
+                // column header stays honest instead of pretending.
+                const currencies = new Set(items.map((o) => o.currency));
+                const singleCurrency = currencies.size <= 1 ? [...currencies][0] : undefined;
                 return (
                   <div key={stage.id} className="flex w-72 shrink-0 flex-col rounded-lg border border-border bg-muted/30">
                     <div className="border-b border-border p-3">
@@ -210,7 +242,9 @@ export function OpportunitiesKanbanView() {
                         <h3 className="text-sm font-semibold text-foreground">{stage.name}</h3>
                         <Badge variant={stage.isWon ? 'success' : stage.isLost ? 'destructive' : 'outline'}>{items.length}</Badge>
                       </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{formatCurrency(total)}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {currencies.size > 1 ? 'Mixed currencies' : formatCurrency(total, singleCurrency)}
+                      </p>
                     </div>
                     <div className="flex-1 space-y-2 p-2">
                       {items.length === 0 ? (

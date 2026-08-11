@@ -5,6 +5,9 @@ import { UsersController } from './users.controller';
 import { RoleGrantsController } from './role-grants.controller';
 import { RolesController } from './roles.controller';
 import { PermissionsController } from './permissions.controller';
+import { FieldPermissionsController } from './field-permissions.controller';
+import { ApiKeysController } from './api-keys.controller';
+import { ExchangeRatesController } from './exchange-rates.controller';
 import { DepartmentsController } from './departments.controller';
 import { BranchesController } from './branches.controller';
 import { TeamsController } from './teams.controller';
@@ -14,6 +17,7 @@ import { KeycloakWebhookController } from './keycloak-webhook.controller';
 import { ScimController } from './scim.controller';
 import { ScimTokensController } from './scim-tokens.controller';
 import { AuditExportController } from './audit-export.controller';
+import { MicrosoftSsoController } from './microsoft-sso.controller';
 import { UserProvisioningService } from './user-provisioning.service';
 import { KeycloakAdminService } from './keycloak-admin.service';
 
@@ -30,6 +34,9 @@ import { KeycloakAdminService } from './keycloak-admin.service';
     RoleGrantsController,
     RolesController,
     PermissionsController,
+    FieldPermissionsController,
+    ApiKeysController,
+    ExchangeRatesController,
     DepartmentsController,
     BranchesController,
     TeamsController,
@@ -39,6 +46,7 @@ import { KeycloakAdminService } from './keycloak-admin.service';
     ScimController,
     ScimTokensController,
     AuditExportController,
+    MicrosoftSsoController,
   ],
   providers: [AuditService, UserProvisioningService, KeycloakAdminService],
 })

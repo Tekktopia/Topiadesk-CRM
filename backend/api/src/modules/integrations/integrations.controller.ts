@@ -13,7 +13,12 @@ import { ConnectorResponseDto } from './dto/connector-response.dto';
 import { CreateConnectorDto, UpdateConnectorDto } from './dto/connector-write.dto';
 import { SyncJobResponseDto } from './dto/sync-job-response.dto';
 import { IntegrationLogResponseDto } from './dto/integration-log-response.dto';
+import { WhatsAppTestDto, WhatsAppTestResponseDto } from './dto/whatsapp-test.dto';
 import { deepMergeConfig, redactConnectorConfig } from './redact-connector-config';
+// NOT a type-only import: constructor-injected below — see the same
+// footgun documented on Reflector in permission.guard.ts.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import { WhatsAppCloudService } from './whatsapp-cloud.service';
 
 function toConnectorResponse(connector: IntegrationConnector): ConnectorResponseDto {
   return { ...connector, config: redactConnectorConfig(connector.config) as Record<string, unknown> };
@@ -33,7 +38,10 @@ function toConnectorResponse(connector: IntegrationConnector): ConnectorResponse
 @UseGuards(PermissionGuard)
 @Controller('integrations')
 export class IntegrationsController {
-  constructor(private readonly integrations: IntegrationsService) {}
+  constructor(
+    private readonly integrations: IntegrationsService,
+    private readonly whatsapp: WhatsAppCloudService,
+  ) {}
 
   @Get('connectors')
   @RequirePermission('integration', 'read')
@@ -119,5 +127,12 @@ export class IntegrationsController {
   @ApiOkResponse({ type: [IntegrationLogResponseDto] })
   async listSyncJobLogs(@Param('id') id: string): Promise<IntegrationLogResponseDto[]> {
     return this.integrations.listSyncJobLogs(id);
+  }
+
+  @Post('whatsapp/test')
+  @RequirePermission('integration', 'write')
+  @ApiOkResponse({ type: WhatsAppTestResponseDto })
+  async testWhatsApp(@Body() dto: WhatsAppTestDto): Promise<WhatsAppTestResponseDto> {
+    return this.whatsapp.sendTemplateMessage(dto.to, dto.templateName, dto.params ?? []);
   }
 }

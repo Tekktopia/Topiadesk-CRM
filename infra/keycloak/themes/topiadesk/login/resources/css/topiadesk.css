@@ -662,6 +662,30 @@ a:hover {
   color: var(--td-accent-strong);
 }
 
+/* ---------- "Sign in with Microsoft" placeholder ----------
+   Shown only when no real identity provider is configured yet for this
+   realm (see template.ftl) — reads as a normal, fully-present button (no
+   dimming), just inert since it's a <span> with no href rather than an
+   <a>. gap/icon sizing here mirrors a standard Microsoft-branded sign-in
+   button rather than the base theme's icon+space-between layout. */
+.td-social-placeholder {
+  gap: 0.65rem;
+  cursor: default;
+}
+.td-social-placeholder:hover {
+  background: var(--td-input-bg) !important;
+}
+/* Keycloak's own styles.css recolors every non-Google social icon with a
+   blue-tint filter (built for flat single-colour icons) — cancelled here
+   so the official 4-colour Microsoft mark renders in its real brand
+   colours instead of Keycloak's blue. */
+#kc-social-providers svg.td-ms-logo {
+  filter: none !important;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
 .pf-v5-c-alert.pf-m-danger {
   background: rgba(217, 83, 79, 0.08) !important;
   border-color: rgba(217, 83, 79, 0.3) !important;

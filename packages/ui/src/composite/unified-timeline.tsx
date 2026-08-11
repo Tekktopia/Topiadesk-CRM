@@ -14,16 +14,17 @@ import { RecordHistoryRow, useRecordHistory } from './record-history';
  * g in the ticketing-robustness pass).
  *
  * Deliberately a CLIENT-SIDE merge of two independent fetches, not a new
- * backend endpoint: `activity:read` (front-line brokers get this) and
- * `audit_log:read` (ADMIN/COMPLIANCE_OFFICER only) are different,
- * non-overlapping permission tiers. A server-merged endpoint would force
- * one permission check to gate both sources, silently hiding the whole
- * timeline from most agents. So this always renders the activity items
- * (the primary, most-agents-can-see data) and quietly folds in audit rows
- * only when useRecordHistory actually returns them — a 403 (or any other
- * fetch error) on the audit half degrades to "no audit rows shown," same
- * as RecordHistory's own graceful 403 handling, rather than an error
- * blocking the activity half too.
+ * backend endpoint: `activity:read` (front-line brokers get this) and the
+ * audit half's own access tier are resolved separately. Pass
+ * `historyFetchUrl` (see RecordHistoryProps.fetchUrl) to point the audit
+ * half at a per-record `:id/history` endpoint — open to anyone who can
+ * read the record — instead of the ADMIN/COMPLIANCE_OFFICER-only default.
+ * Either way this always renders the activity items (the primary,
+ * most-agents-can-see data) and quietly folds in audit rows only when
+ * useRecordHistory actually returns them — a 403 (or any other fetch
+ * error) on the audit half degrades to "no audit rows shown," same as
+ * RecordHistory's own graceful 403 handling, rather than an error blocking
+ * the activity half too.
  *
  * Built generically (entityType/entityId are plain strings, same as
  * RecordHistoryProps) so other entity detail pages can adopt this later —
@@ -38,6 +39,8 @@ export interface UnifiedTimelineProps {
   isLogging?: boolean;
   /** Max audit rows to fetch — see RecordHistoryProps.take. */
   historyTake?: number;
+  /** Overrides the default `/api/admin/audit-log` fetch for the audit half — see RecordHistoryProps.fetchUrl. */
+  historyFetchUrl?: string;
   emptyMessage?: string;
   className?: string;
 }
@@ -54,10 +57,11 @@ export function UnifiedTimeline({
   onLogActivity,
   isLogging = false,
   historyTake = 50,
+  historyFetchUrl,
   emptyMessage = 'No activity or history recorded yet.',
   className,
 }: UnifiedTimelineProps) {
-  const historyQuery = useRecordHistory(entityType, entityId, historyTake);
+  const historyQuery = useRecordHistory(entityType, entityId, historyTake, historyFetchUrl);
   const auditEntries = historyQuery.isError ? [] : (historyQuery.data ?? []);
 
   const merged: MergedRow[] = [

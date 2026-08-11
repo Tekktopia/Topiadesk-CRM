@@ -1,6 +1,6 @@
 import type { Config } from 'tailwindcss';
 import tailwindcssAnimate from 'tailwindcss-animate';
-import { brand, gold, slate } from './tokens';
+import { brand, gold, navy, slate, teal, violet } from './tokens';
 
 /**
  * Shared Tailwind preset for the TopiaDesk design system. Consuming apps
@@ -43,6 +43,9 @@ const uiPreset: Partial<Config> = {
         brand: asHslScale(brand),
         gold: asHslScale(gold),
         slate: asHslScale(slate),
+        violet: asHslScale(violet),
+        navy: asHslScale(navy),
+        teal: asHslScale(teal),
         border: withOpacity('--border'),
         input: withOpacity('--input'),
         ring: withOpacity('--ring'),

@@ -6,6 +6,10 @@ export class CreateOpportunityDto {
   @ApiProperty() @IsString() @MinLength(1) name!: string;
   @ApiProperty() @IsUUID() pipelineStageId!: string;
   @ApiProperty({ description: 'Decimal amount, e.g. "45000000.00"' }) @IsString() amount!: string;
+  @ApiProperty({ required: false, default: 'NGN', description: 'ISO 4217 code — see ExchangeRate for how non-NGN amounts get normalized in dashboard/report totals.' })
+  @IsOptional()
+  @IsString()
+  currency?: string;
   @ApiProperty({ required: false, description: 'Defaults to the target stage defaultProbability' })
   @IsOptional()
   @IsInt()
@@ -56,6 +60,7 @@ export class OpportunityResponseDto {
   @ApiProperty() name!: string;
   @ApiProperty() pipelineStageId!: string;
   @ApiProperty({ description: 'Decimal serialized as string' }) amount!: string;
+  @ApiProperty() currency!: string;
   @ApiProperty() probability!: number;
   @ApiProperty() expectedCloseDate!: Date;
   @ApiProperty({ nullable: true }) actualCloseDate!: Date | null;
@@ -63,9 +68,22 @@ export class OpportunityResponseDto {
   @ApiProperty({ nullable: true }) lostReason!: string | null;
   @ApiProperty() ownerId!: string;
   @ApiProperty({ nullable: true }) lineOfBusiness!: string | null;
+  /** Composite "on track" signal (overdue-vs-close-date + activity staleness) — see refresh-deal-health.job.ts. Null for closed deals or before the first scoring run. Distinct from `probability`. */
+  @ApiProperty({ nullable: true }) dealHealthScore!: number | null;
+  @ApiProperty({ nullable: true }) dealHealthScoreComputedAt!: Date | null;
   @ApiProperty({ type: 'object', additionalProperties: true }) customFields!: unknown;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
+}
+
+/** One stage transition, resolved from the audit log's changed_fields.pipeline_stage_id diff — see OpportunitiesController.stageHistory(). */
+export class StageHistoryEntryDto {
+  @ApiProperty() changedAt!: Date;
+  @ApiProperty({ nullable: true }) actorName!: string | null;
+  @ApiProperty({ nullable: true }) fromStageId!: string | null;
+  @ApiProperty({ nullable: true }) fromStageName!: string | null;
+  @ApiProperty({ nullable: true }) toStageId!: string | null;
+  @ApiProperty({ nullable: true }) toStageName!: string | null;
 }
 
 export class BulkAssignOpportunitiesDto {

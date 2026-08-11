@@ -338,6 +338,45 @@
           <div class="${properties.kcLoginMainFooter!}">
               <#nested "socialProviders">
 
+              <#-- No real identity provider configured yet for this realm
+                   (tenant admin hasn't saved Azure credentials via Admin ->
+                   Integrations — see microsoft-sso.controller.ts) — show a
+                   full-strength placeholder (official multi-colour Microsoft
+                   mark, no dimming) so it reads as a normal, present button
+                   rather than a disabled one — it just has no href, so a
+                   click is inert instead of erroring against a Keycloak
+                   broker endpoint that doesn't exist yet. Reuses
+                   #kc-social-providers's own id/classes so spacing matches
+                   the real button exactly, and disappears on its own the
+                   moment a real provider exists (social.providers becomes
+                   non-empty) with no cleanup needed here. `social??` guards
+                   this for any other page sharing this layout macro (e.g.
+                   terms.ftl, error.ftl) where `social` may not be bound at
+                   all. -->
+              <#if social?? && realm.password && !(social.providers?? && social.providers?has_content)>
+                  <div class="${properties.kcLoginMainFooterBand!}">
+                      <span class="${properties.kcLoginMainFooterBandItem!} ${properties.kcLoginMainFooterHelperText!}">
+                          ${msg("identity-provider-login-label")}
+                      </span>
+                  </div>
+                  <div id="kc-social-providers" class="">
+                      <ul class="pf-v5-c-login__main-body pf-v5-u-pl-0 pf-v5-u-pr-0">
+                          <li class="pf-v5-u-pb-sm">
+                              <span class="pf-v5-c-button pf-m-secondary pf-m-block pf-v5-u-display-flex pf-v5-u-align-items-center pf-v5-u-justify-content-center td-social-placeholder"
+                                      title="Sign in with Microsoft">
+                                  <svg class="td-ms-logo" viewBox="0 0 21 21" aria-hidden="true">
+                                      <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                                      <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                                      <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                                      <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                                  </svg>
+                                  <span class="pf-v5-u-m-auto">Sign in with Microsoft</span>
+                              </span>
+                          </li>
+                      </ul>
+                  </div>
+              </#if>
+
               <#if displayInfo>
                   <div id="kc-info" class="${properties.kcLoginMainFooterBand!} ${properties.kcFormClass}">
                       <div id="kc-info-wrapper" class="${properties.kcLoginMainFooterBandItem!}">

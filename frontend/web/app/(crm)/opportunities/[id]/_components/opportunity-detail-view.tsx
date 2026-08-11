@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowRight, History, Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   ActivityTimeline,
   Badge,
@@ -32,6 +32,8 @@ import { ConfirmDialog } from '../../../_components/confirm-dialog';
 import { EmptyState } from '../../../_components/empty-state';
 import { PageHeader } from '../../../_components/page-header';
 import {
+  dealHealthScoreLabel,
+  dealHealthScoreVariant,
   marketSubmissionStatusLabel,
   marketSubmissionStatusVariant,
   taskPriorityLabel,
@@ -39,7 +41,7 @@ import {
   taskStatusLabel,
   taskStatusVariant,
 } from '../../../_lib/constants';
-import { formatCurrency, formatDate } from '../../../_lib/format';
+import { formatCurrency, formatDate, formatDateTime } from '../../../_lib/format';
 import {
   useAccount,
   useActivities,
@@ -50,6 +52,7 @@ import {
   useDirectoryUsers,
   useMarketSubmissions,
   useOpportunity,
+  useOpportunityStageHistory,
   useTasksForEntity,
   useUpdateOpportunityStage,
 } from '../../../_lib/hooks';
@@ -96,6 +99,9 @@ export function OpportunityDetailView({ opportunityId }: { opportunityId: string
             <Badge variant={currentStage?.isWon ? 'success' : currentStage?.isLost ? 'destructive' : 'outline'}>
               {currentStage?.name ?? '—'}
             </Badge>
+            {opportunity.dealHealthScore !== null ? (
+              <Badge variant={dealHealthScoreVariant(opportunity.dealHealthScore)}>Health {dealHealthScoreLabel(opportunity.dealHealthScore)}</Badge>
+            ) : null}
           </span>
         }
         description={
@@ -158,8 +164,16 @@ export function OpportunityDetailView({ opportunityId }: { opportunityId: string
           <CardTitle>Profile</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Amount" value={formatCurrency(opportunity.amount)} />
+          <Field label="Amount" value={formatCurrency(opportunity.amount, opportunity.currency)} />
           <Field label="Probability" value={`${opportunity.probability}%`} />
+          <Field
+            label="Deal health"
+            value={
+              opportunity.dealHealthScoreComputedAt
+                ? `${dealHealthScoreLabel(opportunity.dealHealthScore)} · as of ${formatDate(opportunity.dealHealthScoreComputedAt)}`
+                : dealHealthScoreLabel(opportunity.dealHealthScore)
+            }
+          />
           <Field label="Line of business" value={opportunity.lineOfBusiness ?? '—'} />
           <Field label="Expected close" value={formatDate(opportunity.expectedCloseDate)} />
           <Field label="Actual close" value={formatDate(opportunity.actualCloseDate)} />
@@ -171,6 +185,7 @@ export function OpportunityDetailView({ opportunityId }: { opportunityId: string
 
       <MarketSubmissionsCard opportunityId={opportunityId} onLogSubmission={() => setSubmissionOpen(true)} />
       <RelatedTasksCard opportunityId={opportunityId} />
+      <StageHistoryCard opportunityId={opportunityId} />
 
       <Card>
         <CardHeader>
@@ -300,6 +315,59 @@ function RelatedTasksCard({ opportunityId }: { opportunityId: string }) {
               ))}
             </TableBody>
           </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Reconstructed from the audit log, not a dedicated table — see the backend endpoint's own comment. */
+function StageHistoryCard({ opportunityId }: { opportunityId: string }) {
+  const { data, isLoading, isError } = useOpportunityStageHistory(opportunityId);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <History className="h-4 w-4" aria-hidden /> Stage history
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-16 w-full" />
+        ) : isError ? (
+          <p className="text-sm text-muted-foreground">Couldn&apos;t load stage history.</p>
+        ) : !data || data.length === 0 ? (
+          <EmptyState title="No stage changes yet" description="Every move through the pipeline will show up here." />
+        ) : (
+          <ol className="space-y-3">
+            {data
+              .slice()
+              .reverse()
+              .map((entry, index) => (
+                <li key={`${entry.changedAt}-${index}`} className="flex items-start gap-3 text-sm">
+                  <History className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <div>
+                    <p className="text-foreground">
+                      {entry.fromStageName ? (
+                        <>
+                          Moved from <span className="font-medium">{entry.fromStageName}</span> to{' '}
+                          <span className="font-medium">{entry.toStageName}</span>
+                        </>
+                      ) : (
+                        <>
+                          Set to <span className="font-medium">{entry.toStageName}</span>
+                        </>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDateTime(entry.changedAt)}
+                      {entry.actorName ? ` · ${entry.actorName}` : ''}
+                    </p>
+                  </div>
+                </li>
+              ))}
+          </ol>
         )}
       </CardContent>
     </Card>

@@ -104,7 +104,7 @@ export function AssignmentRulesListView() {
     <div className="space-y-6">
       <PageHeader
         title="Assignment Rules"
-        description="How new claims/tickets route to an owner — round robin, load-based, or skill-based, evaluated highest priority first."
+        description="How new claims/tickets/leads route to an owner — round robin, load-based, or skill-based, evaluated highest priority first."
         actions={
           canWrite ? (
             <Button onClick={() => setCreateOpen(true)}>

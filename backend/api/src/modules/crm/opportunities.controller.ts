@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { getPrismaClient, type Prisma } from '@topiadesk/db';
+import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, type Prisma } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -12,6 +12,7 @@ import {
   CreateOpportunityDto,
   OpportunityQueryDto,
   OpportunityResponseDto,
+  StageHistoryEntryDto,
   UpdateOpportunityDto,
   UpdateOpportunityStageDto,
 } from './dto/opportunity.dto';
@@ -62,6 +63,63 @@ export class OpportunitiesController {
     return toOpportunityDto(opportunity);
   }
 
+  /**
+   * Every stage move, oldest first — reconstructed from the tamper-evident
+   * audit log rather than a dedicated table (there isn't one; see
+   * packages/reports/src/definitions/sales-pipeline-conversion-velocity.ts's
+   * own comment on this). `audit_log` itself is RLS-locked to
+   * audit_log:read (ADMIN/COMPLIANCE_OFFICER only) — a regular rep viewing
+   * their own deal has neither, so the read below runs under
+   * SYSTEM_JOB_CONTEXT to bypass that row-level restriction, but only AFTER
+   * confirming (under the caller's own real RLS context, one line up) that
+   * this specific opportunity is visible to them at all. That ordering is
+   * load-bearing: it's what keeps this from becoming a way to read another
+   * team's opportunity history just by guessing its id.
+   */
+  @Get(':id/stage-history')
+  @RequirePermission('opportunity', 'read')
+  @ApiOkResponse({ type: [StageHistoryEntryDto] })
+  async stageHistory(@Param('id') id: string): Promise<StageHistoryEntryDto[]> {
+    const prisma = getPrismaClient();
+    const opportunity = await prisma.opportunity.findUnique({ where: { id } });
+    if (!opportunity) throw new NotFoundException('Opportunity not found');
+
+    return runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+      const rows = await prisma.auditLog.findMany({
+        where: { entityType: 'opportunities', entityId: id, action: 'UPDATE' },
+        include: { actorUser: { select: { fullName: true } } },
+        orderBy: { id: 'asc' },
+      });
+
+      const transitions = rows
+        .map((row) => {
+          const changed = row.changedFields as Record<string, { old: unknown; new: unknown }> | null;
+          const diff = changed?.pipeline_stage_id;
+          if (!diff) return null;
+          return {
+            changedAt: row.createdAt,
+            actorName: row.actorUser?.fullName ?? null,
+            fromStageId: (diff.old as string | null) ?? null,
+            toStageId: (diff.new as string | null) ?? null,
+          };
+        })
+        .filter((t): t is NonNullable<typeof t> => t !== null);
+
+      const stageIds = [...new Set(transitions.flatMap((t) => [t.fromStageId, t.toStageId]).filter((v): v is string => Boolean(v)))];
+      const stages = stageIds.length ? await prisma.pipelineStage.findMany({ where: { id: { in: stageIds } } }) : [];
+      const nameById = new Map(stages.map((s) => [s.id, s.name]));
+
+      return transitions.map((t) => ({
+        changedAt: t.changedAt,
+        actorName: t.actorName,
+        fromStageId: t.fromStageId,
+        fromStageName: t.fromStageId ? (nameById.get(t.fromStageId) ?? 'Unknown stage') : null,
+        toStageId: t.toStageId,
+        toStageName: t.toStageId ? (nameById.get(t.toStageId) ?? 'Unknown stage') : null,
+      }));
+    });
+  }
+
   @Post()
   @RequirePermission('opportunity', 'write')
   @ApiOkResponse({ type: OpportunityResponseDto })
@@ -80,6 +138,7 @@ export class OpportunitiesController {
         name: dto.name,
         pipelineStageId: dto.pipelineStageId,
         amount: dto.amount,
+        currency: dto.currency,
         probability,
         expectedCloseDate: new Date(dto.expectedCloseDate),
         actualCloseDate: dto.actualCloseDate ? new Date(dto.actualCloseDate) : undefined,

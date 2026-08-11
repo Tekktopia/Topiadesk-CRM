@@ -21,8 +21,10 @@
  * identical to before this file changed.
  */
 import { randomUUID } from 'node:crypto';
-import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, type AutomationRule } from '@topiadesk/db';
+import { loadEnv } from '@topiadesk/config';
+import { getPrismaClient, getRlsContext, runWithRlsContext, SYSTEM_JOB_CONTEXT, type AutomationRule } from '@topiadesk/db';
 import { executeActions, type CaseManagementEntityRef } from './action-handler';
+import { generateTeamsActionToken, hashTeamsActionToken } from './teams-action-token.util';
 
 export type AutomationStep =
   | { id: string; type: 'ACTION'; actionType: string; params?: Record<string, unknown> }
@@ -226,6 +228,7 @@ async function notifyApprovers(
   recipientIds: string[],
   entityType: 'CASE' | 'CLAIM',
   entityId: string,
+  runStateId: string,
 ): Promise<void> {
   if (recipientIds.length === 0) return;
   const prisma = getPrismaClient();
@@ -246,6 +249,70 @@ async function notifyApprovers(
       })),
     ),
   });
+
+  await notifyApproversViaTeams(title, body, recipientIds, runStateId);
+}
+
+/**
+ * Two-way Teams: posts a MessageCard with real Approve/Reject buttons
+ * (`potentialAction: HttpPOST`, the same no-bot-required Incoming Webhook
+ * mechanism NOTIFY_TEAMS_CHANNEL already uses for one-way posts — see
+ * handlers.ts's own comment) to every enabled TEAMS_WEBHOOK connector, one
+ * card per recipient so each button carries a token scoped to exactly that
+ * person (see TeamsActionToken's schema comment). Best-effort: no enabled
+ * connector, or a failed POST, silently skips this channel — the IN_APP/
+ * EMAIL notifications above are already the load-bearing path, this is
+ * additive.
+ */
+async function notifyApproversViaTeams(title: string, body: string, recipientIds: string[], runStateId: string): Promise<void> {
+  const prisma = getPrismaClient();
+  const connectors = await prisma.integrationConnector.findMany({ where: { connectorType: 'TEAMS_WEBHOOK', isEnabled: true } });
+  if (connectors.length === 0) return;
+  const tenantSchema = getRlsContext()?.tenantSchema ?? 'public';
+  const env = loadEnv();
+
+  for (const connector of connectors) {
+    const config = connector.config as { webhookUrl?: string } | null;
+    if (!config?.webhookUrl) continue;
+
+    for (const recipientUserId of recipientIds) {
+      const rawToken = generateTeamsActionToken();
+      await prisma.teamsActionToken.create({
+        data: {
+          tokenHash: hashTeamsActionToken(rawToken),
+          tenantSchema,
+          runStateId,
+          actingUserId: recipientUserId,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+      });
+      const approveUrl = `${env.API_URL}/integrations/teams-actions/${rawToken}?decision=APPROVED`;
+      const rejectUrl = `${env.API_URL}/integrations/teams-actions/${rawToken}?decision=REJECTED`;
+
+      try {
+        const res = await fetch(config.webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            '@type': 'MessageCard',
+            '@context': 'http://schema.org/extensions',
+            summary: title,
+            title,
+            text: body,
+            potentialAction: [
+              { '@type': 'HttpPOST', name: 'Approve', target: approveUrl },
+              { '@type': 'HttpPOST', name: 'Reject', target: rejectUrl },
+            ],
+          }),
+        });
+        if (!res.ok) {
+          console.error(`[run-engine] Teams webhook POST failed for connector ${connector.id}: ${res.status}`);
+        }
+      } catch (err) {
+        console.error(`[run-engine] Teams webhook POST threw for connector ${connector.id}`, err);
+      }
+    }
+  }
 }
 
 /**
@@ -262,6 +329,19 @@ export async function advanceRun(runStateId: string): Promise<void> {
     const prisma = getPrismaClient();
     const run = await prisma.automationRunState.findUnique({ where: { id: runStateId }, include: { rule: true } });
     if (!run || run.status !== 'RUNNING') return;
+
+    // CaseManagementEntityType gained a LEAD member for AssignmentRule's
+    // sake (assignment-resolver.util.ts), but this engine — CONDITION_FIELDS,
+    // resolveApprovers, toEntityRef's CaseManagementEntityRef — is Case/Claim
+    // only; nothing creates a LEAD AutomationRunState (startRun()'s own
+    // param stays 'CASE' | 'CLAIM'). This narrows run.entityType back to
+    // that pair for the rest of the function instead of widening four
+    // Case/Claim-specific helpers to a value they can never actually see.
+    if (run.entityType === 'LEAD') {
+      console.error(`[automation] run ${run.id} has unsupported entityType LEAD — automation runs are never created for leads`);
+      await prisma.automationRunState.update({ where: { id: run.id }, data: { status: 'FAILED', failureReason: 'Unsupported entityType: LEAD' } });
+      return;
+    }
 
     const steps = parseSteps(run.rule);
     const entityRef = toEntityRef(run.entityType, run.entityId);
@@ -309,7 +389,7 @@ export async function advanceRun(runStateId: string): Promise<void> {
             data: { status: 'WAITING_APPROVAL', currentStepIndex: index, approvalId: approval.id, context },
           });
         }
-        await notifyApprovers(run.rule.name, step.reason, recipientIds, run.entityType, run.entityId);
+        await notifyApprovers(run.rule.name, step.reason, recipientIds, run.entityType, run.entityId, run.id);
         return;
       }
 

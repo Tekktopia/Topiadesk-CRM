@@ -1,0 +1,4 @@
+-- AlterEnum
+ALTER TYPE "ConnectorType" ADD VALUE 'PAYSTACK';
+ALTER TYPE "ConnectorType" ADD VALUE 'DOJAH';
+ALTER TYPE "ConnectorType" ADD VALUE 'WHATSAPP_CLOUD';

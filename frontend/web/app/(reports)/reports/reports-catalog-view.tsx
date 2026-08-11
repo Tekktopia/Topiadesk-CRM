@@ -3,15 +3,20 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import {
+  AreaChart,
   BarChart3,
   ChartBarStacked,
+  ChartNoAxesCombined,
+  Donut,
   Funnel,
   GaugeCircle,
   Gauge,
+  Hash,
   Landmark,
   LayoutGrid,
   LineChart,
   Megaphone,
+  PieChart,
   Shield,
   ShieldCheck,
   Table2,
@@ -50,20 +55,30 @@ const CHART_TYPE_ICON: Record<ReportChartType, ReactNode> = {
   bar: <BarChart3 className="h-3 w-3" aria-hidden />,
   stackedBar: <ChartBarStacked className="h-3 w-3" aria-hidden />,
   line: <LineChart className="h-3 w-3" aria-hidden />,
+  area: <AreaChart className="h-3 w-3" aria-hidden />,
+  pie: <PieChart className="h-3 w-3" aria-hidden />,
+  donut: <Donut className="h-3 w-3" aria-hidden />,
   funnel: <Funnel className="h-3 w-3" aria-hidden />,
   table: <Table2 className="h-3 w-3" aria-hidden />,
   treemap: <LayoutGrid className="h-3 w-3" aria-hidden />,
   gauge: <GaugeCircle className="h-3 w-3" aria-hidden />,
+  kpi: <Hash className="h-3 w-3" aria-hidden />,
+  combo: <ChartNoAxesCombined className="h-3 w-3" aria-hidden />,
 };
 
 const CHART_TYPE_LABEL: Record<ReportChartType, string> = {
   bar: 'Bar',
   stackedBar: 'Stacked bar',
   line: 'Line',
+  area: 'Area',
+  pie: 'Pie',
+  donut: 'Donut',
   funnel: 'Funnel',
   table: 'Table',
   treemap: 'Treemap',
   gauge: 'Gauge',
+  kpi: 'KPI card',
+  combo: 'Combo',
 };
 
 /**

@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, NotFoundException, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { getPrismaClient, type ApprovalStatus, type PolicyVersion } from '@topiadesk/db';
+import { getPrismaClient, Prisma, type ApprovalStatus, type PolicyVersion } from '@topiadesk/db';
 import { decimalToString } from './decimal.util';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
@@ -11,6 +11,7 @@ import { CreatePolicyVersionDto } from './dto/create-policy-version.dto';
 import { DecideApprovalDto } from './dto/decide-approval.dto';
 import { PolicyVersionResponseDto } from './dto/policy-version-response.dto';
 import {
+  assertKycValidForRenewal,
   assertValidPolicyTransition,
   isApprovalGated,
   resolveApprovalThreshold,
@@ -86,6 +87,42 @@ export class PolicyVersionController {
     const prisma = getPrismaClient();
     const policy = await prisma.policy.findUnique({ where: { id: policyId } });
     if (!policy) throw new NotFoundException('Policy not found');
+
+    if (dto.versionType === 'RENEWAL') {
+      const account = await prisma.account.findUniqueOrThrow({
+        where: { id: policy.accountId },
+        select: { kycStatus: true, kycExpiryDate: true },
+      });
+      try {
+        assertKycValidForRenewal(account);
+      } catch (err) {
+        if (err instanceof BadRequestException) {
+          // Self-notification only — RLS's notifications_rw WITH CHECK
+          // requires recipientUserId to equal the current session's user
+          // outside a SYSTEM_JOB context (see NotificationsService's header
+          // comment), so this can only notify the person who just attempted
+          // the blocked action, not e.g. the account owner if different.
+          await prisma.notification
+            .create({
+              data: {
+                recipientUserId: user.id,
+                type: 'KYC_BLOCKED_RENEWAL',
+                title: 'Renewal quote blocked — KYC required',
+                body: (err.getResponse() as { message?: string })?.message ?? err.message,
+                channel: 'IN_APP',
+                dedupeKey: `kyc-blocked-renewal:${policyId}:${new Date().toISOString().slice(0, 10)}`,
+                relatedEntityType: 'policy',
+                relatedEntityId: policyId,
+              },
+            })
+            .catch((notifyErr) => {
+              // P2002 on dedupeKey = already notified today for this policy — a healthy no-op, not an error.
+              if (!(notifyErr instanceof Prisma.PrismaClientKnownRequestError && notifyErr.code === 'P2002')) throw notifyErr;
+            });
+        }
+        throw err;
+      }
+    }
 
     const targetStatus = VERSION_TYPE_STATUS_EFFECT[dto.versionType];
     // Fail fast at request time even for gated types — re-validated again

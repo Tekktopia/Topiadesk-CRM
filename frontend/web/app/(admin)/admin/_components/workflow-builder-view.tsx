@@ -44,6 +44,7 @@ import { apiFetch } from '../_lib/api';
 import { PageHeader } from './page-header';
 import { ErrorState } from './query-states';
 import { SearchableUserPicker, SearchableUserMultiPicker } from './searchable-user-picker';
+import { WorkflowExecutionLogPanel } from './workflow-execution-log-panel';
 import { WorkflowPreviewPanel } from './workflow-preview-panel';
 import type { AutomationRuleDto, CreateAutomationRuleBody, UpdateAutomationRuleBody } from '../_lib/types';
 
@@ -865,7 +866,10 @@ export function WorkflowBuilderView({ ruleId }: { ruleId?: string }) {
         </Card>
       </div>
 
-      <WorkflowPreviewPanel entityType={entityType} eventTypes={eventTypes} steps={steps} users={users} teams={teams} />
+      <div className="space-y-6">
+        <WorkflowPreviewPanel entityType={entityType} eventTypes={eventTypes} steps={steps} users={users} teams={teams} />
+        {isEdit && ruleId ? <WorkflowExecutionLogPanel ruleId={ruleId} /> : null}
+      </div>
     </div>
   );
 }

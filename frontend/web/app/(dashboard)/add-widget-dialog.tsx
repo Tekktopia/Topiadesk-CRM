@@ -21,7 +21,23 @@ import { DimensionSelect, NO_DIMENSION } from '../(reports)/_components/dimensio
 import { DynamicFilterForm } from '../(reports)/_components/dynamic-filter-form';
 import { buildFiltersPayload, deriveFilterFields } from '../(reports)/_lib/filter-schema';
 import { useReportCatalog } from '../(reports)/_lib/hooks';
+import { REPORT_CHART_TYPES, type ReportChartType } from '../(reports)/_lib/types';
 import type { DashboardWidgetSpec } from './types';
+
+const CHART_TYPE_LABEL: Record<ReportChartType, string> = {
+  bar: 'Bar',
+  stackedBar: 'Stacked bar',
+  line: 'Line',
+  area: 'Area',
+  pie: 'Pie',
+  donut: 'Donut',
+  funnel: 'Funnel',
+  treemap: 'Treemap',
+  gauge: 'Gauge',
+  kpi: 'KPI card',
+  combo: 'Combo (bar + line)',
+  table: 'Table',
+};
 
 /**
  * Widget picker for the customizable home dashboard — pick a report from
@@ -38,6 +54,7 @@ export function AddWidgetDialog({ open, onOpenChange, onAdd }: { open: boolean; 
   const [title, setTitle] = useState('');
   const [dimension, setDimension] = useState(NO_DIMENSION);
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
+  const [chartType, setChartType] = useState<ReportChartType>('bar');
 
   const entry = useMemo(() => catalog?.find((r) => r.key === reportKey), [catalog, reportKey]);
   const fields = useMemo(() => deriveFilterFields(entry?.filterSchema), [entry]);
@@ -48,11 +65,15 @@ export function AddWidgetDialog({ open, onOpenChange, onAdd }: { open: boolean; 
       setTitle('');
       setDimension(NO_DIMENSION);
       setFilterValues({});
+      setChartType('bar');
     }
   }, [open]);
 
   useEffect(() => {
-    if (entry) setTitle(entry.name);
+    if (entry) {
+      setTitle(entry.name);
+      setChartType(entry.defaultChartType);
+    }
     setDimension(NO_DIMENSION);
     setFilterValues({});
   }, [entry]);
@@ -66,6 +87,7 @@ export function AddWidgetDialog({ open, onOpenChange, onAdd }: { open: boolean; 
       reportKey: entry.key,
       filters: Object.keys(filters).length > 0 ? filters : undefined,
       dimension: dimension === NO_DIMENSION ? undefined : dimension,
+      chartType: chartType === entry.defaultChartType ? undefined : chartType,
     });
     onOpenChange(false);
   }
@@ -105,6 +127,23 @@ export function AddWidgetDialog({ open, onOpenChange, onAdd }: { open: boolean; 
               {entry.allowedDimensions.length > 0 ? (
                 <DimensionSelect dimensions={entry.allowedDimensions} value={dimension} onChange={setDimension} />
               ) : null}
+
+              <div className="space-y-1.5">
+                <Label>Visualization</Label>
+                <Select value={chartType} onValueChange={(v) => setChartType(v as ReportChartType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {REPORT_CHART_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {CHART_TYPE_LABEL[t]}
+                        {t === entry.defaultChartType ? ' (default)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               <DynamicFilterForm fields={fields} values={filterValues} onChange={(key, value) => setFilterValues((prev) => ({ ...prev, [key]: value }))} idPrefix="widget-filter-" />
             </>

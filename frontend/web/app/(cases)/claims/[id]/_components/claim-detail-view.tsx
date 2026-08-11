@@ -93,6 +93,15 @@ export function ClaimDetailView({ claimId }: { claimId: string }) {
 
       <StatusHistoryCard claimId={claimId} />
 
+      <Card>
+        <CardHeader>
+          <CardTitle>History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <RecordHistory entityType="claims" entityId={claimId} fetchUrl={`/api/claims/${claimId}/history`} />
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>

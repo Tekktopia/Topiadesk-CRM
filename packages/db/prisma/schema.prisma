@@ -24,12 +24,29 @@ datasource db {
 enum AccountType {
   INDIVIDUAL
   CORPORATE
+  /// FSC's Household (a record type of Account, not a separate table) — a
+  /// family unit whose members are Contacts linked via the existing
+  /// Contact.accountId FK, same as a Business account's employees. Member
+  /// role within the household (Spouse/Child/Dependent) lives on
+  /// Contact.householdRole rather than a new junction table — this
+  /// codebase's Contact already models "belongs to exactly one Account",
+  /// which is sufficient for a household member (unlike a genuine
+  /// many-to-many party-relationship model FSC uses).
+  HOUSEHOLD
 }
 
 enum AccountStatus {
   PROSPECT
   CLIENT
   FORMER_CLIENT
+}
+
+enum KycStatus {
+  NOT_STARTED
+  PENDING
+  VERIFIED
+  EXPIRED
+  REJECTED
 }
 
 enum RiskRating {
@@ -93,15 +110,25 @@ enum AccountRelationshipType {
   OTHER
 }
 
-enum LeadSource {
-  WEB
-  EMAIL
-  REFERRAL
-  PARTNER
-  SOCIAL
-  PHONE
-  EVENT
-  OTHER
+/// Admin-editable lookup, same "open config tier, no RLS" shape as
+/// CaseCategory (case_categories) — replaces what used to be a fixed
+/// `LeadSource` enum, now this model's name. `code` is the stable natural
+/// key Lead.source's FK targets directly (not `id`) — see that field's own
+/// comment for why this keeps the "lead.source is a plain string" contract
+/// every existing caller (assignment-resolver.util.ts, the Lead->Account
+/// conversion, saved-view-filters.ts) already relies on, unchanged.
+model LeadSource {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  code      String   @unique
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  leads Lead[]
+
+  @@map("lead_sources")
 }
 
 enum LeadStatus {
@@ -238,6 +265,26 @@ enum ConnectorType {
   /// Users/Departments/Branches — config.seamlessHR = {apiBaseUrl, apiKey}.
   /// See integrations.service.ts's triggerSync() SEAMLESSHR branch.
   SEAMLESSHR
+  /// Premium collection — config.paystack = {secretKey, publicKey}. NOT
+  /// wired into triggerSync()/SyncJob (those model pull-sync semantics;
+  /// this is action/webhook-triggered) — see paystack.service.ts, a
+  /// deliberate stub (chosen over Flutterwave per the FSC spec's own
+  /// "Paystack/Flutterwave" either-or) awaiting real API credentials.
+  PAYSTACK
+  /// KYC verification — config.dojah = {appId, apiKey}. Updates
+  /// Account.kycStatus/kycExpiryDate (see dojah.service.ts, chosen over
+  /// Smile Identity). Also a stub — see paystack.service.ts's comment.
+  DOJAH
+  /// Renewal/claim notifications + FNOL intake via WhatsApp — config.
+  /// whatsappCloud = {phoneNumberId, accessToken}. Chosen directly by the
+  /// FSC spec's own "Twilio/WhatsApp Cloud" line (WhatsApp Cloud API is
+  /// Meta's own, no Twilio account needed). Also a stub.
+  WHATSAPP_CLOUD
+  /// E-signature for policy documents — config.docusign = {accountId,
+  /// integrationKey, ...}. DocuSign chosen as the category-defining vendor
+  /// (same "one real name, not a generic placeholder" reasoning as Paystack/
+  /// Dojah above). See esignature.service.ts, also a stub.
+  DOCUSIGN
 }
 
 enum SyncDirection {
@@ -427,25 +474,32 @@ model User {
   roles           UserRole[]
   teamMemberships TeamMember[]
 
-  ownedAccounts            Account[]         @relation("AccountOwner")
-  ownedOpportunities       Opportunity[]     @relation("OpportunityOwner")
-  assignedLeads            Lead[]            @relation("LeadAssignee")
-  assignedTasks            Task[]            @relation("TaskAssignee")
-  createdActivities        Activity[]        @relation("ActivityCreatedBy")
-  brokeredPolicies         Policy[]          @relation("PolicyBrokerOfRecord")
-  createdPolicyVersions    PolicyVersion[]   @relation("PolicyVersionCreatedBy")
-  assignedRenewals         RenewalSchedule[] @relation("RenewalAssignee")
-  uploadedDocuments        Document[]        @relation("DocumentUploadedBy")
-  uploadedDocumentVersions DocumentVersion[] @relation("DocumentVersionUploadedBy")
-  linkedDocuments          DocumentLink[]    @relation("DocumentLinkedBy")
-  auditEntries             AuditLog[]        @relation("AuditActorUser")
-  requestedApprovals       Approval[]        @relation("ApprovalRequestedBy")
-  decidedApprovals         Approval[]        @relation("ApprovalApprovedBy")
-  notifications            Notification[]    @relation("NotificationRecipient")
-  createdAutomationRules   AutomationRule[]  @relation("AutomationRuleCreatedBy")
-  aiUsage                  AiUsageLedger[]   @relation("AiUsageUser")
-  ownedDashboards          SavedDashboard[]  @relation("DashboardOwner")
-  updatedOrgSettings       OrgSetting[]      @relation("OrgSettingUpdatedBy")
+  ownedAccounts               Account[]            @relation("AccountOwner")
+  ownedOpportunities          Opportunity[]        @relation("OpportunityOwner")
+  assignedLeads               Lead[]               @relation("LeadAssignee")
+  assignedTasks               Task[]               @relation("TaskAssignee")
+  createdActivities           Activity[]           @relation("ActivityCreatedBy")
+  brokeredPolicies            Policy[]             @relation("PolicyBrokerOfRecord")
+  createdPolicyVersions       PolicyVersion[]      @relation("PolicyVersionCreatedBy")
+  assignedRenewals            RenewalSchedule[]    @relation("RenewalAssignee")
+  uploadedDocuments           Document[]           @relation("DocumentUploadedBy")
+  uploadedDocumentVersions    DocumentVersion[]    @relation("DocumentVersionUploadedBy")
+  linkedDocuments             DocumentLink[]       @relation("DocumentLinkedBy")
+  auditEntries                AuditLog[]           @relation("AuditActorUser")
+  requestedApprovals          Approval[]           @relation("ApprovalRequestedBy")
+  decidedApprovals            Approval[]           @relation("ApprovalApprovedBy")
+  approvalDelegationsGiven    ApprovalDelegation[] @relation("ApprovalDelegationDelegator")
+  approvalDelegationsReceived ApprovalDelegation[] @relation("ApprovalDelegationDelegate")
+  notifications               Notification[]       @relation("NotificationRecipient")
+  createdAutomationRules      AutomationRule[]     @relation("AutomationRuleCreatedBy")
+  aiUsage                     AiUsageLedger[]      @relation("AiUsageUser")
+  ownedDashboards             SavedDashboard[]     @relation("DashboardOwner")
+  updatedOrgSettings          OrgSetting[]         @relation("OrgSettingUpdatedBy")
+  dsrRequested                DataSubjectRequest[] @relation("DsrRequestedBy")
+  dsrProcessed                DataSubjectRequest[] @relation("DsrProcessedBy")
+  consentRecordsLogged        ConsentRecord[]      @relation("ConsentRecordedBy")
+  signatureRequestsSent       SignatureRequest[]   @relation("SignatureRequestSentBy")
+  exchangeRatesUpdated        ExchangeRate[]       @relation("ExchangeRateUpdatedBy")
 
   // --- Phase 2: Case management ---
   adjustedClaims          Claim[]              @relation("ClaimAdjuster")
@@ -470,6 +524,11 @@ model User {
   ownedSavedViews SavedView[]  @relation("SavedViewOwner")
   salesQuotas     SalesQuota[] @relation("SalesQuotaUser")
 
+  // --- Producer/Commission model ---
+  /// Set only for an internal broker who's also a TopiaDesk User — external
+  /// sub-brokers/correspondents have a Producer row with this left unset.
+  producerProfile Producer?
+
   // --- Phase 2: Reporting & campaigns ---
   ownedScheduledReports        ScheduledReport[]          @relation("ScheduledReportOwner")
   scheduledReportRecipientOf   ScheduledReportRecipient[] @relation("ScheduledReportRecipientUser")
@@ -489,10 +548,10 @@ model User {
 }
 
 model Role {
-  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name         String           @unique
-  description  String?
-  isSystemRole Boolean          @default(false) @map("is_system_role")
+  id                       String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                     String             @unique
+  description              String?
+  isSystemRole             Boolean            @default(false) @map("is_system_role")
   /// Same semantics as ApprovalThresholdRule.requiredApprovals — 1 (the
   /// default) means granting this role is immediate, today's behavior for
   /// every existing role, byte-for-byte unchanged. >1 routes the grant
@@ -500,13 +559,48 @@ model Role {
   /// UsersController.assignRole()), requiring that many distinct approvers
   /// before the UserRole row is actually created. Backfilled to 2 for
   /// ADMIN/COMPLIANCE_OFFICER by this migration; admin-editable afterward.
-  requiredApprovalsToGrant Int   @default(1) @map("required_approvals_to_grant")
-  permissions  RolePermission[]
-  users        UserRole[]
-  pendingGrants PendingRoleGrant[]
-  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  requiredApprovalsToGrant Int                @default(1) @map("required_approvals_to_grant")
+  permissions              RolePermission[]
+  users                    UserRole[]
+  pendingGrants            PendingRoleGrant[]
+  fieldPermissions         FieldPermission[]
+  createdAt                DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("roles")
+}
+
+enum FieldPermissionVisibility {
+  HIDDEN
+  READ_ONLY
+}
+
+/// Field-Level Security — restricts a single FIELD on a resource (not the
+/// whole resource, which `Permission`/`RolePermission`/RLS already gate) for
+/// a given role. Opt-in/additive only: a (role, resource, field) pair with
+/// no row here is EDITABLE (today's unrestricted behavior, unchanged) — this
+/// table only ever narrows access, never widens it. When a caller holds
+/// multiple roles, the EFFECTIVE visibility for a field is the MOST
+/// permissive value across all their roles (a role with no row contributes
+/// EDITABLE) — the same "union of role abilities" principle
+/// app_max_scope() already applies for whole-resource scope (see
+/// prisma/rls/002_policies.sql), kept consistent here rather than inventing
+/// a second, stricter composition rule. `resource`/`fieldName` are plain
+/// strings, not FKs — there is no single canonical field catalog in this
+/// schema to reference (Prisma model fields, not database rows) — enforced
+/// application-side (backend/api/src/common/field-permissions/) against a
+/// small fixed allowlist per resource, same "fixed keys, not an open query"
+/// convention as SavedView.filters / AutomationRule condition filters.
+model FieldPermission {
+  id         String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roleId     String                     @map("role_id") @db.Uuid
+  role       Role                       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  resource   String
+  fieldName  String                     @map("field_name")
+  visibility FieldPermissionVisibility
+  createdAt  DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([roleId, resource, fieldName])
+  @@map("field_permissions")
 }
 
 /// The "not yet effective" row an Approval/ApprovalChain points at via
@@ -571,6 +665,29 @@ model OrgSetting {
   @@map("org_settings")
 }
 
+/// Multi-currency support — one row per non-base currency the org quotes
+/// business in, storing how many units of the org's base currency (NGN,
+/// matching Policy.currency/Opportunity.currency's own default — NGN has
+/// no row here, its implicit rate is always 1) one unit of `currencyCode`
+/// converts to. Read by dashboards.controller.ts's pipeline/forecast sums
+/// to normalize mixed-currency Opportunity.amount values into one
+/// comparable total before summing — see toBaseCurrency() there. Admin-
+/// managed (see exchange-rates.controller.ts), same RLS-free "config
+/// tier" as automation_rules/carriers — reads ungated, writes gated on
+/// 'identity' (no dedicated resource, matching field_permissions'
+/// reasoning for the same tier).
+model ExchangeRate {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  currencyCode String   @unique @map("currency_code")
+  rateToBase   Decimal  @map("rate_to_base") @db.Decimal(18, 6)
+  updatedById  String?  @map("updated_by_id") @db.Uuid
+  updatedBy    User?    @relation("ExchangeRateUpdatedBy", fields: [updatedById], references: [id])
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("exchange_rates")
+}
+
 model IpWhitelistEntry {
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   cidrRange       String   @map("cidr_range")
@@ -612,6 +729,14 @@ model Account {
   state             String?
   country           String?       @default("NG")
   postalCode        String?       @map("postal_code")
+  /// FSC's Account.KYC Status/KYC Expiry/NAICOM ID — compliance fields
+  /// gating the "KYC Expiry Flow" automation (see
+  /// policy-lifecycle.ts's assertKycValidForRenewal): a RENEWAL policy
+  /// version can't be created against this account unless kycStatus is
+  /// VERIFIED and kycExpiryDate is more than 30 days out.
+  kycStatus         KycStatus     @default(NOT_STARTED) @map("kyc_status")
+  kycExpiryDate     DateTime?     @map("kyc_expiry_date") @db.Date
+  naicomId          String?       @map("naicom_id")
   parentAccountId   String?       @map("parent_account_id") @db.Uuid
   parentAccount     Account?      @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
   subAccounts       Account[]     @relation("AccountHierarchy")
@@ -624,6 +749,13 @@ model Account {
   /// free and needs no join on list queries. Validated against active
   /// CustomFieldDefinition rows at the service layer before write.
   customFields      Json          @default("{}") @map("custom_fields")
+  /// Composite 0-100 relationship-health signal — renewal status + open
+  /// claims + payment aging, NOT underwriting risk (see riskRating, which
+  /// stays 100% manual). Recomputed by refresh-health-score.job.ts; null
+  /// until the first run, or if the account has no renewal/claims/premium
+  /// data to score at all.
+  healthScore           Int?      @map("health_score")
+  healthScoreComputedAt DateTime? @map("health_score_computed_at") @db.Timestamptz(6)
   createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -663,26 +795,47 @@ model AccountRelationship {
 /// CHECK constraint (prisma/rls/004_check_constraints.sql); Prisma's DSL
 /// cannot express cross-column checks.
 model Contact {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  accountId    String?  @map("account_id") @db.Uuid
-  account      Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  carrierId    String?  @map("carrier_id") @db.Uuid
-  carrier      Carrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId     String?  @map("account_id") @db.Uuid
+  account       Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  carrierId     String?  @map("carrier_id") @db.Uuid
+  carrier       Carrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
   /// Optional — which of the account's Sites (branches) this contact
   /// belongs to, for a corporate client with multiple locations. Not
   /// required: most accounts have zero Sites and every Contact is simply
   /// account-wide.
-  siteId       String?  @map("site_id") @db.Uuid
-  site         Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
-  firstName    String   @map("first_name")
-  lastName     String   @map("last_name")
-  email        String?
-  phone        String?
-  title        String?
-  isPrimary    Boolean  @default(false) @map("is_primary")
-  customFields Json     @default("{}") @map("custom_fields")
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  siteId        String?  @map("site_id") @db.Uuid
+  site          Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  firstName     String   @map("first_name")
+  lastName      String   @map("last_name")
+  email         String?
+  phone         String?
+  title         String?
+  /// Free text (Spouse/Child/Dependent/Head of Household/...) — only
+  /// meaningful when the parent account is AccountType.HOUSEHOLD, but not
+  /// enforced as such (same "don't invent cross-field validation the DSL
+  /// can't express cleanly" call as elsewhere in this schema). `title`
+  /// stays the job-title field for Business-account contacts; this is a
+  /// distinct concept even though both are free strings.
+  householdRole String?  @map("household_role")
+  /// FSC's Contact.ID Type/ID Number — supporting identity-document detail
+  /// for the parent Account's kycStatus, not a separate parallel KYC state
+  /// on Contact itself (the FSC spec's own field list keeps KYC Status/
+  /// Expiry on Account only).
+  idType        String?  @map("id_type")
+  idNumber      String?  @map("id_number")
+  isPrimary     Boolean  @default(false) @map("is_primary")
+  /// Set by DataSubjectRequestsController.process() on a DELETE request —
+  /// see DataSubjectRequest's own schema comment for why this is anonymize-
+  /// in-place, not a hard delete. Non-null is the durable "this contact was
+  /// erased" signal, independent of whichever DataSubjectRequest row
+  /// triggered it (that row can itself be queried for the full history/who
+  /// processed it, but this field is what every other reader — a contact
+  /// list, a form pre-fill — needs to check first).
+  anonymizedAt  DateTime? @map("anonymized_at") @db.Timestamptz(6)
+  customFields  Json     @default("{}") @map("custom_fields")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   cases                Case[]
   campaignRecipients   CampaignRecipient[]
@@ -690,8 +843,91 @@ model Contact {
   createdActivities    Activity[]            @relation("ActivityCreatedByContact")
   portalLoginTokens    PortalLoginToken[]
   portalSessions       PortalSession[]
+  policyParticipants   PolicyParticipant[]
+  dataSubjectRequests  DataSubjectRequest[]
+  consentRecords       ConsentRecord[]
 
   @@map("contacts")
+}
+
+/// General-purpose consent tracking — deliberately NOT a fixed enum for
+/// `consentType` (unlike FieldPermission's FIELD_PERMISSION_CATALOG, which
+/// has to be fixed because real DTO fields depend on it): a consent type is
+/// just a label nothing else in the code branches on, so admins can record
+/// "Marketing Email", "Photo/Video Usage", "Third-Party Data Sharing", or
+/// anything specific to their business without a migration. Append-only —
+/// granting or revoking always INSERTs a new row rather than updating one
+/// in place, so "when exactly did this contact consent/withdraw" stays
+/// provable after the fact (the same reasoning ClaimStatusHistory/AuditLog
+/// already apply elsewhere in this schema). The current status for a
+/// (contact, consentType) pair is simply its most recent row by createdAt —
+/// computed at read time (see ConsentRecordsController.current()), not
+/// tracked as a separate mutable column.
+model ConsentRecord {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contactId    String   @map("contact_id") @db.Uuid
+  contact      Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  consentType  String   @map("consent_type")
+  granted      Boolean
+  /// How this was captured — "Web form", "Verbal", "Portal", "Email reply",
+  /// "Paper form", "Import", etc. Free text, not an enum, same reasoning as
+  /// consentType.
+  source       String
+  notes        String?
+  /// Null when self-service (e.g. a future portal opt-in/out) — every
+  /// current write path is staff-logged, so always set today, but kept
+  /// nullable so a later portal-facing consent flow doesn't need a schema
+  /// change.
+  recordedById String?  @map("recorded_by_id") @db.Uuid
+  recordedBy   User?    @relation("ConsentRecordedBy", fields: [recordedById], references: [id])
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([contactId, consentType, createdAt])
+  @@map("consent_records")
+}
+
+enum DataSubjectRequestType {
+  EXPORT
+  DELETE
+}
+
+enum DataSubjectRequestStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+}
+
+/// NDPR/GDPR-style Data Subject Request — a Contact's "export my data" or
+/// "erase my data" request, logged and fulfilled here rather than handled
+/// ad hoc. DELETE is fulfilled as in-place anonymization (Contact.
+/// anonymizedAt + PII fields overwritten), never a hard row delete —
+/// Activity/Case/PolicyParticipant/etc. all FK to contacts, and
+/// unconditionally cascading those away would destroy case history and
+/// policy participant records that have their own independent retention
+/// obligations (insurance records law generally overrides an erasure
+/// request for policy-adjacent data anyway — the honest implementation is
+/// "stop being personally identifiable", not "vanish from every table").
+/// EXPORT's result is captured directly on this row (exportData) rather
+/// than routed through the Document/MinIO pipeline — a small point-in-time
+/// JSON snapshot, not a file worth its own storage lifecycle.
+model DataSubjectRequest {
+  id            String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contactId     String                    @map("contact_id") @db.Uuid
+  contact       Contact                   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  requestType   DataSubjectRequestType    @map("request_type")
+  status        DataSubjectRequestStatus  @default(PENDING)
+  notes         String?
+  requestedById String                    @map("requested_by_id") @db.Uuid
+  requestedBy   User                      @relation("DsrRequestedBy", fields: [requestedById], references: [id])
+  /// EXPORT only — a point-in-time JSON snapshot (contact fields + related
+  /// activities + parent account name), written once by process().
+  exportData    Json?                     @map("export_data")
+  processedById String?                   @map("processed_by_id") @db.Uuid
+  processedBy   User?                     @relation("DsrProcessedBy", fields: [processedById], references: [id])
+  processedAt   DateTime?                 @map("processed_at") @db.Timestamptz(6)
+  createdAt     DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("data_subject_requests")
 }
 
 /// Passwordless magic-link login for the customer portal (Batch 6) —
@@ -701,13 +937,13 @@ model Contact {
 /// SurveyResponse.respondToken's proven shape: a per-row secret compared
 /// with a constant-time equality check, not a shared/guessable value.
 model PortalLoginToken {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  contactId   String    @map("contact_id") @db.Uuid
-  contact     Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  tokenHash   String    @unique @map("token_hash")
-  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
-  consumedAt  DateTime? @map("consumed_at") @db.Timestamptz(6)
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contactId  String    @map("contact_id") @db.Uuid
+  contact    Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([contactId])
   @@map("portal_login_tokens")
@@ -757,16 +993,16 @@ model Site {
 }
 
 model Carrier {
-  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name            String
-  carrierType     CarrierType @map("carrier_type")
+  carrierType     CarrierType         @map("carrier_type")
   amBestRating    String?             @map("am_best_rating")
   linesOfBusiness String[]            @map("lines_of_business")
   panelStatus     CarrierPanelStatus? @map("panel_status")
   treatyType      String?             @map("treaty_type")
-  commissionTerms String?     @map("commission_terms")
-  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  commissionTerms String?             @map("commission_terms")
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   contacts          Contact[]
   policies          Policy[]
@@ -803,7 +1039,18 @@ model PipelineStage {
 
 model Lead {
   id                     String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  source                 LeadSource
+  /// Plain string, not a UUID FK — deliberately targets LeadSource.code
+  /// (a stable natural key, @unique below) rather than LeadSource.id, so
+  /// `lead.source` keeps meaning exactly what it always has (a short,
+  /// human-legible code like "WEB") for every existing reader
+  /// (assignment-resolver.util.ts's findMatchingLeadAssignmentRule(),
+  /// the Lead->Account conversion, saved-view-filters.ts) without an
+  /// `include: { sourceRef: true }` anywhere. onUpdate: Cascade so
+  /// renaming a LeadSource's code (admin UI discourages this in practice,
+  /// but the DB stays correct either way) propagates automatically instead
+  /// of orphaning existing Leads.
+  source                 String       @map("source")
+  sourceRef              LeadSource   @relation(fields: [source], references: [code], onUpdate: Cascade)
   sourceCampaign         String?      @map("source_campaign")
   firstName              String       @map("first_name")
   lastName               String       @map("last_name")
@@ -838,6 +1085,12 @@ model Opportunity {
   pipelineStageId   String        @map("pipeline_stage_id") @db.Uuid
   pipelineStage     PipelineStage @relation(fields: [pipelineStageId], references: [id])
   amount            Decimal       @db.Decimal(15, 2)
+  /// ISO 4217 code — Opportunity has no FK path to anything else that
+  /// carries currency (unlike Premium/Claim/etc., which inherit Policy.
+  /// currency), so it gets its own column, same "NGN default" convention
+  /// as Policy.currency. See ExchangeRate for how a non-NGN amount gets
+  /// normalized into the org's base currency for dashboard/report totals.
+  currency          String        @default("NGN")
   probability       Int
   expectedCloseDate DateTime      @map("expected_close_date") @db.Date
   actualCloseDate   DateTime?     @map("actual_close_date") @db.Date
@@ -847,6 +1100,14 @@ model Opportunity {
   owner             User          @relation("OpportunityOwner", fields: [ownerId], references: [id])
   lineOfBusiness    String?       @map("line_of_business")
   customFields      Json          @default("{}") @map("custom_fields")
+  /// Composite 0-100 "is this deal on track" signal — overdue-vs-
+  /// expectedCloseDate + activity-engagement-staleness, averaged. Only
+  /// computed for OPEN opportunities (pipelineStage.isWon=false AND
+  /// isLost=false) — null once a deal is decided, and null until the first
+  /// refresh-deal-health.job.ts run. Distinct from `probability` (a
+  /// human-set/stage-default forecast weight, never touched by this job).
+  dealHealthScore           Int?      @map("deal_health_score")
+  dealHealthScoreComputedAt DateTime? @map("deal_health_score_computed_at") @db.Timestamptz(6)
   createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -889,44 +1150,44 @@ model OpportunityMarketSubmission {
 /// nullable-unique so a provider's webhook retry is a no-op at the DB
 /// layer, not a duplicate row.
 model Activity {
-  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  accountId          String?           @map("account_id") @db.Uuid
-  account            Account?          @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  contactId          String?           @map("contact_id") @db.Uuid
-  leadId             String?           @map("lead_id") @db.Uuid
-  lead               Lead?             @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  opportunityId      String?           @map("opportunity_id") @db.Uuid
-  opportunity        Opportunity?      @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
-  policyId           String?           @map("policy_id") @db.Uuid
-  policy             Policy?           @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  claimId            String?           @map("claim_id") @db.Uuid
-  claim              Claim?            @relation(fields: [claimId], references: [id], onDelete: Cascade)
-  caseId             String?           @map("case_id") @db.Uuid
-  case               Case?             @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  type               ActivityType
-  direction          ActivityDirection
-  subject            String
-  body               String?
-  occurredAt         DateTime          @map("occurred_at") @db.Timestamptz(6)
-  createdById        String?           @map("created_by_id") @db.Uuid
-  createdBy          User?             @relation("ActivityCreatedBy", fields: [createdById], references: [id])
-  createdBySystemJob String?           @map("created_by_system_job")
+  id                  String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId           String?                      @map("account_id") @db.Uuid
+  account             Account?                     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  contactId           String?                      @map("contact_id") @db.Uuid
+  leadId              String?                      @map("lead_id") @db.Uuid
+  lead                Lead?                        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  opportunityId       String?                      @map("opportunity_id") @db.Uuid
+  opportunity         Opportunity?                 @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  policyId            String?                      @map("policy_id") @db.Uuid
+  policy              Policy?                      @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  claimId             String?                      @map("claim_id") @db.Uuid
+  claim               Claim?                       @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  caseId              String?                      @map("case_id") @db.Uuid
+  case                Case?                        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  type                ActivityType
+  direction           ActivityDirection
+  subject             String
+  body                String?
+  occurredAt          DateTime                     @map("occurred_at") @db.Timestamptz(6)
+  createdById         String?                      @map("created_by_id") @db.Uuid
+  createdBy           User?                        @relation("ActivityCreatedBy", fields: [createdById], references: [id])
+  createdBySystemJob  String?                      @map("created_by_system_job")
   /// Set instead of createdById when a portal Contact (not internal staff)
   /// authored this — a customer-portal case reply. Distinct from the
   /// existing `contactId` above, which records which contact an activity
   /// is ABOUT (e.g. a logged call), not who wrote it.
-  createdByContactId String?           @map("created_by_contact_id") @db.Uuid
-  createdByContact   Contact?          @relation("ActivityCreatedByContact", fields: [createdByContactId], references: [id])
-  channelDetail      String?           @map("channel_detail")
-  externalThreadId   String?           @map("external_thread_id")
-  externalMessageId  String?           @unique @map("external_message_id")
+  createdByContactId  String?                      @map("created_by_contact_id") @db.Uuid
+  createdByContact    Contact?                     @relation("ActivityCreatedByContact", fields: [createdByContactId], references: [id])
+  channelDetail       String?                      @map("channel_detail")
+  externalThreadId    String?                      @map("external_thread_id")
+  externalMessageId   String?                      @unique @map("external_message_id")
   emailDeliveryStatus ActivityEmailDeliveryStatus? @map("email_delivery_status")
-  aiSentiment        String?           @map("ai_sentiment")
-  aiSentimentScore   Decimal?          @map("ai_sentiment_score") @db.Decimal(4, 3)
-  aiAnalyzedAt       DateTime?         @map("ai_analyzed_at") @db.Timestamptz(6)
-  durationMinutes    Int?              @map("duration_minutes")
-  outcome            String?
-  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  aiSentiment         String?                      @map("ai_sentiment")
+  aiSentimentScore    Decimal?                     @map("ai_sentiment_score") @db.Decimal(4, 3)
+  aiAnalyzedAt        DateTime?                    @map("ai_analyzed_at") @db.Timestamptz(6)
+  durationMinutes     Int?                         @map("duration_minutes")
+  outcome             String?
+  createdAt           DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([accountId, occurredAt])
   @@index([externalThreadId])
@@ -990,7 +1251,7 @@ model Policy {
   createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  versions            PolicyVersion[]  @relation("PolicyVersions")
+  versions            PolicyVersion[]            @relation("PolicyVersions")
   premiums            Premium[]
   renewalSchedule     RenewalSchedule?
   activities          Activity[]
@@ -998,6 +1259,12 @@ model Policy {
   claims              Claim[]
   cases               Case[]
   loyaltyTransactions LoyaltyTransaction[]
+  producerAssignments ProducerPolicyAssignment[]
+  producerCommissions ProducerCommission[]
+  coverages           PolicyCoverage[]
+  participants        PolicyParticipant[]
+  assets              PolicyAsset[]
+  signatureRequests   SignatureRequest[]
 
   @@index([expiryDate])
   @@map("policies")
@@ -1048,6 +1315,8 @@ model Premium {
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  producerCommissions ProducerCommission[]
+
   @@index([status, dueDate])
   @@map("premiums")
 }
@@ -1075,6 +1344,215 @@ model RenewalSchedule {
 }
 
 // =============================================================================
+// Policy depth — Coverages / Participants / Assets
+//
+// FSC's InsurancePolicyCoverage/InsurancePolicyParticipant/
+// InsurancePolicyAsset, all child-of-Policy. No dedicated RLS/permission
+// resource — all three reuse the 'policy' resource (see 002_policies.sql),
+// same reasoning as ProducerPolicyAssignment in the Producers block below:
+// nothing in the FSC spec calls for independently-tunable visibility here,
+// unlike ProducerCommission's $ amounts.
+// =============================================================================
+
+/// Coverage type is a free string (not an enum) — deliberately mirrors
+/// Policy.lineOfBusiness itself: what counts as a coverage type varies by
+/// line of business (Motor's "Comprehensive"/"Third Party" vs Marine's
+/// "All Risks"/"Total Loss Only" etc.), and this codebase already treats
+/// line-of-business classification as broker-entered text, not a fixed
+/// taxonomy.
+model PolicyCoverage {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  policyId     String   @map("policy_id") @db.Uuid
+  policy       Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  coverageName String   @map("coverage_name")
+  coverageType String   @map("coverage_type")
+  sumInsured   Decimal? @map("sum_insured") @db.Decimal(18, 2)
+  premium      Decimal? @map("premium") @db.Decimal(15, 2)
+  deductible   Decimal? @map("deductible") @db.Decimal(15, 2)
+  limits       String?
+  subLimits    String?  @map("sub_limits")
+  conditions   String?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([policyId])
+  @@map("policy_coverages")
+}
+
+enum ParticipantType {
+  INSURED
+  BENEFICIARY
+  NOMINEE
+  DRIVER
+  ADDITIONAL_INSURED
+}
+
+/// `name` is always captured directly (not derived from `contact` at read
+/// time) — beneficiary/nominee designations are conventionally frozen as of
+/// when they're set, the same way a signed form wouldn't retroactively
+/// change if the named person's CRM contact record is edited later.
+/// `contactId` is optional and purely a convenience link for participants
+/// who happen to already be a TopiaDesk Contact — most Nominees/
+/// Beneficiaries never are.
+model PolicyParticipant {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  policyId        String          @map("policy_id") @db.Uuid
+  policy          Policy          @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  participantType ParticipantType @map("participant_type")
+  name            String
+  contactId       String?         @map("contact_id") @db.Uuid
+  contact         Contact?        @relation(fields: [contactId], references: [id])
+  relationship    String?
+  percentage      Decimal?        @db.Decimal(5, 2)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([policyId])
+  @@index([contactId])
+  @@map("policy_participants")
+}
+
+enum AssetType {
+  VEHICLE
+  PROPERTY
+  CARGO
+  VESSEL
+}
+
+/// Location captured as plain lat/lng decimals — no PostGIS dependency for
+/// what's currently just a display pin, same "don't reach for
+/// infrastructure the actual requirement doesn't need yet" call as
+/// elsewhere in this schema.
+model PolicyAsset {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  policyId       String    @map("policy_id") @db.Uuid
+  policy         Policy    @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  assetType      AssetType @map("asset_type")
+  assetName      String    @map("asset_name")
+  registrationNo String?   @map("registration_no")
+  chassisNo      String?   @map("chassis_no")
+  address        String?
+  valuation      Decimal?  @db.Decimal(18, 2)
+  year           Int?
+  makeModel      String?   @map("make_model")
+  latitude       Decimal?  @db.Decimal(9, 6)
+  longitude      Decimal?  @db.Decimal(9, 6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([policyId])
+  @@map("policy_assets")
+}
+
+// =============================================================================
+// Producers / Commissions
+//
+// A commission-earning party on a policy — distinct from `Policy.
+// brokerOfRecordId` (a single-User FK for who owns the client relationship)
+// because a Producer need not be a TopiaDesk User at all (external
+// sub-brokers/correspondents from other firms are tracked here with no
+// system login), and a policy can split commission across several of them.
+// =============================================================================
+
+enum ProducerType {
+  INTERNAL_BROKER
+  EXTERNAL_SUB_BROKER
+  CORRESPONDENT
+}
+
+enum ProducerStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+model Producer {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  producerCode     String         @unique @map("producer_code")
+  name             String
+  type             ProducerType   @default(INTERNAL_BROKER)
+  status           ProducerStatus @default(ACTIVE)
+  licenseNumber    String?        @map("license_number")
+  licenseExpiry    DateTime?      @map("license_expiry") @db.Date
+  phone            String?
+  email            String?
+  parentProducerId String?        @map("parent_producer_id") @db.Uuid
+  parentProducer   Producer?      @relation("ProducerHierarchy", fields: [parentProducerId], references: [id])
+  subProducers     Producer[]     @relation("ProducerHierarchy")
+  linkedUserId     String?        @unique @map("linked_user_id") @db.Uuid
+  linkedUser       User?          @relation(fields: [linkedUserId], references: [id])
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  policyAssignments ProducerPolicyAssignment[]
+  commissions       ProducerCommission[]
+
+  @@index([parentProducerId])
+  @@map("producers")
+}
+
+enum ProducerAssignmentRole {
+  PRIMARY
+  SUB_PRODUCER
+  SERVICING
+}
+
+/// Per-policy commission split — a policy can have multiple producers (e.g.
+/// a primary broker plus a servicing sub-producer), each with their own %.
+model ProducerPolicyAssignment {
+  id                     String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  policyId               String                 @map("policy_id") @db.Uuid
+  policy                 Policy                 @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  producerId             String                 @map("producer_id") @db.Uuid
+  producer               Producer               @relation(fields: [producerId], references: [id])
+  role                   ProducerAssignmentRole @default(PRIMARY)
+  commissionSplitPercent Decimal                @map("commission_split_percent") @db.Decimal(5, 2)
+  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([policyId, producerId])
+  @@index([producerId])
+  @@map("producer_policy_assignments")
+}
+
+enum ProducerCommissionStatus {
+  PENDING
+  APPROVED
+  PAID
+}
+
+/// The actual payable record — one per producer per premium installment
+/// (optionally linked to the specific Premium row it was computed from).
+/// VAT/WHT are captured as explicit amounts entered by whoever approves the
+/// commission, not an auto-applied global rate — real tax rates are a
+/// finance/config decision out of scope for this pass.
+model ProducerCommission {
+  id                String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  commissionNumber  String                   @unique @map("commission_number")
+  policyId          String                   @map("policy_id") @db.Uuid
+  policy            Policy                   @relation(fields: [policyId], references: [id])
+  producerId        String                   @map("producer_id") @db.Uuid
+  producer          Producer                 @relation(fields: [producerId], references: [id])
+  premiumId         String?                  @map("premium_id") @db.Uuid
+  premium           Premium?                 @relation(fields: [premiumId], references: [id])
+  premiumBase       Decimal                  @map("premium_base") @db.Decimal(15, 2)
+  commissionPercent Decimal                  @map("commission_percent") @db.Decimal(5, 2)
+  commissionAmount  Decimal                  @map("commission_amount") @db.Decimal(15, 2)
+  vatAmount         Decimal                  @default(0) @map("vat_amount") @db.Decimal(15, 2)
+  whtAmount         Decimal                  @default(0) @map("wht_amount") @db.Decimal(15, 2)
+  netPayable        Decimal                  @map("net_payable") @db.Decimal(15, 2)
+  status            ProducerCommissionStatus @default(PENDING)
+  /// Commission period/month, e.g. "2026-08" — not a DateTime since it's a
+  /// label for a payroll-style period, not a specific instant.
+  period            String
+  paymentDate       DateTime?                @map("payment_date") @db.Date
+  createdAt         DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([producerId, status])
+  @@index([policyId])
+  @@map("producer_commissions")
+}
+
+// =============================================================================
 // Documents
 // =============================================================================
 
@@ -1095,9 +1573,10 @@ model Document {
   createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  versions       DocumentVersion[] @relation("DocumentVersions")
-  links          DocumentLink[]
-  policyVersions PolicyVersion[]
+  versions          DocumentVersion[]    @relation("DocumentVersions")
+  links             DocumentLink[]
+  policyVersions    PolicyVersion[]
+  signatureRequests SignatureRequest[]
 
   @@map("documents")
 }
@@ -1117,9 +1596,62 @@ model DocumentVersion {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   currentForDocument Document? @relation("DocumentCurrentVersion")
+  signatureRequests  SignatureRequest[]
 
   @@unique([documentId, versionNumber])
   @@map("document_versions")
+}
+
+enum SignatureRequestStatus {
+  SENT
+  VIEWED
+  SIGNED
+  DECLINED
+  EXPIRED
+}
+
+/// E-signature request for a policy document — sent out to an external
+/// signer (never a TopiaDesk `User`), tracked through SENT->VIEWED->SIGNED/
+/// DECLINED/EXPIRED. Deliberately NOT built on the existing Approval system
+/// (ApprovalEntityType/Approval/ApprovalChain) — those model INTERNAL
+/// sign-off by a TopiaDesk User with a PENDING/APPROVED/REJECTED shape that
+/// has no signer-email/viewed/expired concept and no external party. Pinned
+/// to `documentVersionId` (not just `documentId`) so a later re-upload that
+/// bumps Document.currentVersionId can never retroactively change which
+/// exact bytes a signer is shown to have signed. `policyId` required (not
+/// nullable) — this feature is scoped to policy documents specifically, per
+/// its own gap-analysis item; RLS therefore inherits policy_versions_rw's
+/// exact child-of-policy-of-account shape. See esignature.service.ts for
+/// the (stubbed — no live DocuSign credentials in this environment)
+/// send/webhook logic, same "real model, stubbed external call" pattern as
+/// paystack.service.ts.
+model SignatureRequest {
+  id                 String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId         String                 @map("document_id") @db.Uuid
+  document           Document               @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentVersionId  String                 @map("document_version_id") @db.Uuid
+  documentVersion    DocumentVersion        @relation(fields: [documentVersionId], references: [id])
+  policyId           String                 @map("policy_id") @db.Uuid
+  policy             Policy                 @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  signerName         String                 @map("signer_name")
+  signerEmail        String                 @map("signer_email")
+  status             SignatureRequestStatus @default(SENT)
+  /// Fabricated (`stub_<uuid>`) in this environment — see
+  /// esignature.service.ts. A real integration would store DocuSign's own
+  /// envelopeId here.
+  externalEnvelopeId String                 @map("external_envelope_id")
+  sentById           String                 @map("sent_by_id") @db.Uuid
+  sentBy             User                   @relation("SignatureRequestSentBy", fields: [sentById], references: [id])
+  sentAt             DateTime               @default(now()) @map("sent_at") @db.Timestamptz(6)
+  viewedAt           DateTime?              @map("viewed_at") @db.Timestamptz(6)
+  signedAt           DateTime?              @map("signed_at") @db.Timestamptz(6)
+  declinedAt         DateTime?              @map("declined_at") @db.Timestamptz(6)
+  declineReason      String?                @map("decline_reason")
+  updatedAt          DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([documentId])
+  @@index([policyId])
+  @@map("signature_requests")
 }
 
 /// The one legitimately polymorphic table — entityType/entityId, integrity
@@ -1245,15 +1777,15 @@ model Approval {
 /// those domains has a real dollar amount to threshold against, and forcing
 /// one would be unmotivated complexity for zero benefit.
 model ApprovalChain {
-  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   entityType        ApprovalEntityType @map("entity_type")
-  entityId          String         @map("entity_id") @db.Uuid
-  requiredApprovals Int            @map("required_approvals")
-  status            ApprovalStatus @default(PENDING)
-  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  entityId          String             @map("entity_id") @db.Uuid
+  requiredApprovals Int                @map("required_approvals")
+  status            ApprovalStatus     @default(PENDING)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  approvals Approval[]
+  approvals           Approval[]
   automationRunStates AutomationRunState[]
 
   @@index([entityType, entityId])
@@ -1276,6 +1808,34 @@ model ApprovalThresholdRule {
   updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("approval_threshold_rules")
+}
+
+/// Self-service "while I'm out, my pending decisions go to X too" — a
+/// time-boxed standing instruction, not a one-off reassignment of any
+/// specific Approval row. Only load-bearing for CASE_AUTOMATION_GATE
+/// approvals with a frozen `AutomationRunState.context.approverAllowlist`
+/// (see that field's own comment): `approvals_rw`/`automation_run_states_rw`
+/// (prisma/rls/002_policies.sql) both OR in "an active delegate of someone
+/// on the allowlist" alongside the allowlist itself, and
+/// AutomationRunStatesController.decide()'s own allowlist check does the
+/// same in application code. For the other four Approval entityTypes,
+/// deciding is already a broad `approval:write` ALL-scope pool
+/// (COMPLIANCE_OFFICER/ADMIN today) with no per-individual gate to delegate
+/// — a delegation row there has nothing to widen, so nothing reads it.
+model ApprovalDelegation {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  delegatorId String   @map("delegator_id") @db.Uuid
+  delegator   User     @relation("ApprovalDelegationDelegator", fields: [delegatorId], references: [id])
+  delegateId  String   @map("delegate_id") @db.Uuid
+  delegate    User     @relation("ApprovalDelegationDelegate", fields: [delegateId], references: [id])
+  startsAt    DateTime @map("starts_at") @db.Timestamptz(6)
+  endsAt      DateTime @map("ends_at") @db.Timestamptz(6)
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([delegatorId])
+  @@index([delegateId])
+  @@map("approval_delegations")
 }
 
 // =============================================================================
@@ -1301,6 +1861,29 @@ model IntegrationConnector {
   oauthCredentials IntegrationOAuthCredential[]
 
   @@map("integration_connectors")
+}
+
+/// Per-tenant "Sign in with Microsoft 365" self-service config — each
+/// tenant admin registers their own Azure App Registration, pushed to
+/// their own Keycloak realm's "microsoft" identity provider via
+/// KeycloakAdminService (see microsoft-sso.controller.ts). Single logical
+/// row per tenant (schema-per-tenant already isolates this, no tenantId
+/// column needed — same as every other table here), enforced at the
+/// application layer, not a DB constraint. encryptedClientSecret is
+/// AES-256-GCM ciphertext via oauth-token-crypto.ts's encrypt()/decrypt()
+/// (iv:authTag:ciphertext, hex) — deliberately NOT the plaintext-with-
+/// masking pattern IntegrationConnector.config uses, since a client
+/// secret needs real encryption at rest, not just response-time redaction.
+model MicrosoftSsoConfig {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  azureTenantId         String   @map("azure_tenant_id")
+  azureClientId         String   @map("azure_client_id")
+  encryptedClientSecret String   @map("encrypted_client_secret")
+  isEnabled             Boolean  @default(true) @map("is_enabled")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("microsoft_sso_configs")
 }
 
 model SyncJob {
@@ -1400,7 +1983,8 @@ model AutomationRule {
   createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  runStates AutomationRunState[]
+  runStates            AutomationRunState[]
+  executionLogs        AutomationExecutionLog[]
   defaultForCategories CaseCategory[]
 
   @@map("automation_rules")
@@ -1410,6 +1994,48 @@ enum AutomationRuleStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
+}
+
+enum AutomationExecutionStatus {
+  SUCCESS
+  PARTIAL_FAILURE
+  FAILED
+}
+
+/// One row per firing of an AutomationRule's flat `actions` list — the
+/// "simple/flat" trigger path's counterpart to AutomationRunState (which
+/// only exists for the `steps`/branching path). Written from both flat
+/// execution sites: automation-events.queue.ts's processEntityEvent
+/// (ENTITY_EVENT trigger) and renewal-playbook.ts's runRenewalPlaybooks
+/// (renewal-threshold trigger) — previously each computed a per-action
+/// result list and then discarded it behind a one-line console.log, with
+/// zero durable trace of which rule did what, when, distinguishable from a
+/// human edit (see this table's own gap-analysis writeup). ruleId is
+/// nullable + SetNull (not Cascade) so a log entry survives rule deletion
+/// — ruleName is denormalized alongside it for exactly that reason.
+model AutomationExecutionLog {
+  id            String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ruleId        String?                    @map("rule_id") @db.Uuid
+  rule          AutomationRule?            @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  ruleName      String                     @map("rule_name")
+  /// 'CASE' | 'CLAIM' | 'POLICY' — POLICY covers renewal-playbook firings,
+  /// which act on a Policy/RenewalSchedule, not a Case/Claim; kept a plain
+  /// string (not CaseManagementEntityType) since it needs to represent that
+  /// third case CaseManagementEntityType doesn't model.
+  entityType    String                     @map("entity_type")
+  entityId      String?                    @map("entity_id") @db.Uuid
+  /// 'ENTITY_EVENT' | 'RENEWAL_PLAYBOOK' — which of the two flat-execution
+  /// sites produced this row.
+  triggerSource String                     @map("trigger_source")
+  status        AutomationExecutionStatus
+  /// ActionExecutionResult[] — {actionType, ok, error?} per action, in
+  /// order (see action-handler.ts).
+  actionResults Json                       @map("action_results")
+  createdAt     DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([ruleId, createdAt])
+  @@index([entityType, entityId])
+  @@map("automation_execution_logs")
 }
 
 enum AutomationRunStatus {
@@ -1426,13 +2052,13 @@ enum AutomationRunStatus {
 /// existing flat `actions` path runs synchronously within one queue job
 /// and never creates one of these.
 model AutomationRunState {
-  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ruleId           String               @map("rule_id") @db.Uuid
-  rule             AutomationRule       @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  id               String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ruleId           String                   @map("rule_id") @db.Uuid
+  rule             AutomationRule           @relation(fields: [ruleId], references: [id], onDelete: Cascade)
   entityType       CaseManagementEntityType @map("entity_type")
-  entityId         String               @map("entity_id") @db.Uuid
-  status           AutomationRunStatus  @default(RUNNING)
-  currentStepIndex Int                  @default(0) @map("current_step_index")
+  entityId         String                   @map("entity_id") @db.Uuid
+  status           AutomationRunStatus      @default(RUNNING)
+  currentStepIndex Int                      @default(0) @map("current_step_index")
   /// Free-form per-run state bag. Currently one key: `approverAllowlist:
   /// string[]`, written when an APPROVAL_GATE step names specific
   /// `approverUserIds` — frozen at gate-open time so the decision endpoint
@@ -1441,20 +2067,20 @@ model AutomationRunState {
   /// authorized). Absent for gates with no named approvers (today's
   /// unrestricted-decider behavior, unchanged).
   context          Json?
-  approvalId       String?              @map("approval_id") @db.Uuid
-  approval         Approval?            @relation(fields: [approvalId], references: [id], onDelete: SetNull)
+  approvalId       String?                  @map("approval_id") @db.Uuid
+  approval         Approval?                @relation(fields: [approvalId], references: [id], onDelete: SetNull)
   /// Set instead of `approvalId` when an APPROVAL_GATE step's
   /// `requiredApprovals > 1` — the multi-approver quorum path, mirroring
   /// PolicyVersion's existing ApprovalChain usage
   /// (policy-version.controller.ts). Mutually exclusive with `approvalId`
   /// per run: a gate is either the single-Approval path or the chain path,
   /// decided once at gate-open time.
-  chainId          String?              @map("approval_chain_id") @db.Uuid
-  chain            ApprovalChain?       @relation(fields: [chainId], references: [id], onDelete: SetNull)
-  failureReason    String?              @map("failure_reason")
-  startedAt        DateTime             @default(now()) @map("started_at") @db.Timestamptz(6)
-  completedAt      DateTime?            @map("completed_at") @db.Timestamptz(6)
-  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  chainId          String?                  @map("approval_chain_id") @db.Uuid
+  chain            ApprovalChain?           @relation(fields: [chainId], references: [id], onDelete: SetNull)
+  failureReason    String?                  @map("failure_reason")
+  startedAt        DateTime                 @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt      DateTime?                @map("completed_at") @db.Timestamptz(6)
+  updatedAt        DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([ruleId])
   @@index([entityType, entityId])
@@ -1596,6 +2222,13 @@ enum CasePriority {
 enum CaseManagementEntityType {
   CLAIM
   CASE
+  /// Additive: only AssignmentRule actually evaluates LEAD rules today (see
+  /// assignment-resolver.util.ts's findMatchingLeadAssignmentRule()) — the
+  /// other models sharing this enum (SlaPolicy, Macro, AccountSlaOverride,
+  /// AutomationRunState, BusinessRule) simply gain an unused enum member,
+  /// same "representable but no evaluating code path yet" precedent this
+  /// enum's own CLAIM value already sets for BusinessRule.
+  LEAD
 }
 
 enum SlaMetricType {
@@ -1778,7 +2411,7 @@ model CaseCategory {
   /// convenience binding, not a second execution engine: it reuses the
   /// exact same startRun/executeActions path every condition-matched rule
   /// already goes through.
-  defaultWorkflowId String?        @map("default_workflow_id") @db.Uuid
+  defaultWorkflowId String?         @map("default_workflow_id") @db.Uuid
   defaultWorkflow   AutomationRule? @relation(fields: [defaultWorkflowId], references: [id])
 
   @@map("case_categories")
@@ -1822,9 +2455,9 @@ model SlaPolicy {
   createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  targets SlaTarget[]
-  cases   Case[]
-  claims  Claim[]
+  targets          SlaTarget[]
+  cases            Case[]
+  claims           Claim[]
   accountOverrides AccountSlaOverride[]
 
   @@map("sla_policies")
@@ -1852,8 +2485,8 @@ model SlaTarget {
   /// breach-scan.job.ts only switches to the configurable path when a
   /// target actually has one set, so every existing SlaTarget row is
   /// unaffected until an admin opts in.
-  onBreachActions   Json? @map("on_breach_actions")
-  onEscalateActions Json? @map("on_escalate_actions")
+  onBreachActions      Json?         @map("on_breach_actions")
+  onEscalateActions    Json?         @map("on_escalate_actions")
 
   clocks SlaClock[]
 
@@ -2664,6 +3297,73 @@ model ScimApiToken {
   lastUsedAt  DateTime? @map("last_used_at") @db.Timestamptz(6)
 
   @@map("scim_api_tokens")
+}
+
+/// Two-way Microsoft Teams — a single-use, short-lived token embedded in an
+/// Approve/Reject `potentialAction: HttpPOST` button on the MessageCard
+/// notifyApprovers() posts to a TEAMS_WEBHOOK connector (see
+/// backend/worker/src/automation/run-engine.ts) — clicking the button in
+/// Teams POSTs back to teams-actions.controller.ts (backend/api), which
+/// resolves this token to (runStateId, actingUserId) and applies the
+/// decision via the SAME decideAutomationRun() the in-app "Decide" button
+/// uses (see automation-run-decision.ts). Public-schema-only, same
+/// reasoning as ApiKey — an inbound Teams POST carries no tenant context up
+/// front, so the token itself (looked up in the one always-reachable
+/// schema) is what resolves it; `tenantSchema` on the row is what then
+/// tells the handler which tenant to bind for the rest of the request. Not
+/// tenant-replicated for the same structural reason — see ApiKey's own
+/// comment for the full explanation, not repeated here.
+model TeamsActionToken {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tokenHash    String    @unique @map("token_hash")
+  tenantSchema String    @map("tenant_schema")
+  runStateId   String    @map("run_state_id") @db.Uuid
+  actingUserId String    @map("acting_user_id") @db.Uuid
+  usedAt       DateTime? @map("used_at") @db.Timestamptz(6)
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("teams_action_tokens")
+}
+
+/// Self-service API keys for external integrators — "log in as me" bearer
+/// tokens a user generates for a script/integration to call the same REST
+/// API they use, under their own live permissions (never a frozen snapshot:
+/// RlsContextMiddleware re-resolves `userId`'s current roles/department/
+/// branch on every request the same way it does for a JWT login, so
+/// demoting/deactivating the user immediately narrows/revokes the key too).
+///
+/// Deliberately lives ONLY in the `public` schema — never replicated to
+/// tenant schemas the way most tables are (see retrofit-tenant-schemas-
+/// style scripts elsewhere in this codebase's migration history) — because
+/// authenticating a raw bearer key requires looking it up BEFORE any tenant
+/// is known (unlike a JWT, whose issuer names the realm/tenant up front).
+/// `public.api_keys` is the one schema always reachable without prior
+/// tenant resolution; `tenantSchema` on each row is what tells
+/// RlsContextMiddleware which tenant to bind for the rest of the request.
+/// `tenantSchema`/`userId` are plain columns, not `@relation` FKs — the
+/// `User`/`Role` rows they point to live in a DIFFERENT schema per row (the
+/// tenant named by `tenantSchema`), and a single static FK constraint can't
+/// target a different schema per row; ownership is instead enforced at the
+/// application layer (see api-keys.controller.ts).
+model ApiKey {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  tokenHash     String    @unique @map("token_hash")
+  /// Last 4 chars of the raw key, for the list view ("...a1b2") — the SCIM
+  /// token this model is modeled on shows nothing at all after creation;
+  /// this one small addition lets a user tell their own keys apart without
+  /// ever storing/exposing enough to reconstruct or narrow-search the key.
+  tokenLastFour String    @map("token_last_four")
+  tenantSchema  String    @map("tenant_schema")
+  userId        String    @map("user_id") @db.Uuid
+  isActive      Boolean   @default(true) @map("is_active")
+  lastUsedAt    DateTime? @map("last_used_at") @db.Timestamptz(6)
+  expiresAt     DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId])
+  @@map("api_keys")
 }
 
 enum WebhookEventType {

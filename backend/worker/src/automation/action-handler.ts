@@ -75,3 +75,12 @@ export async function executeActions(actions: ActionSpec[], ctx: AutomationActio
   }
   return results;
 }
+
+/** SUCCESS/PARTIAL_FAILURE/FAILED for AutomationExecutionLog.status — shared by both flat-execution sites (automation-events.queue.ts, renewal-playbook.ts) so the two logging call sites can't drift on what "failed" means. Empty (no actions configured) counts as SUCCESS — there was nothing to fail. */
+export function deriveExecutionStatus(results: ActionExecutionResult[]): 'SUCCESS' | 'PARTIAL_FAILURE' | 'FAILED' {
+  if (results.length === 0) return 'SUCCESS';
+  const failedCount = results.filter((r) => !r.ok).length;
+  if (failedCount === 0) return 'SUCCESS';
+  if (failedCount === results.length) return 'FAILED';
+  return 'PARTIAL_FAILURE';
+}

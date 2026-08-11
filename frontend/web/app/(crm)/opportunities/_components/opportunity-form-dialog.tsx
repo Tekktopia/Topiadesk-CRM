@@ -41,6 +41,7 @@ const opportunityFormSchema = z.object({
     .string()
     .min(1, 'Amount is required')
     .regex(/^\d+(\.\d{1,2})?$/, 'Enter a decimal amount, e.g. 45000000.00'),
+  currency: z.string().min(1),
   expectedCloseDate: z.string().min(1, 'Expected close date is required'),
   lineOfBusiness: z.string(),
 });
@@ -76,6 +77,7 @@ export function OpportunityFormDialog({
       pipelineId: defaultStage?.pipelineId ?? '',
       pipelineStageId: opportunity?.pipelineStageId ?? defaultPipelineStageId ?? '',
       amount: opportunity?.amount ?? '',
+      currency: opportunity?.currency ?? 'NGN',
       expectedCloseDate: opportunity?.expectedCloseDate ? opportunity.expectedCloseDate.slice(0, 10) : '',
       lineOfBusiness: opportunity?.lineOfBusiness ?? '',
     },
@@ -130,6 +132,7 @@ export function OpportunityFormDialog({
       name: values.name,
       pipelineStageId: values.pipelineStageId,
       amount: values.amount,
+      currency: values.currency,
       expectedCloseDate: new Date(values.expectedCloseDate).toISOString(),
       lineOfBusiness: values.lineOfBusiness || undefined,
       customFields: hasActiveCustomFields ? customFields : undefined,
@@ -240,13 +243,13 @@ export function OpportunityFormDialog({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-[2fr_1fr] gap-4">
               <FormField
                 control={form.control}
                 name="amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Amount (NGN)</FormLabel>
+                    <FormLabel>Amount</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g. 45000000.00" {...field} />
                     </FormControl>
@@ -254,6 +257,22 @@ export function OpportunityFormDialog({
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="currency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Currency</FormLabel>
+                    <FormControl>
+                      <Input maxLength={3} {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="expectedCloseDate"

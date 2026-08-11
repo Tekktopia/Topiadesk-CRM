@@ -1,3 +1,4 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { ApiUnauthenticatedError, fetchApi } from '@/lib/api/server-fetch';
 
@@ -45,10 +46,19 @@ export interface RenewalRow {
  * backend endpoint: GET /policies (already ordered by expiryDate asc,
  * capped at 100 by the controller) fanned out into one renewal-schedule
  * lookup per policy, tolerating the 404 a policy with no schedule yet
- * returns, then joined against account names for display.
+ * returns, then joined against account names for display. `ownerId`/
+ * `from`/`to` filter the already-fully-fetched result in-memory (by
+ * `assignedToId` and `renewalDueDate`) rather than a new backend query —
+ * this route already holds the complete joined dataset before any
+ * filtering would apply.
  */
-export async function GET(): Promise<NextResponse<RenewalRow[]>> {
+export async function GET(request: NextRequest): Promise<NextResponse<RenewalRow[]>> {
   try {
+    const { searchParams } = new URL(request.url);
+    const ownerId = searchParams.get('ownerId');
+    const from = searchParams.get('from');
+    const to = searchParams.get('to');
+
     const policiesRes = await fetchApi('/policies');
     if (!policiesRes.ok) return NextResponse.json([], { status: 200 });
     const policies = (await policiesRes.json()) as PolicyRow[];
@@ -87,6 +97,9 @@ export async function GET(): Promise<NextResponse<RenewalRow[]>> {
           assignedToId: schedule.assignedToId,
         };
       })
+      .filter((r) => !ownerId || r.assignedToId === ownerId)
+      .filter((r) => !from || r.renewalDueDate >= from)
+      .filter((r) => !to || r.renewalDueDate <= to)
       .sort((a, b) => new Date(a.renewalDueDate).getTime() - new Date(b.renewalDueDate).getTime());
 
     return NextResponse.json(rows);

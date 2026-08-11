@@ -23,7 +23,7 @@
  * `processEntityEvent`.
  */
 import { getPrismaClient, type Prisma } from '@topiadesk/db';
-import { getActionHandler, type ActionSpec, type AutomationActionContext } from '../../automation/action-handler';
+import { deriveExecutionStatus, getActionHandler, type ActionExecutionResult, type ActionSpec, type AutomationActionContext } from '../../automation/action-handler';
 import '../../automation/renewal-task-handler';
 
 interface RenewalPlaybookConditions {
@@ -72,10 +72,12 @@ export async function runRenewalPlaybooks(params: RenewalPlaybookParams): Promis
 
   for (const rule of matched) {
     const actions = Array.isArray(rule.actions) ? (rule.actions as unknown as ActionSpec[]) : [];
+    const results: ActionExecutionResult[] = [];
     for (const action of actions) {
       const handler = getActionHandler(action.actionType);
       if (!handler) {
         console.warn(`[renewal-playbook] rule ${rule.id} (${rule.name}) references unknown actionType "${action.actionType}" — skipping`);
+        results.push({ actionType: action.actionType, ok: false, error: `Unknown actionType: ${action.actionType}` });
         continue;
       }
       // Rule-authored params win over these defaults when both set the same key.
@@ -87,10 +89,23 @@ export async function runRenewalPlaybooks(params: RenewalPlaybookParams): Promis
       };
       try {
         await handler.execute(resolvedParams, RENEWAL_ACTION_CTX);
+        results.push({ actionType: action.actionType, ok: true });
       } catch (err) {
         console.error(`[renewal-playbook] rule ${rule.id} (${rule.name}) action "${action.actionType}" failed for policy ${params.policyId}`, err);
+        results.push({ actionType: action.actionType, ok: false, error: err instanceof Error ? err.message : String(err) });
       }
     }
+    await prisma.automationExecutionLog.create({
+      data: {
+        ruleId: rule.id,
+        ruleName: rule.name,
+        entityType: 'POLICY',
+        entityId: params.policyId,
+        triggerSource: 'RENEWAL_PLAYBOOK',
+        status: deriveExecutionStatus(results),
+        actionResults: results as unknown as Prisma.InputJsonValue,
+      },
+    });
   }
 
   return { matchedRules: matched.length };

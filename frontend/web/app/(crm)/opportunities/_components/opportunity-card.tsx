@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@topiadesk/ui';
 import { formatCurrency, formatDate } from '../../_lib/format';
+import { dealHealthScoreLabel, dealHealthScoreVariant } from '../../_lib/constants';
 import type { Opportunity } from '../../_lib/types';
 
 export interface KanbanStage {
@@ -67,8 +68,13 @@ export function OpportunityCard({
         </div>
         <p className="truncate text-xs text-muted-foreground">{accountName ?? 'Unknown account'}</p>
         <div className="flex items-center justify-between text-xs">
-          <span className="font-medium text-foreground">{formatCurrency(opportunity.amount)}</span>
-          <Badge variant="outline">{opportunity.probability}%</Badge>
+          <span className="font-medium text-foreground">{formatCurrency(opportunity.amount, opportunity.currency)}</span>
+          <div className="flex items-center gap-1">
+            {opportunity.dealHealthScore !== null ? (
+              <Badge variant={dealHealthScoreVariant(opportunity.dealHealthScore)}>{dealHealthScoreLabel(opportunity.dealHealthScore)}</Badge>
+            ) : null}
+            <Badge variant="outline">{opportunity.probability}%</Badge>
+          </div>
         </div>
         <p className="text-xs text-muted-foreground">Expected close {formatDate(opportunity.expectedCloseDate)}</p>
 

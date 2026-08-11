@@ -1,12 +1,15 @@
-import { Controller, Get, NotFoundException, Param, Query } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT } from '@topiadesk/db';
-// NOT type-only: PublicKnowledgeArticleQueryDto is a @Query() parameter type
-// (ValidationPipe needs the real class reference at runtime) — same footgun
-// documented on KnowledgeArticleQueryDto in knowledge-articles.controller.ts.
+// NOT type-only: PublicKnowledgeArticleQueryDto/PublicKnowledgeArticleFeedbackDto
+// are @Query()/@Body() parameter types (ValidationPipe needs the real class
+// reference at runtime) — same footgun documented on KnowledgeArticleQueryDto
+// in knowledge-articles.controller.ts.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import {
   PublicKnowledgeArticleDetailDto,
+  PublicKnowledgeArticleFeedbackDto,
+  PublicKnowledgeArticleFeedbackResponseDto,
   PublicKnowledgeArticleListItemDto,
   PublicKnowledgeArticleQueryDto,
   PublicKnowledgeCategoryDto,
@@ -142,6 +145,29 @@ export class PublicKnowledgeController {
         bodyMarkdown: article.currentVersion?.bodyMarkdown ?? '',
         updatedAt: article.updatedAt,
       };
+    });
+  }
+
+  @Post('articles/:slug/feedback')
+  @ApiOkResponse({ type: PublicKnowledgeArticleFeedbackResponseDto })
+  async feedback(@Param('slug') slug: string, @Body() dto: PublicKnowledgeArticleFeedbackDto): Promise<PublicKnowledgeArticleFeedbackResponseDto> {
+    return runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+      const prisma = getPrismaClient();
+      // Hardcoded status/visibility — see this file's header comment. Voting
+      // on a non-published/non-customer article (or one that no longer
+      // exists) 404s exactly like reading it would.
+      const article = await prisma.knowledgeArticle.findFirst({
+        where: { slug, status: 'PUBLISHED', visibility: 'CUSTOMER' },
+        select: { id: true },
+      });
+      if (!article) throw new NotFoundException('Article not found');
+
+      const updated = await prisma.knowledgeArticle.update({
+        where: { id: article.id },
+        data: dto.vote === 'HELPFUL' ? { helpfulCount: { increment: 1 } } : { notHelpfulCount: { increment: 1 } },
+        select: { helpfulCount: true },
+      });
+      return updated;
     });
   }
 }

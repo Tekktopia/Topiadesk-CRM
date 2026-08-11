@@ -1,13 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, LayoutGrid, Loader2, Pencil, Plus, RotateCcw, Save, X } from 'lucide-react';
-import { Button, Card, CardContent, Input, Skeleton, Tabs, TabsList, TabsTrigger } from '@topiadesk/ui';
+import { useMemo, useState } from 'react';
+import { LayoutGrid, Loader2, Pencil, Plus, RotateCcw, Save, X } from 'lucide-react';
+import { Button, Card, CardContent, DashboardGrid, Input, Skeleton, Tabs, TabsList, TabsTrigger } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { AddWidgetDialog } from './add-widget-dialog';
 import { DashboardWidgetTile } from './dashboard-widget-tile';
-import { useCreateSavedDashboard, useDeleteSavedDashboard, useMyDashboards, useRenderSavedDashboard, useUpdateSavedDashboard } from './dashboard-hooks';
-import type { DashboardWidgetSpec } from './types';
+import { useCreateSavedDashboard, useDeleteSavedDashboard, useMyDashboards, useRenderPreview, useRenderSavedDashboard, useUpdateSavedDashboard } from './dashboard-hooks';
+import type { DashboardWidgetSpec, GridLayoutItem, RenderedDashboardWidget } from './types';
+
+const DEFAULT_W = 6;
+const DEFAULT_H = 4;
 
 /** ADMIN -> Executive, COMPLIANCE_OFFICER -> Compliance, MANAGER -> Branch
  * Manager, everyone else (ACCOUNT_HANDLER and any other role) -> Broker —
@@ -21,6 +24,31 @@ function defaultDashboardNameForRoles(roles: string[]): string {
   return 'Broker Dashboard';
 }
 
+/** `layoutConfig` is untyped JSON end to end (SavedDashboard.layoutConfig / RenderedDashboard.layoutConfig) — parse defensively, same "best-effort, never throw on stored shape drift" posture as the rest of this module's rendering code. */
+function parseLayoutItems(layoutConfig: unknown): GridLayoutItem[] {
+  if (!layoutConfig || typeof layoutConfig !== 'object') return [];
+  const items = (layoutConfig as { items?: unknown }).items;
+  if (!Array.isArray(items)) return [];
+  const result: GridLayoutItem[] = [];
+  for (const raw of items) {
+    if (!raw || typeof raw !== 'object') continue;
+    const item = raw as { widgetId?: unknown; x?: unknown; y?: unknown; w?: unknown; h?: unknown };
+    if (typeof item.widgetId !== 'string') continue;
+    result.push({ i: item.widgetId, x: Number(item.x) || 0, y: Number(item.y) || 0, w: Number(item.w) || DEFAULT_W, h: Number(item.h) || DEFAULT_H });
+  }
+  return result;
+}
+
+/** Every widget needs a grid position — for any id without a matching stored entry (a widget added since the layout was last saved, or first-ever save), fall back to the same left-to-right/top-to-bottom placement the pre-drag version of this page used to compute for every widget. */
+function withFallbackPositions(widgetIds: string[], known: GridLayoutItem[]): GridLayoutItem[] {
+  const knownById = new Map(known.map((l) => [l.i, l]));
+  return widgetIds.map((id, i) => knownById.get(id) ?? { i: id, x: (i % 2) * 6, y: Math.floor(i / 2) * DEFAULT_H, w: DEFAULT_W, h: DEFAULT_H });
+}
+
+function nextGridY(layout: GridLayoutItem[]): number {
+  return layout.reduce((max, l) => Math.max(max, l.y + l.h), 0);
+}
+
 /**
  * Customizable widget grid below the Overview strip — resolution order on
  * load: the viewer's own most-recently-updated PRIVATE SavedDashboard,
@@ -28,6 +56,12 @@ function defaultDashboardNameForRoles(roles: string[]): string {
  * generic id-based render endpoint (SavedDashboardsController.render).
  * "Customize" forks the current view into (or edits) the viewer's own
  * PRIVATE copy — the seeded ORG defaults are never edited in place.
+ *
+ * Both view and edit mode render through the same `DashboardGrid` (real
+ * react-grid-layout, packages/ui) — view mode with drag/resize disabled,
+ * edit mode with both enabled and backed by a live preview
+ * (useRenderPreview) so a widget just added or repositioned shows real
+ * chart data immediately rather than a title-only placeholder.
  */
 export function CustomDashboardSection() {
   const { user } = useCurrentUser();
@@ -61,48 +95,52 @@ export function CustomDashboardSection() {
   const viewingMine = selectedTab === 'mine';
 
   const renderQuery = useRenderSavedDashboard(viewedDashboard?.id);
+  const previewMutation = useRenderPreview();
   const createMutation = useCreateSavedDashboard();
   const updateMutation = useUpdateSavedDashboard(myDashboard?.id);
   const deleteMutation = useDeleteSavedDashboard();
 
   const [editing, setEditing] = useState(false);
   const [draftWidgets, setDraftWidgets] = useState<DashboardWidgetSpec[]>([]);
+  const [draftLayout, setDraftLayout] = useState<GridLayoutItem[]>([]);
   const [draftName, setDraftName] = useState('My Dashboard');
   const [addOpen, setAddOpen] = useState(false);
 
-  useEffect(() => {
-    if (editing) return;
-    setDraftWidgets(activeDashboard?.widgets ?? []);
-    setDraftName(myDashboard?.name ?? 'My Dashboard');
-  }, [activeDashboard, myDashboard, editing]);
+  const viewLayout = useMemo(
+    () => withFallbackPositions((renderQuery.data?.widgets ?? []).map((w) => w.id), parseLayoutItems(renderQuery.data?.layoutConfig)),
+    [renderQuery.data],
+  );
+  const previewWidgets: RenderedDashboardWidget[] = previewMutation.data ?? [];
 
   function startEditing() {
-    setDraftWidgets(activeDashboard?.widgets ?? []);
+    const widgets = activeDashboard?.widgets ?? [];
+    setDraftWidgets(widgets);
+    setDraftLayout(withFallbackPositions(widgets.map((w) => w.id), parseLayoutItems(activeDashboard?.layoutConfig)));
     setDraftName(myDashboard?.name ?? 'My Dashboard');
     setEditing(true);
+    if (widgets.length > 0) previewMutation.mutate(widgets);
   }
 
   function cancelEditing() {
     setEditing(false);
   }
 
-  function moveWidget(index: number, direction: -1 | 1) {
-    setDraftWidgets((prev) => {
-      const target = index + direction;
-      if (target < 0 || target >= prev.length) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(index, 1);
-      next.splice(target, 0, moved!);
-      return next;
-    });
+  function addWidget(widget: DashboardWidgetSpec) {
+    const nextWidgets = [...draftWidgets, widget];
+    setDraftWidgets(nextWidgets);
+    setDraftLayout((prev) => [...prev, { i: widget.id, x: 0, y: nextGridY(prev), w: DEFAULT_W, h: DEFAULT_H }]);
+    previewMutation.mutate(nextWidgets);
   }
 
-  function removeWidget(index: number) {
-    setDraftWidgets((prev) => prev.filter((_, i) => i !== index));
+  function removeWidget(id: string) {
+    const nextWidgets = draftWidgets.filter((w) => w.id !== id);
+    setDraftWidgets(nextWidgets);
+    setDraftLayout((prev) => prev.filter((l) => l.i !== id));
+    previewMutation.mutate(nextWidgets);
   }
 
   async function handleSave() {
-    const layoutConfig = { columns: 12, items: draftWidgets.map((w, i) => ({ widgetId: w.id, x: (i % 2) * 6, y: Math.floor(i / 2) * 4, w: 6, h: 4 })) };
+    const layoutConfig = { columns: 12, items: draftLayout.map((l) => ({ widgetId: l.i, x: l.x, y: l.y, w: l.w, h: l.h })) };
     if (myDashboard) {
       await updateMutation.mutateAsync({ name: draftName, widgets: draftWidgets, layoutConfig });
     } else {
@@ -180,29 +218,28 @@ export function CustomDashboardSection() {
             </CardContent>
           </Card>
         ) : (
-          // Lightweight arrange-by-title list while editing, not live chart
-          // tiles — a freshly-added widget has no rendered data yet (only
-          // the saved dashboard is rendered), so showing "fake" chart tiles
-          // here would be misleading; the real charts appear again once
-          // Save re-renders the dashboard.
-          <ol className="space-y-2">
-            {draftWidgets.map((w, i) => (
-              <li key={w.id} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
-                <span className="text-sm font-medium text-foreground">{w.title}</span>
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" disabled={i === 0} onClick={() => moveWidget(i, -1)} aria-label="Move up">
-                    <ArrowUp className="h-3.5 w-3.5" aria-hidden />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" disabled={i === draftWidgets.length - 1} onClick={() => moveWidget(i, 1)} aria-label="Move down">
-                    <ArrowDown className="h-3.5 w-3.5" aria-hidden />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeWidget(i)} aria-label="Remove widget">
-                    <X className="h-3.5 w-3.5" aria-hidden />
-                  </Button>
+          <DashboardGrid layout={draftLayout} onLayoutChange={setDraftLayout} isDraggable isResizable rowHeight={80}>
+            {draftWidgets.map((w) => {
+              const rendered = previewWidgets.find((p) => p.id === w.id);
+              return (
+                <div key={w.id}>
+                  {rendered ? (
+                    <DashboardWidgetTile widget={rendered} editable onRemove={() => removeWidget(w.id)} />
+                  ) : (
+                    <div className="dashboard-grid-handle flex h-full cursor-move flex-col rounded-lg border border-border bg-card p-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-sm font-medium text-foreground">{w.title}</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => removeWidget(w.id)} aria-label="Remove widget">
+                          <X className="h-3.5 w-3.5" aria-hidden />
+                        </Button>
+                      </div>
+                      <Skeleton className="flex-1 w-full" />
+                    </div>
+                  )}
                 </div>
-              </li>
-            ))}
-          </ol>
+              );
+            })}
+          </DashboardGrid>
         )
       ) : renderQuery.isLoading ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -221,14 +258,16 @@ export function CustomDashboardSection() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        <DashboardGrid layout={viewLayout} isDraggable={false} isResizable={false} rowHeight={80}>
           {(renderQuery.data?.widgets ?? []).map((w) => (
-            <DashboardWidgetTile key={w.id} widget={w} />
+            <div key={w.id}>
+              <DashboardWidgetTile widget={w} />
+            </div>
           ))}
-        </div>
+        </DashboardGrid>
       )}
 
-      <AddWidgetDialog open={addOpen} onOpenChange={setAddOpen} onAdd={(widget) => setDraftWidgets((prev) => [...prev, widget])} />
+      <AddWidgetDialog open={addOpen} onOpenChange={setAddOpen} onAdd={addWidget} />
     </div>
   );
 }

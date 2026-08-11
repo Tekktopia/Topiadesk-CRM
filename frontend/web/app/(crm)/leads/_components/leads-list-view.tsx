@@ -23,15 +23,16 @@ import {
   SelectValue,
   selectionColumn,
 } from '@topiadesk/ui';
+import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { useQuickCreateParam } from '@/lib/use-quick-create-param';
 import { BulkActionToolbar } from '../../_components/bulk-action-toolbar';
 import { ConfirmDialog } from '../../_components/confirm-dialog';
 import { EmptyState } from '../../_components/empty-state';
 import { PageHeader } from '../../_components/page-header';
 import { SavedViewBar } from '../../_components/saved-view-bar';
-import { LEAD_SOURCES, LEAD_STATUSES, humanize, leadStatusLabel, leadStatusVariant } from '../../_lib/constants';
+import { LEAD_STATUSES, leadStatusLabel, leadStatusVariant } from '../../_lib/constants';
 import { formatDate, fullName } from '../../_lib/format';
-import { useBulkAssignLeads, useBulkDeleteLeads, useDeleteLead, useLeads } from '../../_lib/hooks';
+import { useBulkAssignLeads, useBulkDeleteLeads, useDeleteLead, useLeads, useLeadSources } from '../../_lib/hooks';
 import type { FilterTree, Lead, LeadQuery } from '../../_lib/types';
 import { LeadConvertDialog } from './lead-convert-dialog';
 import { LeadFormDialog } from './lead-form-dialog';
@@ -45,8 +46,10 @@ function scoreVariant(score: number): 'success' | 'secondary' | 'outline' {
 }
 
 export function LeadsListView() {
+  const { user } = useCurrentUser();
   const [status, setStatus] = React.useState<string>(UNSET);
   const [source, setSource] = React.useState<string>(UNSET);
+  const [mineOnly, setMineOnly] = React.useState(false);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Lead | null>(null);
   const [deleting, setDeleting] = React.useState<Lead | null>(null);
@@ -60,9 +63,13 @@ export function LeadsListView() {
   const query: LeadQuery = {
     status: status === UNSET ? undefined : (status as LeadQuery['status']),
     source: source === UNSET ? undefined : (source as LeadQuery['source']),
+    assignedToId: mineOnly && user ? user.id : undefined,
   };
 
   const { data: liveData, isLoading, isError } = useLeads(query);
+  const { data: leadSourcesData } = useLeadSources();
+  const leadSources = leadSourcesData ?? [];
+  const sourceNameByCode = React.useMemo(() => new Map(leadSources.map((s) => [s.code, s.name])), [leadSources]);
   const data = savedViewRows ?? liveData ?? [];
   const deleteLead = useDeleteLead();
   const bulkAssign = useBulkAssignLeads();
@@ -81,6 +88,7 @@ export function LeadsListView() {
     const conditions: FilterTree['conditions'] = [];
     if (status !== UNSET) conditions.push({ field: 'status', operator: 'eq', value: status });
     if (source !== UNSET) conditions.push({ field: 'source', operator: 'eq', value: source });
+    if (mineOnly && user) conditions.push({ field: 'assignedToId', operator: 'eq', value: user.id });
     return { op: 'AND', conditions };
   }
 
@@ -111,7 +119,7 @@ export function LeadsListView() {
         id: 'source',
         header: 'Source',
         meta: { label: 'Source' },
-        accessorFn: (l) => humanize(l.source),
+        accessorFn: (l) => sourceNameByCode.get(l.source) ?? l.source,
         cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
       },
       {
@@ -159,7 +167,7 @@ export function LeadsListView() {
         ),
       },
     ],
-    [],
+    [sourceNameByCode],
   );
 
   return (
@@ -209,14 +217,24 @@ export function LeadsListView() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={UNSET}>All sources</SelectItem>
-                {LEAD_SOURCES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {humanize(s)}
+                {leadSources.map((s) => (
+                  <SelectItem key={s.id} value={s.code}>
+                    {s.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+          <label className="flex items-center gap-2 pb-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-input accent-primary"
+              checked={mineOnly}
+              onChange={(e) => withViewReset(setMineOnly)(e.target.checked)}
+              disabled={!user}
+            />
+            My leads only
+          </label>
         </CardContent>
       </Card>
 

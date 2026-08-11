@@ -15,7 +15,8 @@
  */
 
 export type ReportCategory = 'FINANCE' | 'SALES' | 'RENEWALS' | 'CLAIMS' | 'COMPLIANCE' | 'PRODUCTIVITY' | 'MARKETING';
-export type ReportChartType = 'bar' | 'stackedBar' | 'line' | 'funnel' | 'table' | 'treemap' | 'gauge';
+export type ReportChartType = 'bar' | 'stackedBar' | 'line' | 'area' | 'pie' | 'donut' | 'funnel' | 'table' | 'treemap' | 'gauge' | 'kpi' | 'combo';
+export const REPORT_CHART_TYPES: ReportChartType[] = ['bar', 'stackedBar', 'line', 'area', 'pie', 'donut', 'funnel', 'treemap', 'gauge', 'kpi', 'combo', 'table'];
 export type ReportValueFormat = 'currency' | 'number' | 'percent' | 'days' | 'text' | 'date';
 export type ReportMeasureAggregate = 'sum' | 'count' | 'avg';
 

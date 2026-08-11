@@ -1,7 +1,8 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { AppShell } from './app-shell';
 import { Providers } from './providers';
+import { ServiceWorkerRegistration } from './service-worker-registration';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -10,6 +11,18 @@ export const metadata: Metadata = {
     template: '%s · TopiaDesk CRM',
   },
   description: 'TopiaDesk CRM — the engagement layer for Scib Nigeria insurance brokerage operations.',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: '/icons/icon-192.png',
+    apple: '/icons/apple-touch-icon.png',
+  },
+};
+
+// Next 15 splits viewport-affecting metadata (themeColor, among others) out
+// of `metadata` into its own export — this is what puts a matching color in
+// the OS status bar / task switcher once the app is installed as a PWA.
+export const viewport: Viewport = {
+  themeColor: '#147bc6',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -23,6 +36,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>
+        <ServiceWorkerRegistration />
       </body>
     </html>
   );

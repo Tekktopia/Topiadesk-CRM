@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from './api';
-import type { BranchDto, DepartmentDto, PendingRoleGrantDto, PermissionDto, RoleDto, UserDto } from './types';
+import type { BranchDto, DepartmentDto, ExchangeRateDto, FieldPermissionCatalog, FieldPermissionDto, PendingRoleGrantDto, PermissionDto, RoleDto, UserDto } from './types';
 
 /** Shared reference-data queries reused across several admin pages (e.g.
  * department/branch pickers on the Users and Teams pages). Kept in one
@@ -48,5 +48,29 @@ export function useUsers() {
   return useQuery({
     queryKey: ['admin', 'users', 'all'],
     queryFn: () => apiFetch<UserDto[]>('/api/admin/users?take=200'),
+  });
+}
+
+/** FIELD_PERMISSION_CATALOG mirrored to the client — which fields are gate-able per resource, so the admin UI can offer a dropdown instead of a free-text field name. */
+export function useFieldPermissionCatalog() {
+  return useQuery({
+    queryKey: ['admin', 'field-permissions', 'catalog'],
+    queryFn: () => apiFetch<FieldPermissionCatalog>('/api/admin/field-permissions/catalog'),
+    staleTime: Infinity,
+  });
+}
+
+export function useFieldPermissions(roleId: string | undefined) {
+  return useQuery({
+    queryKey: ['admin', 'field-permissions', roleId],
+    queryFn: () => apiFetch<FieldPermissionDto[]>(`/api/admin/field-permissions?roleId=${roleId}`),
+    enabled: Boolean(roleId),
+  });
+}
+
+export function useExchangeRates() {
+  return useQuery({
+    queryKey: ['admin', 'exchange-rates'],
+    queryFn: () => apiFetch<ExchangeRateDto[]>('/api/admin/exchange-rates'),
   });
 }

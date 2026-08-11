@@ -9,6 +9,7 @@ import {
   PipelineDetailResponseDto,
   PipelineResponseDto,
   PipelineStageResponseDto,
+  ReorderPipelineStagesDto,
   UpdatePipelineDto,
   UpdatePipelineStageDto,
 } from './dto/pipeline.dto';
@@ -79,6 +80,36 @@ export class PipelinesController {
     const pipeline = await prisma.pipeline.findUnique({ where: { id } });
     if (!pipeline) throw new NotFoundException('Pipeline not found');
     return prisma.pipelineStage.create({ data: { ...dto, pipelineId: id } });
+  }
+
+  /**
+   * Re-sequences every stage of one pipeline to match `stageIds`' order
+   * (0-indexed) — the only way to move a stage without hand-computing a
+   * collision-free `order` value yourself, since (pipelineId, order) is a
+   * DB-level unique constraint. Two-phase within one transaction: first
+   * bump every stage's order into a disjoint high range (+1000), then set
+   * final 0..n-1 values — the intermediate range can never collide with
+   * either the old or new values because pipelines don't have anywhere
+   * near 1000 stages.
+   */
+  @Post(':id/stages/reorder')
+  @RequirePermission('opportunity', 'write')
+  @ApiOkResponse({ type: [PipelineStageResponseDto] })
+  async reorderStages(@Param('id') id: string, @Body() dto: ReorderPipelineStagesDto): Promise<PipelineStageResponseDto[]> {
+    const prisma = getPrismaClient();
+    const pipeline = await prisma.pipeline.findUnique({ where: { id }, include: { stages: true } });
+    if (!pipeline) throw new NotFoundException('Pipeline not found');
+
+    const existingIds = new Set(pipeline.stages.map((s) => s.id));
+    if (dto.stageIds.length !== pipeline.stages.length || !dto.stageIds.every((sid) => existingIds.has(sid))) {
+      throw new NotFoundException('stageIds must be exactly the set of this pipeline’s current stage ids');
+    }
+
+    return prisma.$transaction(async (tx) => {
+      await Promise.all(dto.stageIds.map((stageId, index) => tx.pipelineStage.update({ where: { id: stageId }, data: { order: index + 1000 } })));
+      await Promise.all(dto.stageIds.map((stageId, index) => tx.pipelineStage.update({ where: { id: stageId }, data: { order: index } })));
+      return tx.pipelineStage.findMany({ where: { pipelineId: id }, orderBy: { order: 'asc' } });
+    });
   }
 }
 

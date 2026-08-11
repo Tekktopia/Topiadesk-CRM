@@ -9,6 +9,8 @@ export interface DashboardWidgetSpec {
   reportKey: string;
   filters?: Record<string, unknown>;
   dimension?: string;
+  /** User-chosen visualization override — falls back to the report definition's own `defaultChartType` when unset. Not validated server-side (an incompatible pairing just degrades to the existing client-side NotChartable fallback, same graceful-degradation precedent this function already uses for a stale reportKey or invalid filters). */
+  chartType?: string;
 }
 
 export interface RenderedDashboardWidget {
@@ -34,21 +36,22 @@ export async function renderDashboardWidget(prisma: PrismaClient, spec: Dashboar
   if (!definition) {
     return { id: spec.id, title: spec.title, reportKey: spec.reportKey, chartType: 'table', error: `Unknown report key: ${spec.reportKey}` };
   }
+  const chartType = spec.chartType ?? definition.defaultChartType;
   const parsed = definition.filterSchema.safeParse(spec.filters ?? {});
   if (!parsed.success) {
     return {
       id: spec.id,
       title: spec.title,
       reportKey: spec.reportKey,
-      chartType: definition.defaultChartType,
+      chartType,
       error: "Stored widget filters no longer validate against this report's filterSchema",
     };
   }
   try {
     const result = await definition.execute(prisma, parsed.data, spec.dimension);
-    return { id: spec.id, title: spec.title, reportKey: spec.reportKey, chartType: definition.defaultChartType, result };
+    return { id: spec.id, title: spec.title, reportKey: spec.reportKey, chartType, result };
   } catch (err) {
-    return { id: spec.id, title: spec.title, reportKey: spec.reportKey, chartType: definition.defaultChartType, error: err instanceof Error ? err.message : String(err) };
+    return { id: spec.id, title: spec.title, reportKey: spec.reportKey, chartType, error: err instanceof Error ? err.message : String(err) };
   }
 }
 

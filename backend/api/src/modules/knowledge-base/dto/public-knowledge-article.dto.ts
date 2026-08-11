@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { KnowledgeFeedbackVote } from '@topiadesk/db';
 
 /**
  * Query params for the public knowledge portal's article list
@@ -43,4 +44,24 @@ export class PublicKnowledgeArticleListItemDto {
 export class PublicKnowledgeArticleDetailDto extends PublicKnowledgeArticleListItemDto {
   @ApiProperty({ description: "The article's current published version body" }) bodyMarkdown!: string;
   @ApiProperty() updatedAt!: Date;
+}
+
+/**
+ * Anonymous "was this helpful?" vote — deliberately NOT the internal
+ * KnowledgeArticleFeedback table (KnowledgeArticlesService.upsertFeedback()):
+ * that model's `userId` is a required FK to the internal `users` table, so
+ * it has no identity to record an anonymous public visitor or portal
+ * Contact against. This is a bare increment on the same denormalized
+ * `helpfulCount`/`notHelpfulCount` columns the public list/detail DTOs
+ * already surface — no per-visitor uniqueness enforced server-side, same
+ * "fire-and-forget, no dedup" posture as this controller's own viewCount
+ * increment (findBySlug()). A future login-gated Portal-only "one vote per
+ * contact" version is a real possible follow-up, not this pass's job.
+ */
+export class PublicKnowledgeArticleFeedbackDto {
+  @ApiProperty({ enum: KnowledgeFeedbackVote }) @IsEnum(KnowledgeFeedbackVote) vote!: KnowledgeFeedbackVote;
+}
+
+export class PublicKnowledgeArticleFeedbackResponseDto {
+  @ApiProperty() helpfulCount!: number;
 }

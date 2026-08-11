@@ -185,6 +185,45 @@ CREATE POLICY contacts_rw ON contacts FOR ALL
     OR EXISTS (SELECT 1 FROM accounts a WHERE a.id = account_id AND app_can_access_owner('account', 'write', a.owner_id))
   );
 
+-- Data Subject Requests — child-of-contact-of-account, same inherited
+-- scoping shape as account_sla_overrides/sites below (via 'account'
+-- read/write, since Contact has no dedicated resource of its own — see
+-- ContactsController's header comment). No carrier-side branch: a DSR only
+-- ever targets an account-side contact (a carrier-side contact — an
+-- underwriter — isn't a data subject this org holds PII for in the same
+-- sense).
+DROP POLICY IF EXISTS data_subject_requests_rw ON data_subject_requests;
+CREATE POLICY data_subject_requests_rw ON data_subject_requests FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM contacts c JOIN accounts a ON a.id = c.account_id
+      WHERE c.id = contact_id AND app_can_access_owner('account', 'read', a.owner_id)
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM contacts c JOIN accounts a ON a.id = c.account_id
+      WHERE c.id = contact_id AND app_can_access_owner('account', 'write', a.owner_id)
+    )
+  );
+
+-- Consent records — same child-of-contact-of-account shape as
+-- data_subject_requests_rw immediately above.
+DROP POLICY IF EXISTS consent_records_rw ON consent_records;
+CREATE POLICY consent_records_rw ON consent_records FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM contacts c JOIN accounts a ON a.id = c.account_id
+      WHERE c.id = contact_id AND app_can_access_owner('account', 'read', a.owner_id)
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM contacts c JOIN accounts a ON a.id = c.account_id
+      WHERE c.id = contact_id AND app_can_access_owner('account', 'write', a.owner_id)
+    )
+  );
+
 -- Same shape as account_relationships_rw above — a child-of-account config
 -- row, visible/writable exactly when the parent account is.
 DROP POLICY IF EXISTS account_sla_overrides_rw ON account_sla_overrides;
@@ -287,6 +326,19 @@ CREATE POLICY policy_versions_rw ON policy_versions FOR ALL
     WHERE p.id = policy_id AND app_can_access_owner('policy', 'write', a.owner_id)
   ));
 
+-- E-signature requests — same child-of-policy-of-account shape as
+-- policy_versions_rw immediately above.
+DROP POLICY IF EXISTS signature_requests_rw ON signature_requests;
+CREATE POLICY signature_requests_rw ON signature_requests FOR ALL
+  USING (EXISTS (
+    SELECT 1 FROM policies p JOIN accounts a ON a.id = p.account_id
+    WHERE p.id = policy_id AND app_can_access_owner('policy', 'read', a.owner_id)
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM policies p JOIN accounts a ON a.id = p.account_id
+    WHERE p.id = policy_id AND app_can_access_owner('policy', 'write', a.owner_id)
+  ));
+
 DROP POLICY IF EXISTS premiums_rw ON premiums;
 CREATE POLICY premiums_rw ON premiums FOR ALL
   USING (EXISTS (
@@ -306,6 +358,93 @@ CREATE POLICY renewal_schedules_rw ON renewal_schedules FOR ALL
     OR EXISTS (SELECT 1 FROM policies p JOIN accounts a ON a.id = p.account_id WHERE p.id = policy_id AND app_can_access_owner('policy', 'read', a.owner_id))
   )
   WITH CHECK (app_max_scope('renewal_schedule', 'write') IS NOT NULL);
+
+-- =============================================================================
+-- policy_coverages / policy_participants / policy_assets
+-- Policy depth (FSC's InsurancePolicyCoverage/Participant/Asset) — plain
+-- child-of-Policy scoping, same shape as renewal_schedules_rw above. No
+-- dedicated resource: nothing in the FSC spec calls out these as more
+-- sensitive than the policy record itself, unlike producer_commissions
+-- below.
+-- =============================================================================
+
+DROP POLICY IF EXISTS policy_coverages_rw ON policy_coverages;
+CREATE POLICY policy_coverages_rw ON policy_coverages FOR ALL
+  USING (EXISTS (
+    SELECT 1 FROM policies p JOIN accounts a ON a.id = p.account_id
+    WHERE p.id = policy_id AND app_can_access_owner('policy', 'read', a.owner_id)
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM policies p JOIN accounts a ON a.id = p.account_id
+    WHERE p.id = policy_id AND app_can_access_owner('policy', 'write', a.owner_id)
+  ));
+
+DROP POLICY IF EXISTS policy_participants_rw ON policy_participants;
+CREATE POLICY policy_participants_rw ON policy_participants FOR ALL
+  USING (EXISTS (
+    SELECT 1 FROM policies p JOIN accounts a ON a.id = p.account_id
+    WHERE p.id = policy_id AND app_can_access_owner('policy', 'read', a.owner_id)
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM policies p JOIN accounts a ON a.id = p.account_id
+    WHERE p.id = policy_id AND app_can_access_owner('policy', 'write', a.owner_id)
+  ));
+
+DROP POLICY IF EXISTS policy_assets_rw ON policy_assets;
+CREATE POLICY policy_assets_rw ON policy_assets FOR ALL
+  USING (EXISTS (
+    SELECT 1 FROM policies p JOIN accounts a ON a.id = p.account_id
+    WHERE p.id = policy_id AND app_can_access_owner('policy', 'read', a.owner_id)
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM policies p JOIN accounts a ON a.id = p.account_id
+    WHERE p.id = policy_id AND app_can_access_owner('policy', 'write', a.owner_id)
+  ));
+
+-- =============================================================================
+-- producer_policy_assignments / producer_commissions
+-- 'producers' itself carries no RLS (see 001_enable_rls.sql's comment —
+-- same config-tier as carriers/pipelines, gated purely by
+-- @RequirePermission at the controller layer).
+--
+-- producer_policy_assignments (who's assigned + their split %, not $
+-- amounts) scopes through the same 'policy' grant premiums_rw already
+-- uses — simplest correct answer, no new resource needed for this one.
+--
+-- producer_commissions (the actual payable $ record) uses its OWN
+-- 'producer_commission' resource instead of reusing 'policy' — the FSC
+-- spec this model was built from explicitly calls out commission amounts
+-- as more sensitive than general policy data ("visible only to Manager +
+-- Finance"), so this needs to be independently OWN/DEPARTMENT/ALL-tunable
+-- from a line broker's regular 'policy' grant, not permanently coupled to
+-- it. Write (create/approve/mark-paid) is additionally gated at the
+-- controller layer via @RequirePermission('producer_commission', 'write')
+-- requiring DEPARTMENT+ scope — RLS here only answers "can this row be
+-- seen/touched at all", same two-layer split PermissionGuard/RLS already
+-- use everywhere else in this codebase.
+-- =============================================================================
+
+DROP POLICY IF EXISTS producer_policy_assignments_rw ON producer_policy_assignments;
+CREATE POLICY producer_policy_assignments_rw ON producer_policy_assignments FOR ALL
+  USING (EXISTS (
+    SELECT 1 FROM policies p JOIN accounts a ON a.id = p.account_id
+    WHERE p.id = policy_id AND app_can_access_owner('policy', 'read', a.owner_id)
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM policies p JOIN accounts a ON a.id = p.account_id
+    WHERE p.id = policy_id AND app_can_access_owner('policy', 'write', a.owner_id)
+  ));
+
+DROP POLICY IF EXISTS producer_commissions_rw ON producer_commissions;
+CREATE POLICY producer_commissions_rw ON producer_commissions FOR ALL
+  USING (EXISTS (
+    SELECT 1 FROM policies p JOIN accounts a ON a.id = p.account_id
+    WHERE p.id = policy_id AND app_can_access_owner('producer_commission', 'read', a.owner_id)
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM policies p JOIN accounts a ON a.id = p.account_id
+    WHERE p.id = policy_id AND app_can_access_owner('producer_commission', 'write', a.owner_id)
+  ));
 
 -- =============================================================================
 -- documents / document_versions / document_links
@@ -354,14 +493,84 @@ CREATE POLICY document_links_rw ON document_links FOR ALL
 -- approver pool for that entity type, or ALL-scope roles (compliance/admin).
 -- =============================================================================
 
+-- A CASE_AUTOMATION_GATE approval whose gate names specific approvers
+-- (AutomationRunState.context.approverAllowlist, frozen at gate-open time —
+-- see that column's own comment) must be visible/decidable by exactly those
+-- people even when they hold none of `approval:read`/`write` ALL scope
+-- (e.g. a MANAGER named as an explicit approver, or resolved via
+-- ASSIGNEE_MANAGER/TEAM_LEAD) — without this, only COMPLIANCE_OFFICER/ADMIN
+-- could ever decide ANY named-approver gate, defeating the whole point of
+-- naming one. `ad.delegator_id::text` lets an active ApprovalDelegation
+-- (approval_delegations, below) stand in for someone on the allowlist —
+-- the one Approval entityType where delegation is load-bearing; the other
+-- four already sit behind a broad ALL-scope pool with nothing to delegate.
+-- Joins on approval_id (single-approver gates) OR approval_chain_id
+-- (quorum gates: decideChainedGate() INSERTs a fresh row per decider, so
+-- the new row's own `id` isn't known to automation_run_states yet — only
+-- its `chain_id` is, via the chain the gate opened).
 DROP POLICY IF EXISTS approvals_rw ON approvals;
 CREATE POLICY approvals_rw ON approvals FOR ALL
   USING (
     requested_by_id = app_current_user_id()
     OR approved_by_id = app_current_user_id()
     OR app_max_scope('approval', 'read') = 'ALL'
+    OR (
+      entity_type = 'CASE_AUTOMATION_GATE'
+      AND EXISTS (
+        SELECT 1 FROM automation_run_states ars
+        WHERE (ars.approval_id = approvals.id OR ars.approval_chain_id = approvals.chain_id)
+          AND (
+            ars.context -> 'approverAllowlist' ? app_current_user_id()::text
+            OR EXISTS (
+              SELECT 1 FROM approval_delegations ad
+              WHERE ad.delegate_id = app_current_user_id()
+                AND now() BETWEEN ad.starts_at AND ad.ends_at
+                AND ars.context -> 'approverAllowlist' ? ad.delegator_id::text
+            )
+          )
+      )
+    )
   )
-  WITH CHECK (requested_by_id = app_current_user_id() OR app_max_scope('approval', 'write') = 'ALL');
+  WITH CHECK (
+    requested_by_id = app_current_user_id()
+    OR app_max_scope('approval', 'write') = 'ALL'
+    OR (
+      entity_type = 'CASE_AUTOMATION_GATE'
+      AND EXISTS (
+        SELECT 1 FROM automation_run_states ars
+        WHERE (ars.approval_id = approvals.id OR ars.approval_chain_id = approvals.chain_id)
+          AND (
+            ars.context -> 'approverAllowlist' ? app_current_user_id()::text
+            OR EXISTS (
+              SELECT 1 FROM approval_delegations ad
+              WHERE ad.delegate_id = app_current_user_id()
+                AND now() BETWEEN ad.starts_at AND ad.ends_at
+                AND ars.context -> 'approverAllowlist' ? ad.delegator_id::text
+            )
+          )
+      )
+    )
+  );
+
+-- Self-service: a delegator manages their own standing instruction, a
+-- delegate can see (never edit) delegations naming them so they understand
+-- why a gate they didn't request now shows up as theirs to decide, and
+-- COMPLIANCE_OFFICER/ADMIN (approval:read/write ALL) get full oversight —
+-- same tier as approvals_rw itself, since a delegation is really "who may
+-- decide an approval" metadata.
+DROP POLICY IF EXISTS approval_delegations_rw ON approval_delegations;
+CREATE POLICY approval_delegations_rw ON approval_delegations FOR ALL
+  USING (
+    delegator_id = app_current_user_id()
+    OR delegate_id = app_current_user_id()
+    OR app_max_scope('approval', 'read') = 'ALL'
+    OR app_current_role() = 'SYSTEM_JOB'
+  )
+  WITH CHECK (
+    delegator_id = app_current_user_id()
+    OR app_max_scope('approval', 'write') = 'ALL'
+    OR app_current_role() = 'SYSTEM_JOB'
+  );
 
 -- ApprovalChain has no requester/approver column of its own (only its
 -- linked Approval rows do), and no sensitive fields at all — just
@@ -466,6 +675,14 @@ CREATE POLICY audit_log_insert ON audit_log FOR INSERT
 
 DROP POLICY IF EXISTS integration_connectors_rw ON integration_connectors;
 CREATE POLICY integration_connectors_rw ON integration_connectors FOR ALL
+  USING (app_max_scope('integration', 'read') = 'ALL' OR app_current_role() = 'SYSTEM_JOB')
+  WITH CHECK (app_max_scope('integration', 'write') = 'ALL' OR app_current_role() = 'SYSTEM_JOB');
+
+-- Same 'integration' ALL-scope tier as integration_connectors_rw above —
+-- holds an encrypted Azure client secret (microsoft-sso.controller.ts),
+-- not a generic connector, but the access tier is identical.
+DROP POLICY IF EXISTS microsoft_sso_configs_rw ON microsoft_sso_configs;
+CREATE POLICY microsoft_sso_configs_rw ON microsoft_sso_configs FOR ALL
   USING (app_max_scope('integration', 'read') = 'ALL' OR app_current_role() = 'SYSTEM_JOB')
   WITH CHECK (app_max_scope('integration', 'write') = 'ALL' OR app_current_role() = 'SYSTEM_JOB');
 
@@ -833,6 +1050,14 @@ CREATE POLICY loyalty_transactions_rw ON loyalty_transactions FOR ALL
 -- tier" as carriers/pipelines/custom_field_definitions.
 -- =============================================================================
 
+-- Same named-approver reasoning as approvals_rw above: a run whose gate
+-- froze `context.approverAllowlist` must be readable/updatable by exactly
+-- those people (directly, or standing in via an active
+-- approval_delegations row) even without case/claim visibility or
+-- approval:read/write ALL scope — otherwise AutomationRunStatesController.
+-- decide()'s own findUnique() 404s before its allowlist check ever runs,
+-- and its closing automationRunState.update() (advancing currentStepIndex)
+-- would be silently rejected by this same policy's WITH CHECK.
 DROP POLICY IF EXISTS automation_run_states_rw ON automation_run_states;
 CREATE POLICY automation_run_states_rw ON automation_run_states FOR ALL
   USING (
@@ -844,5 +1069,26 @@ CREATE POLICY automation_run_states_rw ON automation_run_states FOR ALL
     OR (entity_type = 'CLAIM' AND EXISTS (SELECT 1 FROM claims c WHERE c.id = entity_id
           AND ((c.adjuster_id IS NOT NULL AND app_can_access_owner('claim', 'read', c.adjuster_id))
             OR EXISTS (SELECT 1 FROM policies p JOIN accounts a ON a.id = p.account_id WHERE p.id = c.policy_id AND app_can_access_owner('claim', 'read', a.owner_id)))))
+    OR (
+      context -> 'approverAllowlist' ? app_current_user_id()::text
+      OR EXISTS (
+        SELECT 1 FROM approval_delegations ad
+        WHERE ad.delegate_id = app_current_user_id()
+          AND now() BETWEEN ad.starts_at AND ad.ends_at
+          AND context -> 'approverAllowlist' ? ad.delegator_id::text
+      )
+    )
   )
-  WITH CHECK (app_current_role() = 'SYSTEM_JOB' OR app_max_scope('approval', 'write') = 'ALL');
+  WITH CHECK (
+    app_current_role() = 'SYSTEM_JOB'
+    OR app_max_scope('approval', 'write') = 'ALL'
+    OR (
+      context -> 'approverAllowlist' ? app_current_user_id()::text
+      OR EXISTS (
+        SELECT 1 FROM approval_delegations ad
+        WHERE ad.delegate_id = app_current_user_id()
+          AND now() BETWEEN ad.starts_at AND ad.ends_at
+          AND context -> 'approverAllowlist' ? ad.delegator_id::text
+      )
+    )
+  );

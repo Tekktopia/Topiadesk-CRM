@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { ArrayMinSize, IsArray, IsEnum, IsInt, IsObject, IsOptional, IsString, IsUUID, Min, MinLength } from 'class-validator';
-import { AccountStatus, AccountType, RiskRating } from '@topiadesk/db';
+import { ArrayMinSize, IsArray, IsDateString, IsEnum, IsInt, IsObject, IsOptional, IsString, IsUUID, Min, MinLength } from 'class-validator';
+import { AccountStatus, AccountType, KycStatus, RiskRating } from '@topiadesk/db';
 
 export class CreateAccountDto {
   @ApiProperty() @IsString() @MinLength(1) name!: string;
@@ -15,6 +15,9 @@ export class CreateAccountDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() state?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() country?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() postalCode?: string;
+  @ApiProperty({ enum: KycStatus, required: false }) @IsOptional() @IsEnum(KycStatus) kycStatus?: KycStatus;
+  @ApiProperty({ required: false }) @IsOptional() @IsDateString() kycExpiryDate?: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() naicomId?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() parentAccountId?: string;
   // Defaults to the calling user if omitted — see AccountsController.create().
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() ownerId?: string;

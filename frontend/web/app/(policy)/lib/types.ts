@@ -23,6 +23,8 @@ import type { ApiPaths } from '@topiadesk/shared-types';
  * their real type, confirmed against the backend DTO source directly.
  */
 type FixNullable<T, K extends keyof T> = Omit<T, K> & { [P in K]: string | null };
+/** Same codegen gap as FixNullable above, for a nullable field whose real type is `number` (e.g. PolicyAsset.year) rather than `string`. */
+type FixNullableNumber<T, K extends keyof T> = Omit<T, K> & { [P in K]: number | null };
 
 type PolicyDtoRaw = ApiPaths['/policies']['get']['responses'][200]['content']['application/json'][number];
 export type PolicyDto = FixNullable<PolicyDtoRaw, 'sumInsured' | 'brokerOfRecordId' | 'currentVersionId'>;
@@ -59,6 +61,43 @@ export type CreatePremiumDto =
 export type PremiumAgingRowDto = ApiPaths['/premiums/aging']['get']['responses'][200]['content']['application/json'][number];
 export type UpdatePremiumDto = ApiPaths['/premiums/{id}']['patch']['requestBody']['content']['application/json'];
 
+type PolicyCoverageDtoRaw =
+  ApiPaths['/policies/{policyId}/coverages']['get']['responses'][200]['content']['application/json'][number];
+export type PolicyCoverageDto = FixNullable<
+  PolicyCoverageDtoRaw,
+  'sumInsured' | 'premium' | 'deductible' | 'limits' | 'subLimits' | 'conditions'
+>;
+export type CreatePolicyCoverageDto =
+  ApiPaths['/policies/{policyId}/coverages']['post']['requestBody']['content']['application/json'];
+export type UpdatePolicyCoverageDto =
+  ApiPaths['/policies/{policyId}/coverages/{id}']['patch']['requestBody']['content']['application/json'];
+
+type PolicyParticipantDtoRaw =
+  ApiPaths['/policies/{policyId}/participants']['get']['responses'][200]['content']['application/json'][number];
+export type PolicyParticipantDto = FixNullable<PolicyParticipantDtoRaw, 'contactId' | 'relationship' | 'percentage'>;
+export type CreatePolicyParticipantDto =
+  ApiPaths['/policies/{policyId}/participants']['post']['requestBody']['content']['application/json'];
+export type UpdatePolicyParticipantDto =
+  ApiPaths['/policies/{policyId}/participants/{id}']['patch']['requestBody']['content']['application/json'];
+
+type PolicyAssetDtoRaw =
+  ApiPaths['/policies/{policyId}/assets']['get']['responses'][200]['content']['application/json'][number];
+type PolicyAssetDtoStringFixed = FixNullable<
+  PolicyAssetDtoRaw,
+  'registrationNo' | 'chassisNo' | 'address' | 'valuation' | 'makeModel' | 'latitude' | 'longitude'
+>;
+export type PolicyAssetDto = FixNullableNumber<PolicyAssetDtoStringFixed, 'year'>;
+export type CreatePolicyAssetDto =
+  ApiPaths['/policies/{policyId}/assets']['post']['requestBody']['content']['application/json'];
+export type UpdatePolicyAssetDto =
+  ApiPaths['/policies/{policyId}/assets/{id}']['patch']['requestBody']['content']['application/json'];
+
+export const PARTICIPANT_TYPES = ['INSURED', 'BENEFICIARY', 'NOMINEE', 'DRIVER', 'ADDITIONAL_INSURED'] as const;
+export type ParticipantType = (typeof PARTICIPANT_TYPES)[number];
+
+export const ASSET_TYPES = ['VEHICLE', 'PROPERTY', 'CARGO', 'VESSEL'] as const;
+export type AssetType = (typeof ASSET_TYPES)[number];
+
 type RenewalScheduleDtoRaw =
   ApiPaths['/policies/{policyId}/renewal-schedule']['get']['responses'][200]['content']['application/json'];
 export type RenewalScheduleDto = FixNullable<RenewalScheduleDtoRaw, 'assignedToId' | 'lastAlertSentAt' | 'renewalMeetingDate'>;
@@ -70,6 +109,33 @@ export type DocumentDto = FixNullable<DocumentDtoRaw, 'categoryId' | 'currentVer
 export type DocumentCategoryDto =
   ApiPaths['/documents/categories']['get']['responses'][200]['content']['application/json'][number];
 export type DocumentLinkDto = ApiPaths['/documents/{id}/links']['get']['responses'][200]['content']['application/json'][number];
+
+type ProducerDtoRaw = ApiPaths['/producers']['get']['responses'][200]['content']['application/json'][number];
+export type ProducerDto = FixNullable<ProducerDtoRaw, 'licenseNumber' | 'licenseExpiry' | 'phone' | 'email' | 'parentProducerId' | 'linkedUserId'>;
+export type CreateProducerDto = ApiPaths['/producers']['post']['requestBody']['content']['application/json'];
+export type UpdateProducerDto = ApiPaths['/producers/{id}']['patch']['requestBody']['content']['application/json'];
+
+export type ProducerPolicyAssignmentDto =
+  ApiPaths['/policies/{policyId}/producers']['get']['responses'][200]['content']['application/json'][number];
+export type CreateProducerPolicyAssignmentDto =
+  ApiPaths['/policies/{policyId}/producers']['post']['requestBody']['content']['application/json'];
+
+type ProducerCommissionDtoRaw = ApiPaths['/producer-commissions']['get']['responses'][200]['content']['application/json'][number];
+export type ProducerCommissionDto = FixNullable<ProducerCommissionDtoRaw, 'premiumId' | 'paymentDate'>;
+export type CreateProducerCommissionDto = ApiPaths['/producer-commissions']['post']['requestBody']['content']['application/json'];
+export type UpdateProducerCommissionDto = ApiPaths['/producer-commissions/{id}']['patch']['requestBody']['content']['application/json'];
+
+export const PRODUCER_TYPES = ['INTERNAL_BROKER', 'EXTERNAL_SUB_BROKER', 'CORRESPONDENT'] as const;
+export type ProducerType = (typeof PRODUCER_TYPES)[number];
+
+export const PRODUCER_STATUSES = ['ACTIVE', 'SUSPENDED'] as const;
+export type ProducerStatus = (typeof PRODUCER_STATUSES)[number];
+
+export const PRODUCER_ASSIGNMENT_ROLES = ['PRIMARY', 'SUB_PRODUCER', 'SERVICING'] as const;
+export type ProducerAssignmentRole = (typeof PRODUCER_ASSIGNMENT_ROLES)[number];
+
+export const PRODUCER_COMMISSION_STATUSES = ['PENDING', 'APPROVED', 'PAID'] as const;
+export type ProducerCommissionStatus = (typeof PRODUCER_COMMISSION_STATUSES)[number];
 
 export type OperationalKpiDto = ApiPaths['/dashboards/operational-kpis']['get']['responses'][200]['content']['application/json'];
 

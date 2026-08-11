@@ -8,7 +8,7 @@
 export const ACCOUNT_STATUSES = ['PROSPECT', 'CLIENT', 'FORMER_CLIENT'] as const;
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
 
-export const ACCOUNT_TYPES = ['INDIVIDUAL', 'CORPORATE'] as const;
+export const ACCOUNT_TYPES = ['INDIVIDUAL', 'CORPORATE', 'HOUSEHOLD'] as const;
 export type AccountType = (typeof ACCOUNT_TYPES)[number];
 
 export const LEAD_STATUSES = ['NEW', 'CONTACTED', 'QUALIFIED', 'DISQUALIFIED', 'CONVERTED'] as const;

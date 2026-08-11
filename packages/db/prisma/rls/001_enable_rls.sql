@@ -24,6 +24,17 @@ BEGIN
     'accounts', 'account_relationships', 'contacts',
     'leads', 'opportunities', 'opportunity_market_submissions', 'activities', 'tasks',
     'policies', 'policy_versions', 'premiums', 'renewal_schedules',
+    -- Policy depth — Coverages/Participants/Assets. Same child-of-Policy
+    -- shape as renewal_schedules/premiums above — no dedicated resource,
+    -- reuses 'policy' scoping (see 002_policies.sql).
+    'policy_coverages', 'policy_participants', 'policy_assets',
+    -- Producer/commission model. 'producers' itself is deliberately NOT
+    -- enabled here — an org-wide roster of who earns commission, same
+    -- RLS-free "config tier" as carriers/pipelines/automation_rules (see
+    -- that comment further down). ProducerPolicyAssignment/ProducerCommission
+    -- hold real per-policy $ data and scope through their parent Policy,
+    -- same child-of-account shape as account_sla_overrides/sites below.
+    'producer_policy_assignments', 'producer_commissions',
     'documents', 'document_versions', 'document_links',
     'approvals', 'notifications', 'ai_usage_ledger',
     'audit_log', 'integration_connectors', 'sync_jobs', 'integration_logs',
@@ -85,7 +96,26 @@ BEGIN
     -- data. See users_rw in 002_policies.sql and
     -- rls-context.middleware.ts's header comment for the one caller
     -- (the bootstrap identity lookup) that must explicitly bypass this.
-    'users'
+    'users',
+    -- Per-tenant Microsoft 365 SSO config — holds an encrypted Azure client
+    -- secret, same 'integration' ALL-scope tier as integration_connectors.
+    'microsoft_sso_configs',
+    -- Approval Delegation — "while I'm out, my named-approver gates also
+    -- decide for X" (see approval_delegations_rw, 002_policies.sql).
+    'approval_delegations',
+    -- NDPR/GDPR Data Subject Requests — child-of-contact (which is itself
+    -- child-of-account), same inherited-scoping shape as
+    -- account_sla_overrides/sites above (see data_subject_requests_rw,
+    -- 002_policies.sql).
+    'data_subject_requests',
+    -- General-purpose consent log — same child-of-contact-of-account shape
+    -- as data_subject_requests above (see consent_records_rw,
+    -- 002_policies.sql).
+    'consent_records',
+    -- E-signature requests — child-of-policy-of-account, same inherited
+    -- scoping shape as policy_versions above (see signature_requests_rw,
+    -- 002_policies.sql).
+    'signature_requests'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);

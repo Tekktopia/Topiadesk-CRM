@@ -116,6 +116,14 @@ export async function seedBaseline(prisma: PrismaClient, opts: { adminUserId?: s
     // only meaningful to PermissionGuard's coarse "does a grant exist at
     // all" check, not row-level filtering.
     'carrier',
+    // Producer/commission model. 'producer' has no RLS (org-wide roster,
+    // same config tier as 'carrier' just above), so its scope tier is only
+    // meaningful to PermissionGuard's coarse check. 'producer_commission'
+    // DOES have real RLS (producer_commissions_rw in 002_policies.sql) and
+    // is deliberately its own resource, not reusing 'policy' — see that
+    // policy's comment: commission $ amounts need independently-tunable
+    // visibility from general policy access.
+    'producer', 'producer_commission',
   ] as const;
   const actions = ['read', 'write'] as const;
   const scopes = ['OWN', 'DEPARTMENT', 'BRANCH', 'ALL'] as const;
@@ -201,6 +209,12 @@ export async function seedBaseline(prisma: PrismaClient, opts: { adminUserId?: s
       // status/commission terms) is a department-head-level action, same
       // tier as this role's other supply-side-adjacent grants.
       ['carrier', 'write', 'DEPARTMENT'],
+      // Producer roster management + commission approval/payout for their
+      // own department — the actual point of splitting 'producer_commission'
+      // out from 'policy': a department head can approve/mark-paid their
+      // team's commissions without gaining a blanket ALL-scope grant.
+      ['producer', 'read', 'ALL'], ['producer', 'write', 'DEPARTMENT'],
+      ['producer_commission', 'read', 'DEPARTMENT'], ['producer_commission', 'write', 'DEPARTMENT'],
       // Baseline self-service (identity-enterprise pass) — PATCH
       // /identity/me, presence, and avatar (identity.controller.ts) write
       // the caller's OWN users row with no @RequirePermission of their
@@ -275,6 +289,16 @@ export async function seedBaseline(prisma: PrismaClient, opts: { adminUserId?: s
       // 'account'). A front-line broker routinely needs to add a new
       // market they've started placing business with.
       ['carrier', 'write', 'OWN'],
+      // A front-line broker needs to SEE the producer roster (to assign a
+      // sub-producer/split on their own policy — producer_policy_
+      // assignments_rw reuses this role's existing 'policy':write:OWN
+      // grant, no separate grant needed for that table) and their OWN
+      // commission records (their book-of-business earnings view) — but
+      // deliberately no 'producer_commission' WRITE grant at any scope:
+      // approving/marking a commission paid is a finance/management
+      // action, not a line broker's, per the FSC spec this model is built
+      // from ("Commission Amount visible only to Manager + Finance").
+      ['producer', 'read', 'ALL'], ['producer_commission', 'read', 'OWN'],
     ],
   );
   const complianceRole = await grantRole('COMPLIANCE_OFFICER', 'Audit, approvals, and regulatory oversight', true, [
@@ -287,6 +311,10 @@ export async function seedBaseline(prisma: PrismaClient, opts: { adminUserId?: s
     // /decision endpoint.
     ['policy', 'write', 'ALL'],
     ['audit_log', 'read', 'ALL'], ['ai_usage', 'read', 'ALL'], ['document', 'read', 'ALL'], ['carrier', 'read', 'ALL'],
+    // Oversight visibility, same tier as this role's other read-only ALL
+    // grants — audits the producer roster/commission ledger, doesn't
+    // approve payouts (no write grant).
+    ['producer', 'read', 'ALL'], ['producer_commission', 'read', 'ALL'],
     // Directory visibility for oversight, satisfying
     // UsersController.list()/get()'s @RequirePermission gate (users_rw's
     // read side is unconditionally open regardless of scope — see that

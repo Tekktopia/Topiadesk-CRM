@@ -1,4 +1,15 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString, IsUUID } from 'class-validator';
+
+export class OperationalKpiQueryDto {
+  @ApiPropertyOptional() @IsOptional() @IsUUID() ownerId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() lineOfBusiness?: string;
+}
+
+export class LossReasonBreakdownDto {
+  @ApiProperty() reason!: string;
+  @ApiProperty() count!: number;
+}
 
 /** Grouped by the opportunity owner's User.departmentId — Opportunity has
  * no direct departmentId of its own. Department, not Team: Department is
@@ -24,4 +35,6 @@ export class OperationalKpiResponseDto {
   @ApiProperty({ description: 'won / (won + lost) among all opportunities with a non-null actualCloseDate, all-time. Null when there are none yet.', nullable: true })
   winRate!: number | null;
   @ApiProperty({ type: [DepartmentPipelineBreakdownDto] }) byDepartment!: DepartmentPipelineBreakdownDto[];
+  @ApiProperty({ type: [LossReasonBreakdownDto], description: 'Top 5 lost reasons by count, all-time, plus an "Other" bucket for the rest' })
+  lossReasonBreakdown!: LossReasonBreakdownDto[];
 }

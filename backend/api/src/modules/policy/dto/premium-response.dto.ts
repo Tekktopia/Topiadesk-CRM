@@ -17,6 +17,12 @@ export class PremiumResponseDto {
   @ApiProperty() updatedAt!: Date;
 }
 
+/** POST /premiums/:id/paystack/initialize — PaystackService.initializePremiumPayment's stub response shape (a real integration returns these same two fields from Paystack's own /transaction/initialize call). */
+export class PaystackInitializeResponseDto {
+  @ApiProperty() reference!: string;
+  @ApiProperty() authorizationUrl!: string;
+}
+
 /** Row shape of `premium_aging_summary_scoped` (prisma/rls/004_reporting_views.sql), camelCased. */
 export class PremiumAgingRowDto {
   @ApiProperty() premiumId!: string;

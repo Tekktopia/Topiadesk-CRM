@@ -24,6 +24,7 @@ import { canWriteAdmin } from '../_lib/permissions';
 import type { ConnectorDto, SyncJobDto } from '../_lib/types';
 import { SyncJobLogsDialog } from './sync-job-logs-dialog';
 import { ConnectorFormDialog } from './connector-form-dialog';
+import { MicrosoftSsoCard } from './microsoft-sso-card';
 
 export default function IntegrationsPage() {
   const { user: currentUser } = useCurrentUser();
@@ -137,6 +138,8 @@ export default function IntegrationsPage() {
           ) : undefined
         }
       />
+
+      <MicrosoftSsoCard />
 
       {connectorsQuery.isLoading ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">

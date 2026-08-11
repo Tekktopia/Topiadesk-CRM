@@ -4,11 +4,13 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlarmClockCheck, Hourglass, ShieldAlert, Timer } from 'lucide-react';
 import {
+  BarChart,
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
+  LineChart,
   Select,
   SelectContent,
   SelectItem,
@@ -17,10 +19,19 @@ import {
   Skeleton,
   StatTile,
 } from '@topiadesk/ui';
-import { ReportBarChart } from '../../../(reports)/_components/report-bar-chart';
-import { ReportLineChart } from '../../../(reports)/_components/report-line-chart';
+import { formatReportValue } from '../../../(reports)/_lib/format';
 import type { ReportResult } from '../../../(reports)/_lib/types';
 import { caseStatusLabel } from '../../_lib/constants';
+
+/** Same adapter pattern as (reports)/_components/report-chart.tsx's local `toDatums` — turns a one-dimension/one-measure ReportResult into the plain BarChartDatum/LineChart shape @topiadesk/ui's chart components expect. */
+function toDatums(result: ReportResult, dimensionKey: string, measureKey: string) {
+  const measureColumn = result.columns.find((c) => c.key === measureKey)!;
+  return result.rows.map((row) => ({
+    name: String(row[dimensionKey] ?? 'Unknown'),
+    value: Number(row[measureKey] ?? 0),
+    formattedValue: formatReportValue(measureColumn.format, row[measureKey] ?? null),
+  }));
+}
 
 interface CaseKpiResponse {
   days: number;
@@ -56,9 +67,9 @@ function formatHours(hours: number | null): string {
  * volume trend, agent workload. Sourced from GET /api/case-kpis (proxying
  * CaseKpisController), a sibling of the sales-scoped app/(dashboard) home
  * page rather than a tab bolted onto it. Trend/workload charts reshape the
- * endpoint's plain arrays into the local ReportResult shape
- * ReportLineChart/ReportBarChart already expect (see those components +
- * (reports)/_lib/chart.ts) — genuine reuse, no new charting code.
+ * endpoint's plain arrays into the local ReportResult shape, then `toDatums`
+ * adapts that into the plain shape @topiadesk/ui's LineChart/BarChart
+ * expect — same adapter pattern (reports)/_components/report-chart.tsx uses.
  */
 export function CaseDashboardView() {
   const [days, setDays] = useState('30');
@@ -188,7 +199,7 @@ export function CaseDashboardView() {
             ) : !trendResult || trendResult.rows.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">No tickets created in this window.</p>
             ) : (
-              <ReportLineChart result={trendResult} shape={{ dimensionColumn: trendResult.columns[0]!, measureColumn: trendResult.columns[1]! }} />
+              <LineChart data={toDatums(trendResult, 'date', 'count')} valueLabel="Tickets created" />
             )}
           </CardContent>
         </Card>
@@ -227,7 +238,7 @@ export function CaseDashboardView() {
             ) : !workloadResult || workloadResult.rows.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">No open tickets are currently assigned.</p>
             ) : (
-              <ReportBarChart result={workloadResult} shape={{ dimensionColumn: workloadResult.columns[0]!, measureColumn: workloadResult.columns[1]! }} />
+              <BarChart data={toDatums(workloadResult, 'userName', 'openCaseCount')} />
             )}
           </CardContent>
         </Card>
@@ -244,7 +255,7 @@ export function CaseDashboardView() {
               <p className="py-8 text-center text-sm text-muted-foreground">No open tickets currently assigned to a department.</p>
             ) : (
               <>
-                <ReportBarChart result={byDepartmentResult} shape={{ dimensionColumn: byDepartmentResult.columns[0]!, measureColumn: byDepartmentResult.columns[1]! }} />
+                <BarChart data={toDatums(byDepartmentResult, 'departmentName', 'openCaseCount')} />
                 <ul className="space-y-1.5">
                   {kpis!.byDepartment.map((d) => (
                     <li key={d.departmentId} className="flex items-center justify-between text-xs">
@@ -272,7 +283,7 @@ export function CaseDashboardView() {
               <p className="py-8 text-center text-sm text-muted-foreground">No open tickets currently assigned to a team.</p>
             ) : (
               <>
-                <ReportBarChart result={byTeamResult} shape={{ dimensionColumn: byTeamResult.columns[0]!, measureColumn: byTeamResult.columns[1]! }} />
+                <BarChart data={toDatums(byTeamResult, 'teamName', 'openCaseCount')} />
                 <ul className="space-y-1.5">
                   {kpis!.byTeam.map((t) => (
                     <li key={t.teamId} className="flex items-center justify-between text-xs">

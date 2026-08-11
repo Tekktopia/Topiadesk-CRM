@@ -1,6 +1,8 @@
 import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient, type Prisma } from '@topiadesk/db';
+import { AuditLogResponseDto } from '../audit/dto/audit-log-response.dto';
+import { loadEntityHistory } from '../audit/entity-history';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -13,7 +15,7 @@ import {
   CreateAccountDto,
   UpdateAccountDto,
 } from './dto/account.dto';
-import { AccountDetailResponseDto, AccountRenewalRowDto, AccountResponseDto } from './dto/account-response.dto';
+import { AccountDetailResponseDto, AccountGroupRollupDto, AccountRenewalRowDto, AccountResponseDto } from './dto/account-response.dto';
 import { AccountSlaOverrideResponseDto, UpsertAccountSlaOverrideDto } from './dto/account-sla-override.dto';
 import {
   AccountRelationshipResponseDto,
@@ -27,7 +29,12 @@ import { validateCustomFields } from './custom-fields.validator';
 import { diffBulkIds } from './bulk-actions';
 import { checkAccountDuplicates } from './duplicate-detection';
 import { mergeAccounts } from './merge';
+import { assertFieldsWritable, redactHiddenFields, redactHiddenFieldsMany, resolveFieldVisibilities } from '../../common/field-permissions/field-visibility.util';
 import { decimalToString } from '../policy/decimal.util';
+// NOT a type-only import: constructor-injected below — see the same
+// footgun documented on Reflector in permission.guard.ts.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import { DojahService } from '../integrations/dojah.service';
 
 /**
  * Account/Contact/AccountRelationship all key off 'account' — the only
@@ -39,13 +46,15 @@ import { decimalToString } from '../policy/decimal.util';
 @UseGuards(PermissionGuard)
 @Controller('crm/accounts')
 export class AccountsController {
+  constructor(private readonly dojah: DojahService) {}
+
   @Get()
   @RequirePermission('account', 'read')
   @ApiOkResponse({ type: [AccountResponseDto] })
-  async list(@Query() query: AccountQueryDto): Promise<AccountResponseDto[]> {
+  async list(@Query() query: AccountQueryDto, @CurrentUser() user: AuthenticatedUser): Promise<AccountResponseDto[]> {
     // RLS (accounts_rw) restricts rows to the caller's granted scope — no
     // manual owner/department WHERE clause needed here.
-    return getPrismaClient().account.findMany({
+    const accounts = await getPrismaClient().account.findMany({
       where: {
         status: query.status,
         industryId: query.industryId,
@@ -57,6 +66,8 @@ export class AccountsController {
       take: query.take ?? 50,
       skip: query.skip ?? 0,
     });
+    const visibilities = await resolveFieldVisibilities(user, 'account');
+    return redactHiddenFieldsMany(accounts, visibilities);
   }
 
   // Must precede ':id' — Nest matches literal segments in declaration order
@@ -72,7 +83,7 @@ export class AccountsController {
   @Get(':id')
   @RequirePermission('account', 'read')
   @ApiOkResponse({ type: AccountDetailResponseDto })
-  async getOne(@Param('id') id: string): Promise<AccountDetailResponseDto> {
+  async getOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser): Promise<AccountDetailResponseDto> {
     const prisma = getPrismaClient();
     const account = await prisma.account.findUnique({
       where: { id },
@@ -100,8 +111,9 @@ export class AccountsController {
     const paidPremium = premiumAgg._sum.paidAmount;
 
     const { contacts, _count, ...rest } = account;
+    const visibilities = await resolveFieldVisibilities(user, 'account');
     return {
-      ...rest,
+      ...redactHiddenFields(rest, visibilities),
       contacts,
       counts: {
         contacts: contacts.length,
@@ -118,6 +130,16 @@ export class AccountsController {
         wonOpportunityValue: decimalToString(opportunityAgg._sum.amount),
       },
     };
+  }
+
+  /** Who changed what, and when — see entity-history.ts's header comment for why this needs its own endpoint rather than reusing GET /audit-log. */
+  @Get(':id/history')
+  @RequirePermission('account', 'read')
+  @ApiOkResponse({ type: [AuditLogResponseDto] })
+  async history(@Param('id') id: string): Promise<AuditLogResponseDto[]> {
+    const account = await getPrismaClient().account.findUnique({ where: { id }, select: { id: true } });
+    if (!account) throw new NotFoundException('Account not found');
+    return loadEntityHistory('accounts', id);
   }
 
   // Must precede nothing in particular re: ':id' — this has an extra path
@@ -148,6 +170,60 @@ export class AccountsController {
       nextAlertDueAt: p.renewalSchedule?.nextAlertDueAt ?? null,
       assignedToId: p.renewalSchedule?.assignedToId ?? null,
     }));
+  }
+
+  // Same non-collision reasoning as :id/renewals above.
+  @Get(':id/group-rollup')
+  @RequirePermission('account', 'read')
+  @ApiOkResponse({ type: AccountGroupRollupDto })
+  async groupRollup(@Param('id') id: string): Promise<AccountGroupRollupDto> {
+    const prisma = getPrismaClient();
+    const root = await prisma.account.findUnique({ where: { id }, select: { id: true } });
+    if (!root) throw new NotFoundException('Account not found');
+
+    // Collect the account + every descendant, level by level. A bounded BFS
+    // loop rather than a raw SQL recursive CTE — this codebase's own
+    // account-relationship-graph.tsx already notes real hierarchies here
+    // are shallow, so this stays simple and RLS-transparent (plain Prisma
+    // calls, no manual context wiring needed).
+    const allIds = new Set<string>([id]);
+    let frontier = [id];
+    for (let depth = 0; depth < 10 && frontier.length > 0; depth++) {
+      const children = await prisma.account.findMany({ where: { parentAccountId: { in: frontier } }, select: { id: true } });
+      frontier = children.map((c) => c.id).filter((cid) => !allIds.has(cid));
+      frontier.forEach((cid) => allIds.add(cid));
+    }
+    const idsArray = Array.from(allIds);
+
+    const [subsidiaries, memberCount, totalPolicies, openClaims, policyAgg, premiumAgg] = await Promise.all([
+      prisma.account.findMany({ where: { id: { in: idsArray, not: id } }, select: { id: true, name: true } }),
+      prisma.contact.count({ where: { accountId: id } }),
+      prisma.policy.count({ where: { accountId: { in: idsArray } } }),
+      prisma.claim.count({ where: { policy: { accountId: { in: idsArray } }, status: { notIn: ['SETTLED', 'REPUDIATED', 'WITHDRAWN'] } } }),
+      prisma.policy.aggregate({ where: { accountId: { in: idsArray } }, _sum: { sumInsured: true } }),
+      prisma.premium.aggregate({ where: { policy: { accountId: { in: idsArray } } }, _sum: { grossPremium: true } }),
+    ]);
+
+    return {
+      accountCount: idsArray.length,
+      memberCount,
+      totalPolicies,
+      openClaims,
+      totalSumInsured: decimalToString(policyAgg._sum.sumInsured),
+      totalGrossPremium: decimalToString(premiumAgg._sum.grossPremium),
+      subsidiaries,
+    };
+  }
+
+  // Same non-collision reasoning as :id/renewals above.
+  @Post(':id/kyc/verify')
+  @RequirePermission('account', 'write')
+  @ApiOkResponse({ type: AccountResponseDto })
+  async verifyKyc(@Param('id') id: string): Promise<AccountResponseDto> {
+    const existing = await getPrismaClient().account.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Account not found');
+    await this.dojah.verifyKyc(id);
+    return getPrismaClient().account.findUniqueOrThrow({ where: { id } });
   }
 
   // Same gate as sla-policies.controller.ts — SLA config is an ALL-scope
@@ -209,21 +285,36 @@ export class AccountsController {
   @ApiOkResponse({ type: AccountResponseDto })
   async create(@Body() dto: CreateAccountDto, @CurrentUser() user: AuthenticatedUser): Promise<AccountResponseDto> {
     await validateCustomFields('ACCOUNT', dto.customFields, { isCreate: true });
+    assertFieldsWritable(dto, await resolveFieldVisibilities(user, 'account'));
     return getPrismaClient().account.create({
-      data: { ...dto, ownerId: dto.ownerId ?? user.id, customFields: dto.customFields as Prisma.InputJsonValue | undefined },
+      data: {
+        ...dto,
+        ownerId: dto.ownerId ?? user.id,
+        // Prisma's runtime ISO-8601 validator rejects a bare "YYYY-MM-DD"
+        // string even for a @db.Date column (only the TS type accepts
+        // string | Date — the client itself wants a real Date) — explicit
+        // conversion, same as premium.controller.ts's dueDate handling.
+        kycExpiryDate: dto.kycExpiryDate ? new Date(dto.kycExpiryDate) : undefined,
+        customFields: dto.customFields as Prisma.InputJsonValue | undefined,
+      },
     });
   }
 
   @Patch(':id')
   @RequirePermission('account', 'write')
   @ApiOkResponse({ type: AccountResponseDto })
-  async update(@Param('id') id: string, @Body() dto: UpdateAccountDto): Promise<AccountResponseDto> {
+  async update(@Param('id') id: string, @Body() dto: UpdateAccountDto, @CurrentUser() user: AuthenticatedUser): Promise<AccountResponseDto> {
     const existing = await getPrismaClient().account.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Account not found');
     await validateCustomFields('ACCOUNT', dto.customFields, { isCreate: false });
+    assertFieldsWritable(dto, await resolveFieldVisibilities(user, 'account'));
     return getPrismaClient().account.update({
       where: { id },
-      data: { ...dto, customFields: dto.customFields as Prisma.InputJsonValue | undefined },
+      data: {
+        ...dto,
+        kycExpiryDate: dto.kycExpiryDate ? new Date(dto.kycExpiryDate) : undefined,
+        customFields: dto.customFields as Prisma.InputJsonValue | undefined,
+      },
     });
   }
 

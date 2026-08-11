@@ -8,7 +8,21 @@ import type {
   PortalDocument,
   PortalMe,
   PortalPolicy,
+  PublicKnowledgeArticleDetail,
+  PublicKnowledgeArticleListItem,
+  PublicKnowledgeArticleQuery,
+  PublicKnowledgeCategory,
+  PublicKnowledgeVote,
 } from './types';
+
+function buildQuery(params: Record<string, unknown>): string {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') qs.set(key, String(value));
+  }
+  const query = qs.toString();
+  return query ? `?${query}` : '';
+}
 
 export function usePortalMe() {
   return useQuery({ queryKey: ['portal', 'me'], queryFn: () => apiFetch<PortalMe>('/api/portal/me') });
@@ -60,4 +74,39 @@ export function useAddPortalCaseComment(caseId: string) {
 
 export function usePortalDocuments() {
   return useQuery({ queryKey: ['portal', 'documents'], queryFn: () => apiFetch<PortalDocument[]>('/api/portal/documents') });
+}
+
+export function usePublicKnowledgeCategories() {
+  return useQuery({
+    queryKey: ['public-knowledge', 'categories'],
+    queryFn: () => apiFetch<PublicKnowledgeCategory[]>('/api/public/knowledge/categories'),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function usePublicKnowledgeArticles(query: PublicKnowledgeArticleQuery) {
+  return useQuery({
+    queryKey: ['public-knowledge', 'articles', query],
+    queryFn: () => apiFetch<PublicKnowledgeArticleListItem[]>(`/api/public/knowledge/articles${buildQuery(query)}`),
+  });
+}
+
+export function usePublicKnowledgeArticle(slug: string) {
+  return useQuery({
+    queryKey: ['public-knowledge', 'article', slug],
+    queryFn: () => apiFetch<PublicKnowledgeArticleDetail>(`/api/public/knowledge/articles/${encodeURIComponent(slug)}`),
+    enabled: slug.length > 0,
+    retry: false,
+  });
+}
+
+/** Anonymous "was this helpful?" vote — see PublicKnowledgeArticleFeedbackDto's header comment (backend) for why this is a bare increment, not tied to any identity. */
+export function useVotePublicKnowledgeArticle(slug: string) {
+  return useMutation({
+    mutationFn: (vote: PublicKnowledgeVote) =>
+      apiFetch<{ helpfulCount: number }>(`/api/public/knowledge/articles/${encodeURIComponent(slug)}/feedback`, {
+        method: 'POST',
+        body: JSON.stringify({ vote }),
+      }),
+  });
 }

@@ -40,6 +40,7 @@ import type {
   CreateSlaPolicyInput,
   CreateSlaTargetInput,
   DecideCaseClosureInput,
+  LeadSourceOption,
   LinkChildCaseInput,
   LookupOption,
   LossCauseCategory,
@@ -1246,6 +1247,15 @@ export function useTeams() {
     return byId;
   }, [teams]);
   return { teamsById, teams, isLoading: query.isLoading };
+}
+
+/** Same admin-managed lookup app/(crm)/_lib/hooks.ts's useLeadSources() fetches — used here only by the assignment rule form's LEAD "source" condition picker. */
+export function useLeadSources() {
+  return useQuery({
+    queryKey: ['crm', 'lead-sources'],
+    queryFn: () => apiFetch<LeadSourceOption[]>('/api/crm/lead-sources'),
+    staleTime: 60_000,
+  });
 }
 
 /** id/name lookups for the "New claim"/"New ticket" dialogs' policyId + accountId selects — see app/api/policy-lookups/route.ts (extended by this batch to add `policies`). */

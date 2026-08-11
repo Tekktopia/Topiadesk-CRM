@@ -11,6 +11,12 @@ export class AccountResponseDto {
   @ApiProperty({ nullable: true }) parentAccountId!: string | null;
   @ApiProperty({ nullable: true }) city!: string | null;
   @ApiProperty({ nullable: true }) country!: string | null;
+  @ApiProperty() kycStatus!: string;
+  @ApiProperty({ nullable: true }) kycExpiryDate!: Date | null;
+  @ApiProperty({ nullable: true }) naicomId!: string | null;
+  /** Composite relationship-health signal (renewal + claims + payment aging) — see refresh-health-score.job.ts. Not underwriting risk (see riskRating). */
+  @ApiProperty({ nullable: true }) healthScore!: number | null;
+  @ApiProperty({ nullable: true }) healthScoreComputedAt!: Date | null;
   @ApiProperty({ type: 'object', additionalProperties: true }) customFields!: unknown;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
@@ -66,6 +72,28 @@ export class AccountDetailResponseDto extends AccountResponseDto {
   // findOne() this endpoint superseded).
   @ApiProperty({ type: AccountRefDto, nullable: true }) parentAccount!: { id: string; name: string } | null;
   @ApiProperty({ type: [AccountRefDto] }) subAccounts!: { id: string; name: string }[];
+}
+
+/**
+ * GET /crm/accounts/:id/group-rollup — FSC's "Group Premium Rollup" /
+ * Household's "Total AUM, Total Premium, Number of Members": this
+ * account's own financials (AccountFinancialsDto already covers the
+ * single-account case) PLUS every descendant in its parentAccountId/
+ * subAccounts tree, recursively, not just direct children. `memberCount`
+ * doubles as FSC's Household "Number of Members" (this account's own
+ * Contact count) when accountType is HOUSEHOLD, and is simply this
+ * account's contact count otherwise — same field, no branching needed
+ * since a Business account's contacts and a Household's members are both
+ * just `Contact` rows.
+ */
+export class AccountGroupRollupDto {
+  @ApiProperty() accountCount!: number;
+  @ApiProperty() memberCount!: number;
+  @ApiProperty() totalPolicies!: number;
+  @ApiProperty() openClaims!: number;
+  @ApiProperty({ nullable: true }) totalSumInsured!: string | null;
+  @ApiProperty({ nullable: true }) totalGrossPremium!: string | null;
+  @ApiProperty({ type: [AccountRefDto] }) subsidiaries!: { id: string; name: string }[];
 }
 
 /** GET /crm/accounts/:id/renewals — every policy on the account joined with its RenewalSchedule (if any), for the account-level renewal overview. */

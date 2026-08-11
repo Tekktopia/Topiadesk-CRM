@@ -1,6 +1,8 @@
 import { Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient, type Policy } from '@topiadesk/db';
+import { AuditLogResponseDto } from '../audit/dto/audit-log-response.dto';
+import { loadEntityHistory } from '../audit/entity-history';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CreatePolicyDto } from './dto/create-policy.dto';
@@ -108,6 +110,16 @@ export class PolicyController {
     const policy = await getPrismaClient().policy.findUnique({ where: { id } });
     if (!policy) throw new NotFoundException('Policy not found');
     return toPolicyDto(policy);
+  }
+
+  /** Who changed what, and when — see entity-history.ts's header comment for why this needs its own endpoint rather than reusing GET /audit-log. */
+  @Get(':id/history')
+  @RequirePermission('policy', 'read')
+  @ApiOkResponse({ type: [AuditLogResponseDto] })
+  async history(@Param('id', ParseUUIDPipe) id: string): Promise<AuditLogResponseDto[]> {
+    const policy = await getPrismaClient().policy.findUnique({ where: { id }, select: { id: true } });
+    if (!policy) throw new NotFoundException('Policy not found');
+    return loadEntityHistory('policies', id);
   }
 
   @Post()

@@ -119,3 +119,55 @@ export function agingBucketLabel(bucket: string): string {
 }
 
 export const AGING_BUCKET_ORDER = ['CURRENT', '1_30', '31_60', '61_90', '90_PLUS'] as const;
+
+const PRODUCER_STATUS_VARIANT: Record<string, Variant> = {
+  ACTIVE: 'success',
+  SUSPENDED: 'destructive',
+};
+
+export function producerStatusVariant(status: string): Variant {
+  return PRODUCER_STATUS_VARIANT[status] ?? 'outline';
+}
+
+const PRODUCER_TYPE_LABEL: Record<string, string> = {
+  INTERNAL_BROKER: 'Internal broker',
+  EXTERNAL_SUB_BROKER: 'External sub-broker',
+  CORRESPONDENT: 'Correspondent',
+};
+
+export function producerTypeLabel(type: string): string {
+  return PRODUCER_TYPE_LABEL[type] ?? type;
+}
+
+const PRODUCER_COMMISSION_STATUS_VARIANT: Record<string, Variant> = {
+  PENDING: 'outline',
+  APPROVED: 'warning',
+  PAID: 'success',
+};
+
+export function producerCommissionStatusVariant(status: string): Variant {
+  return PRODUCER_COMMISSION_STATUS_VARIANT[status] ?? 'outline';
+}
+
+const PARTICIPANT_TYPE_LABEL: Record<string, string> = {
+  INSURED: 'Insured',
+  BENEFICIARY: 'Beneficiary',
+  NOMINEE: 'Nominee',
+  DRIVER: 'Driver',
+  ADDITIONAL_INSURED: 'Additional insured',
+};
+
+export function participantTypeLabel(type: string): string {
+  return PARTICIPANT_TYPE_LABEL[type] ?? type;
+}
+
+const ASSET_TYPE_LABEL: Record<string, string> = {
+  VEHICLE: 'Vehicle',
+  PROPERTY: 'Property',
+  CARGO: 'Cargo',
+  VESSEL: 'Vessel',
+};
+
+export function assetTypeLabel(type: string): string {
+  return ASSET_TYPE_LABEL[type] ?? type;
+}

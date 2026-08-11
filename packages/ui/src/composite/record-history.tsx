@@ -18,20 +18,23 @@ import { Skeleton } from '../primitives/skeleton';
  * unlike that component this one owns its own fetch (via TanStack Query)
  * instead of taking `items` as a prop, per this component's brief.
  *
- * Access control: the backend's audit-log endpoint is deliberately
- * restricted (`@RequirePermission('audit_log', 'read')` — ADMIN/
- * COMPLIANCE_OFFICER only, see backend/api/src/modules/audit/
- * audit-log.controller.ts's header comment). This component does not
- * attempt to duplicate that check — it simply calls the endpoint and
- * renders whatever comes back, including a clean access-denied message on
- * 403 instead of an error toast or thrown query. That mirrors the
- * established "always show the section, gate the content" convention this
- * codebase already uses for permission-sensitive panels (see
- * app/(cases)/_lib/hooks.ts's useCaseSlaClocks/useClaimSlaClocks
- * `hasAccess: !policyQuery.isError` pattern) — callers are free to also
- * pre-emptively hide the whole tab/section for known-unprivileged roles if
- * that fits their page's existing gating pattern better; both are correct
- * because the real enforcement is server-side either way.
+ * Access control: the default endpoint (`/api/admin/audit-log`) is
+ * deliberately restricted (`@RequirePermission('audit_log', 'read')` —
+ * ADMIN/COMPLIANCE_OFFICER only, see backend/api/src/modules/audit/
+ * audit-log.controller.ts's header comment) — that's the right tier for the
+ * org-wide compliance trail, wrong for "can I see THIS record's own
+ * history" when I can already read the record itself. Pass `fetchUrl` to
+ * point at one of the per-record `:id/history` endpoints instead (Account/
+ * Policy/Case/Claim controllers, backed by
+ * backend/api/src/modules/audit/entity-history.ts) — same response shape,
+ * open to anyone who can read the record. Either way, this component does
+ * not attempt to duplicate the server-side check itself — it simply calls
+ * the endpoint and renders whatever comes back, including a clean
+ * access-denied message on 403 instead of an error toast or thrown query.
+ * That mirrors the established "always show the section, gate the content"
+ * convention this codebase already uses for permission-sensitive panels
+ * (see app/(cases)/_lib/hooks.ts's useCaseSlaClocks/useClaimSlaClocks
+ * `hasAccess: !policyQuery.isError` pattern).
  */
 
 // Hand-mirrored from packages/db/prisma/schema.prisma's AuditAction enum —
@@ -80,6 +83,13 @@ export interface RecordHistoryProps {
    * list, so a generous default is fine; pass lower for a compact widget. */
   take?: number;
   className?: string;
+  /** Overrides the default `/api/admin/audit-log` fetch — pass a per-record
+   * BFF route (e.g. `/api/crm/accounts/:id/history`) when the caller has a
+   * scoped endpoint that lets anyone who can read the record itself see its
+   * history, not just ADMIN/COMPLIANCE_OFFICER (see each such endpoint's
+   * own `loadEntityHistory` comment in backend/api). Response shape must
+   * still match `RecordHistoryEntry[]`. */
+  fetchUrl?: string;
 }
 
 export class RecordHistoryFetchError extends Error {
@@ -90,25 +100,27 @@ export class RecordHistoryFetchError extends Error {
   }
 }
 
-async function fetchRecordHistory(entityType: string, entityId: string, take: number): Promise<RecordHistoryEntry[]> {
-  const params = new URLSearchParams({ entityType, entityId, take: String(take), skip: '0' });
-  const res = await fetch(`/api/admin/audit-log?${params.toString()}`, { credentials: 'same-origin' });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    let message = res.statusText || `Request failed (${res.status})`;
-    if (text) {
-      try {
-        const body: unknown = JSON.parse(text);
-        if (body && typeof body === 'object' && 'message' in body) {
-          const m = (body as { message: unknown }).message;
-          message = Array.isArray(m) ? m.join(', ') : typeof m === 'string' ? m : message;
-        }
-      } catch {
-        // Non-JSON error body — fall back to statusText.
+async function throwFetchError(res: Response): Promise<never> {
+  const text = await res.text().catch(() => '');
+  let message = res.statusText || `Request failed (${res.status})`;
+  if (text) {
+    try {
+      const body: unknown = JSON.parse(text);
+      if (body && typeof body === 'object' && 'message' in body) {
+        const m = (body as { message: unknown }).message;
+        message = Array.isArray(m) ? m.join(', ') : typeof m === 'string' ? m : message;
       }
+    } catch {
+      // Non-JSON error body — fall back to statusText.
     }
-    throw new RecordHistoryFetchError(res.status, message);
   }
+  throw new RecordHistoryFetchError(res.status, message);
+}
+
+async function fetchRecordHistory(entityType: string, entityId: string, take: number, fetchUrl?: string): Promise<RecordHistoryEntry[]> {
+  const url = fetchUrl ?? `/api/admin/audit-log?${new URLSearchParams({ entityType, entityId, take: String(take), skip: '0' }).toString()}`;
+  const res = await fetch(url, { credentials: 'same-origin' });
+  if (!res.ok) return throwFetchError(res);
   return res.json() as Promise<RecordHistoryEntry[]>;
 }
 
@@ -212,10 +224,10 @@ function RawChangedFields({ value }: { value: unknown }) {
  * (unified-timeline.tsx) can pull the same audit rows into its merged
  * Activity+Audit list without duplicating the query/error-shape logic.
  */
-export function useRecordHistory(entityType: string, entityId: string, take = 50) {
+export function useRecordHistory(entityType: string, entityId: string, take = 50, fetchUrl?: string) {
   return useQuery({
-    queryKey: ['record-history', entityType, entityId, take],
-    queryFn: () => fetchRecordHistory(entityType, entityId, take),
+    queryKey: ['record-history', entityType, entityId, take, fetchUrl],
+    queryFn: () => fetchRecordHistory(entityType, entityId, take, fetchUrl),
     enabled: Boolean(entityType && entityId),
     // Same "don't retry a 403 three times" convention as
     // app/(cases)/_lib/hooks.ts's useSlaPolicy — a caller without
@@ -246,8 +258,8 @@ export function RecordHistoryRow({ entry }: { entry: RecordHistoryEntry }) {
   );
 }
 
-function RecordHistory({ entityType, entityId, take = 50, className }: RecordHistoryProps) {
-  const query = useRecordHistory(entityType, entityId, take);
+function RecordHistory({ entityType, entityId, take = 50, className, fetchUrl }: RecordHistoryProps) {
+  const query = useRecordHistory(entityType, entityId, take, fetchUrl);
 
   if (query.isLoading) {
     return (

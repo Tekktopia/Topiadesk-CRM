@@ -3,13 +3,20 @@ import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient, type Premium } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
+import { CurrentUser } from '../../common/auth/current-user.decorator';
+import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
+import { assertFieldsWritable, redactHiddenFields, redactHiddenFieldsMany, resolveFieldVisibilities } from '../../common/field-permissions/field-visibility.util';
 import { CreatePremiumDto } from './dto/create-premium.dto';
 import { UpdatePremiumDto } from './dto/update-premium.dto';
-import { PremiumAgingRowDto, PremiumResponseDto } from './dto/premium-response.dto';
+import { PaystackInitializeResponseDto, PremiumAgingRowDto, PremiumResponseDto } from './dto/premium-response.dto';
 import { BulkActionResponseDto, BulkMarkPremiumsPaidDto } from './dto/bulk-action.dto';
 import { queryRawWithRlsContext } from './rls-raw-query.util';
 import { decimalToString } from './decimal.util';
 import { diffBulkIds } from './bulk-actions';
+// NOT a type-only import: constructor-injected below — see the same
+// footgun documented on Reflector in permission.guard.ts.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import { PaystackService } from '../integrations/paystack.service';
 
 function toPremiumDto(premium: Premium): PremiumResponseDto {
   return {
@@ -59,18 +66,25 @@ export class PolicyPremiumController {
   @Get()
   @RequirePermission('policy', 'read')
   @ApiOkResponse({ type: [PremiumResponseDto] })
-  async list(@Param('policyId', ParseUUIDPipe) policyId: string): Promise<PremiumResponseDto[]> {
+  async list(@Param('policyId', ParseUUIDPipe) policyId: string, @CurrentUser() user: AuthenticatedUser): Promise<PremiumResponseDto[]> {
     const premiums = await getPrismaClient().premium.findMany({ where: { policyId }, orderBy: { dueDate: 'asc' } });
-    return premiums.map(toPremiumDto);
+    const visibilities = await resolveFieldVisibilities(user, 'premium');
+    return redactHiddenFieldsMany(premiums.map(toPremiumDto), visibilities);
   }
 
   @Post()
   @RequirePermission('policy', 'write')
   @ApiOkResponse({ type: PremiumResponseDto })
-  async create(@Param('policyId', ParseUUIDPipe) policyId: string, @Body() dto: CreatePremiumDto): Promise<PremiumResponseDto> {
+  async create(
+    @Param('policyId', ParseUUIDPipe) policyId: string,
+    @Body() dto: CreatePremiumDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<PremiumResponseDto> {
     const prisma = getPrismaClient();
     const policy = await prisma.policy.findUnique({ where: { id: policyId }, select: { id: true } });
     if (!policy) throw new NotFoundException('Policy not found');
+    const visibilities = await resolveFieldVisibilities(user, 'premium');
+    assertFieldsWritable(dto, visibilities);
 
     const premium = await prisma.premium.create({
       data: {
@@ -84,7 +98,7 @@ export class PolicyPremiumController {
         dueDate: new Date(dto.dueDate),
       },
     });
-    return toPremiumDto(premium);
+    return redactHiddenFields(toPremiumDto(premium), visibilities);
   }
 }
 
@@ -103,6 +117,8 @@ export class PolicyPremiumController {
 @UseGuards(PermissionGuard)
 @Controller('premiums')
 export class PremiumController {
+  constructor(private readonly paystack: PaystackService) {}
+
   @Get('aging')
   @RequirePermission('policy', 'read')
   @ApiOkResponse({ type: [PremiumAgingRowDto] })
@@ -156,19 +172,28 @@ export class PremiumController {
   @Get(':id')
   @RequirePermission('policy', 'read')
   @ApiOkResponse({ type: PremiumResponseDto })
-  async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<PremiumResponseDto> {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthenticatedUser): Promise<PremiumResponseDto> {
     const premium = await getPrismaClient().premium.findUnique({ where: { id } });
     if (!premium) throw new NotFoundException('Premium not found');
-    return toPremiumDto(premium);
+    return redactHiddenFields(toPremiumDto(premium), await resolveFieldVisibilities(user, 'premium'));
+  }
+
+  @Post(':id/paystack/initialize')
+  @RequirePermission('policy', 'write')
+  @ApiOkResponse({ type: PaystackInitializeResponseDto })
+  async initializePaystackPayment(@Param('id', ParseUUIDPipe) id: string): Promise<PaystackInitializeResponseDto> {
+    return this.paystack.initializePremiumPayment(id);
   }
 
   @Patch(':id')
   @RequirePermission('policy', 'write')
   @ApiOkResponse({ type: PremiumResponseDto })
-  async update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdatePremiumDto): Promise<PremiumResponseDto> {
+  async update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdatePremiumDto, @CurrentUser() user: AuthenticatedUser): Promise<PremiumResponseDto> {
     const prisma = getPrismaClient();
     const existing = await prisma.premium.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Premium not found');
+    const visibilities = await resolveFieldVisibilities(user, 'premium');
+    assertFieldsWritable(dto, visibilities);
 
     const premium = await prisma.premium.update({
       where: { id },
@@ -184,6 +209,6 @@ export class PremiumController {
         status: dto.status,
       },
     });
-    return toPremiumDto(premium);
+    return redactHiddenFields(toPremiumDto(premium), visibilities);
   }
 }

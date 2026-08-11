@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { getPrismaClient, type BusinessRule } from '@topiadesk/db';
+import { getPrismaClient, type BusinessRule, type CaseManagementEntityType } from '@topiadesk/db';
 
 /**
  * Condition fields mirror backend/worker/src/automation/run-engine.ts's own
@@ -15,14 +15,19 @@ import { getPrismaClient, type BusinessRule } from '@topiadesk/db';
  * kept in sync by hand — a field added to one without the other means the
  * admin UI offers an option the server then rejects, or vice versa.
  */
-export const CONDITION_FIELDS: Record<'CASE' | 'CLAIM', readonly string[]> = {
+export const CONDITION_FIELDS: Record<CaseManagementEntityType, readonly string[]> = {
   CASE: ['status', 'priority', 'caseType', 'categoryId', 'assignedTeamId'],
   CLAIM: ['status', 'priority', 'assignedTeamId'],
+  // Business rules don't support LEAD (see this file's header comment) —
+  // present so this stays a total Record over the shared enum, same "empty
+  // but representable" precedent as CLAIM's own ACTION_FIELDS below.
+  LEAD: [],
 };
 
-export const ACTION_FIELDS: Record<'CASE' | 'CLAIM', readonly string[]> = {
+export const ACTION_FIELDS: Record<CaseManagementEntityType, readonly string[]> = {
   CASE: ['caseType', 'subject', 'description', 'priority', 'categoryId', 'accountId', 'policyId', 'assignedToId'],
   CLAIM: [],
+  LEAD: [],
 };
 
 export type BusinessRuleActionEffect = 'REQUIRE' | 'HIDE' | 'READONLY' | 'SET_VALUE';
@@ -53,7 +58,7 @@ function parseActions(raw: unknown): BusinessRuleAction[] {
  * `existingRow` is undefined on create (nothing to merge defaults from yet).
  */
 export async function validateBusinessRules(
-  entityType: 'CASE' | 'CLAIM',
+  entityType: CaseManagementEntityType,
   existingRow: Record<string, unknown> | undefined,
   data: Record<string, unknown>,
 ): Promise<void> {

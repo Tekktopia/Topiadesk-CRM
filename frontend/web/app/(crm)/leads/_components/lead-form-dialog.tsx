@@ -29,8 +29,8 @@ import {
 } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { CustomFieldsSection, validateCustomFieldValues, type CustomFieldValues } from '../../_components/custom-fields-section';
-import { LEAD_SOURCES, LEAD_STATUSES, leadStatusLabel, humanize } from '../../_lib/constants';
-import { useCreateLead, useCustomFieldDefinitions, useUpdateLead } from '../../_lib/hooks';
+import { LEAD_STATUSES, leadStatusLabel } from '../../_lib/constants';
+import { useCreateLead, useCustomFieldDefinitions, useLeadSources, useUpdateLead } from '../../_lib/hooks';
 import type { Lead } from '../../_lib/types';
 
 const leadFormSchema = z.object({
@@ -39,7 +39,7 @@ const leadFormSchema = z.object({
   companyName: z.string(),
   email: z.union([z.string().email('Enter a valid email'), z.literal('')]),
   phone: z.string(),
-  source: z.enum(LEAD_SOURCES),
+  source: z.string().min(1, 'Source is required'),
   sourceCampaign: z.string(),
   status: z.enum(LEAD_STATUSES),
   score: z.coerce.number().int().min(0).max(100),
@@ -55,7 +55,7 @@ function defaultsFor(lead?: Lead): LeadFormValues {
     companyName: lead?.companyName ?? '',
     email: lead?.email ?? '',
     phone: lead?.phone ?? '',
-    source: lead?.source ?? 'WEB',
+    source: lead?.source ?? '',
     sourceCampaign: lead?.sourceCampaign ?? '',
     status: lead?.status ?? 'NEW',
     score: lead?.score ?? 0,
@@ -84,6 +84,20 @@ export function LeadFormDialog({
   React.useEffect(() => {
     setCustomFields(lead?.customFields ?? {});
   }, [lead]);
+
+  const { data: leadSources } = useLeadSources();
+  const activeSources = (leadSources ?? []).filter((s) => s.isActive);
+  // A source deactivated after being set on this lead still needs to render
+  // as the current selection — same "already-assigned values stay visible"
+  // treatment CustomFieldsSection gives a retired option.
+  const currentSourceStillListed = lead ? activeSources.some((s) => s.code === lead.source) : true;
+  const sourceOptions = currentSourceStillListed || !lead ? activeSources : [...activeSources, { id: lead.source, code: lead.source, name: lead.source }];
+  React.useEffect(() => {
+    if (!isEdit && !form.getValues('source') && activeSources.length > 0) {
+      form.setValue('source', activeSources[0]!.code);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSources.length]);
 
   const createLead = useCreateLead();
   const updateLead = useUpdateLead(lead?.id ?? '');
@@ -211,9 +225,9 @@ export function LeadFormDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {LEAD_SOURCES.map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {humanize(s)}
+                        {sourceOptions.map((s) => (
+                          <SelectItem key={s.id} value={s.code}>
+                            {s.name}
                           </SelectItem>
                         ))}
                       </SelectContent>

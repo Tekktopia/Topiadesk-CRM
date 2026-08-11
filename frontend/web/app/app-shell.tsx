@@ -20,8 +20,15 @@ import { AppSidebar } from './app-sidebar';
  * app/page.tsx, the entry chooser; middleware.ts already redirects any
  * authenticated visitor away from it before this ever renders, so in
  * practice only an anonymous visitor reaches this branch for "/".
+ *
+ * `/offline` is included for a different reason: it's the service worker's
+ * (public/sw.js) precached fallback for when the network is unreachable.
+ * It must render standalone with zero data fetching — the notification
+ * bell/presence/etc. inside AppHeader all assume a live network, which is
+ * exactly what's missing when this page is shown. See app/offline/page.tsx
+ * and middleware.ts's matching matcher exclusion.
  */
-const PUBLIC_PATH_PREFIXES = ['/survey-respond', '/kb', '/portal', '/'];
+const PUBLIC_PATH_PREFIXES = ['/survey-respond', '/kb', '/portal', '/offline', '/'];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));

@@ -31,6 +31,7 @@ import { grantSentence, resourceLabel, scopeLabel } from '../_lib/rbac-labels';
 import type { PermissionSummaryDto, RoleDto } from '../_lib/types';
 import { RoleFormDialog } from './role-form-dialog';
 import { GrantPermissionDialog } from './grant-permission-dialog';
+import { FieldPermissionsCard } from './field-permissions-card';
 
 export default function RolesPage() {
   const { user: currentUser } = useCurrentUser();
@@ -201,50 +202,54 @@ export default function RolesPage() {
           </Card>
 
           {selectedRole ? (
-            <Card>
-              <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-muted-foreground" aria-hidden />
-                    {selectedRole.name}
-                    {selectedRole.isSystemRole ? <Badge variant="outline">System role</Badge> : null}
-                  </CardTitle>
-                  <CardDescription>{selectedRole.description ?? 'No description'}</CardDescription>
-                </div>
-                {canWrite ? (
-                  <div className="flex shrink-0 gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setRoleFormMode('edit')}>
-                      Edit
-                    </Button>
-                    {!selectedRole.isSystemRole ? (
-                      <Button size="sm" variant="outline" onClick={() => setPendingDeleteRole(selectedRole)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    ) : null}
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-muted-foreground" aria-hidden />
+                      {selectedRole.name}
+                      {selectedRole.isSystemRole ? <Badge variant="outline">System role</Badge> : null}
+                    </CardTitle>
+                    <CardDescription>{selectedRole.description ?? 'No description'}</CardDescription>
                   </div>
-                ) : null}
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {canWrite ? (
-                  <Button size="sm" variant="outline" onClick={() => setShowGrantDialog(true)}>
-                    <Plus className="h-4 w-4" /> Add grant
-                  </Button>
-                ) : null}
+                  {canWrite ? (
+                    <div className="flex shrink-0 gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setRoleFormMode('edit')}>
+                        Edit
+                      </Button>
+                      {!selectedRole.isSystemRole ? (
+                        <Button size="sm" variant="outline" onClick={() => setPendingDeleteRole(selectedRole)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {canWrite ? (
+                    <Button size="sm" variant="outline" onClick={() => setShowGrantDialog(true)}>
+                      <Plus className="h-4 w-4" /> Add grant
+                    </Button>
+                  ) : null}
 
-                {grantRows.length === 0 ? (
-                  <EmptyState title="No permission grants" description="This role currently cannot access any resource." />
-                ) : (
-                  <DataTable<PermissionSummaryDto, unknown>
-                    columns={grantColumns}
-                    data={grantRows}
-                    getRowId={(g) => g.id}
-                    pagination={grantsPagination}
-                    onPaginationChange={setGrantsPagination}
-                    totalRowCount={grantRows.length}
-                  />
-                )}
-              </CardContent>
-            </Card>
+                  {grantRows.length === 0 ? (
+                    <EmptyState title="No permission grants" description="This role currently cannot access any resource." />
+                  ) : (
+                    <DataTable<PermissionSummaryDto, unknown>
+                      columns={grantColumns}
+                      data={grantRows}
+                      getRowId={(g) => g.id}
+                      pagination={grantsPagination}
+                      onPaginationChange={setGrantsPagination}
+                      totalRowCount={grantRows.length}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              <FieldPermissionsCard roleId={selectedRole.id} roleName={selectedRole.name} canWrite={canWrite} />
+            </div>
           ) : null}
         </div>
       )}

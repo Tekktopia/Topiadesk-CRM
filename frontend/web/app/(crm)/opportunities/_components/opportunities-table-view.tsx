@@ -22,6 +22,7 @@ import { BulkActionToolbar } from '../../_components/bulk-action-toolbar';
 import { EmptyState } from '../../_components/empty-state';
 import { ConfirmDialog } from '../../_components/confirm-dialog';
 import { formatCurrency, formatDate } from '../../_lib/format';
+import { dealHealthScoreLabel, dealHealthScoreVariant } from '../../_lib/constants';
 import { useBulkAssignOpportunities, useBulkDeleteOpportunities, useDeleteOpportunity } from '../../_lib/hooks';
 import type { DirectoryUser, Opportunity, PipelineStage } from '../../_lib/types';
 import { OpportunityFormDialog } from './opportunity-form-dialog';
@@ -104,7 +105,7 @@ export function OpportunitiesTableView({
       {
         accessorKey: 'amount',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Amount" />,
-        cell: ({ row }) => <span className="tabular-nums">{formatCurrency(row.original.amount)}</span>,
+        cell: ({ row }) => <span className="tabular-nums">{formatCurrency(row.original.amount, row.original.currency)}</span>,
       },
       {
         accessorKey: 'probability',
@@ -115,6 +116,16 @@ export function OpportunitiesTableView({
         accessorKey: 'expectedCloseDate',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Expected close" />,
         cell: ({ row }) => <span className="text-muted-foreground">{formatDate(row.original.expectedCloseDate)}</span>,
+      },
+      {
+        accessorKey: 'dealHealthScore',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Health" />,
+        cell: ({ row }) =>
+          row.original.dealHealthScore !== null ? (
+            <Badge variant={dealHealthScoreVariant(row.original.dealHealthScore)}>{dealHealthScoreLabel(row.original.dealHealthScore)}</Badge>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
       },
       {
         id: 'owner',

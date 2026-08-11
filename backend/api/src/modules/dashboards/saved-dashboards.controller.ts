@@ -5,8 +5,8 @@ import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
-import { CreateSavedDashboardDto, SavedDashboardResponseDto, UpdateSavedDashboardDto } from './dto/saved-dashboard.dto';
-import { RenderedDashboardResponseDto } from './dto/rendered-dashboard-response.dto';
+import { CreateSavedDashboardDto, RenderPreviewDto, SavedDashboardResponseDto, UpdateSavedDashboardDto } from './dto/saved-dashboard.dto';
+import { RenderedDashboardResponseDto, RenderedDashboardWidgetDto } from './dto/rendered-dashboard-response.dto';
 import { renderDashboardWidgets } from './dashboard-render.util';
 
 /**
@@ -56,6 +56,16 @@ export class SavedDashboardsController {
         layoutConfig: dto.layoutConfig as Prisma.InputJsonValue,
       },
     });
+  }
+
+  // Literal segment, not `:id` — no collision either way (this controller
+  // has no `POST :id` route to conflict with), but declared here for
+  // proximity to `create()`, the other POST route.
+  @Post('render-preview')
+  @RequirePermission('report', 'read')
+  @ApiOkResponse({ type: [RenderedDashboardWidgetDto] })
+  async renderPreview(@Body() dto: RenderPreviewDto): Promise<RenderedDashboardWidgetDto[]> {
+    return renderDashboardWidgets(getPrismaClient(), dto.widgets);
   }
 
   @Patch(':id')

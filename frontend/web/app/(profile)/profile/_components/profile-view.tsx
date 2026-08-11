@@ -22,6 +22,7 @@ import {
 } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { bumpAvatarCacheBust, getAvatarCacheBust } from '@/app/account-menu';
+import { ApiKeysCard } from './api-keys-card';
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 
@@ -307,6 +308,8 @@ export function ProfileView() {
           </Button>
         </CardContent>
       </Card>
+
+      <ApiKeysCard />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
+import { ArrayMinSize, IsArray, IsBoolean, IsInt, IsOptional, IsString, IsUUID, Max, Min, MinLength } from 'class-validator';
 
 export class CreatePipelineDto {
   @ApiProperty() @IsString() @MinLength(1) name!: string;
@@ -40,3 +40,8 @@ export class CreatePipelineStageDto {
 }
 
 export class UpdatePipelineStageDto extends PartialType(CreatePipelineStageDto) {}
+
+/** Stage ids for one pipeline, in the desired display order — see PipelinesController.reorderStages(). */
+export class ReorderPipelineStagesDto {
+  @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @IsUUID('4', { each: true }) stageIds!: string[];
+}

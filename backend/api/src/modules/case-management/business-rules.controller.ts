@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { getPrismaClient, Prisma } from '@topiadesk/db';
+import { getPrismaClient, Prisma, type CaseManagementEntityType } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { ACTION_FIELDS, CONDITION_FIELDS } from './business-rules.validator';
@@ -97,7 +97,7 @@ export class BusinessRulesController {
 }
 
 function assertFieldsAllowed(
-  entityType: 'CASE' | 'CLAIM',
+  entityType: CaseManagementEntityType,
   conditionField: string,
   actions: Array<{ field: string }>,
 ): void {

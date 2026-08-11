@@ -1,10 +1,12 @@
 import { z } from 'zod';
-import { LeadSource, type PrismaClient } from '@topiadesk/db';
+import type { PrismaClient } from '@topiadesk/db';
 import { buildReportResult, reportColumns, reportRows, type ReportCellValue, type ReportDefinition, type ReportDimension, type ReportMeasure } from '../report-definition';
 
 const filterSchema = z
   .object({
-    source: z.nativeEnum(LeadSource).optional(),
+    // A LeadSource.code — admin-managed lookup, not a fixed enum, see
+    // LeadSource's own schema.prisma comment.
+    source: z.string().optional(),
     createdFrom: z.string().date().optional(),
     createdTo: z.string().date().optional(),
   })

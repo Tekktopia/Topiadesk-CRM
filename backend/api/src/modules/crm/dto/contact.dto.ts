@@ -16,6 +16,15 @@ export class CreateContactDto {
   @ApiProperty({ required: false }) @IsOptional() @IsEmail() email?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() phone?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() title?: string;
+  @ApiProperty({ required: false, description: 'Only meaningful when the parent account is HOUSEHOLD — Spouse/Child/Dependent/etc.' })
+  @IsOptional()
+  @IsString()
+  householdRole?: string;
+  @ApiProperty({ required: false, description: 'National ID, Passport, Driver\'s License, Utility Bill, CAC, etc.' })
+  @IsOptional()
+  @IsString()
+  idType?: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() idNumber?: string;
   @ApiProperty({ required: false, default: false }) @IsOptional() @IsBoolean() isPrimary?: boolean;
   // Validated against active CustomFieldDefinition rows for CONTACT in
   // ContactsController before write — see custom-fields.validator.ts.
@@ -39,7 +48,12 @@ export class ContactResponseDto {
   @ApiProperty({ nullable: true }) email!: string | null;
   @ApiProperty({ nullable: true }) phone!: string | null;
   @ApiProperty({ nullable: true }) title!: string | null;
+  @ApiProperty({ nullable: true }) householdRole!: string | null;
+  @ApiProperty({ nullable: true }) idType!: string | null;
+  @ApiProperty({ nullable: true }) idNumber!: string | null;
   @ApiProperty() isPrimary!: boolean;
+  /** Set once a DataSubjectRequest DELETE has been processed for this contact — see that model's schema comment. */
+  @ApiProperty({ nullable: true }) anonymizedAt!: Date | null;
   @ApiProperty({ type: 'object', additionalProperties: true }) customFields!: unknown;
   @ApiProperty() createdAt!: Date;
 }

@@ -11,6 +11,11 @@ import { VersionHistory } from './version-history';
 import { PremiumsPanel } from './premiums-panel';
 import { RenewalPanel } from './renewal-panel';
 import { DocumentsPanel } from './documents-panel';
+import { SignaturesPanel } from './signatures-panel';
+import { ProducersPanel } from './producers-panel';
+import { CoveragesPanel } from './coverages-panel';
+import { ParticipantsPanel } from './participants-panel';
+import { AssetsPanel } from './assets-panel';
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: 'same-origin' });
@@ -102,16 +107,33 @@ export function PolicyDetailView({ policyId }: { policyId: string }) {
       <Tabs defaultValue="versions">
         <TabsList>
           <TabsTrigger value="versions">Versions &amp; approvals</TabsTrigger>
+          <TabsTrigger value="coverages">Coverages</TabsTrigger>
+          <TabsTrigger value="participants">Participants</TabsTrigger>
+          <TabsTrigger value="assets">Assets</TabsTrigger>
           <TabsTrigger value="premiums">Premiums</TabsTrigger>
+          <TabsTrigger value="producers">Producers</TabsTrigger>
           <TabsTrigger value="renewal">Renewal</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="signatures">Signatures</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
         <TabsContent value="versions" className="pt-4">
           <VersionHistory policyId={policyId} onChanged={invalidatePolicy} />
         </TabsContent>
+        <TabsContent value="coverages" className="pt-4">
+          <CoveragesPanel policyId={policyId} />
+        </TabsContent>
+        <TabsContent value="participants" className="pt-4">
+          <ParticipantsPanel policyId={policyId} accountId={policy.accountId} />
+        </TabsContent>
+        <TabsContent value="assets" className="pt-4">
+          <AssetsPanel policyId={policyId} />
+        </TabsContent>
         <TabsContent value="premiums" className="pt-4">
           <PremiumsPanel policyId={policyId} />
+        </TabsContent>
+        <TabsContent value="producers" className="pt-4">
+          <ProducersPanel policyId={policyId} />
         </TabsContent>
         <TabsContent value="renewal" className="pt-4">
           <RenewalPanel policyId={policyId} />
@@ -119,8 +141,11 @@ export function PolicyDetailView({ policyId }: { policyId: string }) {
         <TabsContent value="documents" className="pt-4">
           <DocumentsPanel policyId={policyId} />
         </TabsContent>
+        <TabsContent value="signatures" className="pt-4">
+          <SignaturesPanel policyId={policyId} />
+        </TabsContent>
         <TabsContent value="history" className="pt-4">
-          <RecordHistory entityType="policies" entityId={policyId} />
+          <RecordHistory entityType="policies" entityId={policyId} fetchUrl={`/api/policies/${policyId}/history`} />
         </TabsContent>
       </Tabs>
     </div>

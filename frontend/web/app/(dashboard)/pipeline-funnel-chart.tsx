@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipTrigger, Badge, cn } from '@topiadesk/ui';
 import { formatNaira } from '@/app/(policy)/lib/format';
 import type { FunnelStage } from './types';
@@ -16,8 +17,13 @@ import type { FunnelStage } from './types';
  * order (progression reads as "further along"); the won/lost terminal
  * stages use the reserved status colors (success/destructive) instead of
  * continuing the ramp, since those are state, not sequence.
+ *
+ * Each row drills down to /opportunities?pipelineId=...&stageId=... (see
+ * opportunities-kanban-view.tsx's stageIdFilter) — pipelineId comes from
+ * the funnel response itself (PipelineFunnelResponse.pipelineId), not a
+ * separate lookup.
  */
-export function PipelineFunnelChart({ stages, pipelineName }: { stages: FunnelStage[]; pipelineName: string | null }) {
+export function PipelineFunnelChart({ stages, pipelineName, pipelineId }: { stages: FunnelStage[]; pipelineName: string | null; pipelineId: string | null }) {
   if (stages.length === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
@@ -44,40 +50,47 @@ export function PipelineFunnelChart({ stages, pipelineName }: { stages: FunnelSt
             openIndex += 1;
           }
 
+          const href = pipelineId ? `/opportunities?pipelineId=${pipelineId}&stageId=${stage.stageId}` : '/opportunities';
+
           return (
-            <li key={stage.stageId} className="grid grid-cols-[minmax(0,120px)_1fr_auto] items-center gap-3">
-              <span className="truncate text-sm font-medium text-foreground" title={stage.name}>
-                {stage.name}
-              </span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div
-                    tabIndex={0}
-                    className="h-6 w-full overflow-hidden rounded-sm bg-muted focus:outline-none focus:ring-2 focus:ring-ring"
-                    role="img"
-                    aria-label={`${stage.name}: ${stage.count} opportunities, ${formatNaira(stage.value)}`}
-                  >
+            <li key={stage.stageId}>
+              <Link
+                href={href}
+                className="grid grid-cols-[minmax(0,120px)_1fr_auto] items-center gap-3 rounded-md p-1 -m-1 transition-colors hover:bg-muted/60 focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <span className="truncate text-sm font-medium text-foreground" title={stage.name}>
+                  {stage.name}
+                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
                     <div
-                      className={cn('h-full rounded-r-[4px] transition-[width]', colorClass)}
-                      style={{ width: `${widthPercent}%` }}
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <div className="space-y-0.5">
-                    <p className="font-medium text-popover-foreground">{stage.name}</p>
-                    <p>
-                      <span className="font-semibold">{stage.count}</span> opportunities
-                    </p>
-                    <p>{formatNaira(stage.value)} total value</p>
-                    {stage.isWon ? <Badge variant="success">Won</Badge> : null}
-                    {stage.isLost ? <Badge variant="destructive">Lost</Badge> : null}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-              <span className="whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground">
-                {stage.count} · {formatNaira(stage.value)}
-              </span>
+                      tabIndex={-1}
+                      className="h-6 w-full overflow-hidden rounded-sm bg-muted"
+                      role="img"
+                      aria-label={`${stage.name}: ${stage.count} opportunities, ${formatNaira(stage.value)}`}
+                    >
+                      <div
+                        className={cn('h-full rounded-r-[4px] transition-[width]', colorClass)}
+                        style={{ width: `${widthPercent}%` }}
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <div className="space-y-0.5">
+                      <p className="font-medium text-popover-foreground">{stage.name}</p>
+                      <p>
+                        <span className="font-semibold">{stage.count}</span> opportunities
+                      </p>
+                      <p>{formatNaira(stage.value)} total value</p>
+                      {stage.isWon ? <Badge variant="success">Won</Badge> : null}
+                      {stage.isLost ? <Badge variant="destructive">Lost</Badge> : null}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+                <span className="whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground">
+                  {stage.count} · {formatNaira(stage.value)}
+                </span>
+              </Link>
             </li>
           );
         })}

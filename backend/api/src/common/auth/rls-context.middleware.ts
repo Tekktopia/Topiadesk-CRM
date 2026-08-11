@@ -6,7 +6,10 @@ import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, type RlsContext
 import { ENV_TOKEN, type Env } from '../config/config.module';
 import { JwtVerifier } from './jwt-verifier';
 import { resolveActiveTenantByRealm } from './tenant-realm-resolver';
+import { hashApiKey } from '../../modules/identity/api-key.util';
 import type { AuthenticatedUser } from './authenticated-user';
+
+const API_KEY_PREFIX = 'tdk_';
 
 /**
  * Runs before Nest's guard/interceptor chain (middleware executes first in
@@ -89,6 +92,17 @@ export class RlsContextMiddleware implements NestMiddleware {
     }
     const token = authHeader.slice('Bearer '.length);
 
+    // Self-service API keys (see api-keys.controller.ts) authenticate via
+    // this completely separate branch — a `tdk_`-prefixed bearer token can
+    // never be mistaken for a real Keycloak JWT (those are three
+    // dot-separated base64url segments starting `eyJ`), so this check is
+    // unambiguous and every existing JWT request falls through to the
+    // unmodified code below exactly as before.
+    if (token.startsWith(API_KEY_PREFIX)) {
+      await this.useApiKey(token, req, res, next);
+      return;
+    }
+
     const unverified = jwt.decode(token);
     const iss = unverified && typeof unverified === 'object' ? (unverified as { iss?: unknown }).iss : undefined;
     const realmMatch = typeof iss === 'string' ? iss.match(/\/realms\/([^/]+)$/) : null;
@@ -162,6 +176,70 @@ export class RlsContextMiddleware implements NestMiddleware {
       // RlsContext.keycloakRealm's own comment for why that assumption
       // broke for the original pre-multi-tenant seed tenant).
       keycloakRealm: realmName,
+    };
+
+    runWithRlsContext(ctx, () => next());
+  }
+
+  /**
+   * Self-service API key auth (see ApiKey's schema.prisma comment) — an
+   * intentional mirror of the JWT branch above's bootstrap-lookup/context-
+   * build shape, just sourcing `tenantSchema`/the local user differently:
+   * the key row itself (always in `public`, looked up under
+   * SYSTEM_JOB_CONTEXT) names the tenant, then that tenant's own User row
+   * is fetched live — so permissions always reflect the user's CURRENT
+   * roles/department/branch, never a snapshot frozen at key-creation time.
+   */
+  private async useApiKey(token: string, req: Request, res: Response, next: NextFunction): Promise<void> {
+    const prisma = getPrismaClient();
+    const tokenHash = hashApiKey(token);
+    const apiKey = await runWithRlsContext(SYSTEM_JOB_CONTEXT, () => prisma.apiKey.findUnique({ where: { tokenHash } }));
+    if (!apiKey || !apiKey.isActive || (apiKey.expiresAt && apiKey.expiresAt < new Date())) {
+      res.status(401).json({ statusCode: 401, message: 'Invalid or expired API key' });
+      return;
+    }
+
+    const tenantSchema = apiKey.tenantSchema;
+    const localUser = await runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema }, () =>
+      prisma.user.findUnique({
+        where: { id: apiKey.userId },
+        include: { roles: { include: { role: true } } },
+      }),
+    );
+    if (!localUser || localUser.status !== 'ACTIVE') {
+      res.status(403).json({ statusCode: 403, message: 'No active local account for this API key' });
+      return;
+    }
+
+    // Best-effort, doesn't block the request — same fire-and-forget shape
+    // as ScimAuthGuard's own lastUsedAt bookkeeping.
+    runWithRlsContext(SYSTEM_JOB_CONTEXT, () => prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } })).catch(() => {});
+
+    const roleNames = localUser.roles.map((r: { role: { name: string } }) => r.role.name);
+    const roleIds = localUser.roles.map((r: { role: { id: string } }) => r.role.id);
+    const authenticatedUser: AuthenticatedUser = {
+      id: localUser.id,
+      email: localUser.email,
+      fullName: localUser.fullName,
+      presenceStatus: localUser.presenceStatus,
+      roles: roleNames,
+      roleIds,
+      departmentId: localUser.departmentId,
+      branchId: localUser.branchId,
+    };
+    req.user = authenticatedUser;
+
+    const ctx: RlsContext = {
+      userId: localUser.id,
+      role: roleNames.includes('ADMIN') ? 'ADMIN' : 'USER',
+      departmentId: localUser.departmentId,
+      branchId: localUser.branchId,
+      clientIp: req.ip ?? null,
+      tenantSchema,
+      // No real Keycloak realm behind an API-key request — left null,
+      // same documented fallback (tenantSchema, then env.KEYCLOAK_REALM)
+      // KeycloakAdminService.realmName() already has for exactly this case.
+      keycloakRealm: null,
     };
 
     runWithRlsContext(ctx, () => next());

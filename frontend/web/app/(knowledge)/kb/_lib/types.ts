@@ -37,3 +37,5 @@ export type PublicKnowledgeArticleQuery = {
   take?: number;
   skip?: number;
 };
+
+export type PublicKnowledgeVote = 'HELPFUL' | 'NOT_HELPFUL';

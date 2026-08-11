@@ -60,6 +60,12 @@ import { getWebEnv } from '@/lib/env';
  * each protected page itself via `lib/portal-auth/session.ts`, not by this
  * middleware) — see app/(portal)/portal/layout.tsx's header comment.
  *
+ * `/offline` is excluded so the service worker (public/sw.js) can precache
+ * it at install time regardless of whether the installing visitor has a
+ * session — and so it stays reachable as a fallback if a session cookie
+ * expires while genuinely offline. It has no data of its own to protect
+ * (see app-shell.tsx's PUBLIC_PATH_PREFIXES for its matching exclusion).
+ *
  * `/` (exact root only, not a prefix — see the dedicated check below,
  * kept separate from the matcher's static exclusion list since "public
  * unless a valid session says otherwise" is different logic from "always
@@ -122,10 +128,12 @@ export const config = {
      *   token involved; see the header comment above
      * - /portal/* and /api/portal/* (customer self-service portal) — its
      *   own portal_session cookie, checked at the page level, not here
+     * - /offline (service worker's precached fallback page) — see the
+     *   header comment above
      * - Next internals (_next/static, _next/image)
      * - common static file extensions
      * - favicon.ico
      */
-    '/((?!api/auth|survey-respond|api/surveys/responses|api/public|kb|portal|api/portal|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).*)',
+    '/((?!api/auth|survey-respond|api/surveys/responses|api/public|kb|portal|api/portal|offline|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).*)',
   ],
 };

@@ -6,6 +6,7 @@ import { apiFetch, ApiRequestError, buildQuery } from './api';
 import type {
   Account,
   AccountDetail,
+  AccountGroupRollup,
   AccountQuery,
   AccountRelationship,
   AccountRenewalRow,
@@ -38,12 +39,20 @@ import type {
   CreateSavedViewInput,
   CreateSiteInput,
   CreateTaskInput,
+  ConsentRecord,
+  CreateConsentRecordInput,
+  CreateDataSubjectRequestInput,
+  CurrentConsent,
   CustomFieldDefinition,
   CustomFieldEntityType,
+  DataSubjectRequest,
   DirectoryUser,
   DuplicateGroup,
   Lead,
   LeadQuery,
+  LeadSourceOption,
+  CreateLeadSourceInput,
+  UpdateLeadSourceInput,
   LoyaltyAccount,
   LoyaltyTransaction,
   MarketSubmission,
@@ -52,8 +61,14 @@ import type {
   MergeResponse,
   Opportunity,
   OpportunityQuery,
+  StageHistoryEntry,
   PipelineDetail,
   Pipeline,
+  PipelineStage,
+  CreatePipelineInput,
+  UpdatePipelineInput,
+  CreatePipelineStageInput,
+  UpdatePipelineStageInput,
   QuotaAttainment,
   RunSavedViewResult,
   SalesQuota,
@@ -104,6 +119,14 @@ export function useAccountRenewals(id: string | undefined) {
   return useQuery({
     queryKey: ['crm', 'accounts', id, 'renewals'],
     queryFn: () => apiFetch<AccountRenewalRow[]>(`/api/crm/accounts/${id}/renewals`),
+    enabled: Boolean(id),
+  });
+}
+
+export function useAccountGroupRollup(id: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'accounts', id, 'group-rollup'],
+    queryFn: () => apiFetch<AccountGroupRollup>(`/api/crm/accounts/${id}/group-rollup`),
     enabled: Boolean(id),
   });
 }
@@ -255,6 +278,28 @@ export function useContacts(query: ContactQuery) {
   });
 }
 
+/**
+ * Resolves a set of contact ids to their full rows in parallel — for a page
+ * like data-subject-requests-view.tsx that lists contacts by id across
+ * accounts, where useContacts(query) can't help (it's deliberately disabled
+ * without an accountId/carrierId scope, to avoid ever pulling an unscoped
+ * full contact list).
+ */
+export function useContactsByIds(ids: string[]) {
+  const uniqueIds = [...new Set(ids)];
+  const queries = useQueries({
+    queries: uniqueIds.map((id) => ({
+      queryKey: ['crm', 'contacts', 'one', id],
+      queryFn: () => apiFetch<Contact>(`/api/crm/contacts/${id}`),
+    })),
+  });
+  const byId = new Map<string, Contact>();
+  for (const q of queries) {
+    if (q.data) byId.set(q.data.id, q.data);
+  }
+  return { contactsById: byId, isLoading: queries.some((q) => q.isLoading) };
+}
+
 export function useCreateContact() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -291,6 +336,85 @@ export function useDeleteContact(accountId?: string) {
       queryClient.invalidateQueries({ queryKey: ['crm', 'contacts'] });
       if (accountId) queryClient.invalidateQueries({ queryKey: ['crm', 'accounts', accountId] });
       toast.success('Contact removed');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+// -- Data Subject Requests (NDPR/GDPR) ---------------------------------------
+
+export function useDataSubjectRequests(query?: { contactId?: string; status?: string }) {
+  return useQuery({
+    queryKey: ['crm', 'data-subject-requests', query],
+    queryFn: () => apiFetch<DataSubjectRequest[]>(`/api/crm/data-subject-requests${buildQuery(query ?? {})}`),
+  });
+}
+
+export function useCreateDataSubjectRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateDataSubjectRequestInput) =>
+      apiFetch<DataSubjectRequest>('/api/crm/data-subject-requests', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'data-subject-requests'] });
+      toast.success('Request logged');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useProcessDataSubjectRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<DataSubjectRequest>(`/api/crm/data-subject-requests/${id}/process`, { method: 'POST' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'data-subject-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['crm', 'contacts'] });
+      toast.success('Request fulfilled');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useRejectDataSubjectRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      apiFetch<DataSubjectRequest>(`/api/crm/data-subject-requests/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'data-subject-requests'] });
+      toast.success('Request rejected');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+// -- Consent Records ----------------------------------------------------------
+
+export function useCurrentConsent(contactId: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'consent-records', 'current', contactId],
+    queryFn: () => apiFetch<CurrentConsent[]>(`/api/crm/consent-records/current?contactId=${contactId}`),
+    enabled: Boolean(contactId),
+  });
+}
+
+export function useConsentHistory(contactId: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'consent-records', 'history', contactId],
+    queryFn: () => apiFetch<ConsentRecord[]>(`/api/crm/consent-records?contactId=${contactId}`),
+    enabled: Boolean(contactId),
+  });
+}
+
+export function useCreateConsentRecord() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateConsentRecordInput) => apiFetch<ConsentRecord>('/api/crm/consent-records', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'consent-records', 'current', variables.contactId] });
+      queryClient.invalidateQueries({ queryKey: ['crm', 'consent-records', 'history', variables.contactId] });
+      toast.success('Consent recorded');
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -520,6 +644,92 @@ export function usePipeline(id: string | undefined) {
   });
 }
 
+export function useCreatePipeline() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreatePipelineInput) => apiFetch<Pipeline>('/api/crm/pipelines', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (pipeline) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'pipelines'] });
+      toast.success(`Pipeline "${pipeline.name}" created`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useUpdatePipeline(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdatePipelineInput) => apiFetch<Pipeline>(`/api/crm/pipelines/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'pipelines'] });
+      toast.success('Pipeline updated');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useDeletePipeline() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<{ deleted: boolean }>(`/api/crm/pipelines/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'pipelines'] });
+      toast.success('Pipeline deleted');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useCreatePipelineStage(pipelineId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreatePipelineStageInput) =>
+      apiFetch<PipelineStage>(`/api/crm/pipelines/${pipelineId}/stages`, { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'pipelines', pipelineId] });
+      toast.success('Stage added');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useUpdatePipelineStage(pipelineId: string, stageId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdatePipelineStageInput) =>
+      apiFetch<PipelineStage>(`/api/crm/pipeline-stages/${stageId}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'pipelines', pipelineId] });
+      toast.success('Stage updated');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useDeletePipelineStage(pipelineId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (stageId: string) => apiFetch<{ deleted: boolean }>(`/api/crm/pipeline-stages/${stageId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'pipelines', pipelineId] });
+      toast.success('Stage deleted');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useReorderPipelineStages(pipelineId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (stageIds: string[]) =>
+      apiFetch<PipelineStage[]>(`/api/crm/pipelines/${pipelineId}/stages/reorder`, { method: 'POST', body: JSON.stringify({ stageIds }) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'pipelines', pipelineId] });
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
 /**
  * Fetches every Pipeline + its stages and flattens them into a single
  * stageId -> stage (+ pipelineName) lookup. Only 2 pipelines / ~10 stages
@@ -600,6 +810,14 @@ export function useOpportunity(id: string | undefined) {
   return useQuery({
     queryKey: ['crm', 'opportunities', id],
     queryFn: () => apiFetch<Opportunity>(`/api/crm/opportunities/${id}`),
+    enabled: Boolean(id),
+  });
+}
+
+export function useOpportunityStageHistory(id: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'opportunities', id, 'stage-history'],
+    queryFn: () => apiFetch<StageHistoryEntry[]>(`/api/crm/opportunities/${id}/stage-history`),
     enabled: Boolean(id),
   });
 }
@@ -784,6 +1002,54 @@ export function useDirectoryUsers() {
   const byId = new Map<string, DirectoryUser>();
   for (const user of query.data ?? []) byId.set(user.id, user);
   return { usersById: byId, isLoading: query.isLoading };
+}
+
+// ---------------------------------------------------------------------------
+// Lead sources — admin-managed lookup replacing the old fixed LeadSource enum
+// ---------------------------------------------------------------------------
+
+export function useLeadSources() {
+  return useQuery({
+    queryKey: ['crm', 'lead-sources'],
+    queryFn: () => apiFetch<LeadSourceOption[]>('/api/crm/lead-sources'),
+    staleTime: 60_000,
+  });
+}
+
+export function useCreateLeadSource() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateLeadSourceInput) => apiFetch<LeadSourceOption>('/api/crm/lead-sources', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (source) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'lead-sources'] });
+      toast.success(`Lead source "${source.name}" created`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useUpdateLeadSource(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateLeadSourceInput) => apiFetch<LeadSourceOption>(`/api/crm/lead-sources/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'lead-sources'] });
+      toast.success('Lead source updated');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useDeleteLeadSource() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<{ deleted: boolean }>(`/api/crm/lead-sources/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'lead-sources'] });
+      toast.success('Lead source deleted');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
 }
 
 // ---------------------------------------------------------------------------

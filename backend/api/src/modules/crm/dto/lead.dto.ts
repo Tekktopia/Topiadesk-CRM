@@ -14,10 +14,10 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { AccountType, LeadSource, LeadStatus } from '@topiadesk/db';
+import { AccountType, LeadStatus } from '@topiadesk/db';
 
 export class CreateLeadDto {
-  @ApiProperty({ enum: LeadSource }) @IsEnum(LeadSource) source!: LeadSource;
+  @ApiProperty({ description: 'A LeadSource.code — see GET /crm/lead-sources for the admin-managed list' }) @IsString() @MinLength(1) source!: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() sourceCampaign?: string;
   @ApiProperty() @IsString() @MinLength(1) firstName!: string;
   @ApiProperty() @IsString() @MinLength(1) lastName!: string;
@@ -37,7 +37,7 @@ export class UpdateLeadDto extends PartialType(CreateLeadDto) {}
 
 export class LeadQueryDto {
   @ApiProperty({ enum: LeadStatus, required: false }) @IsOptional() @IsEnum(LeadStatus) status?: LeadStatus;
-  @ApiProperty({ enum: LeadSource, required: false }) @IsOptional() @IsEnum(LeadSource) source?: LeadSource;
+  @ApiProperty({ required: false, description: 'A LeadSource.code' }) @IsOptional() @IsString() source?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() assignedToId?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsInt() @Min(0) @Max(100) minScore?: number;
 }
@@ -111,7 +111,7 @@ export class BulkAssignLeadsDto {
 export class BulkUpdateLeadsDto {
   @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @IsUUID(undefined, { each: true }) ids!: string[];
   @ApiProperty({ enum: LeadStatus, required: false }) @IsOptional() @IsEnum(LeadStatus) status?: LeadStatus;
-  @ApiProperty({ enum: LeadSource, required: false }) @IsOptional() @IsEnum(LeadSource) source?: LeadSource;
+  @ApiProperty({ required: false, description: 'A LeadSource.code' }) @IsOptional() @IsString() source?: string;
   @ApiProperty({ required: false, minimum: 0, maximum: 100 }) @IsOptional() @IsInt() @Min(0) @Max(100) score?: number;
 }
 

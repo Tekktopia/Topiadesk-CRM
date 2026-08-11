@@ -4,6 +4,16 @@ import { PolicyVersionController } from './policy-version.controller';
 import { PolicyPremiumController, PremiumController } from './premium.controller';
 import { RenewalScheduleController } from './renewal-schedule.controller';
 import { ApprovalThresholdRulesController } from './approval-threshold-rules.controller';
+import { PolicyProducerAssignmentController, ProducersController } from './producers.controller';
+import { ProducerCommissionsController } from './producer-commissions.controller';
+import { PolicyAssetController, PolicyCoverageController, PolicyParticipantController } from './policy-depth.controller';
+import { SignatureRequestsController } from './signature-requests.controller';
+// Re-provided directly rather than importing IntegrationsModule wholesale
+// — same "stateless service, second injector instance is harmless"
+// pattern integrations.module.ts's own header comment documents for
+// KeycloakAdminService.
+import { PaystackService } from '../integrations/paystack.service';
+import { ESignatureService } from '../integrations/esignature.service';
 
 @Module({
   // ApprovalThresholdRulesController ('policies/approval-threshold-rules')
@@ -19,6 +29,14 @@ import { ApprovalThresholdRulesController } from './approval-threshold-rules.con
     PolicyPremiumController,
     PremiumController,
     RenewalScheduleController,
+    PolicyProducerAssignmentController,
+    ProducersController,
+    ProducerCommissionsController,
+    PolicyCoverageController,
+    PolicyParticipantController,
+    PolicyAssetController,
+    SignatureRequestsController,
   ],
+  providers: [PaystackService, ESignatureService],
 })
 export class PolicyModule {}

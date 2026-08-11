@@ -25,6 +25,9 @@ import type { ConnectorDto, ConnectorType, CreateConnectorBody, SyncDirection } 
 const CONNECTOR_TYPES: { value: ConnectorType; label: string }[] = [
   { value: 'TEAMS_WEBHOOK', label: 'Microsoft Teams (channel webhook)' },
   { value: 'SEAMLESSHR', label: 'SeamlessHR (employee sync)' },
+  { value: 'PAYSTACK', label: 'Paystack (premium collection — stub)' },
+  { value: 'DOJAH', label: 'Dojah (KYC verification — stub)' },
+  { value: 'WHATSAPP_CLOUD', label: 'WhatsApp Cloud API (notifications — stub)' },
   { value: 'MOCK_STUB', label: 'Mock stub (testing)' },
   { value: 'CORE_BROKING_SYSTEM', label: 'Core broking system' },
   { value: 'ERP', label: 'ERP' },

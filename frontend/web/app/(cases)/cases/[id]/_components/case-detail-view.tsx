@@ -166,6 +166,7 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
               onLogActivity={handleLogActivity}
               isLogging={addComment.isPending}
               emptyMessage="No comments or history recorded yet."
+              historyFetchUrl={`/api/cases/${caseId}/history`}
             />
           </CardContent>
         </Card>

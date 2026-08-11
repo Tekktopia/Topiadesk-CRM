@@ -28,7 +28,7 @@ import {
   caseTypeLabel,
   humanize,
 } from '../../_lib/constants';
-import { useCreateAssignmentRule, useTeams, useUpdateAssignmentRule } from '../../_lib/hooks';
+import { useCreateAssignmentRule, useLeadSources, useTeams, useUpdateAssignmentRule } from '../../_lib/hooks';
 import type { AssignmentRule, AssignmentStrategy, CaseManagementEntityType } from '../../_lib/types';
 
 const UNSET = '__unset';
@@ -46,11 +46,25 @@ const UNSET = '__unset';
  * hand-edited via a raw PATCH /assignment-rules/:id curl call, which
  * `assignmentRuleConditionsSchema.strict()` would catch (a caseType/
  * priority value outside the known enums, or an unexpected extra key).
+ *
+ * LEAD rules use a disjoint pair (`source`, `minScore` — see
+ * assignment-resolver.util.ts's leadConditionsMatch()) instead of caseType/
+ * priority. Both pairs live in one non-discriminated `.strict()` shape
+ * rather than a union: submit() below only ever populates the pair
+ * matching the selected `entityType` (enforced by each Select's own
+ * `disabled` prop, same as the existing caseType/priority fields already
+ * do for entityType !== 'CASE'), so nothing legitimate ever produces a
+ * mixed object — a union would just add ceremony for no extra safety here.
+ * `source` is a plain string (a LeadSource.code from the admin-managed
+ * lookup, see useLeadSources()), not a closed enum — it can't be
+ * `z.enum(...)` since the valid set changes at runtime without a deploy.
  */
 const assignmentRuleConditionsSchema = z
   .object({
     caseType: z.enum(CASE_TYPES).optional(),
     priority: z.enum(CASE_PRIORITIES).optional(),
+    source: z.string().optional(),
+    minScore: z.number().int().min(0).max(100).optional(),
   })
   .strict();
 
@@ -69,6 +83,8 @@ export function AssignmentRuleFormDialog({
   const [strategy, setStrategy] = React.useState<AssignmentStrategy>('ROUND_ROBIN');
   const [conditionCaseType, setConditionCaseType] = React.useState('');
   const [conditionPriority, setConditionPriority] = React.useState('');
+  const [conditionSource, setConditionSource] = React.useState('');
+  const [conditionMinScore, setConditionMinScore] = React.useState('');
   const [candidatePoolTeamId, setCandidatePoolTeamId] = React.useState('');
   const [requiredSkillTags, setRequiredSkillTags] = React.useState('');
   const [priority, setPriority] = React.useState(0);
@@ -76,6 +92,8 @@ export function AssignmentRuleFormDialog({
   const [conditionsError, setConditionsError] = React.useState<string | null>(null);
 
   const { teams, isLoading: isLoadingTeams } = useTeams();
+  const { data: leadSourcesData } = useLeadSources();
+  const activeLeadSources = (leadSourcesData ?? []).filter((s) => s.isActive);
 
   React.useEffect(() => {
     if (!open) return;
@@ -84,9 +102,11 @@ export function AssignmentRuleFormDialog({
       setName(rule.name);
       setEntityType(rule.entityType);
       setStrategy(rule.strategy);
-      const conditions = (rule.conditions ?? {}) as { caseType?: string; priority?: string };
+      const conditions = (rule.conditions ?? {}) as { caseType?: string; priority?: string; source?: string; minScore?: number };
       setConditionCaseType(conditions.caseType ?? '');
       setConditionPriority(conditions.priority ?? '');
+      setConditionSource(conditions.source ?? '');
+      setConditionMinScore(conditions.minScore !== undefined ? String(conditions.minScore) : '');
       setCandidatePoolTeamId(rule.candidatePoolTeamId ?? '');
       setRequiredSkillTags(rule.requiredSkillTags.join(', '));
       setPriority(rule.priority);
@@ -97,6 +117,8 @@ export function AssignmentRuleFormDialog({
       setStrategy('ROUND_ROBIN');
       setConditionCaseType('');
       setConditionPriority('');
+      setConditionSource('');
+      setConditionMinScore('');
       setCandidatePoolTeamId('');
       setRequiredSkillTags('');
       setPriority(0);
@@ -111,8 +133,13 @@ export function AssignmentRuleFormDialog({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const rawConditions: Record<string, unknown> = {};
-    if (conditionCaseType) rawConditions.caseType = conditionCaseType;
-    if (conditionPriority) rawConditions.priority = conditionPriority;
+    if (entityType === 'LEAD') {
+      if (conditionSource) rawConditions.source = conditionSource;
+      if (conditionMinScore) rawConditions.minScore = Number(conditionMinScore);
+    } else {
+      if (conditionCaseType) rawConditions.caseType = conditionCaseType;
+      if (conditionPriority) rawConditions.priority = conditionPriority;
+    }
 
     const parsedConditions = assignmentRuleConditionsSchema.safeParse(rawConditions);
     if (!parsedConditions.success) {
@@ -157,7 +184,7 @@ export function AssignmentRuleFormDialog({
       <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit assignment rule' : 'New assignment rule'}</DialogTitle>
-          <DialogDescription>Routes newly created claims/tickets matching the conditions below to a candidate owner.</DialogDescription>
+          <DialogDescription>Routes newly created claims/tickets/leads matching the conditions below to a candidate owner.</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={submit} className="space-y-4">
@@ -199,40 +226,73 @@ export function AssignmentRuleFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Condition: ticket type</Label>
-              <Select value={conditionCaseType || UNSET} onValueChange={(v) => setConditionCaseType(v === UNSET ? '' : v)} disabled={entityType !== 'CASE'}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={UNSET}>Any</SelectItem>
-                  {CASE_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {caseTypeLabel(t)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {entityType === 'LEAD' ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Condition: lead source</Label>
+                <Select value={conditionSource || UNSET} onValueChange={(v) => setConditionSource(v === UNSET ? '' : v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Any" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNSET}>Any</SelectItem>
+                    {activeLeadSources.map((s) => (
+                      <SelectItem key={s.id} value={s.code}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="rule-min-score">Condition: minimum score</Label>
+                <Input
+                  id="rule-min-score"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={conditionMinScore}
+                  onChange={(e) => setConditionMinScore(e.target.value)}
+                  placeholder="Any"
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Condition: priority</Label>
-              <Select value={conditionPriority || UNSET} onValueChange={(v) => setConditionPriority(v === UNSET ? '' : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={UNSET}>Any</SelectItem>
-                  {CASE_PRIORITIES.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {casePriorityLabel(p)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Condition: ticket type</Label>
+                <Select value={conditionCaseType || UNSET} onValueChange={(v) => setConditionCaseType(v === UNSET ? '' : v)} disabled={entityType !== 'CASE'}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Any" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNSET}>Any</SelectItem>
+                    {CASE_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {caseTypeLabel(t)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Condition: priority</Label>
+                <Select value={conditionPriority || UNSET} onValueChange={(v) => setConditionPriority(v === UNSET ? '' : v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Any" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNSET}>Any</SelectItem>
+                    {CASE_PRIORITIES.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {casePriorityLabel(p)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
+          )}
           {conditionsError ? <p className="text-sm text-destructive">{conditionsError}</p> : null}
 
           <div className="space-y-1.5">
