@@ -15,6 +15,9 @@
     "@aws-sdk/s3-request-presigner": "^3.1101.0",
     "@topiadesk/config": "workspace:*",
     "@topiadesk/db": "workspace:*",
+    "canvas": "^3.2.3",
+    "chart.js": "^4.5.1",
+    "chartjs-node-canvas": "^5.0.0",
     "exceljs": "^4.4.0",
     "pdfkit": "^0.15.1",
     "zod": "^3.24.1"

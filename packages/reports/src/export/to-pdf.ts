@@ -1,16 +1,33 @@
 import PDFDocument from 'pdfkit';
-import type { ReportResult } from '../report-definition';
+import type { ReportResult, ReportValueFormat } from '../report-definition';
 import { formatCellForExport } from './to-csv';
 
 /**
- * Deliberately basic per the brief ("a simple lightweight approach is
- * acceptable... don't pull in a heavy headless-browser dependency") — a
- * plain paginated table, no charts/branding. pdfkit streams; buffered here
- * since the caller (export controller / worker delivery job) needs one
- * complete Buffer to hand to MinIO's PutObjectCommand or an email
- * attachment, not a stream.
+ * Still pdfkit, not a headless-browser renderer — that constraint from the
+ * original brief ("don't pull in a heavy headless-browser dependency")
+ * stands. What changed: a real header/row styling pass (fill, borders,
+ * alternating bands, right-aligned numbers, page footer) and an optional
+ * chart image embedded above the table, reusing the same PNG
+ * `renderReportChartImage()` (to-chart-image.ts) already produces for
+ * chat's standalone chart attachment — see export/index.ts's
+ * `renderReportExport()` for where that gets wired in. pdfkit streams;
+ * buffered here since the caller (export controller / worker delivery job)
+ * needs one complete Buffer to hand to MinIO's PutObjectCommand or an
+ * email attachment, not a stream.
  */
-export function reportResultToPdf(result: ReportResult, title: string): Promise<Buffer> {
+
+// Matches to-chart-image.ts's first CHART_COLORS entry — same blue used for
+// chart bars/lines and this PDF's header band, so a report's chart and its
+// table read as one document, not two mismatched halves.
+const BRAND_COLOR = '#2f6fee';
+const HEADER_TEXT_COLOR = '#ffffff';
+const ROW_BAND_COLOR = '#f4f7ff';
+const GRIDLINE_COLOR = '#dfe4ee';
+const MUTED_TEXT_COLOR = '#6b7280';
+
+const RIGHT_ALIGN_FORMATS: ReadonlySet<ReportValueFormat> = new Set(['currency', 'number', 'percent', 'days']);
+
+export function reportResultToPdf(result: ReportResult, title: string, chartImage?: Buffer | null): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 36, size: 'A4', layout: result.columns.length > 5 ? 'landscape' : 'portrait' });
     const chunks: Buffer[] = [];
@@ -20,45 +37,85 @@ export function reportResultToPdf(result: ReportResult, title: string): Promise<
 
     const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
     const columnWidth = pageWidth / Math.max(1, result.columns.length);
-    const rowHeight = 18;
+    const rowHeight = 20;
+    const headerHeight = 22;
+    let pageNumber = 1;
 
-    doc.fontSize(16).text(title, { underline: true });
-    doc.fontSize(9).fillColor('#555').text(`Generated ${result.generatedAt} — ${result.totalRowCount} row(s)`);
-    doc.moveDown(0.5);
+    doc.fontSize(16).fillColor('#111827').font('Helvetica-Bold').text(title);
+    doc.fontSize(9).fillColor(MUTED_TEXT_COLOR).font('Helvetica').text(`Generated ${result.generatedAt} — ${result.totalRowCount} row(s)`);
+    doc.moveDown(0.75);
+
+    if (chartImage) {
+      // Cap height so a chart never eats most of the first page — width
+      // scales to fit, aspect ratio preserved (pdfkit's `fit` does both).
+      const chartHeight = 220;
+      doc.image(chartImage, doc.page.margins.left, doc.y, { fit: [pageWidth, chartHeight], align: 'center' });
+      doc.y += chartHeight + 12;
+    }
 
     const drawHeader = () => {
       const y = doc.y;
-      doc.font('Helvetica-Bold').fontSize(9);
+      doc.rect(doc.page.margins.left, y, pageWidth, headerHeight).fill(BRAND_COLOR);
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(HEADER_TEXT_COLOR);
       result.columns.forEach((col, i) => {
-        doc.text(col.label, doc.page.margins.left + i * columnWidth, y, { width: columnWidth, ellipsis: true });
+        const align = RIGHT_ALIGN_FORMATS.has(col.format) ? 'right' : 'left';
+        doc.text(col.label, doc.page.margins.left + i * columnWidth + 4, y + 6, { width: columnWidth - 8, ellipsis: true, align });
       });
-      doc.moveDown();
-      doc.font('Helvetica').fontSize(8);
+      doc.y = y + headerHeight;
+    };
+
+    const drawFooter = () => {
+      // Inside the bottom margin, not past it — pdfkit auto-inserts a new
+      // page for any .text() call whose y falls beyond page.height minus
+      // the bottom margin (confirmed live: an earlier version placed this
+      // just past that boundary and every render grew a spurious blank
+      // trailing page).
+      const y = doc.page.height - doc.page.margins.bottom - 14;
       doc
-        .moveTo(doc.page.margins.left, doc.y)
-        .lineTo(doc.page.width - doc.page.margins.right, doc.y)
-        .strokeColor('#ccc')
-        .stroke();
-      doc.moveDown(0.3);
+        .font('Helvetica')
+        .fontSize(8)
+        .fillColor(MUTED_TEXT_COLOR)
+        .text(`Page ${pageNumber}`, doc.page.margins.left, y, { width: pageWidth, align: 'center' });
+    };
+
+    const ensureSpace = () => {
+      if (doc.y + rowHeight > doc.page.height - doc.page.margins.bottom) {
+        drawFooter();
+        pageNumber += 1;
+        doc.addPage();
+        drawHeader();
+      }
     };
 
     drawHeader();
 
-    for (const row of result.rows) {
-      if (doc.y + rowHeight > doc.page.height - doc.page.margins.bottom) {
-        doc.addPage();
-        drawHeader();
-      }
+    result.rows.forEach((row, rowIndex) => {
+      ensureSpace();
       const y = doc.y;
+
+      if (rowIndex % 2 === 1) {
+        doc.rect(doc.page.margins.left, y, pageWidth, rowHeight).fill(ROW_BAND_COLOR);
+      }
+      doc
+        .moveTo(doc.page.margins.left, y + rowHeight)
+        .lineTo(doc.page.width - doc.page.margins.right, y + rowHeight)
+        .strokeColor(GRIDLINE_COLOR)
+        .lineWidth(0.5)
+        .stroke();
+
+      doc.font('Helvetica').fontSize(8.5).fillColor('#1f2937');
       result.columns.forEach((col, i) => {
-        doc.text(formatCellForExport(row[col.key], col.format), doc.page.margins.left + i * columnWidth, y, {
-          width: columnWidth,
+        const align = RIGHT_ALIGN_FORMATS.has(col.format) ? 'right' : 'left';
+        doc.text(formatCellForExport(row[col.key], col.format), doc.page.margins.left + i * columnWidth + 4, y + 5, {
+          width: columnWidth - 8,
           ellipsis: true,
+          align,
         });
       });
-      doc.moveDown(0.9);
-    }
+      doc.y = y + rowHeight;
+    });
 
+    drawFooter();
     doc.end();
   });
 }
