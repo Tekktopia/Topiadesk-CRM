@@ -4,6 +4,8 @@
  * frontend/web/app/(admin)/admin/_lib/api.ts's identical helper, same
  * per-route-group duplication convention as every other feature area.
  */
+import { csrfHeaders } from '@/lib/csrf';
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -29,6 +31,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     credentials: 'same-origin',
     headers: {
       ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+      ...csrfHeaders(init?.method),
       ...init?.headers,
     },
   });

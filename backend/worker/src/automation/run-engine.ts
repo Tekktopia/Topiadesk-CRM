@@ -24,6 +24,7 @@ import { randomUUID } from 'node:crypto';
 import { loadEnv } from '@topiadesk/config';
 import { getPrismaClient, getRlsContext, runWithRlsContext, SYSTEM_JOB_CONTEXT, type AutomationRule } from '@topiadesk/db';
 import { executeActions, type CaseManagementEntityRef } from './action-handler';
+import { getEntityMeta, type AutomationEntityType } from '@topiadesk/automation';
 import { generateTeamsActionToken, hashTeamsActionToken } from './teams-action-token.util';
 
 export type AutomationStep =
@@ -81,16 +82,28 @@ export type AutomationStep =
  * specific team or specific approvers. */
 const APPROVER_ROLE_NAMES = ['ADMIN', 'COMPLIANCE_OFFICER'];
 
-/** Fixed, per-entityType allow-list of fields a CONDITION step may branch
- * on — deliberately the same set the builder's own "Conditions" card
- * already exposes; no custom-field conditions in this pass. */
-const CONDITION_FIELDS: Record<'CASE' | 'CLAIM', readonly string[]> = {
-  CASE: ['status', 'priority', 'caseType', 'categoryId', 'assignedTeamId'],
-  CLAIM: ['status', 'priority', 'assignedTeamId'],
-};
+/**
+ * Which fields a CONDITION step may branch on.
+ *
+ * Was a hardcoded two-entry map for CASE and CLAIM, which is one of the two
+ * reasons multi-step workflows could not run on anything else. Now reads the
+ * shared entity registry, so a branch on a policy's expiry date or an
+ * opportunity's value is expressible — and the allowlist stays identical to
+ * the one the rule builder offers, because it is literally the same source.
+ */
+function conditionFieldsFor(entityType: AutomationEntityType): readonly string[] {
+  return getEntityMeta(entityType)?.fields.map((f) => f.name) ?? [];
+}
 
-function toEntityRef(entityType: 'CASE' | 'CLAIM', entityId: string): CaseManagementEntityRef {
-  return entityType === 'CLAIM' ? { entityType: 'CLAIM', claimId: entityId } : { entityType: 'CASE', caseId: entityId };
+/**
+ * Undefined for the six entity types that are not tickets — the ticket-only
+ * actions then fail with a readable message via requireTicketRef rather than
+ * reading a property off a ref that cannot exist.
+ */
+function toEntityRef(entityType: AutomationEntityType, entityId: string): CaseManagementEntityRef | undefined {
+  if (entityType === 'CLAIM') return { entityType: 'CLAIM', claimId: entityId };
+  if (entityType === 'CASE') return { entityType: 'CASE', caseId: entityId };
+  return undefined;
 }
 
 function withStepIds(raw: unknown): AutomationStep[] {
@@ -114,17 +127,16 @@ function stepIndexById(steps: AutomationStep[], id: string): number {
   return index;
 }
 
-async function resolveConditionField(entityType: 'CASE' | 'CLAIM', entityId: string, field: string): Promise<string | null> {
-  if (!CONDITION_FIELDS[entityType].includes(field)) {
+async function resolveConditionField(entityType: AutomationEntityType, entityId: string, field: string): Promise<string | null> {
+  const meta = getEntityMeta(entityType);
+  if (!meta) throw new Error(`Unknown entity type ${entityType}`);
+  if (!conditionFieldsFor(entityType).includes(field)) {
     throw new Error(`"${field}" is not a valid condition field for ${entityType}`);
   }
   const prisma = getPrismaClient();
-  if (entityType === 'CLAIM') {
-    const claim = await prisma.claim.findUnique({ where: { id: entityId }, select: { [field]: true } as never });
-    return claim ? String((claim as Record<string, unknown>)[field] ?? '') : null;
-  }
-  const kase = await prisma.case.findUnique({ where: { id: entityId }, select: { [field]: true } as never });
-  return kase ? String((kase as Record<string, unknown>)[field] ?? '') : null;
+  const delegate = prisma[meta.model] as unknown as { findUnique(args: unknown): Promise<Record<string, unknown> | null> };
+  const row = await delegate.findUnique({ where: { id: entityId }, select: { [field]: true } });
+  return row ? String(row[field] ?? '') : null;
 }
 
 /**
@@ -133,8 +145,13 @@ async function resolveConditionField(entityType: 'CASE' | 'CLAIM', entityId: str
  * (two events firing in close succession must not start two overlapping
  * runs), then creates the run row and immediately advances it.
  */
-export async function startRun(rule: AutomationRule, entityType: 'CASE' | 'CLAIM', entityId: string): Promise<void> {
-  return runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+export async function startRun(rule: AutomationRule, entityType: AutomationEntityType, entityId: string): Promise<void> {
+  // Preserves the CALLER's tenant schema. A bare SYSTEM_JOB_CONTEXT here
+  // carries tenantSchema: null, and runWithRlsContext REPLACES the context
+  // rather than merging — so nesting one inside processEntityEvent's already
+  // tenant-bound context silently moved every multi-step run to `public`,
+  // orphaning the run row from the record it was about.
+  return runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema: getRlsContext()?.tenantSchema ?? null }, async () => {
     const prisma = getPrismaClient();
     const existingActive = await prisma.automationRunState.findFirst({
       where: { ruleId: rule.id, entityType, entityId, status: { in: ['RUNNING', 'WAITING_APPROVAL'] } },
@@ -167,30 +184,49 @@ interface ApproverResolution {
  * used by both advanceRun (to set/skip the decision-time allow-list) and
  * notifyApprovers (to know who to notify) — one DB round-trip per gate
  * open, not two independently-computed answers that could drift apart.
- * ASSIGNEE_MANAGER/TEAM_LEAD only apply to CASE (Claim has no assignee/
- * team-lead concept here); either falls through to today's EXPLICIT
- * default (below) if resolution finds nobody, so a gate never opens with
- * no one able to act on it.
+ * ASSIGNEE_MANAGER resolves through whichever field the entity registry
+ * says holds the responsible person — a case's assignee, a policy's broker
+ * of record, an opportunity's owner — so "the owner's manager signs this
+ * off" works on every entity type rather than only tickets. TEAM_LEAD stays
+ * CASE/CLAIM-only because no other entity carries a team.
+ *
+ * Either falls through to the EXPLICIT default below when resolution finds
+ * nobody, so a gate never opens with no one able to act on it.
  */
 async function resolveApprovers(
   step: Extract<AutomationStep, { type: 'APPROVAL_GATE' }>,
-  entityType: 'CASE' | 'CLAIM',
+  entityType: AutomationEntityType,
   entityId: string,
 ): Promise<ApproverResolution> {
   const prisma = getPrismaClient();
   const approverMode = step.approverMode ?? 'EXPLICIT';
 
-  if ((approverMode === 'ASSIGNEE_MANAGER' || approverMode === 'TEAM_LEAD') && entityType === 'CASE') {
-    const kase = await prisma.case.findUnique({ where: { id: entityId }, select: { assignedToId: true, assignedTeamId: true } });
-    if (approverMode === 'ASSIGNEE_MANAGER' && kase?.assignedToId) {
-      const assignee = await prisma.user.findUnique({ where: { id: kase.assignedToId }, select: { managerId: true } });
-      if (assignee?.managerId) return { recipientIds: [assignee.managerId], restrictive: true };
-    }
-    if (approverMode === 'TEAM_LEAD' && kase?.assignedTeamId) {
-      const leads = await prisma.teamMember.findMany({ where: { teamId: kase.assignedTeamId, role: 'LEAD' }, select: { userId: true } });
-      if (leads.length > 0) return { recipientIds: leads.map((l) => l.userId), restrictive: true };
+  if (approverMode === 'ASSIGNEE_MANAGER') {
+    // Whoever owns the record, per the registry — assignedToId on a case,
+    // brokerOfRecordId on a policy, ownerId on an opportunity or client.
+    const meta = getEntityMeta(entityType);
+    if (meta?.ownerField) {
+      const delegate = prisma[meta.model] as unknown as { findUnique(args: unknown): Promise<Record<string, unknown> | null> };
+      const row = await delegate.findUnique({ where: { id: entityId }, select: { [meta.ownerField]: true } });
+      const ownerId = row?.[meta.ownerField];
+      if (typeof ownerId === 'string') {
+        const owner = await prisma.user.findUnique({ where: { id: ownerId }, select: { managerId: true } });
+        if (owner?.managerId) return { recipientIds: [owner.managerId], restrictive: true };
+      }
     }
     // Resolved to nobody — fall through to EXPLICIT's own logic below.
+  }
+
+  if (approverMode === 'TEAM_LEAD' && (entityType === 'CASE' || entityType === 'CLAIM')) {
+    // Team membership is a ticket concept; nothing else carries one.
+    const delegate = prisma[entityType === 'CLAIM' ? 'claim' : 'case'] as unknown as {
+      findUnique(args: unknown): Promise<{ assignedTeamId: string | null } | null>;
+    };
+    const row = await delegate.findUnique({ where: { id: entityId }, select: { assignedTeamId: true } });
+    if (row?.assignedTeamId) {
+      const leads = await prisma.teamMember.findMany({ where: { teamId: row.assignedTeamId, role: 'LEAD' }, select: { userId: true } });
+      if (leads.length > 0) return { recipientIds: leads.map((l) => l.userId), restrictive: true };
+    }
   }
 
   const approverUserIds = step.approverUserIds ?? [];
@@ -226,7 +262,7 @@ async function notifyApprovers(
   ruleName: string,
   reason: string | undefined,
   recipientIds: string[],
-  entityType: 'CASE' | 'CLAIM',
+  entityType: AutomationEntityType,
   entityId: string,
   runStateId: string,
 ): Promise<void> {
@@ -325,7 +361,9 @@ async function notifyApproversViaTeams(title: string, body: string, recipientIds
  * steps).
  */
 export async function advanceRun(runStateId: string): Promise<void> {
-  return runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+  // Same reasoning as startRun: keep whatever tenant the caller established
+  // (processEntityEvent, the schedule scan, or the resume queue).
+  return runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema: getRlsContext()?.tenantSchema ?? null }, async () => {
     const prisma = getPrismaClient();
     const run = await prisma.automationRunState.findUnique({ where: { id: runStateId }, include: { rule: true } });
     if (!run || run.status !== 'RUNNING') return;
@@ -395,6 +433,11 @@ export async function advanceRun(runStateId: string): Promise<void> {
 
       const results = await executeActions([{ actionType: step.actionType, params: step.params ?? {} }], {
         entity: entityRef,
+        target: { entityType: run.entityType, id: run.entityId },
+        // Multi-step runs span approval gates that can sit for days, so the
+        // row loaded when the run started would be stale by the time a later
+        // step executes — the handlers re-read it instead.
+        targetData: null,
         actingUserId: null,
         systemJobName: `automation-rule:${run.rule.name}`,
       });

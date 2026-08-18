@@ -31,11 +31,15 @@ export class ApprovalsController {
   async list(@Query() query: ApprovalQueryDto, @CurrentUser() user: AuthenticatedUser): Promise<PendingApprovalDto[]> {
     const prisma = getPrismaClient();
     const status = query.status ?? 'PENDING';
+    // 'DECIDED' is a History-view shorthand, not a real Approval.status value
+    // — most-recently-decided first, unlike the PENDING queue below (oldest
+    // first, since an older pending request is the more urgent one).
+    const isDecidedView = status === 'DECIDED';
 
     const rows = await prisma.approval.findMany({
-      where: { status },
-      include: { requestedBy: { select: { fullName: true } } },
-      orderBy: { createdAt: 'asc' },
+      where: isDecidedView ? { status: { in: ['APPROVED', 'REJECTED'] } } : { status },
+      include: { requestedBy: { select: { fullName: true } }, approvedBy: { select: { fullName: true } } },
+      orderBy: isDecidedView ? { decidedAt: 'desc' } : { createdAt: 'asc' },
     });
 
     const byType = new Map<string, string[]>();
@@ -131,6 +135,9 @@ export class ApprovalsController {
         label,
         linkPath,
         isMine: row.requestedById === user.id,
+        decidedAt: row.decidedAt,
+        decisionNote: row.decisionNote,
+        approvedByName: row.approvedBy?.fullName ?? null,
       };
     });
   }

@@ -29,7 +29,8 @@ import { PageHeader } from '../../_components/page-header';
 import { SlaBadge } from '../../_components/sla-badge';
 import { CASE_PRIORITIES, CLAIM_STATUSES, casePriorityLabel, casePriorityVariant, claimStatusLabel, claimStatusVariant } from '../../_lib/constants';
 import { formatDate } from '../../_lib/format';
-import { useBulkReassignClaims, useBulkWithdrawClaims, useClaims, useDirectoryUsers, usePolicyLookups, useSlaClocksByPolicyIds } from '../../_lib/hooks';
+import { useBulkReassignClaims, useBulkWithdrawClaims, useClaimStats, useClaims, useDirectoryUsers, usePolicyLookups, useSlaClocksByPolicyIds } from '../../_lib/hooks';
+import { ClaimStatsStrip } from '../../_components/claim-stats-strip';
 import type { Claim, ClaimQuery } from '../../_lib/types';
 import { ClaimFormDialog } from './claim-form-dialog';
 
@@ -55,6 +56,7 @@ export function ClaimsListView() {
   };
 
   const { data, isLoading, isFetching, isError } = useClaims(query);
+  const { data: claimStats, isLoading: claimStatsLoading } = useClaimStats(query);
   const claims = data ?? [];
 
   const { clocksByEntityId } = useSlaClocksByPolicyIds(claims.map((c) => c.slaPolicyId));
@@ -147,6 +149,8 @@ export function ClaimsListView() {
           </Button>
         }
       />
+
+      <ClaimStatsStrip stats={claimStats} isLoading={claimStatsLoading} />
 
       <Card>
         <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:flex-wrap sm:items-end">

@@ -39,7 +39,10 @@ export function LeadSourcesView() {
   const [deleting, setDeleting] = React.useState<LeadSourceOption | null>(null);
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 20 });
 
-  const rows = data ?? [];
+  // Stable reference: `x ?? []` mints a new array on every render while the
+  // query has no data (i.e. right after a filter change), which is what drove
+  // DataTable's pagination into a render loop. See data-table.tsx.
+  const rows = React.useMemo(() => data ?? [], [data]);
 
   const columns = React.useMemo<ColumnDef<LeadSourceOption>[]>(
     () => [

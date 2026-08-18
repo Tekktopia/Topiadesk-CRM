@@ -1,4 +1,4 @@
-import { getPrismaClient, getRlsContext } from '@topiadesk/db';
+import { getPrismaClient, getRlsContext, type Prisma } from '@topiadesk/db';
 
 /**
  * `getPrismaClient()`'s Proxy only auto-applies the RLS `set_config` step to
@@ -27,5 +27,27 @@ export async function executeRawWithRlsContext(sql: string): Promise<void> {
       set_config('app.current_branch_id', ${ctx.branchId ?? ''}, true),
       set_config('app.current_client_ip', ${ctx.clientIp ?? ''}, true)`;
     await tx.$executeRawUnsafe(sql);
+  });
+}
+
+/**
+ * Query variant of the above (returns rows) — same reasoning, mirrors
+ * backend/api/src/modules/identity/rls-raw-query.util.ts's twin exactly.
+ * Needed by audit-checkpoint/create-checkpoint.job.ts for `SELECT
+ * create_audit_checkpoint()` and the LAG()-window hash-mismatch
+ * recomputation, neither expressible via a Prisma model delegate.
+ */
+export async function queryRawWithRlsContext<T = unknown>(sql: Prisma.Sql): Promise<T[]> {
+  const ctx = getRlsContext();
+  if (!ctx) throw new Error('queryRawWithRlsContext called with no RLS context bound');
+  const prisma = getPrismaClient();
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT
+      set_config('app.current_user_id', ${ctx.userId}, true),
+      set_config('app.current_role', ${ctx.role}, true),
+      set_config('app.current_dept_id', ${ctx.departmentId ?? ''}, true),
+      set_config('app.current_branch_id', ${ctx.branchId ?? ''}, true),
+      set_config('app.current_client_ip', ${ctx.clientIp ?? ''}, true)`;
+    return tx.$queryRaw<T[]>(sql);
   });
 }

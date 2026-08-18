@@ -1,7 +1,10 @@
 'use client';
 
+import * as React from 'react';
 import Link from 'next/link';
-import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton, UnifiedTimeline, type ActivityTimelineItem, type LogActivityFormValues } from '@topiadesk/ui';
+import { Mail } from 'lucide-react';
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Skeleton, UnifiedTimeline, type ActivityTimelineItem, type LogActivityFormValues } from '@topiadesk/ui';
+import { SendCaseEmailDialog } from '../../../_components/send-case-email-dialog';
 import { EmptyState } from '../../../_components/empty-state';
 import { PageHeader } from '../../../_components/page-header';
 import { WatchersPanel } from '../../../_components/watchers-panel';
@@ -33,6 +36,7 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
   const { firstResponse, resolution, hasAccess: hasSlaAccess } = useCaseSlaClocks(kase);
   const { data: comments, isLoading: isCommentsLoading } = useComments('cases', caseId);
   const addComment = useAddComment('cases', caseId);
+  const [sendEmailOpen, setSendEmailOpen] = React.useState(false);
 
   const timelineItems: ActivityTimelineItem[] = (comments ?? []).map((c) => ({
     id: c.id,
@@ -43,6 +47,8 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
     occurredAt: c.occurredAt,
     authorName: c.createdById ? (usersById.get(c.createdById)?.fullName ?? null) : (c.createdBySystemJob ?? null),
     emailDeliveryStatus: c.emailDeliveryStatus,
+    emailTo: c.emailTo,
+    emailCc: c.emailCc,
   }));
 
   async function handleLogActivity(values: LogActivityFormValues) {
@@ -154,8 +160,11 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
         </div>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Timeline</CardTitle>
+            <Button size="sm" onClick={() => setSendEmailOpen(true)} className="gap-1.5">
+              <Mail className="h-3.5 w-3.5" aria-hidden /> Send Email
+            </Button>
           </CardHeader>
           <CardContent>
             <UnifiedTimeline
@@ -170,6 +179,15 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
             />
           </CardContent>
         </Card>
+
+        <SendCaseEmailDialog
+          open={sendEmailOpen}
+          onOpenChange={setSendEmailOpen}
+          caseId={caseId}
+          caseNumber={kase.caseNumber}
+          caseSubject={kase.subject}
+          defaultContactId={kase.contactId}
+        />
 
         <Card>
           <CardHeader>

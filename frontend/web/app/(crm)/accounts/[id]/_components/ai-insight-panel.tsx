@@ -13,7 +13,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  Separator,
   Skeleton,
   toast,
   type ActivityTimelineItem,
@@ -26,15 +25,15 @@ import { useActivities, useDirectoryUsers } from '../../../_lib/hooks';
 /**
  * AI Insight panel — Account detail's Phase 2 addition (backend/api/src/
  * modules/ai-gateway/). Every call here is a human-triggered, advisory-only
- * Anthropic/Voyage request, metered against the org/user cost cap (see
- * ai-gateway.service.ts's class comment) — nothing auto-fetches on mount,
- * nothing writes its result back onto the Account/Activity records. The API
- * exposes no sentiment rollup or dedicated "similar accounts" endpoint (verified
- * by reading ai-gateway.controller.ts): /ai/account-insight is the closest
- * thing to a rollup (a renewal-prep narrative), /ai/sentiment analyzes one
- * piece of text at a time, and /ai/search is a generic semantic search over
- * indexed entities (accounts are indexable, per indexable-entity-types.ts,
- * but nothing seeds an index — an empty result here is normal, not a bug).
+ * request against the fully local AI engine (no external API, no per-request
+ * cost) — nothing auto-fetches on mount, nothing writes its result back onto
+ * the Account/Activity records. The API exposes no sentiment rollup or
+ * dedicated "similar accounts" endpoint (verified by reading
+ * ai-gateway.controller.ts): /ai/account-insight is the closest thing to a
+ * rollup (a renewal-prep narrative), /ai/sentiment analyzes one piece of text
+ * at a time, and /ai/search is a generic semantic search over indexed
+ * entities (accounts are indexable, per indexable-entity-types.ts, but
+ * nothing seeds an index — an empty result here is normal, not a bug).
  */
 
 const AI_CAPABLE_ROLES = ['ADMIN', 'MANAGER', 'ACCOUNT_HANDLER'];
@@ -46,7 +45,6 @@ const MAX_SENTIMENT_ANALYSES = 3;
 interface AccountInsightResult {
   narrative: string;
   riskFlags: string[];
-  estimatedCostUsd: number;
 }
 
 interface SentimentResult {
@@ -54,21 +52,14 @@ interface SentimentResult {
   score: number;
   escalationRisk: 'LOW' | 'MEDIUM' | 'HIGH';
   keyPhrases: string[];
-  estimatedCostUsd: number;
 }
 
 interface SemanticSearchResult {
   results: Array<{ entityType: string; entityId: string; snippet: string; score: number }>;
-  estimatedCostUsd: number;
 }
 
 function errorMessage(err: unknown): string {
   return err instanceof ApiRequestError ? err.message : 'Something went wrong — please try again.';
-}
-
-function formatUsd(amount: number): string {
-  if (amount < 0.01) return `$${amount.toFixed(4)}`;
-  return `$${amount.toFixed(2)}`;
 }
 
 export function AiInsightPanel({ accountId, accountName }: { accountId: string; accountName: string }) {
@@ -78,8 +69,7 @@ export function AiInsightPanel({ accountId, accountName }: { accountId: string; 
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Advisory, AI-generated suggestions — nothing on this tab is saved to the account automatically. Each action
-        below makes a metered AI request.
+        Advisory, AI-generated suggestions, run locally — nothing on this tab is saved to the account automatically.
       </p>
       {!canUseAi ? (
         <Card>
@@ -140,7 +130,6 @@ function AccountInsightCard({ accountId, disabled }: { accountId: string; disabl
               ))}
             </div>
           ) : null}
-          <p className="text-xs text-muted-foreground">Estimated cost: {formatUsd(insightMutation.data.estimatedCostUsd)}</p>
         </CardContent>
       ) : null}
     </Card>
@@ -185,7 +174,7 @@ function RecentActivitySentimentCard({ accountId, disabled }: { accountId: strin
     occurredAt: a.occurredAt,
     durationMinutes: a.durationMinutes,
     outcome: a.outcome,
-    authorName: usersById.get(a.createdById)?.fullName ?? null,
+    authorName: a.createdById ? (usersById.get(a.createdById)?.fullName ?? null) : null,
     aiSentiment: sentimentById[a.id]?.label ?? null,
     aiSentimentScore: sentimentById[a.id]?.score ?? null,
   }));
@@ -262,24 +251,20 @@ function SimilarAccountsCard({ accountId, accountName, disabled }: { accountId: 
           {otherAccountResults.length === 0 ? (
             <p className="text-sm text-muted-foreground">No similar accounts found in the semantic index.</p>
           ) : (
-            <>
-              <ul className="space-y-2">
-                {otherAccountResults.map((r) => (
-                  <li key={r.entityId} className="flex items-start justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
-                    <div className="min-w-0">
-                      <Link href={`/accounts/${r.entityId}`} className="font-medium text-foreground hover:underline">
-                        {r.snippet.length > 80 ? `${r.snippet.slice(0, 80)}…` : r.snippet || r.entityId}
-                      </Link>
-                    </div>
-                    <Badge variant="outline" className="shrink-0">
-                      {Math.round(r.score * 100)}% match
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-              <Separator className="my-3" />
-              <p className="text-xs text-muted-foreground">Estimated cost: {formatUsd(searchMutation.data.estimatedCostUsd)}</p>
-            </>
+            <ul className="space-y-2">
+              {otherAccountResults.map((r) => (
+                <li key={r.entityId} className="flex items-start justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
+                  <div className="min-w-0">
+                    <Link href={`/accounts/${r.entityId}`} className="font-medium text-foreground hover:underline">
+                      {r.snippet.length > 80 ? `${r.snippet.slice(0, 80)}…` : r.snippet || r.entityId}
+                    </Link>
+                  </div>
+                  <Badge variant="outline" className="shrink-0">
+                    {Math.round(r.score * 100)}% match
+                  </Badge>
+                </li>
+              ))}
+            </ul>
           )}
         </CardContent>
       ) : null}

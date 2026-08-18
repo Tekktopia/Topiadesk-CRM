@@ -25,6 +25,36 @@ anything beyond local dev:
   `KEYCLOAK_CLIENT_SECRET_API` / `ANTHROPIC_API_KEY` independently of each
   other — a leak of one should not require rotating all.
 
+## Production TLS & edge protection
+
+Local dev serves every `*.topiadesk.localhost` host off Traefik's built-in
+self-signed cert — no action needed, browsers just show an untrusted-cert
+warning. For a real deployment:
+
+1. Point real DNS (`app.<domain>`, `api.<domain>`, your `KEYCLOAK_HOSTNAME`,
+   `platform.<domain>`) at this host's public IP. Port 80 must be reachable
+   from the internet (Let's Encrypt's HTTP-01 challenge hits it directly).
+2. Set `TRAEFIK_ACME_EMAIL` in `.env` to a real, monitored address.
+3. Start the stack with the TLS overlay:
+   `docker compose -f docker-compose.yml -f docker-compose.prod-tls.yml up -d`
+   — see that file's header comment for exactly what it changes and why
+   `web-tenant` (the wildcard per-tenant-subdomain router) is deliberately
+   excluded (HTTP-01 can't issue wildcard certs; that needs a DNS-01
+   challenge with a provider-specific plugin — a decision tied to whichever
+   DNS provider actually hosts the domain, not something generic here).
+4. Certs persist in the `traefik_acme` volume and auto-renew — no further
+   action needed after first issuance.
+
+Edge-level flood protection (`rate-limit` middleware,
+`infra/traefik/dynamic/dynamic.yml` — 50 req/s average, burst 100, per
+source IP) is already active in every environment, dev included, alongside
+the existing `secure-headers` middleware. It's a coarser, IP-based
+complement to `backend/api`'s own per-authenticated-user `ThrottlerGuard`
+(300 req/60s), not a replacement for a real WAF/DDoS service (Cloudflare,
+AWS WAF/Shield, etc.) in front of the host — provider choice there is a
+deployment decision, but this gives real protection against a naive flood
+either way.
+
 ## Postgres role model (why there are two app roles)
 
 - `app_migrator` — owns the schema, runs `prisma migrate deploy`,

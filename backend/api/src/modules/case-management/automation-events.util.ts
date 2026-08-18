@@ -1,6 +1,8 @@
 import { Queue } from 'bullmq';
 import Redis from 'ioredis';
 import { loadEnv } from '@topiadesk/config';
+import { getRlsContext } from '@topiadesk/db';
+import type { AutomationEntityType } from '@topiadesk/automation';
 
 /**
  * Producer side of AutomationRule's ENTITY_EVENT trigger. Case/claim
@@ -32,10 +34,29 @@ function getQueue(): Queue {
 }
 
 export interface EntityEventPayload {
-  entityType: 'CLAIM' | 'CASE';
+  entityType: AutomationEntityType;
   entityId: string;
   eventType: string;
   occurredAt: string;
+  /**
+   * Which tenant's schema the record lives in.
+   *
+   * Was absent, and its absence made ENTITY_EVENT automation dead for every
+   * real tenant. The worker binds `SYSTEM_JOB_CONTEXT` to run the event,
+   * whose `tenantSchema` is null — which resolves to `public`, the seed
+   * tenant. So an event about a SCIB ticket sent the worker looking for that
+   * ticket in `public`, where it does not exist; the lookup returned null,
+   * the processor logged "no longer exists — skipping", and no rule ever ran.
+   * Silent, because skipping a deleted record is legitimate behaviour and
+   * looks identical in the logs.
+   *
+   * This is the seventh instance of the same defect in this codebase (queued
+   * work capturing no tenant context and defaulting to public). It is
+   * captured at enqueue time from the request's RLS context because that is
+   * the only point where the tenant is still known — the worker has no
+   * request to recover it from.
+   */
+  tenantSchema: string | null;
 }
 
 /**
@@ -57,10 +78,16 @@ export interface EntityEventPayload {
  * jobId as a no-op add regardless of separator, so the dedup guarantee is
  * unaffected.
  */
-export async function enqueueEntityEvent(payload: EntityEventPayload): Promise<void> {
+export async function enqueueEntityEvent(payload: Omit<EntityEventPayload, 'tenantSchema'>): Promise<void> {
   try {
+    // Captured HERE, not asked of the caller. Every one of the ~30 emit
+    // sites would otherwise have to remember to pass it, and the failure
+    // mode when one forgets is invisible (the event is skipped as if the
+    // record had been deleted). Reading it from the ambient RLS context
+    // makes it impossible to omit.
+    const tenantSchema = getRlsContext()?.tenantSchema ?? null;
     const jobId = `${payload.entityType}_${payload.entityId}_${payload.eventType}_${payload.occurredAt}`;
-    await getQueue().add('entity-event', payload, { jobId });
+    await getQueue().add('entity-event', { ...payload, tenantSchema }, { jobId });
   } catch (err) {
     console.error('[case-management] failed to enqueue automation entity event', err);
   }

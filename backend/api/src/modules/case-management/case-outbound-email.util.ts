@@ -1,6 +1,7 @@
 import { Queue } from 'bullmq';
 import Redis from 'ioredis';
 import { loadEnv } from '@topiadesk/config';
+import { getRlsContext } from '@topiadesk/db';
 
 /**
  * Producer side of an OUTBOUND case comment's customer-facing email —
@@ -29,12 +30,31 @@ function getQueue(): Queue {
 export interface CaseCommentEmailPayload {
   activityId: string;
   caseId: string;
+  /** Explicit recipient override (SendCaseEmailDialog) — omitted/empty falls back to resolveCaseEmail() in the worker. */
+  to?: string[];
+  cc?: string[];
+  /**
+   * Which tenant's schema the Activity/Case actually live in.
+   *
+   * REQUIRED for anything outside the seed tenant. The worker runs under
+   * SYSTEM_JOB_CONTEXT, whose tenantSchema is null — i.e. the `public`
+   * schema — so without this it looked up the activity in the WRONG schema,
+   * found nothing, and returned 'skipped-not-found'. BullMQ records that as
+   * a COMPLETED job, so every outbound case email from every real tenant was
+   * silently dropped: no mail, no failed job, no log line. Captured here
+   * from the request's own RLS context rather than passed by callers, so it
+   * can never be forgotten at a call site.
+   */
+  tenantSchema: string | null;
 }
 
 /** Fire-and-forget: the Activity write already committed by the time this is called — a Redis hiccup here must never fail the HTTP response for a comment that already posted. Errors are logged, not thrown. jobId is the activityId itself (no colons, no BullMQ custom-id gotcha, and naturally idempotent — this comment's email can only ever be enqueued once). */
-export async function enqueueCaseCommentEmail(payload: CaseCommentEmailPayload): Promise<void> {
+export async function enqueueCaseCommentEmail(payload: Omit<CaseCommentEmailPayload, 'tenantSchema'>): Promise<void> {
   try {
-    await getQueue().add('case-comment-email', payload, { jobId: payload.activityId });
+    // Read the tenant off the ambient request context at enqueue time — the
+    // worker has no way to infer it later.
+    const tenantSchema = getRlsContext()?.tenantSchema ?? null;
+    await getQueue().add('case-comment-email', { ...payload, tenantSchema }, { jobId: payload.activityId });
   } catch (err) {
     console.error('[case-management] failed to enqueue outbound case comment email', err);
   }

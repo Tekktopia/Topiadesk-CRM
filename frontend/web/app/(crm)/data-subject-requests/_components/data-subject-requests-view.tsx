@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Download, ShieldAlert, ShieldCheck, ShieldX, UserRoundX } from 'lucide-react';
+import { Download, FileSpreadsheet, ShieldAlert, ShieldCheck, ShieldX, UserRoundX, X } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -23,14 +23,32 @@ import {
   TableHeader,
   TableRow,
 } from '@topiadesk/ui';
+import { DataRequestStatsStrip } from '../../_components/data-request-stats-strip';
 import { EmptyState } from '../../_components/empty-state';
 import { PageHeader } from '../../_components/page-header';
 import { ConfirmDialog } from '../../_components/confirm-dialog';
 import { formatDateTime } from '../../_lib/format';
-import { useAccountsLookup, useContactsByIds, useDataSubjectRequests, useProcessDataSubjectRequest, useRejectDataSubjectRequest } from '../../_lib/hooks';
-import type { DataSubjectRequest, DataSubjectRequestStatus } from '../../_lib/types';
+import {
+  useAccountsLookup,
+  useContactsByIds,
+  useDataSubjectRequests,
+  useDataSubjectRequestStats,
+  useProcessDataSubjectRequest,
+  useRejectDataSubjectRequest,
+} from '../../_lib/hooks';
+import type { DataSubjectRequest, DataSubjectRequestStatus, DataSubjectRequestType } from '../../_lib/types';
 
 const UNSET = '__any';
+
+/**
+ * A PENDING request this many days old or older is past the statutory
+ * response window the API computes `overdue` against. Kept in sync with
+ * DSR_RESPONSE_DEADLINE_DAYS via the stats response rather than duplicated
+ * as a literal — see DataSubjectRequestStats.
+ */
+function ageInDays(iso: string): number {
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+}
 
 function statusVariant(status: DataSubjectRequestStatus): 'outline' | 'success' | 'destructive' {
   if (status === 'COMPLETED') return 'success';
@@ -40,14 +58,32 @@ function statusVariant(status: DataSubjectRequestStatus): 'outline' | 'success' 
 
 /**
  * NDPR/GDPR compliance review queue — every logged export/erasure request
- * across all contacts, oldest-pending-first. Creating a request happens
+ * across all contacts, newest first (this comment used to claim
+ * oldest-pending-first, which the API has never done — it orders by
+ * createdAt desc). Age and the overdue badge are what surface a breach
+ * here, not position in the list. Creating a request happens
  * from the contact itself (account-detail-view.tsx's ContactsTab); this
  * page is purely the fulfillment step, kept as a separate deliberate action
  * (see DataSubjectRequestsController.process()'s header comment for why).
  */
 export function DataSubjectRequestsView() {
   const [statusFilter, setStatusFilter] = React.useState<string>('PENDING');
-  const { data: requests, isLoading } = useDataSubjectRequests(statusFilter === UNSET ? undefined : { status: statusFilter });
+  const [typeFilter, setTypeFilter] = React.useState<string>(UNSET);
+
+  const query = React.useMemo(
+    () => ({
+      status: statusFilter === UNSET ? undefined : statusFilter,
+      requestType: typeFilter === UNSET ? undefined : (typeFilter as DataSubjectRequestType),
+    }),
+    [statusFilter, typeFilter],
+  );
+
+  const { data: requests, isLoading } = useDataSubjectRequests(query);
+  // Unfiltered: the strip is the compliance posture of the whole queue.
+  // Scoped to the open tab, "Overdue" would read 0 whenever a reviewer was
+  // looking at COMPLETED — hiding the one number that carries a legal
+  // consequence exactly when it is most reassuring to be wrong about.
+  const { data: stats, isLoading: statsLoading } = useDataSubjectRequestStats();
   const { contactsById } = useContactsByIds((requests ?? []).map((r) => r.contactId));
   const { accountsById } = useAccountsLookup();
   const processMutation = useProcessDataSubjectRequest();
@@ -56,25 +92,66 @@ export function DataSubjectRequestsView() {
   const [pendingReject, setPendingReject] = React.useState<DataSubjectRequest | null>(null);
   const [viewingExport, setViewingExport] = React.useState<DataSubjectRequest | null>(null);
 
+  /**
+   * Downloads the REGISTER (who asked, when, how fast it was answered) —
+   * never the exported PII snapshots themselves, which the API strips out.
+   * See data-subject-request-csv.ts.
+   */
+  function handleExport() {
+    const qs = new URLSearchParams();
+    if (query.status) qs.set('status', query.status);
+    if (query.requestType) qs.set('requestType', query.requestType);
+    window.location.href = `/api/crm/data-subject-requests/export?${qs.toString()}`;
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Data Requests"
         description="NDPR/GDPR export &amp; erasure requests logged against contacts — fulfillment is a deliberate, audited step."
         actions={
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="PENDING">Pending</SelectItem>
-              <SelectItem value="COMPLETED">Completed</SelectItem>
-              <SelectItem value="REJECTED">Rejected</SelectItem>
-              <SelectItem value={UNSET}>All</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40" aria-label="Filter by status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="COMPLETED">Completed</SelectItem>
+                <SelectItem value="REJECTED">Rejected</SelectItem>
+                <SelectItem value={UNSET}>All statuses</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-40" aria-label="Filter by request type">
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNSET}>All types</SelectItem>
+                <SelectItem value="EXPORT">Export</SelectItem>
+                <SelectItem value="DELETE">Erasure</SelectItem>
+              </SelectContent>
+            </Select>
+            {statusFilter !== 'PENDING' || typeFilter !== UNSET ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStatusFilter('PENDING');
+                  setTypeFilter(UNSET);
+                }}
+              >
+                <X aria-hidden /> Reset
+              </Button>
+            ) : null}
+            <Button variant="outline" onClick={handleExport} disabled={!requests || requests.length === 0}>
+              <FileSpreadsheet aria-hidden /> Export register
+            </Button>
+          </div>
         }
       />
+
+      <DataRequestStatsStrip stats={stats} isLoading={statsLoading} />
 
       <Card>
         <CardHeader>
@@ -96,6 +173,7 @@ export function DataSubjectRequestsView() {
                   <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Requested</TableHead>
+                  <TableHead>Age</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
@@ -125,6 +203,7 @@ export function DataSubjectRequestsView() {
                         <Badge variant={statusVariant(req.status)}>{req.status}</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{formatDateTime(req.createdAt)}</TableCell>
+                      <TableCell>{ageCell(req, stats?.deadlineDays)}</TableCell>
                       <TableCell className="text-right">
                         {req.status === 'PENDING' ? (
                           <div className="flex justify-end gap-2">
@@ -196,5 +275,25 @@ export function DataSubjectRequestsView() {
         </Card>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Age with a breach marker. Only PENDING requests can be overdue — once a
+ * request is fulfilled or rejected the clock has stopped, and flagging a
+ * long-closed record red would read as an unresolved breach that isn't one.
+ *
+ * `deadlineDays` is undefined until the stats query lands; the age still
+ * renders, just without the badge, rather than briefly asserting a threshold
+ * this component made up.
+ */
+function ageCell(request: DataSubjectRequest, deadlineDays: number | undefined) {
+  const days = ageInDays(request.createdAt);
+  const label = days === 0 ? 'Today' : `${days}d`;
+  const overdue = request.status === 'PENDING' && deadlineDays !== undefined && days >= deadlineDays;
+  return overdue ? (
+    <Badge variant="destructive">{label} · overdue</Badge>
+  ) : (
+    <span className="text-muted-foreground tabular-nums">{label}</span>
   );
 }

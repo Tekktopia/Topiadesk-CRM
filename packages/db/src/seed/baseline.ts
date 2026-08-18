@@ -81,7 +81,15 @@ export async function seedBaseline(prisma: PrismaClient, opts: { adminUserId?: s
   // ScheduledReport CRUD/run-now 403s at PermissionGuard before RLS is
   // ever reached, same reasoning as 'claim'/'case' etc. above.
   const resources = [
-    'account', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document', 'approval', 'ai_usage', 'audit_log', 'integration', 'identity',
+    // 'contact' was carved out from 'account' (contacts.controller.ts used
+    // to gate every endpoint on 'account' — see that controller's header
+    // comment) so contact-specific access can eventually diverge from
+    // account access; every role below grants it at the same tier as
+    // 'account' for now, so this is a pure decoupling, not a permission
+    // change. RLS visibility is unaffected either way — contacts_rw already
+    // scopes through the parent account's owner_id, not a permission-scope
+    // lookup of its own.
+    'account', 'contact', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document', 'approval', 'ai_usage', 'audit_log', 'integration', 'identity',
     'claim', 'case', 'sla_config', 'macro',
     // 'business_rule' deliberately does NOT follow the case_categories/
     // loss_cause_categories reuse-'case' convention noted above, even
@@ -96,6 +104,18 @@ export async function seedBaseline(prisma: PrismaClient, opts: { adminUserId?: s
     'business_rule',
     'knowledge_category', 'knowledge_article', 'survey', 'survey_response',
     'report', 'scheduled_report',
+    // Compliance obligations register. Its own resource, granted only to
+    // ADMIN and COMPLIANCE_OFFICER — the register is the evidence trail a
+    // regulator inspects, so a broker being able to edit "we filed on time"
+    // would undermine the control it exists to provide. ALL-scope only in
+    // RLS (compliance_obligations_rw), for the reason documented there.
+    'compliance_obligation',
+    // Territories. Its own resource rather than reusing 'account': account
+    // :write is granted at OWN scope to every broker, so reusing it would
+    // let any of them redraw the firm's book structure. Reads are open at
+    // the RLS layer (a producer must see which book a client sits in), so
+    // only write is meaningfully gated here.
+    'territory',
     // Phase 2 Campaigns — gates campaigns_rw/campaign_templates_rw/
     // campaign_variants_rw/audience_segments_rw's WITH CHECK, all of which
     // (like survey/survey_response above) have NO OWN/DEPARTMENT/BRANCH
@@ -182,7 +202,7 @@ export async function seedBaseline(prisma: PrismaClient, opts: { adminUserId?: s
     'Department head — sees and manages all records owned within their department',
     true,
     [
-      ...['account', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document', 'claim', 'case', 'macro', 'loyalty'].flatMap((r) => actions.map((a) => [r, a, 'DEPARTMENT'] as [string, string, (typeof scopes)[number]])),
+      ...['account', 'contact', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document', 'claim', 'case', 'macro', 'loyalty'].flatMap((r) => actions.map((a) => [r, a, 'DEPARTMENT'] as [string, string, (typeof scopes)[number]])),
       // AI copilot (summarize/reply-draft) is a front-line productivity tool,
       // not an admin-only feature — see backend/api/src/modules/ai-gateway/.
       ['ai_usage', 'write', 'DEPARTMENT'],
@@ -254,7 +274,7 @@ export async function seedBaseline(prisma: PrismaClient, opts: { adminUserId?: s
       // macros_rw's WITH CHECK already self-scopes on created_by_id, OWN
       // here is just what lets PermissionGuard's coarse per-endpoint check
       // pass at all.
-      ...['account', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document', 'claim', 'case', 'macro', 'loyalty'].flatMap((r) => actions.map((a) => [r, a, 'OWN'] as [string, string, (typeof scopes)[number]])),
+      ...['account', 'contact', 'lead', 'opportunity', 'task', 'activity', 'policy', 'renewal_schedule', 'document', 'claim', 'case', 'macro', 'loyalty'].flatMap((r) => actions.map((a) => [r, a, 'OWN'] as [string, string, (typeof scopes)[number]])),
       ['ai_usage', 'write', 'OWN'],
       // knowledge_category/knowledge_article: OWN scope satisfies
       // `knowledge_categories_write`'s WITH CHECK (any non-null scope) and
@@ -302,7 +322,7 @@ export async function seedBaseline(prisma: PrismaClient, opts: { adminUserId?: s
     ],
   );
   const complianceRole = await grantRole('COMPLIANCE_OFFICER', 'Audit, approvals, and regulatory oversight', true, [
-    ['account', 'read', 'ALL'], ['policy', 'read', 'ALL'], ['approval', 'read', 'ALL'], ['approval', 'write', 'ALL'],
+    ['account', 'read', 'ALL'], ['contact', 'read', 'ALL'], ['policy', 'read', 'ALL'], ['approval', 'read', 'ALL'], ['approval', 'write', 'ALL'],
     // policy:write (ALL) is required to actually apply a decided approval's
     // effect (status/currentVersionId/sumInsured) to the Policy row, not
     // just decide the Approval itself — RLS on `policies` would otherwise
@@ -311,6 +331,9 @@ export async function seedBaseline(prisma: PrismaClient, opts: { adminUserId?: s
     // /decision endpoint.
     ['policy', 'write', 'ALL'],
     ['audit_log', 'read', 'ALL'], ['ai_usage', 'read', 'ALL'], ['document', 'read', 'ALL'], ['carrier', 'read', 'ALL'],
+    // The obligations register is this role's own working surface — read AND
+    // write, unlike its read-only oversight grants above.
+    ['compliance_obligation', 'read', 'ALL'], ['compliance_obligation', 'write', 'ALL'],
     // Oversight visibility, same tier as this role's other read-only ALL
     // grants — audits the producer roster/commission ledger, doesn't
     // approve payouts (no write grant).

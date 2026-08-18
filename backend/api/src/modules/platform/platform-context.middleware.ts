@@ -41,6 +41,11 @@ export class PlatformContextMiddleware implements NestMiddleware {
       jwksUri: env.KEYCLOAK_PLATFORM_JWKS_URI,
       issuerUrl: env.KEYCLOAK_PLATFORM_ISSUER_URL,
       internalUrl: env.KEYCLOAK_INTERNAL_URL,
+      // topiadesk-global-admin's Audience protocol mapper on the
+      // topiadesk-platform realm (infra/keycloak/platform-realm-export.json)
+      // embeds this literal string — see that mapper's own comment for why
+      // it's `included.custom.audience`, not `included.client.audience`.
+      audience: 'topiadesk-platform-api',
     });
   }
 

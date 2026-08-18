@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -509,7 +509,12 @@ export function WorkflowBuilderView({ ruleId }: { ruleId?: string }) {
     });
   }
 
-  function buildPayload(): { conditions: unknown; steps: unknown[] } {
+  // useCallback rather than a plain function so the autosave memo below can
+  // depend on THIS instead of re-listing every field the payload reads. The
+  // two lists were previously maintained separately and identically; adding a
+  // field to the payload without also adding it there would have silently
+  // stopped autosave firing for that field, with nothing to catch it.
+  const buildPayload = useCallback((): { conditions: unknown; steps: unknown[] } => {
     const filters: Record<string, string> = {};
     if (status) filters.status = status;
     if (priority) filters.priority = priority;
@@ -519,7 +524,7 @@ export function WorkflowBuilderView({ ruleId }: { ruleId?: string }) {
 
     const conditions = { entityType, eventTypes, filters };
     return { conditions, steps: steps.map(serializeStep) };
-  }
+  }, [entityType, eventTypes, status, priority, caseType, categoryId, assignedTeamId, steps]);
 
   const createMutation = useMutation({
     mutationFn: (body: CreateAutomationRuleBody) => apiFetch<AutomationRuleDto>('/api/crm/automation-rules', { method: 'POST', body: JSON.stringify(body) }),
@@ -577,7 +582,7 @@ export function WorkflowBuilderView({ ruleId }: { ruleId?: string }) {
     onError: () => setSaveState('idle'),
   });
 
-  const payloadKey = useMemo(() => JSON.stringify(buildPayload()), [entityType, eventTypes, status, priority, caseType, categoryId, assignedTeamId, steps]);
+  const payloadKey = useMemo(() => JSON.stringify(buildPayload()), [buildPayload]);
 
   useEffect(() => {
     if (!isEdit || !initializedRef.current || !name.trim()) return;

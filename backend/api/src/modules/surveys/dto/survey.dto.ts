@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsBooleanString, IsEnum, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
 import { SurveyTriggerEvent, SurveyType } from '@topiadesk/db';
 
 export class CreateSurveyDto {
@@ -21,7 +21,11 @@ export class UpdateSurveyDto extends PartialType(CreateSurveyDto) {}
 
 export class SurveyQueryDto {
   @ApiPropertyOptional({ enum: SurveyType }) @IsOptional() @IsEnum(SurveyType) type?: SurveyType;
-  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+  // String, not boolean: the global pipe's enableImplicitConversion casts a
+  // boolean-typed query param with Boolean(), turning the string "false"
+  // into `true` and pinning the flag permanently ON. See
+  // AccountQueryDto.includeArchived for the full explanation.
+  @ApiPropertyOptional({ description: "'true' / 'false'" }) @IsOptional() @IsBooleanString() isActive?: string;
 }
 
 /**

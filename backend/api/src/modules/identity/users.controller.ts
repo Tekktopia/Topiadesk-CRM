@@ -149,9 +149,19 @@ export class UsersController {
       emailVerified: true,
     });
 
-    const temporaryPassword = generateTemporaryPassword();
+    const manualPassword = !!dto.password;
+    const temporaryPassword = dto.password ?? generateTemporaryPassword();
     try {
-      await this.keycloakAdmin.resetPassword(keycloakUserId, temporaryPassword);
+      await this.keycloakAdmin.resetPassword(keycloakUserId, temporaryPassword, !manualPassword);
+      if (manualPassword) {
+        // temporary:false above only affects the new credential itself —
+        // it doesn't clear the UPDATE_PASSWORD requiredAction createUser()
+        // sets by default, which would otherwise still force a change
+        // despite this being a deliberately-set password. Same fix as
+        // platform/tenant-users.controller.ts's resetPassword(). MFA setup
+        // (CONFIGURE_TOTP) stays required either way.
+        await this.keycloakAdmin.updateUser(keycloakUserId, { requiredActions: ['CONFIGURE_TOTP'] });
+      }
     } catch (err) {
       await this.keycloakAdmin.setEnabled(keycloakUserId, false).catch(() => undefined);
       throw err;

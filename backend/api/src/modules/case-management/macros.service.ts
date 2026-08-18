@@ -66,7 +66,16 @@ export class MacrosService {
 
     const entityRef: CaseManagementEntityRef = entityType === 'CLAIM' ? { entityType: 'CLAIM', claimId: entityId } : { entityType: 'CASE', caseId: entityId };
     const actions = Array.isArray(macro.actions) ? (macro.actions as unknown as ActionSpec[]) : [];
-    const results = await executeActions(actions, { entity: entityRef, actingUserId, systemJobName: null });
+    const results = await executeActions(actions, {
+      entity: entityRef,
+      target: { entityType, id: entityId },
+      // A macro is applied by a person from an open record; the handlers read
+      // the row themselves so the action sees current state rather than
+      // whatever the page was showing.
+      targetData: null,
+      actingUserId,
+      systemJobName: null,
+    });
 
     await prisma.macro.update({ where: { id: macroId }, data: { usageCount: { increment: 1 } } });
 

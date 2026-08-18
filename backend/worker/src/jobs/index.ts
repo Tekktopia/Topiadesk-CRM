@@ -20,6 +20,7 @@ import {
 } from './notification-dispatch/notification-email-dispatch.job';
 import { createAutomationEventsQueue, createAutomationEventsWorker } from '../automation/automation-events.queue';
 import { createAutomationRunResumeQueue, createAutomationRunResumeWorker } from '../automation/automation-run-resume.queue';
+import { createAutomationAsyncActionQueue, createAutomationAsyncActionWorker } from '../automation/async-action.queue';
 import { createCampaignDispatchQueue, createCampaignDispatchWorker, scheduleCampaignDispatchPoll } from './campaigns/dispatch.job';
 import { createAbTestResolveQueue, createAbTestResolveWorker, scheduleAbTestResolve } from './campaigns/ab-test-resolve.job';
 import {
@@ -38,6 +39,15 @@ import { createCreatePlatformAdminQueue, createCreatePlatformAdminWorker } from 
 import { createCreateTenantAdminQueue, createCreateTenantAdminWorker } from './platform/create-tenant-admin.job';
 import { createCreateSupportTicketQueue, createCreateSupportTicketWorker } from './platform/create-support-ticket.job';
 import { createNotifyTeamAssignmentQueue, createNotifyTeamAssignmentWorker } from './case-management/notify-team-assignment.job';
+import { createNotifyCaseAssignmentQueue, createNotifyCaseAssignmentWorker } from './case-management/notify-case-assignment.job';
+import { createGraphSyncQueue, createGraphSyncWorker, scheduleGraphSync } from './graph-sync/graph-sync.job';
+import {
+  createAutomationScheduleQueue,
+  createAutomationScheduleWorker,
+  scheduleAutomationScan,
+} from './automation-schedule/schedule-scan.job';
+import { createAuditCheckpointQueue, createAuditCheckpointWorker, scheduleAuditCheckpoint } from './audit-checkpoint/create-checkpoint.job';
+import { createDetectAnomaliesQueue, createDetectAnomaliesWorker, scheduleDetectAnomalies } from './security-monitoring/detect-anomalies.job';
 
 export interface RegisteredJobs {
   queues: Queue[];
@@ -183,6 +193,39 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
   const notifyTeamAssignmentQueue = createNotifyTeamAssignmentQueue(connection);
   const notifyTeamAssignmentWorker = createNotifyTeamAssignmentWorker(connection);
 
+  // Individual-assignee counterpart: assigning a ticket to a named person
+  // notified nobody before this, so the assignee only found out by
+  // stumbling across it in a list.
+  const notifyCaseAssignmentQueue = createNotifyCaseAssignmentQueue(connection);
+  const notifyCaseAssignmentWorker = createNotifyCaseAssignmentWorker(connection);
+
+  // Microsoft 365 delta sync — a periodic sweep across every connected
+  // mailbox, per tenant schema. See the job's own header for why this is a
+  // sweep rather than one job per connection.
+  const graphSyncQueue = createGraphSyncQueue(connection);
+  const graphSyncWorker = createGraphSyncWorker(connection);
+  await scheduleGraphSync(graphSyncQueue);
+
+  // Consumes AutomationRule rows with triggerType SCHEDULE. Until this
+  // existed those rules were stored and never executed — see
+  // automation-schedule/schedule-scan.job.ts.
+  // Runs the three outward-facing actions a macro cannot perform inline
+  // without hanging the user's request — see async-action.queue.ts.
+  const automationAsyncActionQueue = createAutomationAsyncActionQueue(connection);
+  const automationAsyncActionWorker = createAutomationAsyncActionWorker(connection);
+
+  const automationScheduleQueue = createAutomationScheduleQueue(connection);
+  const automationScheduleWorker = createAutomationScheduleWorker(connection);
+  await scheduleAutomationScan(automationScheduleQueue);
+
+  const auditCheckpointQueue = createAuditCheckpointQueue(connection);
+  const auditCheckpointWorker = createAuditCheckpointWorker(connection);
+  await scheduleAuditCheckpoint(auditCheckpointQueue);
+
+  const detectAnomaliesQueue = createDetectAnomaliesQueue(connection);
+  const detectAnomaliesWorker = createDetectAnomaliesWorker(connection);
+  await scheduleDetectAnomalies(detectAnomaliesQueue);
+
   return {
     queues: [
       renewalScanQueue,
@@ -210,6 +253,12 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       createTenantAdminQueue,
       createSupportTicketQueue,
       notifyTeamAssignmentQueue,
+      notifyCaseAssignmentQueue,
+      graphSyncQueue,
+      automationScheduleQueue,
+      automationAsyncActionQueue,
+      auditCheckpointQueue,
+      detectAnomaliesQueue,
     ],
     workers: [
       renewalScanWorker,
@@ -237,6 +286,12 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       createTenantAdminWorker,
       createSupportTicketWorker,
       notifyTeamAssignmentWorker,
+      notifyCaseAssignmentWorker,
+      graphSyncWorker,
+      automationScheduleWorker,
+      automationAsyncActionWorker,
+      auditCheckpointWorker,
+      detectAnomaliesWorker,
     ],
   };
 }

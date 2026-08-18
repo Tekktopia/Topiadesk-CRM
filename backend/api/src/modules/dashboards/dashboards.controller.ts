@@ -64,7 +64,22 @@ export class DashboardsController {
       ...(query.lineOfBusiness ? { lineOfBusiness: query.lineOfBusiness } : {}),
     };
 
-    const [openOpportunities, renewalsDueNext90Days, activeClients, wonThisMonth, wonAllTime, lostAllTime, departments, exchangeRates] = await Promise.all([
+    const [
+      openOpportunities,
+      renewalsDueNext90Days,
+      activeClients,
+      wonThisMonth,
+      wonAllTime,
+      lostAllTime,
+      lostThisMonthCount,
+      departments,
+      exchangeRates,
+      totalAccounts,
+      newLeadsThisMonth,
+      totalLeads,
+      convertedLeads,
+      activePolicies,
+    ] = await Promise.all([
       prisma.opportunity.findMany({
         where: { pipelineStage: { isWon: false, isLost: false }, ...scopeFilter },
         select: { amount: true, currency: true, owner: { select: { departmentId: true } } },
@@ -80,8 +95,17 @@ export class DashboardsController {
         where: { pipelineStage: { isLost: true }, actualCloseDate: { not: null }, ...scopeFilter },
         select: { lostReason: true },
       }),
+      prisma.opportunity.count({ where: { pipelineStage: { isLost: true }, actualCloseDate: { gte: monthStart, lte: monthEnd }, ...scopeFilter } }),
       prisma.department.findMany({ select: { id: true, name: true } }),
       loadExchangeRates(),
+      // Not scoped by ownerId/lineOfBusiness, same reasoning as
+      // renewalsDueNext90Days/activeClients above: Lead/Policy aren't
+      // Opportunity-shaped, so the filter has no honest meaning here.
+      prisma.account.count(),
+      prisma.lead.count({ where: { createdAt: { gte: monthStart, lte: monthEnd } } }),
+      prisma.lead.count(),
+      prisma.lead.count({ where: { status: 'CONVERTED' } }),
+      prisma.policy.count({ where: { status: { in: ['BOUND', 'ISSUED', 'RENEWED'] }, expiryDate: { gte: now } } }),
     ]);
     // Every raw money sum below normalizes each row into the org's base
     // currency first (see currency.util.ts) — Opportunity.amount can be
@@ -152,6 +176,12 @@ export class DashboardsController {
       wonThisMonthCount: wonThisMonth.length,
       wonThisMonthValue: wonThisMonthValue.toFixed(2),
       winRate: decidedAllTime > 0 ? wonAllTime / decidedAllTime : null,
+      totalAccounts,
+      newLeadsThisMonth,
+      leadConversionRate: totalLeads > 0 ? convertedLeads / totalLeads : null,
+      activePolicies,
+      avgDealSize: (openOpportunities.length > 0 ? pipelineValue / openOpportunities.length : 0).toFixed(2),
+      lostThisMonthCount,
       byDepartment,
       lossReasonBreakdown,
     };

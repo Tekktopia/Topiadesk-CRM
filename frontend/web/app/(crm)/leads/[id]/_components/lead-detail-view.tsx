@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRightLeft, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Mail, MoreHorizontal, Pencil, Phone, Trash2 } from 'lucide-react';
 import {
   ActivityTimeline,
   Badge,
@@ -41,10 +41,12 @@ import {
 } from '../../../_lib/hooks';
 import { LeadConvertDialog } from '../../_components/lead-convert-dialog';
 import { LeadFormDialog } from '../../_components/lead-form-dialog';
+import { ScoreRing, leadScoreBandLabel } from '../../../_components/score-meter';
 
 export function LeadDetailView({ leadId }: { leadId: string }) {
   const router = useRouter();
   const { data: lead, isLoading } = useLead(leadId);
+  const { usersById } = useDirectoryUsers();
   const [editOpen, setEditOpen] = React.useState(false);
   const [convertOpen, setConvertOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
@@ -62,6 +64,8 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
   if (!lead) {
     return <EmptyState title="Lead not found" description="It may have been deleted." />;
   }
+
+  const ownerName = lead.assignedToId ? (usersById.get(lead.assignedToId)?.fullName ?? 'Unknown') : 'Unassigned';
 
   return (
     <div className="space-y-6">
@@ -104,22 +108,53 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
       />
 
       <Card>
-        <CardHeader>
-          <CardTitle>Profile</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Score" value={String(lead.score)} />
-          <Field label="Source" value={humanize(lead.source)} />
-          <Field label="Campaign" value={lead.sourceCampaign ?? '—'} />
-          <Field label="Email" value={lead.email ?? '—'} />
-          <Field label="Phone" value={lead.phone ?? '—'} />
-          <Field label="Created" value={formatDate(lead.createdAt)} />
-          {lead.qualificationNotes ? (
-            <div className="sm:col-span-2 lg:col-span-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Qualification notes</p>
-              <p className="text-foreground">{lead.qualificationNotes}</p>
+        <CardContent className="flex flex-col gap-6 pt-6 sm:flex-row sm:items-start">
+          {/* Score leads the card: it is the single number that decides
+              whether this lead gets worked today. */}
+          <div className="flex shrink-0 flex-col items-center gap-1.5">
+            <ScoreRing score={lead.score} ariaLabel={`Score ${lead.score} of 100`} />
+            <span className="text-xs font-medium text-muted-foreground">{leadScoreBandLabel(lead.score)} lead</span>
+          </div>
+
+          <div className="min-w-0 flex-1 space-y-4">
+            {/* mailto:/tel: rather than inert text — the two things anyone
+                opens a lead to actually do. */}
+            <div className="flex flex-wrap gap-2">
+              {lead.email ? (
+                <Button variant="outline" size="sm" asChild>
+                  <a href={`mailto:${lead.email}`}>
+                    <Mail aria-hidden /> {lead.email}
+                  </a>
+                </Button>
+              ) : null}
+              {lead.phone ? (
+                <Button variant="outline" size="sm" asChild>
+                  <a href={`tel:${lead.phone}`}>
+                    <Phone aria-hidden /> {lead.phone}
+                  </a>
+                </Button>
+              ) : null}
+              {!lead.email && !lead.phone ? (
+                <p className="text-sm text-muted-foreground">No contact details on file.</p>
+              ) : null}
             </div>
-          ) : null}
+
+            <div className="grid grid-cols-1 gap-4 border-t border-border pt-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+              <Field label="Source" value={humanize(lead.source)} />
+              <Field label="Campaign" value={lead.sourceCampaign ?? '—'} />
+              <Field label="Owner" value={ownerName} />
+              <Field label="Company" value={lead.companyName ?? '—'} />
+              <Field label="Created" value={formatDate(lead.createdAt)} />
+              <Field label="Status" value={leadStatusLabel(lead.status)} />
+            </div>
+
+            {lead.qualificationNotes ? (
+              <div className="border-t border-border pt-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Qualification notes</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{lead.qualificationNotes}</p>
+              </div>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 
@@ -220,7 +255,7 @@ function ActivityLog({ leadId }: { leadId: string }) {
     occurredAt: a.occurredAt,
     durationMinutes: a.durationMinutes,
     outcome: a.outcome,
-    authorName: usersById.get(a.createdById)?.fullName ?? null,
+    authorName: a.createdById ? (usersById.get(a.createdById)?.fullName ?? null) : null,
   }));
 
   async function handleLogActivity(values: LogActivityFormValues) {

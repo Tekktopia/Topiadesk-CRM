@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
@@ -40,6 +41,61 @@ export class LeadQueryDto {
   @ApiProperty({ required: false, description: 'A LeadSource.code' }) @IsOptional() @IsString() source?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() assignedToId?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsInt() @Min(0) @Max(100) minScore?: number;
+  @ApiPropertyOptional({ description: 'Free-text search across first/last name, email, company and phone.' })
+  @IsOptional()
+  @IsString()
+  q?: string;
+  @ApiPropertyOptional({ description: 'Upper bound of the score band, paired with minScore.' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  maxScore?: number;
+  @ApiPropertyOptional({ description: 'Only leads created on/after this instant (ISO 8601).' })
+  @IsOptional()
+  @IsDateString()
+  createdFrom?: string;
+  @ApiPropertyOptional({ description: 'Only leads created on/before this instant (ISO 8601).' })
+  @IsOptional()
+  @IsDateString()
+  createdTo?: string;
+  // Query strings arrive as strings; @Type coerces before @IsInt runs. The
+  // list endpoint caps rows for payload size, which is exactly why the
+  // sibling /count endpoint exists — see accounts.controller.ts's count().
+  @ApiPropertyOptional({ description: 'Max rows to return (default 50).' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  take?: number;
+  @ApiPropertyOptional({ description: 'Rows to skip, for pagination.' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  skip?: number;
+}
+
+/**
+ * Aggregate counters for the Leads page header. Computed server-side over
+ * the caller's whole RLS-visible set rather than derived in the browser
+ * from the (capped) current page, which would silently under-report the
+ * moment a tenant has more leads than one page holds.
+ */
+export class LeadStatsResponseDto {
+  @ApiProperty() total!: number;
+  @ApiProperty() newCount!: number;
+  @ApiProperty() contacted!: number;
+  @ApiProperty() qualified!: number;
+  @ApiProperty() converted!: number;
+  @ApiProperty() disqualified!: number;
+  @ApiProperty({ description: 'Mean score across all matching leads, rounded to a whole number.' })
+  averageScore!: number;
+  @ApiProperty({ description: 'Converted / total, as a 0-100 percentage rounded to one decimal.' })
+  conversionRate!: number;
+  @ApiProperty({ description: 'Leads created in the last 7 days.' }) createdLast7Days!: number;
 }
 
 export class UpdateLeadScoreDto {

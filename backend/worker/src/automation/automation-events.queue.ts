@@ -6,18 +6,14 @@
  * AutomationRule rows and runs any that match through the same action
  * registry Macro uses (./action-handler.ts, ./handlers.ts).
  *
- * `AutomationRule.triggerType` also has a SCHEDULE value in the schema, but
- * the model has no cron/interval column to drive a schedule from — SCHEDULE
- * rows are accepted by assignment-rules.controller.ts-style CRUD (actually
- * macros/assignment-rules controllers, N/A here — AutomationRule itself has
- * no dedicated controller in this build's scope) but never executed by
- * this processor. Flagged in the module report as a schema gap, not
- * something invented here since prisma/schema.prisma is already migrated
- * and out of this module's authority to alter.
+ * SCHEDULE-triggered rules are NOT handled here — they are found and run by
+ * jobs/automation-schedule/schedule-scan.job.ts, which polls for rules whose
+ * `nextRunAt` has passed. (This comment previously recorded that SCHEDULE
+ * had no cron column and no consumer at all, which was true and was the
+ * module's largest gap; both now exist.)
  *
  * Idempotency: the BullMQ job id is
- * `{entityType}:{entityId}:{eventType}:{occurredAt ISO string}` (the exact
- * scheme specified in the build brief) — enqueuing the identical event
+ * `{entityType}_{entityId}_{eventType}_{occurredAt ISO string}` — enqueuing the identical event
  * twice (e.g. a retried request after the DB write already committed) is a
  * harmless duplicate-jobId no-op at the queue level, the same idempotency
  * mechanism the renewal-scan scheduler relies on for its repeat-tick ids.
@@ -25,6 +21,7 @@
 import { Queue, Worker, type Job } from 'bullmq';
 import type Redis from 'ioredis';
 import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, type Prisma } from '@topiadesk/db';
+import { evaluateConditions, getEntityMeta, normalizeConditions, type AutomationEntityType } from '@topiadesk/automation';
 import './handlers';
 import { deriveExecutionStatus, executeActions, type ActionSpec, type CaseManagementEntityRef } from './action-handler';
 import { startRun } from './run-engine';
@@ -32,42 +29,48 @@ import { startRun } from './run-engine';
 export const AUTOMATION_EVENTS_QUEUE_NAME = 'automation-events';
 
 export interface EntityEventPayload {
-  entityType: 'CLAIM' | 'CASE';
+  entityType: AutomationEntityType;
   entityId: string;
   eventType: string;
   occurredAt: string;
+  /** See the producer's comment — its absence is why this path never ran for a real tenant. */
+  tenantSchema?: string | null;
 }
 
-interface AutomationConditions {
-  entityType?: 'CLAIM' | 'CASE';
-  eventTypes?: string[];
-  /** Simple equality filters against a small allowlist of scalar entity fields — matches SavedView.filters' own documented "fixed allowlist", not an open query. */
-  filters?: Record<string, unknown>;
-}
-
-const FILTERABLE_FIELDS = new Set(['status', 'priority', 'caseType', 'categoryId', 'assignedToId', 'assignedTeamId', 'adjusterId']);
-
-function conditionsMatch(conditions: Prisma.JsonValue, event: EntityEventPayload, entity: Record<string, unknown>): boolean {
-  if (conditions === null || typeof conditions !== 'object' || Array.isArray(conditions)) return false;
-  const c = conditions as AutomationConditions;
-  if (c.entityType && c.entityType !== event.entityType) return false;
-  if (c.eventTypes && c.eventTypes.length > 0 && !c.eventTypes.includes(event.eventType)) return false;
-  if (c.filters) {
-    for (const [field, expected] of Object.entries(c.filters)) {
-      if (!FILTERABLE_FIELDS.has(field)) continue;
-      if (entity[field] !== expected) return false;
-    }
-  }
-  return true;
+/**
+ * Matches an event against a rule's conditions.
+ *
+ * Was a bespoke three-key check with a seven-field allowlist that SKIPPED any
+ * condition naming a field outside it — so a rule with a typo'd or
+ * CRM-entity field name matched everything instead of nothing, which on a
+ * rule that mutates records is the dangerous direction to fail in. Now
+ * delegates to the shared condition engine, which supports real operators and
+ * the same eight entity types the scheduler does, and which the API validates
+ * against at save time so an unknown field is rejected before it can run.
+ */
+function conditionsMatch(conditions: Prisma.JsonValue, event: EntityEventPayload, entity: Record<string, unknown>, now: Date): boolean {
+  const parsed = normalizeConditions(conditions);
+  if (parsed.entityType && parsed.entityType !== event.entityType) return false;
+  if (parsed.eventTypes && parsed.eventTypes.length > 0 && !parsed.eventTypes.includes(event.eventType)) return false;
+  return evaluateConditions(parsed, entity, now);
 }
 
 export async function processEntityEvent(payload: EntityEventPayload): Promise<{ matchedRules: number; results: unknown[] }> {
-  return runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+  // `tenantSchema` rather than the bare SYSTEM_JOB_CONTEXT this used to bind.
+  // That context carries tenantSchema: null, which resolves to the `public`
+  // schema — so every event about a real tenant's record looked for that
+  // record in the seed tenant, found nothing, and skipped. See the payload's
+  // own comment; this is the fix for it.
+  return runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema: payload.tenantSchema ?? null }, async () => {
     const prisma = getPrismaClient();
-    const entity =
-      payload.entityType === 'CLAIM'
-        ? await prisma.claim.findUnique({ where: { id: payload.entityId } })
-        : await prisma.case.findUnique({ where: { id: payload.entityId } });
+    const now = new Date();
+    const meta = getEntityMeta(payload.entityType);
+    if (!meta) {
+      console.warn(`[automation-events] unknown entity type ${payload.entityType} — skipping`);
+      return { matchedRules: 0, results: [] };
+    }
+    const delegate = prisma[meta.model] as unknown as { findUnique(args: unknown): Promise<Record<string, unknown> | null> };
+    const entity = await delegate.findUnique({ where: { id: payload.entityId } });
     if (!entity) {
       console.warn(`[automation-events] ${payload.entityType} ${payload.entityId} no longer exists — skipping`);
       return { matchedRules: 0, results: [] };
@@ -77,7 +80,7 @@ export async function processEntityEvent(payload: EntityEventPayload): Promise<{
     // from the /admin/workflows builder) from ever running, regardless of
     // isActive — see AutomationRule.status's schema comment.
     const rules = await prisma.automationRule.findMany({ where: { triggerType: 'ENTITY_EVENT', isActive: true, status: 'PUBLISHED' } });
-    const matched = rules.filter((rule) => conditionsMatch(rule.conditions, payload, entity as unknown as Record<string, unknown>));
+    const matched = rules.filter((rule) => conditionsMatch(rule.conditions, payload, entity, now));
 
     // A CaseCategory can name a "default workflow" guaranteed to run on
     // CASE CREATED for that category, independent of the rule's own
@@ -100,8 +103,15 @@ export async function processEntityEvent(payload: EntityEventPayload): Promise<{
       }
     }
 
-    const entityRef: CaseManagementEntityRef =
-      payload.entityType === 'CLAIM' ? { entityType: 'CLAIM', claimId: payload.entityId } : { entityType: 'CASE', caseId: payload.entityId };
+    // Undefined for the six entity types that are not tickets — the
+    // ticket-only actions raise a readable error via requireTicketRef rather
+    // than reading a property off a ref that cannot exist.
+    const entityRef: CaseManagementEntityRef | undefined =
+      payload.entityType === 'CLAIM'
+        ? { entityType: 'CLAIM', claimId: payload.entityId }
+        : payload.entityType === 'CASE'
+          ? { entityType: 'CASE', caseId: payload.entityId }
+          : undefined;
 
     const results: unknown[] = [];
     for (const rule of matched) {
@@ -115,7 +125,13 @@ export async function processEntityEvent(payload: EntityEventPayload): Promise<{
         continue;
       }
       const actions = Array.isArray(rule.actions) ? (rule.actions as unknown as ActionSpec[]) : [];
-      const result = await executeActions(actions, { entity: entityRef, actingUserId: null, systemJobName: `automation-rule:${rule.name}` });
+      const result = await executeActions(actions, {
+        target: { entityType: payload.entityType, id: payload.entityId },
+        targetData: entity,
+        entity: entityRef,
+        actingUserId: null,
+        systemJobName: `automation-rule:${rule.name}`,
+      });
       results.push({ ruleId: rule.id, ruleName: rule.name, result });
       await prisma.automationExecutionLog.create({
         data: {

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { getWebEnv } from '../env';
 import {
+  CSRF_COOKIE_NAME,
   OAUTH_TXN_COOKIE_NAME,
   OAUTH_TXN_MAX_AGE_SECONDS,
   REFRESH_SKEW_SECONDS,
@@ -92,6 +93,12 @@ export async function writeSession(payload: SessionPayload, existingSessionId?: 
   const token = await encryptPayload(envelope, env.WEB_SESSION_SECRET, SESSION_MAX_AGE_SECONDS);
   const store = await cookies();
   store.set(SESSION_COOKIE_NAME, token, baseCookieOptions(SESSION_MAX_AGE_SECONDS));
+
+  // Re-minted on every refresh too, not just fresh login — harmless (the
+  // client always just echoes back whatever's currently in the cookie) and
+  // simpler than threading "is this actually a new session" through here.
+  const csrfOptions = { ...baseCookieOptions(SESSION_MAX_AGE_SECONDS), httpOnly: false };
+  store.set(CSRF_COOKIE_NAME, randomUUID(), csrfOptions);
 }
 
 export async function clearSession(): Promise<void> {
@@ -99,6 +106,7 @@ export async function clearSession(): Promise<void> {
   if (sessionId) await deleteStoredSession(sessionId);
   const store = await cookies();
   store.delete(SESSION_COOKIE_NAME);
+  store.delete(CSRF_COOKIE_NAME);
 }
 
 export async function writeOAuthTransaction(payload: OAuthTransactionPayload): Promise<void> {
@@ -119,6 +127,45 @@ export async function readOAuthTransaction(): Promise<OAuthTransactionPayload | 
 export async function clearOAuthTransaction(): Promise<void> {
   const store = await cookies();
   store.delete(OAUTH_TXN_COOKIE_NAME);
+}
+
+/**
+ * Collapses concurrent refreshes for the same session into one shared
+ * in-flight request. A single page (e.g. the dashboard) fires a dozen
+ * parallel BFF calls; if the access token is near expiry, every one of
+ * them independently observed that and would otherwise call
+ * refreshTokens() with the same refresh token at once. Keycloak rotates
+ * refresh tokens on use, so only the first of those would succeed — every
+ * other concurrent refresh would be rejected with invalid_grant and fall
+ * into the catch below, which called clearSession() and wiped out the
+ * session the winning request had just written. That raced as a burst of
+ * 401s across every endpoint on the page, followed by the user's session
+ * actually being gone. See ADR/incident note: freeze recurrence, 2026-08.
+ */
+const inFlightRefreshes = new Map<string, Promise<string | null>>();
+
+async function refreshAndStore(sessionId: string, session: SessionPayload): Promise<string | null> {
+  try {
+    const tokens = await refreshTokens(session.realm, session.refreshToken);
+    const nowAfterRefresh = Math.floor(Date.now() / 1000);
+    const nextSession: SessionPayload = {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token ?? session.refreshToken,
+      idToken: tokens.id_token ?? session.idToken,
+      accessTokenExpiresAt: nowAfterRefresh + (tokens.expiresIn() ?? 60),
+      // Keycloak refresh-token rotation may extend the refresh token's own
+      // lifetime too; if the grant didn't report a new expiry, keep the
+      // previous one rather than guessing.
+      refreshTokenExpiresAt: session.refreshTokenExpiresAt,
+      subject: session.subject,
+      realm: session.realm,
+    };
+    await writeSession(nextSession, sessionId);
+    return nextSession.accessToken;
+  } catch {
+    await clearSession();
+    return null;
+  }
 }
 
 /**
@@ -147,25 +194,12 @@ export async function getValidAccessToken(): Promise<string | null> {
     return null;
   }
 
-  try {
-    const tokens = await refreshTokens(session.realm, session.refreshToken);
-    const nowAfterRefresh = Math.floor(Date.now() / 1000);
-    const nextSession: SessionPayload = {
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token ?? session.refreshToken,
-      idToken: tokens.id_token ?? session.idToken,
-      accessTokenExpiresAt: nowAfterRefresh + (tokens.expiresIn() ?? 60),
-      // Keycloak refresh-token rotation may extend the refresh token's own
-      // lifetime too; if the grant didn't report a new expiry, keep the
-      // previous one rather than guessing.
-      refreshTokenExpiresAt: session.refreshTokenExpiresAt,
-      subject: session.subject,
-      realm: session.realm,
-    };
-    await writeSession(nextSession, sessionId);
-    return nextSession.accessToken;
-  } catch {
-    await clearSession();
-    return null;
-  }
+  const existing = inFlightRefreshes.get(sessionId);
+  if (existing) return existing;
+
+  const refreshPromise = refreshAndStore(sessionId, session).finally(() => {
+    inFlightRefreshes.delete(sessionId);
+  });
+  inFlightRefreshes.set(sessionId, refreshPromise);
+  return refreshPromise;
 }

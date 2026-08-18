@@ -10,6 +10,8 @@
  * for a ~20-line file (same reasoning knowledge-articles.controller.ts's
  * DecideKnowledgeApprovalDto gives for duplicating over importing).
  */
+import { csrfHeaders } from '@/lib/csrf';
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -35,6 +37,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     credentials: 'same-origin',
     headers: {
       ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+      ...csrfHeaders(init?.method),
       ...init?.headers,
     },
   });

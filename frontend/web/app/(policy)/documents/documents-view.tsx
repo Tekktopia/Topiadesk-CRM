@@ -100,7 +100,10 @@ export function DocumentsView() {
     [categoriesQuery.data],
   );
 
-  const visibleDocuments = documentsQuery.data ?? [];
+  // Stable reference: `x ?? []` mints a new array on every render while the
+  // query has no data (i.e. right after a filter change), which is what drove
+  // DataTable's pagination into a render loop. See data-table.tsx.
+  const visibleDocuments = React.useMemo(() => documentsQuery.data ?? [], [documentsQuery.data]);
 
   async function archiveSelected() {
     setArchiving(true);

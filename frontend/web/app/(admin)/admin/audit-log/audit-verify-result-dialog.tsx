@@ -31,6 +31,14 @@ export function AuditVerifyResultDialog({
         {result.mismatchCount > 0 ? (
           <div className="space-y-1.5">
             <p className="text-sm font-medium text-destructive">{result.mismatchCount} hash mismatch{result.mismatchCount === 1 ? '' : 'es'} found</p>
+            {result.rangeStart === null ? (
+              <p className="text-xs text-muted-foreground">
+                This is a from-genesis check — very old rows written before an algorithm fix can surface here even though they
+                were never tampered with (hashing is one-way, so there&apos;s no way to know retroactively which version wrote
+                them). A &quot;Verify since checkpoint&quot; run only ever examines rows newer than a checkpoint, so this can&apos;t
+                happen there.
+              </p>
+            ) : null}
             <ul className="max-h-48 space-y-1 overflow-y-auto rounded-md border border-border p-2 font-mono text-xs text-muted-foreground">
               {result.mismatches.map((m) => (
                 <li key={m.id}>

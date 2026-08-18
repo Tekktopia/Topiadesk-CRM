@@ -170,6 +170,10 @@ export interface PendingApproval {
   label: string;
   linkPath: string | null;
   isMine: boolean;
+  /** Null while status is PENDING. */
+  decidedAt: string | null;
+  decisionNote: string | null;
+  approvedByName: string | null;
 }
 
 /** Mirrors backend's ApprovalDelegationResponseDto — see approval-delegations.controller.ts. */

@@ -6,6 +6,8 @@
  * HttpOnly session cookie is sent automatically and the Route Handler can
  * attach the bearer token server-side.
  */
+import { csrfHeaders } from '@/lib/csrf';
+
 export class ApiRequestError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -29,18 +31,66 @@ async function parseErrorMessage(res: Response): Promise<string> {
   return `Request failed (${res.status})`;
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-  });
-  if (!res.ok) {
-    throw new ApiRequestError(await parseErrorMessage(res), res.status);
+/**
+ * Thrown instead of a network error when a mutation has been safely queued
+ * for replay (see lib/offline/outbox.ts). Callers that want to show "saved,
+ * will sync" rather than "failed" can check `queued`.
+ */
+export class OfflineQueuedError extends Error {
+  readonly queued = true;
+  constructor(public readonly label: string) {
+    super(`You're offline — "${label}" was saved on this device and will sync when you're back online.`);
+    this.name = 'OfflineQueuedError';
   }
-  if (res.status === 204) return undefined as T;
-  const text = await res.text();
-  return (text ? JSON.parse(text) : undefined) as T;
+}
+
+const QUEUEABLE_METHODS = new Set(['POST', 'PATCH', 'DELETE']);
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? 'GET').toUpperCase();
+  try {
+    const res = await fetch(path, {
+      ...init,
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', ...csrfHeaders(init?.method), ...(init?.headers ?? {}) },
+    });
+    if (!res.ok) {
+      throw new ApiRequestError(await parseErrorMessage(res), res.status);
+    }
+    if (res.status === 204) return undefined as T;
+    const text = await res.text();
+    return (text ? JSON.parse(text) : undefined) as T;
+  } catch (err) {
+    // Only a genuine transport failure gets queued. An ApiRequestError means
+    // the server answered and rejected this write on its merits — queueing
+    // that would replay a request already known to be invalid.
+    if (err instanceof ApiRequestError) throw err;
+    if (!QUEUEABLE_METHODS.has(method) || (typeof navigator !== 'undefined' && navigator.onLine)) throw err;
+
+    const { enqueue } = await import('@/lib/offline/outbox');
+    const label = describeMutation(method, path);
+    await enqueue({
+      path,
+      method: method as 'POST' | 'PATCH' | 'DELETE',
+      body: typeof init?.body === 'string' ? init.body : undefined,
+      // Generated once, here, and reused for every replay attempt — that
+      // stable identity is what the server's IdempotencyInterceptor keys on
+      // to collapse duplicates. Regenerating it per attempt would defeat
+      // the entire mechanism.
+      idempotencyKey: crypto.randomUUID(),
+      label,
+    });
+    throw new OfflineQueuedError(label);
+  }
+}
+
+/** Best-effort human label for the pending-changes list, from the REST shape alone. */
+function describeMutation(method: string, path: string): string {
+  const resource = path.replace(/^\/api\/crm\//, '').split('?')[0]!.split('/')[0]!.replace(/-/g, ' ');
+  const singular = resource.endsWith('s') ? resource.slice(0, -1) : resource;
+  if (method === 'POST') return `New ${singular}`;
+  if (method === 'DELETE') return `Delete ${singular}`;
+  return `Update ${singular}`;
 }
 
 /** Builds a `?a=1&b=2` query string, dropping undefined/null/empty values. */

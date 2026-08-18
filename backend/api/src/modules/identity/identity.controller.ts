@@ -22,66 +22,59 @@ import { getPrismaClient, type PermissionScope } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
+import { assertSafeImageMimeType } from '../../common/uploads/image-mimetype.util';
 import { getMinioClient, documentsBucket } from '../documents/minio-client';
 import { storeAvatarFromBuffer } from './avatar-storage.util';
 import { CurrentUserResponseDto, ResolvedPermissionDto } from './dto/current-user-response.dto';
 import { UpdateMyPresenceDto } from './dto/update-my-presence.dto';
 import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
 
-/**
- * Resource/action pairs the app/(cases)/** Case Config admin pages
- * (sla-policies/macros/assignment-rules/business-hours/agent-skills/
- * case-categories/loss-cause-categories) need write-scope for, to
- * button-gate New/Edit/Delete client-side. NOT one resource per page —
- * see each case-management/*.controller.ts's @RequirePermission
- * decorators, the actual source of truth this list mirrors:
- *   - sla_config: sla-policies, assignment-rules, business-hours, agent-skills
- *   - macro: macros
- *   - case: case-categories (case-categories.controller.ts reuses 'case',
- *     no dedicated 'case_category' resource is seeded)
- *   - claim: loss-cause-categories (same story, reuses 'claim')
- * Kept as a small fixed list (not every Permission row) — this is purely a
- * UX-gating signal for one part of the frontend, not a general-purpose
- * permissions API. The backend's @RequirePermission guard on each endpoint
- * remains the real enforcement regardless of what this reports.
- */
-const CASE_CONFIG_WRITE_RESOURCES = ['sla_config', 'macro', 'case', 'claim'] as const;
-
 const SCOPE_RANK: Record<PermissionScope, number> = { OWN: 1, DEPARTMENT: 2, BRANCH: 3, ALL: 4 };
 
 /**
- * Resolves the caller's highest granted scope per CASE_CONFIG_WRITE_RESOURCES
- * entry — same ADMIN-is-always-'ALL' short-circuit and the same
- * user_roles -> role_permissions -> permissions join PermissionGuard already
- * runs (common/auth/permission.guard.ts), and the same ranking
- * app_max_scope() uses (packages/db/prisma/rls/002_policies.sql) — done here
- * via Prisma rather than a raw SQL call into that Postgres function, since
- * this only needs a fixed, small resource list and Prisma is already the
- * established pattern for this exact join (see PermissionGuard).
+ * Resolves ALL the caller's granted permissions (both read and write, all
+ * resources) — used for frontend useCan() gating on all pages, not just Case
+ * Config. Same ADMIN-is-always-'ALL' short-circuit and the same user_roles ->
+ * role_permissions -> permissions join PermissionGuard already runs
+ * (common/auth/permission.guard.ts), and the same ranking app_max_scope() uses
+ * (packages/db/prisma/rls/002_policies.sql) — done here via Prisma rather than
+ * raw SQL, following the established pattern (see PermissionGuard).
  */
-async function resolveCaseConfigPermissions(user: AuthenticatedUser): Promise<ResolvedPermissionDto[]> {
+async function resolveAllPermissions(user: AuthenticatedUser): Promise<ResolvedPermissionDto[]> {
   if (user.roles.includes('ADMIN')) {
-    return CASE_CONFIG_WRITE_RESOURCES.map((resource) => ({ resource, action: 'write', scope: 'ALL' as PermissionScope }));
+    // ADMIN can do everything: fetch all Permission rows seeded in baseline.ts
+    const allPermissions = await getPrismaClient().permission.findMany({
+      select: { resource: true, action: true },
+    });
+    return allPermissions.map((p) => ({
+      resource: p.resource,
+      action: p.action as 'read' | 'write',
+      scope: 'ALL' as PermissionScope,
+    }));
   }
 
+  // Non-ADMIN: find all permissions granted via their roles
   const grants = await getPrismaClient().rolePermission.findMany({
     where: {
       role: { users: { some: { userId: user.id } } },
-      permission: { resource: { in: [...CASE_CONFIG_WRITE_RESOURCES] }, action: 'write' },
     },
-    select: { permission: { select: { resource: true, scope: true } } },
+    select: { permission: { select: { resource: true, action: true, scope: true } } },
   });
 
-  const maxScopeByResource = new Map<string, PermissionScope>();
+  const maxScopeByKey = new Map<string, PermissionScope>();
   for (const grant of grants) {
-    const { resource, scope } = grant.permission;
-    const current = maxScopeByResource.get(resource);
+    const { resource, action, scope } = grant.permission;
+    const key = `${resource}:${action}`;
+    const current = maxScopeByKey.get(key);
     if (!current || SCOPE_RANK[scope] > SCOPE_RANK[current]) {
-      maxScopeByResource.set(resource, scope);
+      maxScopeByKey.set(key, scope);
     }
   }
 
-  return Array.from(maxScopeByResource.entries()).map(([resource, scope]) => ({ resource, action: 'write' as const, scope }));
+  return Array.from(maxScopeByKey.entries()).map(([key, scope]) => {
+    const [resource, action] = key.split(':');
+    return { resource: resource!, action: action as 'read' | 'write', scope };
+  });
 }
 
 /**
@@ -100,6 +93,7 @@ async function loadSelfWithNames(userId: string) {
       phone: true,
       presenceStatus: true,
       avatarStorageKey: true,
+      kpiTilePreferences: true,
       department: { select: { name: true } },
       branch: { select: { name: true } },
     },
@@ -109,6 +103,7 @@ async function loadSelfWithNames(userId: string) {
     phone: row?.phone ?? null,
     presenceStatus: row?.presenceStatus ?? 'OFFLINE',
     hasAvatar: row?.avatarStorageKey != null,
+    kpiTilePreferences: (row?.kpiTilePreferences as string[] | null) ?? null,
     departmentName: row?.department?.name ?? null,
     branchName: row?.branch?.name ?? null,
   };
@@ -129,7 +124,7 @@ export class IdentityController {
   @ApiOkResponse({ type: CurrentUserResponseDto })
   async me(@CurrentUser() user: AuthenticatedUser): Promise<CurrentUserResponseDto> {
     const self = await loadSelfWithNames(user.id);
-    return { ...user, ...self, permissions: await resolveCaseConfigPermissions(user) };
+    return { ...user, ...self, permissions: await resolveAllPermissions(user) };
   }
 
   /**
@@ -146,14 +141,15 @@ export class IdentityController {
   @Patch('me')
   @ApiOkResponse({ type: CurrentUserResponseDto })
   async updateMyProfile(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateMyProfileDto): Promise<CurrentUserResponseDto> {
-    const data: { fullName?: string; phone?: string | null } = {};
+    const data: { fullName?: string; phone?: string | null; kpiTilePreferences?: string[] } = {};
     if (dto.fullName !== undefined) data.fullName = dto.fullName;
     if (dto.phone !== undefined) data.phone = dto.phone;
+    if (dto.kpiTilePreferences !== undefined) data.kpiTilePreferences = dto.kpiTilePreferences;
     if (Object.keys(data).length > 0) {
       await getPrismaClient().user.update({ where: { id: user.id }, data });
     }
     const self = await loadSelfWithNames(user.id);
-    return { ...user, ...self, permissions: await resolveCaseConfigPermissions(user) };
+    return { ...user, ...self, permissions: await resolveAllPermissions(user) };
   }
 
   /**
@@ -172,7 +168,7 @@ export class IdentityController {
       data: { presenceStatus: dto.presenceStatus, presenceUpdatedAt: new Date() },
     });
     const self = await loadSelfWithNames(user.id);
-    return { ...user, ...self, permissions: await resolveCaseConfigPermissions(user) };
+    return { ...user, ...self, permissions: await resolveAllPermissions(user) };
   }
 
   /**
@@ -188,12 +184,12 @@ export class IdentityController {
   @ApiOkResponse({ type: CurrentUserResponseDto })
   async uploadMyAvatar(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: AuthenticatedUser): Promise<CurrentUserResponseDto> {
     if (!file?.buffer?.length) throw new BadRequestException('No file uploaded (expected multipart field "file")');
-    if (!file.mimetype.startsWith('image/')) throw new BadRequestException('Avatar must be an image file');
+    assertSafeImageMimeType(file.mimetype, 'Avatar');
 
     await storeAvatarFromBuffer(user.id, file.buffer, file.mimetype, file.originalname);
 
     const self = await loadSelfWithNames(user.id);
-    return { ...user, ...self, permissions: await resolveCaseConfigPermissions(user) };
+    return { ...user, ...self, permissions: await resolveAllPermissions(user) };
   }
 
   /**
@@ -213,7 +209,11 @@ export class IdentityController {
     const result = await getMinioClient().send(new GetObjectCommand({ Bucket: documentsBucket(), Key: row.avatarStorageKey }));
     if (!result.Body) throw new NotFoundException('Avatar missing from storage');
 
-    res.set({ 'Content-Type': result.ContentType ?? 'application/octet-stream', 'Cache-Control': 'private, max-age=3600' });
+    res.set({
+      'Content-Type': result.ContentType ?? 'application/octet-stream',
+      'Cache-Control': 'private, max-age=3600',
+      'X-Content-Type-Options': 'nosniff',
+    });
     return new StreamableFile(result.Body as Readable);
   }
 
@@ -229,6 +229,6 @@ export class IdentityController {
         .catch(() => undefined);
     }
     const self = await loadSelfWithNames(user.id);
-    return { ...user, ...self, permissions: await resolveCaseConfigPermissions(user) };
+    return { ...user, ...self, permissions: await resolveAllPermissions(user) };
   }
 }

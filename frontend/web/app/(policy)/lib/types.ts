@@ -239,3 +239,59 @@ const VERSIONED_TARGET_STATUSES = new Set(Object.values(VERSION_TYPE_STATUS_EFFE
 export function directOnlyTransitions(currentStatus: PolicyStatus): PolicyStatus[] {
   return POLICY_STATUS_TRANSITIONS[currentStatus].filter((s) => !VERSIONED_TARGET_STATUSES.has(s));
 }
+
+// -- Renewals board ----------------------------------------------------------
+// Hand-written rather than ApiPaths-derived, matching this file's existing
+// convention for endpoints the OpenAPI client hasn't been regenerated for.
+
+export type RenewalStatus = 'ON_TRACK' | 'AT_RISK' | 'IN_PROGRESS' | 'RENEWED' | 'LAPSED' | 'DECLINED_TO_RENEW';
+
+export interface RenewalBoardRow {
+  policyId: string;
+  policyNumber: string;
+  accountId: string;
+  accountName: string;
+  carrierName: string;
+  lineOfBusiness: string;
+  expiryDate: string;
+  /** Negative once the policy has already expired. */
+  daysToExpiry: number;
+  renewalStatus: RenewalStatus | null;
+  renewalDueDate: string | null;
+  assignedToId: string | null;
+  assignedToName: string | null;
+  brokerOfRecordName: string | null;
+  annualPremiumBase: number;
+  baseCurrency: string;
+  /** No RenewalSchedule row exists — expiring with no process started at all. */
+  scheduleMissing: boolean;
+}
+
+export interface RenewalBoardStats {
+  total: number;
+  overdue: number;
+  dueIn30: number;
+  dueIn60: number;
+  dueIn90: number;
+  unassigned: number;
+  atRisk: number;
+  noScheduleStarted: number;
+  valueAtRisk: number;
+  baseCurrency: string;
+}
+
+export type RenewalBoardQuery = {
+  withinDays?: number;
+  renewalStatus?: RenewalStatus;
+  assignedToId?: string;
+  brokerOfRecordId?: string;
+  accountId?: string;
+  carrierId?: string;
+  lineOfBusiness?: string;
+  q?: string;
+  /** 'true' only — a string, matching how the API models boolean query flags. */
+  unassignedOnly?: string;
+  sortBy?: 'expiryDate' | 'premium';
+  take?: number;
+  skip?: number;
+};

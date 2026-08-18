@@ -1,5 +1,6 @@
-import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, Res, StreamableFile, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, type Prisma } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
@@ -12,15 +13,19 @@ import {
   CreateOpportunityDto,
   OpportunityQueryDto,
   OpportunityResponseDto,
+  OpportunityStatsResponseDto,
   StageHistoryEntryDto,
   UpdateOpportunityDto,
   UpdateOpportunityStageDto,
 } from './dto/opportunity.dto';
+import { opportunitiesToCsv } from './opportunity-csv';
+import { BASE_CURRENCY, loadExchangeRates, toBaseCurrency } from '../dashboards/currency.util';
 import { CreateMarketSubmissionDto, MarketSubmissionResponseDto, UpdateMarketSubmissionDto } from './dto/opportunity-market-submission.dto';
 import { toMarketSubmissionDto, toOpportunityDto } from './mapping';
 import { BulkActionResponseDto } from './dto/bulk-action.dto';
 import { validateCustomFields } from './custom-fields.validator';
 import { diffBulkIds } from './bulk-actions';
+import { enqueueEntityEvent } from '../case-management/automation-events.util';
 
 @ApiTags('crm')
 @ApiBearerAuth()
@@ -36,22 +41,116 @@ export class OpportunitiesController {
   @ApiOkResponse({ type: [OpportunityResponseDto] })
   async list(@Query() query: OpportunityQueryDto): Promise<OpportunityResponseDto[]> {
     const opportunities = await getPrismaClient().opportunity.findMany({
-      where: {
-        accountId: query.accountId,
-        ownerId: query.ownerId,
-        lineOfBusiness: query.lineOfBusiness,
-        pipelineStageId: query.pipelineStageId,
-        pipelineStage:
-          query.pipelineId !== undefined || query.isOpen !== undefined
-            ? {
-                pipelineId: query.pipelineId,
-                ...(query.isOpen ? { isWon: false, isLost: false } : {}),
-              }
-            : undefined,
-      },
+      where: opportunityListWhere(query),
       orderBy: { createdAt: 'desc' },
+      // Previously unbounded: every opportunity in the tenant was serialized
+      // on every pipeline page load. The board groups by stage client-side
+      // and so genuinely wants a large page, hence 200 rather than the
+      // 50 used for flat lists — with /count + a truncation notice in the
+      // UI covering the overflow, same contract as accounts and leads.
+      take: query.take ?? 200,
+      skip: query.skip ?? 0,
     });
     return opportunities.map(toOpportunityDto);
+  }
+
+  // Must precede ':id' — Nest matches literal segments in declaration order
+  // ahead of a dynamic param competing for the same position.
+  @Get('count')
+  @RequirePermission('opportunity', 'read')
+  @ApiOkResponse({ type: Number })
+  async count(@Query() query: OpportunityQueryDto): Promise<{ count: number }> {
+    const count = await getPrismaClient().opportunity.count({ where: opportunityListWhere(query) });
+    return { count };
+  }
+
+  /**
+   * Pipeline header aggregates over the same filter set as list().
+   *
+   * Unlike the leads equivalent this cannot be done with groupBy/aggregate:
+   * every total has to be currency-normalized per row before summing (see
+   * OpportunityStatsResponseDto), and "open/won/lost" is a property of the
+   * related PipelineStage rather than a column on Opportunity. So it reads
+   * the matching rows with their stage flags and folds them in JS —
+   * bounded by the same filters the user already narrowed to.
+   */
+  @Get('stats')
+  @RequirePermission('opportunity', 'read')
+  @ApiOkResponse({ type: OpportunityStatsResponseDto })
+  async stats(@Query() query: OpportunityQueryDto): Promise<OpportunityStatsResponseDto> {
+    const [rows, exchangeRates] = await Promise.all([
+      getPrismaClient().opportunity.findMany({
+        where: opportunityListWhere(query),
+        select: {
+          amount: true,
+          currency: true,
+          probability: true,
+          expectedCloseDate: true,
+          pipelineStage: { select: { isWon: true, isLost: true } },
+        },
+      }),
+      loadExchangeRates(),
+    ]);
+
+    // Date-only comparison against today's date, matching expectedCloseDate's
+    // @db.Date type — a deal due today is not yet overdue.
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let openCount = 0;
+    let wonCount = 0;
+    let lostCount = 0;
+    let openValue = 0;
+    let weightedValue = 0;
+    let wonValue = 0;
+    let overdueCount = 0;
+
+    for (const row of rows) {
+      const base = toBaseCurrency(Number(row.amount), row.currency, exchangeRates);
+      if (row.pipelineStage.isWon) {
+        wonCount += 1;
+        wonValue += base;
+      } else if (row.pipelineStage.isLost) {
+        lostCount += 1;
+      } else {
+        openCount += 1;
+        openValue += base;
+        weightedValue += base * (row.probability / 100);
+        if (row.expectedCloseDate < today) overdueCount += 1;
+      }
+    }
+
+    const decided = wonCount + lostCount;
+    const round2 = (n: number): number => Math.round(n * 100) / 100;
+
+    return {
+      baseCurrency: BASE_CURRENCY,
+      totalCount: rows.length,
+      openCount,
+      wonCount,
+      lostCount,
+      openValue: round2(openValue),
+      weightedValue: round2(weightedValue),
+      wonValue: round2(wonValue),
+      // Win rate is won/(won+lost) — deals still open are not yet a loss,
+      // so including them would drag the rate down as the pipeline grows.
+      winRate: decided === 0 ? 0 : Math.round((wonCount / decided) * 1000) / 10,
+      averageDealSize: openCount === 0 ? 0 : round2(openValue / openCount),
+      overdueCount,
+    };
+  }
+
+  @Get('export')
+  @RequirePermission('opportunity', 'read')
+  async export(@Query() query: OpportunityQueryDto, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
+    const opportunities = await getPrismaClient().opportunity.findMany({
+      where: opportunityListWhere(query),
+      orderBy: { createdAt: 'desc' },
+      take: 10_000,
+    });
+    const csv = opportunitiesToCsv(opportunities);
+    res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="opportunities.csv"' });
+    return new StreamableFile(Buffer.from(csv, 'utf-8'));
   }
 
   @Get(':id')
@@ -149,6 +248,12 @@ export class OpportunitiesController {
         customFields: dto.customFields as Prisma.InputJsonValue | undefined,
       },
     });
+    await enqueueEntityEvent({
+      entityType: 'OPPORTUNITY',
+      entityId: opportunity.id,
+      eventType: 'CREATED',
+      occurredAt: opportunity.createdAt.toISOString(),
+    }).catch(() => undefined);
     return toOpportunityDto(opportunity);
   }
 
@@ -169,6 +274,15 @@ export class OpportunitiesController {
         customFields: dto.customFields as Prisma.InputJsonValue | undefined,
       },
     });
+    // A stage move through this endpoint (rather than PATCH :id/stage) still
+    // reports as STAGE_CHANGED — a rule watching for deals advancing must not
+    // depend on WHICH endpoint the UI happened to call.
+    await enqueueEntityEvent({
+      entityType: 'OPPORTUNITY',
+      entityId: updated.id,
+      eventType: dto.pipelineStageId && dto.pipelineStageId !== existing.pipelineStageId ? 'STAGE_CHANGED' : 'UPDATED',
+      occurredAt: updated.updatedAt.toISOString(),
+    }).catch(() => undefined);
     return toOpportunityDto(updated);
   }
 
@@ -253,6 +367,14 @@ export class OpportunitiesController {
         lostReason: dto.lostReason,
       },
     });
+    // The pipeline movement rules want to hook: "when a deal reaches
+    // Quoted, task the producer", "when one is lost, log the reason".
+    await enqueueEntityEvent({
+      entityType: 'OPPORTUNITY',
+      entityId: updated.id,
+      eventType: 'STAGE_CHANGED',
+      occurredAt: updated.updatedAt.toISOString(),
+    }).catch(() => undefined);
     return toOpportunityDto(updated);
   }
 
@@ -315,4 +437,47 @@ export class MarketSubmissionsController {
     await prisma.opportunityMarketSubmission.delete({ where: { id } });
     return { deleted: true };
   }
+}
+
+/**
+ * Shared by list/count/stats/export so the four can never disagree about
+ * what the current filter selects — same contract as accountListWhere() and
+ * leadListWhere().
+ *
+ * The `pipelineStage` relation filter is built conditionally because an
+ * empty `{}` there would still force a join; it is only included when
+ * pipelineId or isOpen actually constrain something.
+ */
+function opportunityListWhere(query: OpportunityQueryDto): Prisma.OpportunityWhereInput {
+  const q = query.q?.trim();
+  const hasAmountBand = query.minAmount !== undefined || query.maxAmount !== undefined;
+  const hasCloseBand = Boolean(query.closeFrom || query.closeTo);
+  const hasStageFilter = query.pipelineId !== undefined || query.isOpen !== undefined;
+
+  return {
+    accountId: query.accountId,
+    ownerId: query.ownerId,
+    lineOfBusiness: query.lineOfBusiness,
+    pipelineStageId: query.pipelineStageId,
+    pipelineStage: hasStageFilter
+      ? {
+          pipelineId: query.pipelineId,
+          // Explicit string comparison — see AccountQueryDto.includeArchived.
+          ...(query.isOpen === 'true' ? { isWon: false, isLost: false } : {}),
+        }
+      : undefined,
+    // Prisma compares Decimal columns against a number fine; the bound is a
+    // filter value, never persisted, so no Decimal construction needed.
+    amount: hasAmountBand ? { gte: query.minAmount, lte: query.maxAmount } : undefined,
+    expectedCloseDate: hasCloseBand
+      ? {
+          gte: query.closeFrom ? new Date(query.closeFrom) : undefined,
+          lte: query.closeTo ? new Date(query.closeTo) : undefined,
+        }
+      : undefined,
+    // Only `name` is searchable here. Account name would need a relation
+    // filter and the board already lets you filter by account explicitly,
+    // so this stays a cheap indexable predicate on the opportunity itself.
+    ...(q ? { name: { contains: q, mode: 'insensitive' as const } } : {}),
+  };
 }

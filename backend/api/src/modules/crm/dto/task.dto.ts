@@ -1,5 +1,6 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { ArrayMinSize, IsArray, IsDateString, IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { ArrayMinSize, IsArray, IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min, MinLength } from 'class-validator';
 import { TaskPriority, TaskStatus } from '@topiadesk/db';
 
 export class CreateTaskDto {
@@ -24,6 +25,48 @@ export class TaskQueryDto {
   @ApiProperty({ required: false }) @IsOptional() @IsDateString() dueBefore?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsDateString() dueAfter?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() caseId?: string;
+  @ApiProperty({ required: false, description: 'Powers an Account detail page\'s Tasks tab — previously had to be client-filtered from the full list.' })
+  @IsOptional()
+  @IsUUID()
+  accountId?: string;
+  @ApiPropertyOptional({ description: 'Free-text search across task title and description.' })
+  @IsOptional()
+  @IsString()
+  q?: string;
+  @ApiPropertyOptional({ enum: TaskPriority })
+  @IsOptional()
+  @IsEnum(TaskPriority)
+  priority?: TaskPriority;
+  @ApiPropertyOptional({ description: 'Max rows to return (default 100).' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  take?: number;
+  @ApiPropertyOptional({ description: 'Rows to skip, for pagination.' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  skip?: number;
+}
+
+/**
+ * Task-list aggregates.
+ *
+ * `overdue` is the number this page exists to surface: OPEN/IN_PROGRESS with
+ * a dueDate in the past. Tasks with no due date are never overdue — they are
+ * counted in `noDueDate` instead of being silently lumped into either side,
+ * because "undated" and "on time" are different problems.
+ */
+export class TaskStatsResponseDto {
+  @ApiProperty() total!: number;
+  @ApiProperty({ description: 'Neither COMPLETED nor CANCELLED.' }) open!: number;
+  @ApiProperty() completed!: number;
+  @ApiProperty({ description: 'Still open with a dueDate strictly before today.' }) overdue!: number;
+  @ApiProperty({ description: 'Still open and due today.' }) dueToday!: number;
+  @ApiProperty({ description: 'Still open with no dueDate set.' }) noDueDate!: number;
 }
 
 export class TaskResponseDto {

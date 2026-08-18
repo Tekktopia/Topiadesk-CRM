@@ -1,12 +1,11 @@
 import type { MiddlewareConsumer, NestModule} from '@nestjs/common';
 import { Module, RequestMethod } from '@nestjs/common';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { AppConfigModule, ENV_TOKEN, type Env } from './common/config/config.module';
 import { RlsContextMiddleware } from './common/auth/rls-context.middleware';
 import { HealthModule } from './common/health/health.module';
-import { AuditService } from './common/audit/audit.service';
 import { IdentityModule } from './modules/identity/identity.module';
 import { CrmModule } from './modules/crm/crm.module';
 import { PolicyModule } from './modules/policy/policy.module';
@@ -25,6 +24,7 @@ import { SearchModule } from './modules/search/search.module';
 import { OmnichannelModule } from './modules/omnichannel/omnichannel.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { ApprovalsModule } from './modules/approvals/approvals.module';
+import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor';
 import { IpWhitelistGuard } from './modules/identity/ip-whitelist.guard';
 import { PortalModule } from './modules/portal/portal.module';
 import { SupportModule } from './modules/support/support.module';
@@ -89,9 +89,13 @@ import { PlatformSearchController } from './modules/platform/platform-search.con
     // (today's default), so registering it here is safe regardless of
     // whether an operator has opted in yet.
     { provide: APP_GUARD, useClass: IpWhitelistGuard },
-    AuditService,
+    // Makes mutations replay-safe for the offline PWA's write outbox (see
+    // common/idempotency/idempotency.interceptor.ts). Global because the
+    // outbox can queue a write from any module, and a no-op for every
+    // request that doesn't carry an `Idempotency-Key` header — which is
+    // all of them today.
+    { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
   ],
-  exports: [AuditService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
@@ -158,6 +162,11 @@ export class AppModule implements NestModule {
         // a visitor has logged in (no TopiaDesk-issued JWT could exist
         // yet). See public-tenant-lookup.controller.ts's header comment.
         { path: 'public/tenant-lookup', method: RequestMethod.GET },
+        // Per-tenant login-page logo, fetched by the Keycloak login theme's
+        // own <img> tag — same "before any session exists" reasoning as
+        // public/tenant-lookup above. See
+        // public-tenant-branding.controller.ts's header comment.
+        { path: 'public/tenant-branding/:realmName/logo', method: RequestMethod.GET },
         // Customer portal — external Contacts, never a Keycloak bearer
         // token. PortalContextMiddleware (registered below) is this
         // surface's own equivalent, applied to portal/* except portal/auth/*

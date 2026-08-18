@@ -7,7 +7,14 @@ import { dirname, join } from 'node:path';
 import openapiTS, { astToString, COMMENT_HEADER } from 'openapi-typescript';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const apiUrl = process.env.API_URL ?? 'http://localhost:4000';
+// 127.0.0.1, deliberately NOT "localhost". docker-compose.override.yml
+// publishes the API as `127.0.0.1:4000:4000` — loopback-bound on purpose, so
+// a stray `docker compose up` on a server cannot expose it — and that is an
+// IPv4-only listener. Node 17+ no longer reorders DNS results, so `localhost`
+// resolves to ::1 (IPv6) first and the connection is refused before IPv4 is
+// ever tried, with a bare "fetch failed". Same trap applies to any other
+// host-side tooling pointed at a published port.
+const apiUrl = process.env.API_URL ?? 'http://127.0.0.1:4000';
 const outDir = join(__dirname, '..', 'src', 'api-client');
 
 async function main() {

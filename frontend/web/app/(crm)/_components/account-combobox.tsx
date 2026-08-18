@@ -23,16 +23,20 @@ export function AccountCombobox({
   onChange,
   placeholder = 'Search accounts…',
   disabled,
+  excludeId,
 }: {
   value: AccountRef | null;
   onChange: (account: AccountRef | null) => void;
   placeholder?: string;
   disabled?: boolean;
+  /** Omits this id from results — e.g. an account picking its own parent shouldn't be able to select itself. Doesn't guard against deeper cycles (an account picking one of its own descendants), same gap as the backend's group-rollup BFS. */
+  excludeId?: string;
 }) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 250);
-  const { data, isFetching } = useAccounts({ q: debouncedSearch || undefined, take: 8 });
+  const { data: rawData, isFetching } = useAccounts({ q: debouncedSearch || undefined, take: 8 });
+  const data = excludeId ? rawData?.filter((a) => a.id !== excludeId) : rawData;
 
   return (
     <div className="relative">

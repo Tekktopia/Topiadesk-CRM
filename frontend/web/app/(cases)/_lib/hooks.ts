@@ -17,6 +17,7 @@ import type {
   CaseClosureApproval,
   CaseComment,
   CaseQuery,
+  CaseStats,
   CaseQueueQuery,
   CaseSavedView,
   CaseWatcher,
@@ -24,6 +25,7 @@ import type {
   ChangeClaimStatusInput,
   Claim,
   ClaimQuery,
+  ClaimStats,
   ClaimStatusHistoryEntry,
   CreateAgentSkillInput,
   CreateAssignmentRuleInput,
@@ -98,6 +100,22 @@ function reportBulkResult(entityLabel: string, verb: string, { updated, skipped 
 // ---------------------------------------------------------------------------
 // Claims
 // ---------------------------------------------------------------------------
+
+/** Real total for the current claim filters — useClaims() caps `take`. */
+export function useClaimsCount(query: ClaimQuery = {}) {
+  return useQuery({
+    queryKey: ['claims', 'count', query],
+    queryFn: () => apiFetch<{ count: number }>(`/api/claims/count${buildQuery(query)}`),
+  });
+}
+
+/** Claims-desk aggregates — reserve (live exposure) and settled reported separately. */
+export function useClaimStats(query: ClaimQuery = {}) {
+  return useQuery({
+    queryKey: ['claims', 'stats', query],
+    queryFn: () => apiFetch<ClaimStats>(`/api/claims/stats${buildQuery(query)}`),
+  });
+}
 
 export function useClaims(query: ClaimQuery = {}) {
   return useQuery({
@@ -223,6 +241,14 @@ export function useCases(query: CaseQuery = {}) {
 }
 
 /** Powers the ticket workspace's "a–b of N" pager — GET /cases/count runs the exact same filter-building logic as GET /cases (see case-query.util.ts) so the two can never disagree. */
+/** Ticket-desk aggregates over the same filter set as the workspace list. */
+export function useCaseStats(query: CaseQuery = {}) {
+  return useQuery({
+    queryKey: ['cases', 'stats', query],
+    queryFn: () => apiFetch<CaseStats>(`/api/cases/stats${buildQuery(query)}`),
+  });
+}
+
 export function useCasesCount(query: CaseQuery = {}) {
   return useQuery({
     queryKey: ['cases', 'count', query],
@@ -513,9 +539,15 @@ export function useAddComment(entity: EntityKind, id: string) {
   return useMutation({
     mutationFn: (input: CreateCommentInput) =>
       apiFetch<CaseComment>(`/api/${entity}/${id}/comments`, { method: 'POST', body: JSON.stringify(input) }),
-    onSuccess: () => {
+    onSuccess: (_data, input) => {
       queryClient.invalidateQueries({ queryKey: [entity, id, 'comments'] });
-      toast.success('Comment added');
+      // "Queued", not "sent". This mutation only knows the comment was
+      // saved and an email job enqueued (fire-and-forget — the producer
+      // deliberately never throws). Actual delivery happens later in the
+      // worker, which can still skip or fail. Claiming "Email sent" here
+      // told users mail had gone out when nothing had been transmitted at
+      // all; the timeline's own delivery status is the honest source.
+      toast.success(input.emailTo?.length ? 'Email queued for delivery' : 'Comment added');
     },
     onError: (err) => toast.error(errorMessage(err)),
   });

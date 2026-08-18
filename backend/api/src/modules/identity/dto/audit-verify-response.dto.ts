@@ -15,6 +15,13 @@ export class AuditCheckpointVerificationDto {
   anchorHashValid!: boolean;
 }
 
+/** Plain checkpoint listing — GET /identity/audit-log/checkpoints, distinct from AuditCheckpointVerificationDto (which only appears nested inside a verify() response, and only for checkpoints explicitly referenced by fromCheckpointId/toCheckpointId). */
+export class AuditCheckpointDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() checkpointAt!: Date;
+  @ApiProperty() anchorHash!: string;
+}
+
 export class AuditVerifyResponseDto {
   @ApiProperty({ nullable: true }) rangeStart!: Date | null;
   @ApiProperty() rangeEnd!: Date;

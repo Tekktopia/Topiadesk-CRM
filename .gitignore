@@ -26,6 +26,10 @@ secrets/
 packages/db/generated/
 packages/db-platform/generated/
 
+# training/export/convert_to_onnx.sh clones this at repo root, per its own
+# header comment — external conversion tooling, not project content.
+/transformers.js-tooling/
+
 # Logs
 *.log
 npm-debug.log*

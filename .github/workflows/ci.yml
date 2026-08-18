@@ -117,6 +117,50 @@ jobs:
           REDIS_URL: redis://localhost:6379
         run: pnpm test:integration
 
+  compose-config:
+    name: Compose config renders (dev + prod overlay)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # docker-compose.prod-tls.yml is never exercised by any other job —
+      # nothing in CI brings the stack up with it, and it is only applied by
+      # hand at deploy time. A typo in one of its Traefik labels or an
+      # unbalanced ${VAR} therefore surfaces for the first time ON the
+      # production host, mid-deploy. `config` fully parses and interpolates
+      # both files, so this catches that class of mistake for the price of
+      # a few seconds.
+      - name: Seed .env from the committed example
+        run: cp .env.example .env
+
+      - name: Dev config renders
+        run: docker compose config --quiet
+
+      - name: Production config renders
+        run: docker compose -f docker-compose.yml -f docker-compose.prod-tls.yml config --quiet
+
+      # Guards the invariant that matters most about the prod overlay: only
+      # Traefik may publish ports. docker-compose.override.yml is auto-merged
+      # by a bare `docker compose up`, and it exposes Postgres/Redis/MinIO —
+      # loopback-bound, but this asserts the production path never picks up
+      # any of it regardless.
+      - name: Only Traefik publishes ports in production
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.prod-tls.yml config --format json \
+            > /tmp/prod.json
+          python3 - <<'PY'
+          import json, sys
+          cfg = json.load(open('/tmp/prod.json'))
+          offenders = [
+              name
+              for name, svc in cfg.get('services', {}).items()
+              if (svc.get('ports') or []) and name != 'traefik'
+          ]
+          if offenders:
+              sys.exit(f"Services publishing host ports in the production config: {offenders}")
+          print("OK: traefik is the only service publishing ports.")
+          PY
+
   docker-build-and-scan:
     name: Docker build + Trivy scan
     runs-on: ubuntu-latest

@@ -6,6 +6,8 @@
  * session cookie is sent automatically and the Route Handler can attach the
  * bearer token server-side. Mirrors app/(crm)/_lib/api.ts exactly.
  */
+import { csrfHeaders } from '@/lib/csrf';
+
 export class ApiRequestError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -33,7 +35,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const res = await fetch(path, {
     ...init,
     credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: { 'Content-Type': 'application/json', ...csrfHeaders(init?.method), ...(init?.headers ?? {}) },
   });
   if (!res.ok) {
     throw new ApiRequestError(await parseErrorMessage(res), res.status);

@@ -26,10 +26,18 @@ const ENTITY_EXISTS_CHECK: Record<DocumentEntityType, (id: string) => Promise<bo
   CLAIM: async (id) => (await getPrismaClient().claim.findUnique({ where: { id }, select: { id: true } })) !== null,
   CASE: async (id) => (await getPrismaClient().case.findUnique({ where: { id }, select: { id: true } })) !== null,
   CARRIER: async (id) => (await getPrismaClient().carrier.findUnique({ where: { id }, select: { id: true } })) !== null,
+  // Evidence for a regulatory filing — the submitted return, the
+  // regulator's acknowledgement. Same fail-closed contract as every entry
+  // above: outside the caller's RLS scope reads as "doesn't exist", which
+  // for the obligations register means a broker cannot attach documents to
+  // filings they can't see.
+  COMPLIANCE_FILING: async (id) =>
+    (await getPrismaClient().complianceFiling.findUnique({ where: { id }, select: { id: true } })) !== null,
 };
 
 export interface DocumentWithCurrentVersion extends Document {
   currentVersion: DocumentVersion | null;
+  links?: { id: string; linkedAt: Date }[];
 }
 
 @Injectable()
@@ -143,16 +151,35 @@ export class DocumentsService {
     return document;
   }
 
-  async list(categoryId?: string, search?: string): Promise<DocumentWithCurrentVersion[]> {
-    return getPrismaClient().document.findMany({
+  async list(
+    categoryId?: string,
+    search?: string,
+    entityType?: DocumentEntityType,
+    entityId?: string,
+  ): Promise<DocumentWithCurrentVersion[]> {
+    const scoped = Boolean(entityType && entityId);
+    const documents = await getPrismaClient().document.findMany({
       where: {
         ...(categoryId ? { categoryId } : {}),
         ...(search ? { fileName: { contains: search, mode: 'insensitive' } } : {}),
+        // entityType/entityId power a record-detail page's "Documents" tab
+        // (e.g. Account) — same DocumentLink join the customer portal
+        // already uses for its own account-scoped listing
+        // (portal.controller.ts's listDocuments()), just exposed on the
+        // staff API too.
+        ...(scoped ? { links: { some: { entityType, entityId } } } : {}),
       },
-      include: { currentVersion: true },
+      include: {
+        currentVersion: true,
+        // Only the matching link, not every link this document has — a
+        // caller scoped to one entity only ever needs its own linkId/
+        // linkedAt (e.g. to unlink), never every other entity's links too.
+        ...(scoped ? { links: { where: { entityType, entityId }, select: { id: true, linkedAt: true } } } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
+    return documents as DocumentWithCurrentVersion[];
   }
 
   /**

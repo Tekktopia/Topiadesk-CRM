@@ -5,8 +5,8 @@ import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
 import type { AiGatewayService } from './ai-gateway.service';
 import { APP_HELP_CORPUS } from './local/app-help-corpus';
 import { findReportByExactMatch, generateReportInsights, recommendReports } from './report-matching';
-import { setCurrentEntity, getCurrentEntity } from './conversation-state';
-import { suggestForAccount, suggestForOpportunity, formatSuggestions, type Suggestion } from './smart-suggestions';
+import { setCurrentEntity } from './conversation-state';
+import { suggestForAccount, suggestForOpportunity } from './smart-suggestions';
 
 /**
  * Read-only tools the local chat-intent-router.ts can dispatch to — this is
@@ -19,16 +19,6 @@ import { suggestForAccount, suggestForOpportunity, formatSuggestions, type Sugge
 
 const MAX_ROWS = 10;
 
-interface CounterResult {
-  accountCount?: number;
-  contactCount?: number;
-  policyCount?: number;
-  opportunityCount?: number;
-  leadCount?: number;
-  caseCount?: number;
-  campaignCount?: number;
-  total?: number;
-}
 
 async function searchAccounts(user: AuthenticatedUser, input: { query: string }) {
   const accounts = await getPrismaClient().account.findMany({

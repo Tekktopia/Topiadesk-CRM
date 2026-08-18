@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { ArrayMinSize, IsArray, IsDateString, IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ArrayMinSize, IsArray, IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min, MinLength } from 'class-validator';
 import { CasePriority, ClaimStatus } from '@topiadesk/db';
 
 export class CreateClaimDto {
@@ -51,6 +52,65 @@ export class ClaimQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsUUID() adjusterId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() policyId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() assignedTeamId?: string;
+  @ApiPropertyOptional({ description: 'Free-text search across claim number and cause of loss.' })
+  @IsOptional()
+  @IsString()
+  q?: string;
+  @ApiPropertyOptional({ description: 'Only claims whose catastrophe event is this one — the "how exposed are we to this storm" filter.' })
+  @IsOptional()
+  @IsUUID()
+  catastropheEventId?: string;
+  @ApiPropertyOptional({ description: 'Date of loss on/after this date (ISO 8601).' })
+  @IsOptional()
+  @IsDateString()
+  lossFrom?: string;
+  @ApiPropertyOptional({ description: 'Date of loss on/before this date (ISO 8601).' })
+  @IsOptional()
+  @IsDateString()
+  lossTo?: string;
+  @ApiPropertyOptional({ description: 'Max rows to return (default 100).' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  take?: number;
+  @ApiPropertyOptional({ description: 'Rows to skip, for pagination.' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  skip?: number;
+}
+
+/**
+ * Claims-desk aggregates.
+ *
+ * The two money figures are the ones a claims manager is actually asked
+ * about: outstanding RESERVE (money set aside but not yet paid — the live
+ * exposure) and SETTLED (money actually paid out). They are deliberately
+ * separate rather than combined into one "total", because they mean opposite
+ * things on a balance sheet.
+ *
+ * Both are normalized into the org's base currency: Claim carries no
+ * currency column and inherits Policy.currency, so a mixed-currency book
+ * cannot be raw-summed.
+ *
+ * `open` excludes the three terminal states (SETTLED / REPUDIATED /
+ * WITHDRAWN). REOPENED is deliberately counted as open — a reopened claim is
+ * live work again, which is the whole point of reopening it.
+ */
+export class ClaimStatsResponseDto {
+  @ApiProperty() total!: number;
+  @ApiProperty({ description: 'Not SETTLED, REPUDIATED or WITHDRAWN — REOPENED counts as open.' }) open!: number;
+  @ApiProperty() settled!: number;
+  @ApiProperty() repudiated!: number;
+  @ApiProperty({ description: 'Claims that have been reopened at least once.' }) reopened!: number;
+  @ApiProperty({ description: 'ISO 4217 code both money figures are expressed in.' }) baseCurrency!: string;
+  @ApiProperty({ description: 'Sum of reserveAmount on OPEN claims — live exposure, in baseCurrency.' })
+  outstandingReserve!: number;
+  @ApiProperty({ description: 'Sum of settledAmount across settled claims, in baseCurrency.' })
+  totalSettled!: number;
 }
 
 export class ChangeClaimStatusDto {

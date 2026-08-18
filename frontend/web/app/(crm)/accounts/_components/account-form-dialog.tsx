@@ -15,12 +15,12 @@ import {
   DialogTitle,
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
   Input,
+  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -28,9 +28,12 @@ import {
   SelectValue,
   toast,
 } from '@topiadesk/ui';
+import { AccountCombobox, type AccountRef } from '../../_components/account-combobox';
+import { IndustryCombobox } from '../../_components/industry-combobox';
+import { TagInput } from '../../_components/tag-input';
 import { CustomFieldsSection, validateCustomFieldValues, type CustomFieldValues } from '../../_components/custom-fields-section';
 import { ACCOUNT_STATUSES, ACCOUNT_TYPES, KYC_STATUSES, RISK_RATINGS, accountStatusLabel, accountTypeLabel, kycStatusLabel, riskRatingLabel } from '../../_lib/constants';
-import { useCreateAccount, useCustomFieldDefinitions, useUpdateAccount } from '../../_lib/hooks';
+import { useCreateAccount, useCustomFieldDefinitions, useIndustry, useUpdateAccount } from '../../_lib/hooks';
 import type { Account } from '../../_lib/types';
 
 const accountFormSchema = z.object({
@@ -42,7 +45,6 @@ const accountFormSchema = z.object({
   state: z.string(),
   country: z.string(),
   source: z.string(),
-  industryId: z.string(),
   notes: z.string(),
   kycStatus: z.enum(KYC_STATUSES),
   kycExpiryDate: z.string(),
@@ -58,11 +60,10 @@ function defaultsFor(account?: Account): AccountFormValues {
     status: account?.status ?? 'PROSPECT',
     riskRating: account?.riskRating ?? '',
     city: account?.city ?? '',
-    state: '',
+    state: account?.state ?? '',
     country: account?.country ?? '',
-    source: '',
-    industryId: account?.industryId ?? '',
-    notes: '',
+    source: account?.source ?? '',
+    notes: account?.notes ?? '',
     kycStatus: account?.kycStatus ?? 'NOT_STARTED',
     kycExpiryDate: account?.kycExpiryDate ? account.kycExpiryDate.slice(0, 10) : '',
     naicomId: account?.naicomId ?? '',
@@ -86,9 +87,29 @@ export function AccountFormDialog({
 
   const { data: customFieldDefinitions } = useCustomFieldDefinitions('ACCOUNT');
   const [customFields, setCustomFields] = React.useState<CustomFieldValues>(account?.customFields ?? {});
+  const [tags, setTags] = React.useState<string[]>(account?.tags ?? []);
+  const [parentAccount, setParentAccount] = React.useState<AccountRef | null>(null);
+  const { data: currentIndustry } = useIndustry(account?.industryId ?? undefined);
+  const [industry, setIndustry] = React.useState<{ id: string; name: string } | null>(null);
+
   React.useEffect(() => {
     setCustomFields(account?.customFields ?? {});
+    setTags(account?.tags ?? []);
+    // parentAccountId's name isn't on the plain Account response (only
+    // AccountDetail carries a resolved `parentAccount` ref) — this dialog
+    // is opened from both the list (Account) and detail (AccountDetail)
+    // pages, so cleared here and re-derived below whenever we do have it.
+    setParentAccount(null);
   }, [account]);
+
+  React.useEffect(() => {
+    const withParent = account as (Account & { parentAccount?: AccountRef | null }) | undefined;
+    if (withParent?.parentAccount) setParentAccount(withParent.parentAccount);
+  }, [account]);
+
+  React.useEffect(() => {
+    setIndustry(currentIndustry ? { id: currentIndustry.id, name: currentIndustry.name } : null);
+  }, [currentIndustry]);
 
   const createAccount = useCreateAccount();
   const updateAccount = useUpdateAccount(account?.id ?? '');
@@ -110,11 +131,13 @@ export function AccountFormDialog({
       state: values.state || undefined,
       country: values.country || undefined,
       source: values.source || undefined,
-      industryId: values.industryId || undefined,
+      industryId: industry?.id,
+      parentAccountId: parentAccount?.id,
       notes: values.notes || undefined,
       kycStatus: values.kycStatus,
       kycExpiryDate: values.kycExpiryDate || undefined,
       naicomId: values.naicomId || undefined,
+      tags,
       customFields: hasActiveCustomFields ? customFields : undefined,
     };
     if (isEdit && account) {
@@ -125,6 +148,9 @@ export function AccountFormDialog({
     onOpenChange(false);
     form.reset(defaultsFor(undefined));
     setCustomFields({});
+    setTags([]);
+    setParentAccount(null);
+    setIndustry(null);
   });
 
   return (
@@ -230,6 +256,17 @@ export function AccountFormDialog({
               )}
             />
 
+            <div className="space-y-1.5">
+              <Label>Parent account</Label>
+              <AccountCombobox
+                value={parentAccount}
+                onChange={setParentAccount}
+                placeholder="None — search to link a parent…"
+                excludeId={account?.id}
+              />
+              <p className="text-sm text-muted-foreground">Rolls this account into a parent&apos;s hierarchy (group premium rollup, org chart).</p>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -315,6 +352,20 @@ export function AccountFormDialog({
 
             <FormField
               control={form.control}
+              name="state"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>State</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. Rivers" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="source"
               render={({ field }) => (
                 <FormItem>
@@ -327,23 +378,15 @@ export function AccountFormDialog({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="industryId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Industry ID</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Optional — UUID" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    No industry directory endpoint is exposed by the API yet — paste an Industry UUID if you have
-                    one, or leave blank.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="space-y-1.5">
+              <Label>Industry</Label>
+              <IndustryCombobox value={industry} onChange={setIndustry} />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Tags</Label>
+              <TagInput value={tags} onChange={setTags} />
+            </div>
 
             <FormField
               control={form.control}

@@ -24,12 +24,14 @@ import {
   selectionColumn,
 } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
+import { apiFetch, buildQuery } from '../../_lib/api';
 import { BulkActionToolbar } from '../../_components/bulk-action-toolbar';
 import { EmptyState } from '../../_components/empty-state';
 import { SlaBadge } from '../../_components/sla-badge';
 import { caseTypeLabel, casePriorityLabel, casePriorityVariant, caseStatusLabel, caseStatusVariant } from '../../_lib/constants';
 import { formatDate } from '../../_lib/format';
-import { useBulkCloseCases, useBulkReassignCases, useCaseSavedViews, useCases, useCasesCount, useDirectoryUsers, usePolicyLookups, useSlaClocksByPolicyIds, useTeams } from '../../_lib/hooks';
+import { useBulkCloseCases, useBulkReassignCases, useCaseSavedViews, useCases, useCaseStats,
+  useCasesCount, useDirectoryUsers, usePolicyLookups, useSlaClocksByPolicyIds, useTeams } from '../../_lib/hooks';
 import type { Case, CaseQuery } from '../../_lib/types';
 import { CaseFormDialog } from './case-form-dialog';
 import {
@@ -39,6 +41,7 @@ import {
   ticketFilterFieldsToQuery,
   type TicketFilterFields,
 } from './ticket-filters-panel';
+import { CaseStatsStrip } from '../../_components/case-stats-strip';
 import { TicketCard } from './ticket-card';
 import { DEFAULT_TICKET_VIEW_ID, TICKET_VIEWS } from './ticket-views';
 import { TicketViewsSidebar } from './ticket-views-sidebar';
@@ -139,6 +142,7 @@ export function TicketWorkspace() {
 
   const { data, isLoading, isFetching, isError } = useCases(query);
   const { data: countData } = useCasesCount(query);
+  const { data: caseStats, isLoading: caseStatsLoading } = useCaseStats(query);
   const cases = data ?? [];
   const total = countData?.total ?? cases.length;
 
@@ -152,6 +156,32 @@ export function TicketWorkspace() {
   const bulkReassign = useBulkReassignCases();
   const bulkClose = useBulkCloseCases();
   const selectedIds = React.useMemo(() => Object.keys(rowSelection).filter((id) => rowSelection[id]), [rowSelection]);
+
+  const [exporting, setExporting] = React.useState(false);
+
+  /**
+   * Exports the whole FILTERED set, not just the page on screen.
+   *
+   * This used to hand downloadTicketsCsv the `cases` array directly — which
+   * is one page (PAGE_SIZE = 20). On a desk showing "1–20 of 500", Export
+   * silently produced a 20-row file. Re-fetching without pagination fixes
+   * that while keeping the human-readable columns (requester and assignee
+   * resolved to names); the server-side /cases/export endpoint returns the
+   * same rows with raw ids instead, and is the better choice for
+   * programmatic use.
+   */
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const { skip: _skip, take: _take, ...unpaged } = query;
+      const all = await apiFetch<Case[]>(`/api/cases${buildQuery({ ...unpaged, take: 10_000 })}`);
+      downloadTicketsCsv(all, usersById, contactsById);
+    } catch {
+      // apiFetch surfaces its own toast; nothing useful to add here.
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const rangeStart = total === 0 ? 0 : page * PAGE_SIZE + 1;
   const rangeEnd = Math.min(total, (page + 1) * PAGE_SIZE);
@@ -246,6 +276,8 @@ export function TicketWorkspace() {
 
   return (
     <div className="space-y-4 pt-4">
+      <CaseStatsStrip stats={caseStats} isLoading={caseStatsLoading} />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Sort by:</span>
@@ -275,8 +307,9 @@ export function TicketWorkspace() {
             </SelectContent>
           </Select>
 
-          <Button variant="outline" size="sm" onClick={() => downloadTicketsCsv(cases, usersById, contactsById)} disabled={cases.length === 0}>
-            <Download className="h-3.5 w-3.5" aria-hidden /> Export
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={total === 0 || exporting}>
+            {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Download className="h-3.5 w-3.5" aria-hidden />}
+            Export
           </Button>
 
           <div className="flex items-center gap-1 text-sm text-muted-foreground">

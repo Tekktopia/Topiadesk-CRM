@@ -1,7 +1,7 @@
 import { Queue } from 'bullmq';
 import Redis from 'ioredis';
 import { loadEnv } from '@topiadesk/config';
-import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT } from '@topiadesk/db';
+import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, getRlsContext } from '@topiadesk/db';
 
 /**
  * Producer side of Survey dispatch for every real trigger event —
@@ -55,14 +55,20 @@ function getQueue(): Queue {
 }
 
 export interface SendCaseSurveyInviteJobData {
+  /** Captured at enqueue time — the worker cannot infer which tenant this belongs to. */
+  tenantSchema: string | null;
   surveyId: string;
   caseId: string;
 }
 export interface SendClaimSurveyInviteJobData {
+  /** Captured at enqueue time — the worker cannot infer which tenant this belongs to. */
+  tenantSchema: string | null;
   surveyId: string;
   claimId: string;
 }
 export interface SendPolicySurveyInviteJobData {
+  /** Captured at enqueue time — the worker cannot infer which tenant this belongs to. */
+  tenantSchema: string | null;
   surveyId: string;
   policyVersionId: string;
   triggerEvent: 'POLICY_ISSUED' | 'POLICY_RENEWED';
@@ -122,6 +128,7 @@ export async function enqueueSurveyInvitesForResolvedCase(caseId: string): Promi
   await enqueueForTrigger('CASE_RESOLVED', 'send-case-survey-invite', `case_${caseId}`, (surveyId): SendCaseSurveyInviteJobData => ({
     surveyId,
     caseId,
+    tenantSchema: getRlsContext()?.tenantSchema ?? null,
   }));
 }
 
@@ -129,6 +136,7 @@ export async function enqueueSurveyInvitesForSettledClaim(claimId: string): Prom
   await enqueueForTrigger('CLAIM_SETTLED', 'send-claim-survey-invite', `claim_${claimId}`, (surveyId): SendClaimSurveyInviteJobData => ({
     surveyId,
     claimId,
+    tenantSchema: getRlsContext()?.tenantSchema ?? null,
   }));
 }
 
@@ -140,5 +148,6 @@ export async function enqueueSurveyInvitesForPolicyVersion(
     surveyId,
     policyVersionId,
     triggerEvent,
+    tenantSchema: getRlsContext()?.tenantSchema ?? null,
   }));
 }

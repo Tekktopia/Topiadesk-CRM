@@ -62,7 +62,14 @@ export class SurveysController {
   @RequirePermission('survey', 'read')
   @ApiOkResponse({ type: [SurveyDto] })
   async list(@Query() query: SurveyQueryDto): Promise<SurveyDto[]> {
-    return this.surveys.list(query);
+    // isActive crosses the boundary as a string (see SurveyQueryDto) and is
+    // parsed here rather than in the service, which keeps taking a real
+    // boolean for its non-HTTP callers. `undefined` stays undefined so an
+    // omitted filter means "both", not "inactive only".
+    return this.surveys.list({
+      type: query.type,
+      isActive: query.isActive === undefined ? undefined : query.isActive === 'true',
+    });
   }
 
   @Post()

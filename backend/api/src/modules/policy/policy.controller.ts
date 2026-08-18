@@ -12,6 +12,7 @@ import { BulkActionResponseDto, BulkAssignPoliciesDto, BulkUpdatePoliciesDto } f
 import { assertValidPolicyTransition } from './policy-lifecycle';
 import { decimalToString } from './decimal.util';
 import { diffBulkIds } from './bulk-actions';
+import { enqueueEntityEvent } from '../case-management/automation-events.util';
 
 function toPolicyDto(policy: Policy): PolicyResponseDto {
   return { ...policy, sumInsured: decimalToString(policy.sumInsured) };
@@ -141,6 +142,15 @@ export class PolicyController {
         // ISSUED etc. happens via PolicyVersion creation (policy-version.controller.ts).
       },
     });
+    // Automation had no visibility of the policy lifecycle at all before
+    // this — no CREATED, no STATUS_CHANGED — so "when a policy is issued,
+    // raise the onboarding tasks" was not expressible as a rule.
+    await enqueueEntityEvent({
+      entityType: 'POLICY',
+      entityId: policy.id,
+      eventType: 'CREATED',
+      occurredAt: policy.createdAt.toISOString(),
+    }).catch(() => undefined);
     return toPolicyDto(policy);
   }
 
@@ -168,6 +178,15 @@ export class PolicyController {
         status: dto.status,
       },
     });
+    await enqueueEntityEvent({
+      entityType: 'POLICY',
+      entityId: policy.id,
+      // A status move is the event rules actually care about; a plain field
+      // edit is reported separately so a rule can subscribe to one without
+      // firing on the other.
+      eventType: dto.status && dto.status !== existing.status ? 'STATUS_CHANGED' : 'UPDATED',
+      occurredAt: policy.updatedAt.toISOString(),
+    }).catch(() => undefined);
     return toPolicyDto(policy);
   }
 }

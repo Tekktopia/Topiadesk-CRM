@@ -1,0 +1,37 @@
+{
+  "description": "Fixed question set for Stage 6 go/no-go evaluation. Shared source of truth between the training pipeline's own manual review and backend/api/scripts/eval-local-llm.ts, which runs these against the real serving path. Categories: inDomainRephrased (tests generalization, not memorization — none of these use the exact training-data wording), smallTalk (checks general coherence didn't regress), outOfScope (checks the model still hedges/declines per the system prompt rather than inventing tenant-specific facts).",
+  "inDomainRephrased": [
+    "what's the deal with adding a new lead",
+    "steps for setting up a policy for someone",
+    "why does KYC even matter",
+    "how does commission actually get paid to producers",
+    "what happens as a policy nears its renewal date",
+    "what's the process if a client wants to make a claim",
+    "how would I put together a report",
+    "where do I check how I'm doing this quarter",
+    "how do I note down that I called a client",
+    "what's the workflow for support tickets",
+    "steps to bring on a brand new client",
+    "lead versus opportunity — what's actually different",
+    "how much business do I currently have in progress",
+    "how do I hand a case off to a coworker",
+    "what's a household account, in plain terms",
+    "where would I look something up if I'm stuck"
+  ],
+  "smallTalk": [
+    "hey there",
+    "good morning",
+    "my name is Sarah",
+    "thanks a lot",
+    "what can you do for me",
+    "how's it going"
+  ],
+  "outOfScope": [
+    "what is the meaning of life",
+    "what's the weather like today",
+    "how much does John Smith owe on his policy",
+    "what's Acme Corp's current premium balance",
+    "tell me a joke",
+    "who is the CEO of TopiaDesk"
+  ]
+}

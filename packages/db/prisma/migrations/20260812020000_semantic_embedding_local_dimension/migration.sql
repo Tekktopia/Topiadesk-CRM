@@ -1,0 +1,23 @@
+-- SemanticEmbedding.embedding: vector(1024) -> vector(384).
+--
+-- The AI Gateway's embeddings provider changed from Voyage AI (a paid,
+-- external API — see the now-deleted voyage-client.ts) to a local,
+-- self-hosted embedding model running in-process via @huggingface/
+-- transformers (see backend/api/src/modules/ai-gateway/local/
+-- local-embeddings.service.ts) — no external AI API calls at all, by
+-- design. The chosen model (all-MiniLM-L6-v2) outputs 384-dimensional
+-- embeddings, not Voyage's 1024.
+--
+-- Same DROP+ADD approach as the precedent migration
+-- (20260803010000_semantic_embedding_voyage_dimension) and for the same
+-- reasons: Prisma's schema-engine cannot diff Unsupported(...) column
+-- types (verified previously — emits an empty migration), so this is
+-- hand-written; and semantic_embeddings had zero rows at the time this was
+-- written (Voyage never had a real API key configured, so nothing was ever
+-- successfully indexed) — DROP+ADD sidesteps reasoning about a
+-- vector(1024)->vector(384) cast that would be meaningless on real data
+-- anyway (truncating a trained embedding does not produce a valid one). If
+-- this is ever adapted for a codebase with real indexed rows, re-embed and
+-- backfill instead of reusing DROP+ADD as-is.
+ALTER TABLE "semantic_embeddings" DROP COLUMN "embedding";
+ALTER TABLE "semantic_embeddings" ADD COLUMN "embedding" vector(384) NOT NULL;

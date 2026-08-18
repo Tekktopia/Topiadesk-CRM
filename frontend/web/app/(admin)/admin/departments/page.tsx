@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button, Skeleton, toast } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { PageHeader } from '../_components/page-header';

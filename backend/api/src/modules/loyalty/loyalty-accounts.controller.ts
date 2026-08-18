@@ -1,14 +1,37 @@
-import { Body, ConflictException, Controller, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  ConflictException,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+  StreamableFile,
+  UseGuards,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient, Prisma } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
-import { EnrollLoyaltyAccountDto, LoyaltyAccountResponseDto, UpdateLoyaltyTierDto } from './dto/loyalty-account.dto';
+import {
+  EnrollLoyaltyAccountDto,
+  LoyaltyAccountQueryDto,
+  LoyaltyAccountResponseDto,
+  LoyaltyStatsResponseDto,
+  LOYALTY_DEFAULT_TAKE,
+  LOYALTY_MAX_TAKE,
+  UpdateLoyaltyTierDto,
+} from './dto/loyalty-account.dto';
 import { AdjustPointsDto, EarnPointsDto, LoyaltyTransactionResponseDto, RedeemPointsDto } from './dto/loyalty-transaction.dto';
 import { postLoyaltyTransaction } from './loyalty-ledger.util';
 import { queryRawWithRlsContext } from './rls-raw-query.util';
+import { loyaltyAccountsToCsv } from './loyalty-csv';
 
 interface LoyaltyAccountRow {
   id: string;
@@ -61,13 +84,78 @@ export class LoyaltyAccountsController {
   @Get()
   @RequirePermission('loyalty', 'read')
   @ApiOkResponse({ type: [LoyaltyAccountResponseDto] })
-  async list(@Query('search') search?: string): Promise<LoyaltyAccountResponseDto[]> {
-    const rows = search
-      ? await queryRawWithRlsContext<LoyaltyAccountRow>(
-          Prisma.sql`${BALANCE_SELECT} WHERE a.name ILIKE ${`%${search}%`} ORDER BY a.name ASC LIMIT 200`,
-        )
-      : await queryRawWithRlsContext<LoyaltyAccountRow>(Prisma.sql`${BALANCE_SELECT} ORDER BY a.name ASC LIMIT 200`);
+  async list(@Query() query: LoyaltyAccountQueryDto): Promise<LoyaltyAccountResponseDto[]> {
+    const rows = await queryRawWithRlsContext<LoyaltyAccountRow>(
+      Prisma.sql`${BALANCE_SELECT} ${loyaltyListWhere(query)} ORDER BY a.name ASC LIMIT ${loyaltyTake(query)}`,
+    );
     return rows.map(toResponse);
+  }
+
+  /**
+   * Programme-level aggregates. Raw SQL for the same reason the list is:
+   * points balance is SUM over loyalty_transactions, which Prisma cannot
+   * express as a grouped aggregate across a relation in one round trip.
+   *
+   * Must precede ':id' — Nest matches literal segments in declaration order.
+   */
+  @Get('stats')
+  @RequirePermission('loyalty', 'read')
+  @ApiOkResponse({ type: LoyaltyStatsResponseDto })
+  async stats(@Query() query: LoyaltyAccountQueryDto): Promise<LoyaltyStatsResponseDto> {
+    // Same JOIN + WHERE as the list so the header can never describe a
+    // different population than the table underneath it. Points outstanding
+    // is summed over the filtered members' own ledgers, not the whole
+    // programme, for the same reason.
+    const where = loyaltyListWhere(query);
+    const [totals] = await queryRawWithRlsContext<{ members: bigint; enrolled_recent: bigint; points_outstanding: bigint | null }>(
+      Prisma.sql`
+        SELECT COUNT(*)::bigint AS members,
+               COUNT(*) FILTER (WHERE la.enrolled_at >= now() - interval '30 days')::bigint AS enrolled_recent,
+               COALESCE(SUM(bal.points_balance), 0)::bigint AS points_outstanding
+        FROM loyalty_accounts la
+        JOIN accounts a ON a.id = la.account_id
+        LEFT JOIN LATERAL (
+          SELECT SUM(points) AS points_balance FROM loyalty_transactions lt WHERE lt.loyalty_account_id = la.id
+        ) bal ON true
+        ${where}
+      `,
+    );
+    const tiers = await queryRawWithRlsContext<{ tier: string; members: bigint }>(
+      Prisma.sql`
+        SELECT la.tier, COUNT(*)::bigint AS members
+        FROM loyalty_accounts la
+        JOIN accounts a ON a.id = la.account_id
+        ${where}
+        GROUP BY la.tier ORDER BY la.tier ASC
+      `,
+    );
+
+    // COUNT/SUM come back as bigint from pg; Number() is safe here (member
+    // counts and point totals are far below 2^53, unlike money at scale).
+    return {
+      members: Number(totals?.members ?? 0),
+      enrolledLast30Days: Number(totals?.enrolled_recent ?? 0),
+      pointsOutstanding: Number(totals?.points_outstanding ?? 0),
+      tierBreakdown: tiers.map((t) => ({ tier: t.tier, members: Number(t.members) })),
+    };
+  }
+
+  /**
+   * CSV over the current filter. Ignores `take` and caps at 10,000 instead —
+   * an export that silently stopped at the table's page size is the
+   * truncation bug this codebase already hit once on the ticket desk.
+   *
+   * Must precede ':id'.
+   */
+  @Get('export')
+  @RequirePermission('loyalty', 'read')
+  async export(@Query() query: LoyaltyAccountQueryDto, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
+    const rows = await queryRawWithRlsContext<LoyaltyAccountRow>(
+      Prisma.sql`${BALANCE_SELECT} ${loyaltyListWhere(query)} ORDER BY a.name ASC LIMIT 10000`,
+    );
+    const csv = loyaltyAccountsToCsv(rows.map(toResponse));
+    res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="loyalty-accounts.csv"' });
+    return new StreamableFile(Buffer.from(csv, 'utf-8'));
   }
 
   @Get('by-account/:accountId')
@@ -187,4 +275,27 @@ export class LoyaltyAccountsController {
 
 function isUniqueConstraintViolation(err: unknown): boolean {
   return typeof err === 'object' && err !== null && 'code' in err && (err as { code?: unknown }).code === 'P2002';
+}
+
+/**
+ * Shared by list() and stats() so the KPI header and the table can never
+ * describe different populations. Returns a full WHERE clause (or empty SQL)
+ * for interpolation after the FROM/JOIN block.
+ */
+function loyaltyListWhere(query: LoyaltyAccountQueryDto): Prisma.Sql {
+  const clauses: Prisma.Sql[] = [];
+  if (query.search) clauses.push(Prisma.sql`a.name ILIKE ${`%${query.search}%`}`);
+  if (query.tier) clauses.push(Prisma.sql`la.tier = ${query.tier}`);
+  return clauses.length ? Prisma.sql`WHERE ${Prisma.join(clauses, ' AND ')}` : Prisma.empty;
+}
+
+/**
+ * LIMIT is a bound parameter, never interpolated text — but clamp anyway
+ * rather than trusting the pipe, since this value reaches raw SQL and a
+ * missing global transform would let a string through.
+ */
+function loyaltyTake(query: LoyaltyAccountQueryDto): number {
+  const raw = Number(query.take);
+  if (!Number.isFinite(raw)) return LOYALTY_DEFAULT_TAKE;
+  return Math.min(Math.max(Math.trunc(raw), 1), LOYALTY_MAX_TAKE);
 }

@@ -8,27 +8,38 @@
 # at a service without going through Traefik) plus enabling the Traefik
 # dashboard. Nothing here changes application behavior or credentials.
 #
-# For a stricter run that matches what a real deployment looks like
-# (nothing exposed except Traefik's 80/443), run:
-#   docker compose -f docker-compose.yml up -d
+# EVERY mapping below is deliberately bound to 127.0.0.1, never the
+# `0.0.0.0` that a bare `"5432:5432"` implies. Docker publishes ports by
+# writing DNAT rules that bypass the host firewall (ufw/firewalld do not
+# see them), so an unqualified mapping on a server with a public interface
+# puts Postgres, Redis, MinIO and an untrusted-HTTP Keycloak/API straight
+# on the internet. Because this file auto-merges, that would be one stray
+# `docker compose up -d` away on a production host. Loopback-binding costs
+# local tooling nothing (it connects to localhost regardless) and makes the
+# exposure impossible rather than merely undocumented.
+#
+# That said, production should still be run without this file at all —
+# it also enables the Traefik dashboard and maildev, neither of which
+# belongs there:
+#   docker compose -f docker-compose.yml -f docker-compose.prod-tls.yml up -d
 # =============================================================================
 services:
   postgres:
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "127.0.0.1:${POSTGRES_PORT}:5432"
 
   pgbouncer:
     ports:
-      - "${PGBOUNCER_PORT}:${PGBOUNCER_PORT}"
+      - "127.0.0.1:${PGBOUNCER_PORT}:${PGBOUNCER_PORT}"
 
   redis:
     ports:
-      - "${REDIS_PORT}:6379"
+      - "127.0.0.1:${REDIS_PORT}:6379"
 
   minio:
     ports:
-      - "${MINIO_PORT}:${MINIO_PORT}"
-      - "${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_PORT}"
+      - "127.0.0.1:${MINIO_PORT}:${MINIO_PORT}"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_PORT}"
 
   # Direct host access to the API (bypassing Traefik/TLS) — mainly so local
   # tooling like packages/shared-types/scripts/generate-api-client.mjs can
@@ -36,29 +47,29 @@ services:
   # Traefik's route requires.
   api:
     ports:
-      - "${API_PORT}:${API_PORT}"
+      - "127.0.0.1:${API_PORT}:${API_PORT}"
 
   keycloak:
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
 
   prometheus:
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
 
   grafana:
     # Host 3001, not 3000 — frontend/web already claims WEB_PORT=3000.
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
 
   loki:
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
 
   maildev:
     ports:
-      - "${MAILDEV_WEB_PORT}:${MAILDEV_WEB_PORT}"
-      - "${MAILDEV_SMTP_PORT}:${MAILDEV_SMTP_PORT}"
+      - "127.0.0.1:${MAILDEV_WEB_PORT}:${MAILDEV_WEB_PORT}"
+      - "127.0.0.1:${MAILDEV_SMTP_PORT}:${MAILDEV_SMTP_PORT}"
 
   traefik:
     # Traefik supports setting any static-config key via TRAEFIK_<KEY> env
@@ -75,4 +86,4 @@ services:
       # dashboard router binds to. Visit http://localhost:8081/dashboard/
       # (8081, not 8080 — keycloak's direct-access override above already
       # claims host port 8080; both can't bind it).
-      - "8081:8082"
+      - "127.0.0.1:8081:8082"

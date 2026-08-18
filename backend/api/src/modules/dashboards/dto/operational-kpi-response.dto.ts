@@ -34,6 +34,13 @@ export class OperationalKpiResponseDto {
   @ApiProperty({ description: 'Sum of amount for wonThisMonthCount' }) wonThisMonthValue!: string;
   @ApiProperty({ description: 'won / (won + lost) among all opportunities with a non-null actualCloseDate, all-time. Null when there are none yet.', nullable: true })
   winRate!: number | null;
+  @ApiProperty({ description: 'All accounts, any status (activeClients above is CLIENT-status only)' }) totalAccounts!: number;
+  @ApiProperty({ description: 'Leads with createdAt in the current calendar month' }) newLeadsThisMonth!: number;
+  @ApiProperty({ description: 'CONVERTED leads / all-time lead count. Null when there are no leads yet.', nullable: true })
+  leadConversionRate!: number | null;
+  @ApiProperty({ description: 'Policies with status BOUND, ISSUED, or RENEWED and expiryDate in the future' }) activePolicies!: number;
+  @ApiProperty({ description: 'pipelineValue / openOpportunities. "0.00" when there are no open opportunities.' }) avgDealSize!: string;
+  @ApiProperty({ description: 'Opportunities with pipelineStage.isLost and actualCloseDate in the current calendar month' }) lostThisMonthCount!: number;
   @ApiProperty({ type: [DepartmentPipelineBreakdownDto] }) byDepartment!: DepartmentPipelineBreakdownDto[];
   @ApiProperty({ type: [LossReasonBreakdownDto], description: 'Top 5 lost reasons by count, all-time, plus an "Other" bucket for the rest' })
   lossReasonBreakdown!: LossReasonBreakdownDto[];

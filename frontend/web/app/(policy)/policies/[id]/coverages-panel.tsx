@@ -28,6 +28,7 @@ import {
 import { formatNaira } from '@/app/(policy)/lib/format';
 import type { PolicyCoverageDto } from '@/app/(policy)/lib/types';
 import { ConfirmDialog } from '../../_components/confirm-dialog';
+import { csrfHeaders } from '@/lib/csrf';
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: 'same-origin' });
@@ -51,7 +52,7 @@ export function CoveragesPanel({ policyId }: { policyId: string }) {
 
   const deleteCoverage = useMutation({
     mutationFn: (coverageId: string) =>
-      fetch(`/api/policies/${policyId}/coverages/${coverageId}`, { method: 'DELETE', credentials: 'same-origin' }),
+      fetch(`/api/policies/${policyId}/coverages/${coverageId}`, { method: 'DELETE', credentials: 'same-origin', headers: csrfHeaders('DELETE') }),
     onSuccess: () => {
       toast.success('Coverage removed');
       invalidate();
@@ -189,9 +190,10 @@ function CoverageFormDialog({
         conditions: conditions || undefined,
       };
       const url = isEdit ? `/api/policies/${policyId}/coverages/${coverage!.id}` : `/api/policies/${policyId}/coverages`;
+      const method = isEdit ? 'PATCH' : 'POST';
       const res = await fetch(url, {
-        method: isEdit ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method,
+        headers: { 'Content-Type': 'application/json', ...csrfHeaders(method) },
         credentials: 'same-origin',
         body: JSON.stringify(payload),
       });

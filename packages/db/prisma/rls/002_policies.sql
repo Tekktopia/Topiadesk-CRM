@@ -655,6 +655,31 @@ CREATE POLICY ai_usage_ledger_rw ON ai_usage_ledger FOR ALL
   WITH CHECK (app_current_role() = 'SYSTEM_JOB' OR user_id = app_current_user_id());
 
 -- =============================================================================
+-- ai_chat_sessions / ai_chat_messages — strictly self, no ALL-scope
+-- carve-out at all (unlike ai_usage_ledger_rw just above): a chat
+-- conversation's CONTENT is private to whoever asked, not something an
+-- admin/finance oversight grant should expose, unlike the cost/token
+-- counts ai_usage_ledger tracks. ai_chat_messages is a child-of-session
+-- table, same EXISTS-join shape as consent_records_rw (child-of-contact).
+-- =============================================================================
+
+DROP POLICY IF EXISTS ai_chat_sessions_rw ON ai_chat_sessions;
+CREATE POLICY ai_chat_sessions_rw ON ai_chat_sessions FOR ALL
+  USING (user_id = app_current_user_id() OR app_current_role() = 'SYSTEM_JOB')
+  WITH CHECK (user_id = app_current_user_id() OR app_current_role() = 'SYSTEM_JOB');
+
+DROP POLICY IF EXISTS ai_chat_messages_rw ON ai_chat_messages;
+CREATE POLICY ai_chat_messages_rw ON ai_chat_messages FOR ALL
+  USING (
+    app_current_role() = 'SYSTEM_JOB'
+    OR EXISTS (SELECT 1 FROM ai_chat_sessions s WHERE s.id = session_id AND s.user_id = app_current_user_id())
+  )
+  WITH CHECK (
+    app_current_role() = 'SYSTEM_JOB'
+    OR EXISTS (SELECT 1 FROM ai_chat_sessions s WHERE s.id = session_id AND s.user_id = app_current_user_id())
+  );
+
+-- =============================================================================
 -- audit_log — insert-only for SYSTEM_JOB/app writers (see triggers/), read
 -- restricted to ALL-scope roles (compliance/admin). No UPDATE/DELETE policy
 -- is defined on purpose: combined with the REVOKE in triggers/001, this
@@ -1092,3 +1117,84 @@ CREATE POLICY automation_run_states_rw ON automation_run_states FOR ALL
       )
     )
   );
+
+-- ---------------------------------------------------------------------------
+-- Compliance obligations register + regulatory returns calendar
+-- ---------------------------------------------------------------------------
+-- ALL-scope only, no OWN/DEPARTMENT tier. An obligations register is an
+-- org-wide control: a broker who could only see the returns they personally
+-- own would get a false "nothing overdue" picture, which is precisely the
+-- failure this register exists to prevent. Reads are therefore ALL-or-
+-- nothing, and COMPLIANCE_OFFICER/ADMIN are the only roles granted it (see
+-- baseline.ts). Same shape as surveys_rw.
+DROP POLICY IF EXISTS compliance_obligations_rw ON compliance_obligations;
+CREATE POLICY compliance_obligations_rw ON compliance_obligations FOR ALL
+  USING (app_max_scope('compliance_obligation', 'read') = 'ALL' OR app_current_role() = 'SYSTEM_JOB')
+  WITH CHECK (app_max_scope('compliance_obligation', 'write') = 'ALL' OR app_current_role() = 'SYSTEM_JOB');
+
+-- Filings inherit their parent obligation's visibility rather than carrying
+-- a duplicate scope check: a filing is meaningless without the obligation it
+-- satisfies, so the two can never diverge.
+DROP POLICY IF EXISTS compliance_filings_rw ON compliance_filings;
+CREATE POLICY compliance_filings_rw ON compliance_filings FOR ALL
+  USING (app_max_scope('compliance_obligation', 'read') = 'ALL' OR app_current_role() = 'SYSTEM_JOB')
+  WITH CHECK (app_max_scope('compliance_obligation', 'write') = 'ALL' OR app_current_role() = 'SYSTEM_JOB');
+
+-- ---------------------------------------------------------------------------
+-- Territories / books of business
+-- ---------------------------------------------------------------------------
+-- Readable by any authenticated user, writable only at ALL scope. A producer
+-- needs to SEE which book a client sits in (it appears on the account record
+-- and drives the territory filter), but re-drawing the firm's book structure
+-- is a management action. Same read-open/write-gated split business_rule
+-- uses, and the reason 'territory' gets its own resource rather than reusing
+-- 'account': account:write is granted at OWN scope to every broker, and
+-- reusing it would let any of them redraw the org's territories.
+DROP POLICY IF EXISTS territories_rw ON territories;
+CREATE POLICY territories_rw ON territories FOR ALL
+  USING (true)
+  WITH CHECK (app_max_scope('territory', 'write') = 'ALL' OR app_current_role() = 'SYSTEM_JOB');
+
+DROP POLICY IF EXISTS territory_members_rw ON territory_members;
+CREATE POLICY territory_members_rw ON territory_members FOR ALL
+  USING (true)
+  WITH CHECK (app_max_scope('territory', 'write') = 'ALL' OR app_current_role() = 'SYSTEM_JOB');
+
+-- ---------------------------------------------------------------------------
+-- Microsoft Graph sync
+-- ---------------------------------------------------------------------------
+-- A mailbox link is PERSONAL. Only the owning user (or a background job) may
+-- see or change it — not their manager, and not an ALL-scope admin, because
+-- these rows are the keys to someone's actual inbox. Deliberately stricter
+-- than the ALL-scope pattern most tables use.
+DROP POLICY IF EXISTS microsoft_graph_connections_rw ON microsoft_graph_connections;
+CREATE POLICY microsoft_graph_connections_rw ON microsoft_graph_connections FOR ALL
+  USING (user_id = app_current_user_id() OR app_current_role() = 'SYSTEM_JOB')
+  WITH CHECK (user_id = app_current_user_id() OR app_current_role() = 'SYSTEM_JOB');
+
+DROP POLICY IF EXISTS graph_sync_states_rw ON graph_sync_states;
+CREATE POLICY graph_sync_states_rw ON graph_sync_states FOR ALL
+  USING (EXISTS (SELECT 1 FROM microsoft_graph_connections c WHERE c.id = connection_id
+                 AND (c.user_id = app_current_user_id() OR app_current_role() = 'SYSTEM_JOB')))
+  WITH CHECK (EXISTS (SELECT 1 FROM microsoft_graph_connections c WHERE c.id = connection_id
+                 AND (c.user_id = app_current_user_id() OR app_current_role() = 'SYSTEM_JOB')));
+
+DROP POLICY IF EXISTS graph_subscriptions_rw ON graph_subscriptions;
+CREATE POLICY graph_subscriptions_rw ON graph_subscriptions FOR ALL
+  USING (EXISTS (SELECT 1 FROM microsoft_graph_connections c WHERE c.id = connection_id
+                 AND (c.user_id = app_current_user_id() OR app_current_role() = 'SYSTEM_JOB')))
+  WITH CHECK (EXISTS (SELECT 1 FROM microsoft_graph_connections c WHERE c.id = connection_id
+                 AND (c.user_id = app_current_user_id() OR app_current_role() = 'SYSTEM_JOB')));
+
+-- ---------------------------------------------------------------------------
+-- Outbound mail settings
+-- ---------------------------------------------------------------------------
+-- This row holds an SMTP credential for the firm's own mail domain, so it is
+-- ADMIN-ONLY in both directions — reads included. Most config tables here are
+-- read-open/write-gated; this one is not, because being able to READ it is
+-- most of the way to sending mail as the firm. SYSTEM_JOB is permitted
+-- because the worker is the process that actually sends.
+DROP POLICY IF EXISTS mail_settings_rw ON mail_settings;
+CREATE POLICY mail_settings_rw ON mail_settings FOR ALL
+  USING (app_max_scope('integration', 'read') = 'ALL' OR app_current_role() = 'SYSTEM_JOB')
+  WITH CHECK (app_max_scope('integration', 'write') = 'ALL' OR app_current_role() = 'SYSTEM_JOB');

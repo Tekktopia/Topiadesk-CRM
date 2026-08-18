@@ -105,7 +105,12 @@ export async function mergeAccounts(winnerId: string, loserId: string): Promise<
       .catch(() => prisma.accountRelationship.delete({ where: { id: rel.id } }).catch(() => undefined));
   }
 
-  await prisma.account.delete({ where: { id: loserId } });
+  // Soft-archive, not a hard delete — matches Document.isArchived's
+  // pattern and accounts.controller.ts's remove()/bulkDelete(). The loser
+  // is fully reassigned by this point (nothing meaningful left pointing at
+  // it besides its own row), so archiving is enough; deleting it outright
+  // would also throw away its audit history for no benefit.
+  await prisma.account.update({ where: { id: loserId }, data: { isArchived: true } });
   return { winnerId, loserId };
 }
 

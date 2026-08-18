@@ -20,6 +20,7 @@ import {
   toast,
 } from '@topiadesk/ui';
 import { Upload } from 'lucide-react';
+import { csrfHeaders } from '@/lib/csrf';
 
 interface DocumentCategory {
   id: string;
@@ -63,13 +64,13 @@ export function CarrierUploadDocumentDialog({ carrierId, onUploaded }: { carrier
       formData.append('file', file);
       if (categoryId !== NO_CATEGORY) formData.append('categoryId', categoryId);
 
-      const uploadRes = await fetch('/api/documents', { method: 'POST', body: formData });
+      const uploadRes = await fetch('/api/documents', { method: 'POST', headers: csrfHeaders('POST'), body: formData });
       const uploaded = (await uploadRes.json().catch(() => null)) as { id?: string; message?: string } | null;
       if (!uploadRes.ok || !uploaded?.id) throw new Error(uploaded?.message ?? 'Upload failed');
 
       const linkRes = await fetch(`/api/documents/${uploaded.id}/links`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeaders('POST') },
         body: JSON.stringify({ entityType: 'CARRIER', entityId: carrierId }),
       });
       if (!linkRes.ok) {

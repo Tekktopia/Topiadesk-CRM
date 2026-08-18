@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PolicyController } from './policy.controller';
 import { PolicyVersionController } from './policy-version.controller';
 import { PolicyPremiumController, PremiumController } from './premium.controller';
+import { RenewalBoardController } from './renewal-board.controller';
 import { RenewalScheduleController } from './renewal-schedule.controller';
 import { ApprovalThresholdRulesController } from './approval-threshold-rules.controller';
 import { PolicyProducerAssignmentController, ProducersController } from './producers.controller';
@@ -29,6 +30,7 @@ import { ESignatureService } from '../integrations/esignature.service';
     PolicyPremiumController,
     PremiumController,
     RenewalScheduleController,
+    RenewalBoardController,
     PolicyProducerAssignmentController,
     ProducersController,
     ProducerCommissionsController,

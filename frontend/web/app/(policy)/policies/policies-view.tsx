@@ -107,7 +107,10 @@ export function PoliciesView() {
     [lookupsQuery.data],
   );
 
-  const visiblePolicies = policiesQuery.data ?? [];
+  // Stable reference: `x ?? []` mints a new array on every render while the
+  // query has no data (i.e. right after a filter change), which is what drove
+  // DataTable's pagination into a render loop. See data-table.tsx.
+  const visiblePolicies = React.useMemo(() => policiesQuery.data ?? [], [policiesQuery.data]);
 
   async function reassignBroker(brokerOfRecordId: string) {
     setReassigning(true);

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@topiadesk/ui';
+import { csrfHeaders } from '@/lib/csrf';
 import type {
   ApprovalDelegation,
   ColleagueOption,
@@ -20,11 +21,26 @@ import type {
   UpdateSavedDashboardInput,
 } from './types';
 
+// Carries `.status` so Providers's QueryClient default `retry` (in
+// app/providers.tsx) can recognize a 4xx and skip its 3-retry exponential
+// backoff — a bare Error here defeated that check for every dashboard
+// widget, so an expired/invalid session turned into a ~7s+ retry storm
+// per widget instead of failing fast. Same shape as (crm)/_lib/api.ts's
+// ApiRequestError; dashboard-hooks.ts predates that shared pattern.
+class DashboardFetchError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'DashboardFetchError';
+    this.status = status;
+  }
+}
+
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { credentials: 'same-origin', ...init });
+  const res = await fetch(url, { ...init, credentials: 'same-origin', headers: { ...csrfHeaders(init?.method), ...init?.headers } });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(text || `${url} failed: ${res.status}`);
+    throw new DashboardFetchError(text || `${url} failed: ${res.status}`, res.status);
   }
   return res.json() as Promise<T>;
 }
@@ -55,6 +71,16 @@ export function usePendingApprovals() {
     queryKey: ['approvals', 'PENDING'],
     queryFn: () => fetchJson<PendingApproval[]>('/api/approvals?status=PENDING'),
     staleTime: 30_000,
+  });
+}
+
+/** APPROVED + REJECTED, most-recently-decided first (see approvals.controller.ts's 'DECIDED' query shorthand). `enabled` so the History tab's full decision log is only ever fetched once a caller actually opens it. */
+export function useApprovalHistory(enabled: boolean) {
+  return useQuery({
+    queryKey: ['approvals', 'DECIDED'],
+    queryFn: () => fetchJson<PendingApproval[]>('/api/approvals?status=DECIDED'),
+    staleTime: 30_000,
+    enabled,
   });
 }
 
@@ -161,6 +187,12 @@ export interface OperationalKpis {
   wonThisMonthCount: number;
   wonThisMonthValue: string;
   winRate: number | null;
+  totalAccounts: number;
+  newLeadsThisMonth: number;
+  leadConversionRate: number | null;
+  activePolicies: number;
+  avgDealSize: string;
+  lostThisMonthCount: number;
   byDepartment: DepartmentPipelineBreakdown[];
   lossReasonBreakdown: LossReasonBreakdown[];
 }

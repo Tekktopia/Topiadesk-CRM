@@ -91,6 +91,15 @@ model Tenant {
   /// convention) simply have no working tenant-subdomain and fall back to
   /// the default app.<root domain> entry point — no backfill required.
   subdomain           String?      @unique
+  /// MinIO object key for this tenant's uploaded login-page logo — same
+  /// storage-key-on-the-row pattern as User.avatarStorageKey
+  /// (packages/db/prisma/schema.prisma), just scoped to the platform's
+  /// Tenant instead. Null means "no custom logo" — the Keycloak login
+  /// theme (infra/keycloak/themes/topiadesk/login/template.ftl) falls back
+  /// to the baked-in TopiaDesk mark via an <img onerror> handler, since the
+  /// login page itself has no session yet and can't know in advance
+  /// whether a given realm has a logo to show.
+  logoStorageKey      String?      @map("logo_storage_key")
   status              TenantStatus @default(PROVISIONING)
   primaryContactEmail String       @map("primary_contact_email")
   createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)

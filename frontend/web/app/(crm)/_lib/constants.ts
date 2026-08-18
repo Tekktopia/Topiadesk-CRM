@@ -30,7 +30,7 @@ export type CarrierPanelStatus = (typeof CARRIER_PANEL_STATUSES)[number];
 export const MARKET_SUBMISSION_STATUSES = ['SUBMITTED', 'DECLINED', 'QUOTED', 'BOUND'] as const;
 export type MarketSubmissionStatus = (typeof MARKET_SUBMISSION_STATUSES)[number];
 
-export const ACTIVITY_TYPES = ['CALL', 'EMAIL', 'MEETING', 'NOTE', 'WHATSAPP', 'PORTAL_MESSAGE', 'SMS'] as const;
+export const ACTIVITY_TYPES = ['CALL', 'EMAIL', 'MEETING', 'NOTE', 'WHATSAPP', 'PORTAL_MESSAGE', 'SMS', 'SOCIAL', 'LIVE_CHAT'] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 
 export const ACTIVITY_DIRECTIONS = ['INBOUND', 'OUTBOUND', 'INTERNAL'] as const;
@@ -221,6 +221,31 @@ export function taskPriorityVariant(priority: string): BadgeVariant {
       return 'warning';
     case 'URGENT':
       return 'destructive';
+    default:
+      return 'outline';
+  }
+}
+
+/** Mirrors app/(cases)/_lib/constants.ts's claimStatusVariant exactly — local copy, not a cross-route-group import, same convention every other duplicated small helper in this module follows (see account-documents-panel.tsx's header comment for the fuller reasoning). Used by the Account detail page's Claims tab. */
+export function claimStatusLabel(status: string): string {
+  return humanize(status);
+}
+export function claimStatusVariant(status: string): BadgeVariant {
+  switch (status) {
+    case 'NOTIFIED':
+      return 'secondary';
+    case 'UNDER_REVIEW':
+      return 'warning';
+    case 'ADJUSTED':
+      return 'default';
+    case 'SETTLED':
+      return 'success';
+    case 'REPUDIATED':
+      return 'destructive';
+    case 'REOPENED':
+      return 'warning';
+    case 'WITHDRAWN':
+      return 'outline';
     default:
       return 'outline';
   }

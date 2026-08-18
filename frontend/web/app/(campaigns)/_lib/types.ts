@@ -33,12 +33,21 @@ export interface AudienceSegment {
   id: string;
   name: string;
   description: string | null;
-  /** Typed as `unknown` on the backend response DTO (raw Json column) — narrowed to SegmentFilterGroup here since buildContactWhereFromFilters is the only writer and always produces this shape. */
+  /** Typed as `unknown` on the backend response DTO (raw Json column) — narrowed to SegmentFilterGroup here since buildContactWhereFromFilters is the only current writer and always produces this shape going forward. Real stored rows aren't guaranteed to match it though (a raw Json column has no DB-level schema, and at least one pre-existing row was found with an incompatible legacy shape, e.g. `{renewalWithinDays: 90}` instead of `{match, conditions}`) — every read goes through normalizeSegmentFilters below (wired in as each hook's `select`) so this invariant is actually true by the time any component sees it, instead of every consumer needing its own defensive check. */
   filters: SegmentFilterGroup;
   isDynamic: boolean;
   ownerId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Coerces whatever's actually stored in the raw Json filters column into a well-formed SegmentFilterGroup — an unrecognized/legacy shape degrades to "matches everyone" (empty conditions) rather than crashing the reader, mirroring buildContactWhereFromFilters' own `!filters.conditions -> {}` fallback on the backend. */
+export function normalizeSegmentFilters(filters: unknown): SegmentFilterGroup {
+  if (filters && typeof filters === 'object' && Array.isArray((filters as { conditions?: unknown }).conditions)) {
+    const candidate = filters as SegmentFilterGroup;
+    return { match: candidate.match === 'ANY' ? 'ANY' : 'ALL', conditions: candidate.conditions };
+  }
+  return { match: 'ALL', conditions: [] };
 }
 
 export interface CreateAudienceSegmentInput {

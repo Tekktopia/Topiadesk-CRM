@@ -15,6 +15,17 @@ export interface JwtVerifierConfig {
   issuerUrl: string;
   /** Docker Compose only — see resolveInternalJwksUri's comment below. */
   internalUrl?: string;
+  /**
+   * Expected `aud` claim — a token minted for a client that never had this
+   * resource server in its audience (e.g. a different app registered on
+   * the same realm) is otherwise accepted as long as the signature and
+   * issuer check out. Requires the issuing client to actually carry an
+   * Audience protocol mapper naming this value (see
+   * keycloak-realm-provisioning.ts's `topiadesk-web` client def) — omit
+   * only for a realm/client that doesn't have one configured yet, since
+   * jsonwebtoken rejects every token outright otherwise.
+   */
+  audience?: string;
 }
 
 /**
@@ -77,7 +88,7 @@ export class JwtVerifier {
       jwt.verify(
         token,
         this.getSigningKey,
-        { issuer: this.config.issuerUrl, algorithms: ['RS256'] },
+        { issuer: this.config.issuerUrl, algorithms: ['RS256'], audience: this.config.audience },
         (err, decoded) => {
           if (err || !decoded || typeof decoded === 'string') {
             reject(err ?? new Error('Invalid token'));

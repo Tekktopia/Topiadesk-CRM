@@ -1,6 +1,7 @@
 import { Queue } from 'bullmq';
 import Redis from 'ioredis';
 import { loadEnv } from '@topiadesk/config';
+import { getRlsContext } from '@topiadesk/db';
 
 /**
  * Producer side of resuming a WAITING_APPROVAL AutomationRunState —
@@ -37,8 +38,14 @@ function getQueue(): Queue {
  * resume enqueue can never double-execute a step.
  */
 export async function enqueueAutomationRunResume(runStateId: string): Promise<void> {
+  // Captured from the deciding user's request context. Without it the worker
+  // binds SYSTEM_JOB_CONTEXT (tenantSchema: null → `public`), looks for the
+  // run state in the seed schema, finds nothing, and the approved workflow
+  // never resumes — the approver sees their decision recorded and the
+  // workflow silently stops. Same defect class as the entity-event path.
+  const tenantSchema = getRlsContext()?.tenantSchema ?? null;
   try {
-    await getQueue().add('resume', { runStateId });
+    await getQueue().add('resume', { runStateId, tenantSchema });
   } catch (err) {
     console.error('[case-management] failed to enqueue automation run resume', err);
   }

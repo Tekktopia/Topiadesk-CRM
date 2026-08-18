@@ -15,8 +15,8 @@ import {
   DropdownMenuTrigger,
 } from '@topiadesk/ui';
 import { formatCurrency, formatDate } from '../../_lib/format';
-import { dealHealthScoreLabel, dealHealthScoreVariant } from '../../_lib/constants';
 import type { Opportunity } from '../../_lib/types';
+import { ScoreMeter, dealHealthBandLabel } from '../../_components/score-meter';
 
 export interface KanbanStage {
   id: string;
@@ -49,6 +49,14 @@ export function OpportunityCard({
   const nextStage = currentIndex >= 0 ? stages[currentIndex + 1] : undefined;
   const otherStages = stages.filter((s) => s.id !== opportunity.pipelineStageId);
 
+  // Only meaningful for a deal still in play — a won deal that closed after
+  // its expected date is history, not something to chase. Compared
+  // date-only, matching expectedCloseDate's @db.Date type, so a deal due
+  // today is not flagged.
+  const currentStage = stages[currentIndex];
+  const isOpen = currentStage ? !currentStage.isWon && !currentStage.isLost : false;
+  const isOverdue = isOpen && opportunity.expectedCloseDate.slice(0, 10) < new Date().toISOString().slice(0, 10);
+
   return (
     <Card className="shadow-brand-sm">
       <CardContent className="space-y-2 p-3">
@@ -69,14 +77,27 @@ export function OpportunityCard({
         <p className="truncate text-xs text-muted-foreground">{accountName ?? 'Unknown account'}</p>
         <div className="flex items-center justify-between text-xs">
           <span className="font-medium text-foreground">{formatCurrency(opportunity.amount, opportunity.currency)}</span>
-          <div className="flex items-center gap-1">
-            {opportunity.dealHealthScore !== null ? (
-              <Badge variant={dealHealthScoreVariant(opportunity.dealHealthScore)}>{dealHealthScoreLabel(opportunity.dealHealthScore)}</Badge>
-            ) : null}
-            <Badge variant="outline">{opportunity.probability}%</Badge>
-          </div>
+          <Badge variant="outline">{opportunity.probability}%</Badge>
         </div>
-        <p className="text-xs text-muted-foreground">Expected close {formatDate(opportunity.expectedCloseDate)}</p>
+        {/* Deal health as a track rather than the numeric Badge this
+            replaces — the whole point of the score is comparing cards down a
+            column, and a number in a pill looks the same at 12 as at 87.
+            Null means the refresh-deal-health job hasn't scored it yet, or
+            the deal is already won/lost (the job only scores open ones), so
+            the row is omitted entirely rather than shown as a zero. */}
+        {opportunity.dealHealthScore !== null ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground">{dealHealthBandLabel(opportunity.dealHealthScore)}</span>
+            <ScoreMeter
+              score={opportunity.dealHealthScore}
+              ariaLabel={`Deal health ${opportunity.dealHealthScore} of 100 — ${dealHealthBandLabel(opportunity.dealHealthScore)}`}
+            />
+          </div>
+        ) : null}
+        <p className="text-xs text-muted-foreground">
+          Expected close {formatDate(opportunity.expectedCloseDate)}
+          {isOverdue ? <span className="ml-1 font-medium text-destructive">· overdue</span> : null}
+        </p>
 
         <div className="flex items-center gap-1 pt-1">
           {nextStage ? (

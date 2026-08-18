@@ -32,6 +32,7 @@ import {
   toast,
 } from '@topiadesk/ui';
 import { participantTypeLabel } from '@/app/(policy)/lib/format';
+import { csrfHeaders } from '@/lib/csrf';
 import { PARTICIPANT_TYPES, type ParticipantType, type PolicyParticipantDto } from '@/app/(policy)/lib/types';
 import { ConfirmDialog } from '../../_components/confirm-dialog';
 
@@ -73,7 +74,7 @@ export function ParticipantsPanel({ policyId, accountId }: { policyId: string; a
 
   const deleteParticipant = useMutation({
     mutationFn: (participantId: string) =>
-      fetch(`/api/policies/${policyId}/participants/${participantId}`, { method: 'DELETE', credentials: 'same-origin' }),
+      fetch(`/api/policies/${policyId}/participants/${participantId}`, { method: 'DELETE', credentials: 'same-origin', headers: csrfHeaders('DELETE') }),
     onSuccess: () => {
       toast.success('Participant removed');
       invalidate();
@@ -211,9 +212,10 @@ function ParticipantFormDialog({
         percentage: percentage || undefined,
       };
       const url = isEdit ? `/api/policies/${policyId}/participants/${participant!.id}` : `/api/policies/${policyId}/participants`;
+      const method = isEdit ? 'PATCH' : 'POST';
       const res = await fetch(url, {
-        method: isEdit ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method,
+        headers: { 'Content-Type': 'application/json', ...csrfHeaders(method) },
         credentials: 'same-origin',
         body: JSON.stringify(payload),
       });

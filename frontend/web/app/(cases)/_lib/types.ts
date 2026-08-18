@@ -44,7 +44,7 @@ export const CASE_LINK_TYPES = ['PARENT_CHILD', 'MERGED'] as const;
 export type CaseLinkType = (typeof CASE_LINK_TYPES)[number];
 
 /** Reuses CRM's Activity type/direction enums — Comment threading on Claim/Case is Activity rows with claimId/caseId set, see comment.dto.ts. */
-export const COMMENT_ACTIVITY_TYPES = ['CALL', 'EMAIL', 'MEETING', 'NOTE', 'WHATSAPP', 'PORTAL_MESSAGE', 'SMS'] as const;
+export const COMMENT_ACTIVITY_TYPES = ['CALL', 'EMAIL', 'MEETING', 'NOTE', 'WHATSAPP', 'PORTAL_MESSAGE', 'SMS', 'SOCIAL', 'LIVE_CHAT'] as const;
 export type CommentActivityType = (typeof COMMENT_ACTIVITY_TYPES)[number];
 export const COMMENT_ACTIVITY_DIRECTIONS = ['INBOUND', 'OUTBOUND', 'INTERNAL'] as const;
 export type CommentActivityDirection = (typeof COMMENT_ACTIVITY_DIRECTIONS)[number];
@@ -134,7 +134,44 @@ export type ClaimQuery = {
   adjusterId?: string;
   policyId?: string;
   assignedTeamId?: string;
+  /** Free-text across claim number and cause of loss. */
+  q?: string;
+  catastropheEventId?: string;
+  /** Date of loss window, ISO 8601. */
+  lossFrom?: string;
+  lossTo?: string;
+  take?: number;
+  skip?: number;
 };
+
+/**
+ * GET /claims/stats. Reserve and settled are reported separately on purpose
+ * — reserve is live exposure, settled is money already paid; combining them
+ * would be meaningless. Both are normalized into `baseCurrency` server-side,
+ * since Claim inherits Policy.currency and a mixed-currency book cannot be
+ * raw-summed.
+ */
+export interface ClaimStats {
+  total: number;
+  open: number;
+  settled: number;
+  repudiated: number;
+  reopened: number;
+  baseCurrency: string;
+  outstandingReserve: number;
+  totalSettled: number;
+}
+
+/** GET /cases/stats — `open` spans every non-terminal status, not just OPEN. */
+export interface CaseStats {
+  total: number;
+  newCount: number;
+  open: number;
+  resolved: number;
+  closed: number;
+  unassigned: number;
+  breaching: number;
+}
 
 export interface CreateClaimInput {
   claimNumber: string;
@@ -360,6 +397,9 @@ export interface CaseComment {
   createdBySystemJob: string | null;
   /** Only set for OUTBOUND comments on a Case — see comment.dto.ts. */
   emailDeliveryStatus?: 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED_NO_EMAIL' | null;
+  /** Actual recipients once the email sends (explicit or auto-resolved) — empty until then. */
+  emailTo: string[];
+  emailCc: string[];
   createdAt: string;
 }
 
@@ -369,6 +409,9 @@ export interface CreateCommentInput {
   type?: CommentActivityType;
   direction?: CommentActivityDirection;
   occurredAt?: string;
+  /** Explicit recipient override for an OUTBOUND Case email (SendCaseEmailDialog) — omit to fall back to the case's auto-resolved contact email. */
+  emailTo?: string[];
+  emailCc?: string[];
 }
 
 export interface CaseWatcher {
@@ -593,10 +636,17 @@ export interface AssignmentTestResponse {
 // readonly/set-value on these fields"). CASE only in v1 (see the model's
 // doc comment in schema.prisma). CONDITION_FIELDS/ACTION_FIELDS mirror
 // backend/api/src/modules/case-management/business-rules.validator.ts's
-// exports of the same name exactly — kept in sync by hand, same convention
-// as every other hand-mirrored shape in this file; a field added to one
+// exports of the same name — kept in sync by hand; a field added to one
 // without the other means the rule dialog offers an option the server then
 // rejects, or vice versa.
+//
+// The KEYS are deliberately a subset, not a mirror. The shared
+// CaseManagementEntityType enum gained POLICY/OPPORTUNITY/TASK/ACCOUNT/
+// CONTACT so AutomationRunState could carry a multi-step workflow on any
+// entity type. Business rules are a form-behaviour engine over the case and
+// claim forms and model none of those, so listing them here would make this
+// dialog offer entity types the server has no rules for. The backend's own
+// maps carry them as empty arrays purely to stay total over the enum.
 // ---------------------------------------------------------------------------
 
 export const BUSINESS_RULE_OPERATORS = ['EQUALS', 'NOT_EQUALS'] as const;

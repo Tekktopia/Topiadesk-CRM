@@ -11,6 +11,8 @@ import {
   StickyNote,
   Users,
   Loader2,
+  Share2,
+  Headphones,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Badge } from '../primitives/badge';
@@ -42,6 +44,8 @@ export const ACTIVITY_TIMELINE_TYPES = [
   'WHATSAPP',
   'PORTAL_MESSAGE',
   'SMS',
+  'SOCIAL',
+  'LIVE_CHAT',
 ] as const;
 export type ActivityTimelineType = (typeof ACTIVITY_TIMELINE_TYPES)[number];
 
@@ -78,6 +82,9 @@ export interface ActivityTimelineItem {
   aiSentimentScore?: number | null;
   /** Mirrors Activity.emailDeliveryStatus (schema.prisma) — only ever set for OUTBOUND Case comments. Omit/null for everything else, same "purely additive" convention as aiSentiment above. */
   emailDeliveryStatus?: 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED_NO_EMAIL' | null;
+  /** Mirrors Activity.emailTo/emailCc — the actual addresses this was sent to, once known. Empty/omitted for everything else. */
+  emailTo?: string[];
+  emailCc?: string[];
 }
 
 export interface LogActivityFormValues {
@@ -109,6 +116,8 @@ const TYPE_ICON: Record<ActivityTimelineType, React.ComponentType<{ className?: 
   WHATSAPP: MessageCircle,
   PORTAL_MESSAGE: MessagesSquare,
   SMS: MessageSquareText,
+  SOCIAL: Share2,
+  LIVE_CHAT: Headphones,
 };
 
 const TYPE_LABEL: Record<ActivityTimelineType, string> = {
@@ -119,6 +128,8 @@ const TYPE_LABEL: Record<ActivityTimelineType, string> = {
   WHATSAPP: 'WhatsApp',
   PORTAL_MESSAGE: 'Portal message',
   SMS: 'SMS',
+  SOCIAL: 'Social',
+  LIVE_CHAT: 'Live chat',
 };
 
 const DIRECTION_LABEL: Record<ActivityTimelineDirection, string> = {
@@ -285,7 +296,13 @@ export function ActivityLogComposer({
 
 /** One activity row's markup, extracted so UnifiedTimeline can interleave it with RecordHistoryRow (record-history.tsx) inside one merged `<ol>` — must render as a bare `<li>` (no wrapping list) so it drops into either caller's list unchanged. */
 export function ActivityTimelineRow({ item }: { item: ActivityTimelineItem }) {
-  const Icon = TYPE_ICON[item.type];
+  // Falls back rather than rendering `undefined` as a component (a hard
+  // crash — React error #130) if `item.type` is ever a value not in
+  // TYPE_ICON/TYPE_LABEL, e.g. this hand-mirrored enum drifting out of
+  // sync with the real ActivityType enum (packages/db/prisma/schema.prisma)
+  // — exactly what happened live with LIVE_CHAT before it was added here.
+  const Icon = TYPE_ICON[item.type] ?? MessageSquareText;
+  const typeLabel = TYPE_LABEL[item.type] ?? item.type;
   return (
     <li className="relative pb-6 last:pb-0">
       <span className="absolute -left-[29px] flex h-6 w-6 items-center justify-center rounded-none border border-border bg-background text-muted-foreground">
@@ -293,7 +310,7 @@ export function ActivityTimelineRow({ item }: { item: ActivityTimelineItem }) {
       </span>
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium text-foreground">{item.subject}</span>
-        <Badge variant="outline">{TYPE_LABEL[item.type]}</Badge>
+        <Badge variant="outline">{typeLabel}</Badge>
         <Badge variant="secondary">{DIRECTION_LABEL[item.direction]}</Badge>
         {item.aiSentiment ? (
           <Badge variant={SENTIMENT_BADGE_VARIANT[item.aiSentiment]}>{SENTIMENT_LABEL[item.aiSentiment]}</Badge>
@@ -309,6 +326,12 @@ export function ActivityTimelineRow({ item }: { item: ActivityTimelineItem }) {
         {item.authorName ? ` · ${item.authorName}` : ''}
         {item.durationMinutes ? ` · ${item.durationMinutes} min` : ''}
       </p>
+      {item.emailTo && item.emailTo.length > 0 ? (
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          To: {item.emailTo.join(', ')}
+          {item.emailCc && item.emailCc.length > 0 ? ` · Cc: ${item.emailCc.join(', ')}` : ''}
+        </p>
+      ) : null}
       {item.body ? <p className="mt-1.5 text-sm text-foreground/90">{item.body}</p> : null}
       {item.outcome ? <p className="mt-1 text-xs text-muted-foreground">Outcome: {item.outcome}</p> : null}
     </li>

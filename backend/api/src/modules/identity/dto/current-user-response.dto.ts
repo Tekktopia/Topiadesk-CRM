@@ -30,5 +30,7 @@ export class CurrentUserResponseDto {
   @ApiProperty({ nullable: true }) departmentName!: string | null;
   @ApiProperty({ nullable: true }) branchId!: string | null;
   @ApiProperty({ nullable: true }) branchName!: string | null;
+  /** Null means "use the default 6 tiles" — see kpi-tile-catalog.ts's DEFAULT_KPI_TILE_KEYS. */
+  @ApiProperty({ type: [String], nullable: true }) kpiTilePreferences!: string[] | null;
   @ApiProperty({ type: [ResolvedPermissionDto] }) permissions!: ResolvedPermissionDto[];
 }

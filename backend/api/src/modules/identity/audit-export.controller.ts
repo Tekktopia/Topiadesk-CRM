@@ -7,7 +7,7 @@ import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { AuditService } from '../../common/audit/audit.service';
 import { AuditExportQueryDto, AuditVerifyQueryDto } from './dto/audit-export-query.dto';
-import type { AuditVerifyResponseDto } from './dto/audit-verify-response.dto';
+import type { AuditCheckpointDto, AuditVerifyResponseDto } from './dto/audit-verify-response.dto';
 import { queryRawWithRlsContext } from './rls-raw-query.util';
 
 const EXPORT_BATCH_SIZE = 500;
@@ -42,6 +42,25 @@ interface CheckpointValidityRow {
 @Controller('identity/audit-log')
 export class AuditExportController {
   constructor(private readonly auditService: AuditService) {}
+
+  /**
+   * Recent checkpoints, newest first — populates the admin UI's checkpoint
+   * picker/history and lets it default "Verify" to the fast incremental
+   * path (fromCheckpointId = the most recent one) instead of always
+   * rescanning from genesis. Written by backend/worker's
+   * audit-checkpoint/create-checkpoint.job.ts, one row per tenant schema
+   * roughly every 5 minutes — see that job's header comment.
+   */
+  @Get('checkpoints')
+  @RequirePermission('audit_log', 'read')
+  @ApiOkResponse({ type: [Object], description: 'AuditCheckpointDto[]' })
+  async checkpoints(): Promise<AuditCheckpointDto[]> {
+    const rows = await getPrismaClient().auditCheckpoint.findMany({
+      orderBy: { checkpointAt: 'desc' },
+      take: 50,
+    });
+    return rows.map((row) => ({ id: row.id, checkpointAt: row.checkpointAt, anchorHash: row.anchorHash }));
+  }
 
   /**
    * Streamed via the raw Express response, never materialized in memory —
@@ -108,24 +127,36 @@ export class AuditExportController {
   }
 
   /**
-   * Recomputes every row's current_hash independently (LAG() window
-   * function replicating audit_chain_before_insert()'s per-lane prev_hash
-   * chaining — see prisma/triggers/001_audit_chain_function.sql) and
-   * compares against the stored value; this is the exact logic
-   * packages/db/test/rls-and-audit.integration.test.ts's "every stored
-   * current_hash matches an independent recomputation" test already proves
-   * against a raw admin connection, exposed here as a real endpoint over
-   * the normal RLS-scoped path instead.
+   * Recomputes every row's own `current_hash` from its OWN already-stored
+   * `prev_hash` column + its own payload fields, and compares against the
+   * stored value. Deliberately does NOT reconstruct prev_hash via
+   * `LAG() OVER (ORDER BY id)` — an earlier version of this endpoint did,
+   * and that was a real, live-caught bug: `id` (nextval()) is allocated
+   * before audit_chain_before_insert()'s per-lane `pg_advisory_xact_lock`
+   * is acquired, so under concurrent writes to the SAME lane, two rows can
+   * receive `id`s in one order but truly link into the chain (acquire the
+   * lock, read the real prior head, commit) in the OPPOSITE order —
+   * `id` ordering is not guaranteed to equal true chain order. The trigger
+   * itself has no such bug (the advisory lock fully serializes writers
+   * within a lane, so each row's stored `prev_hash` always correctly
+   * reflects its true predecessor's real `current_hash` at insert time) —
+   * only the RECONSTRUCTION of that ordering via `id` was wrong. Trusting
+   * each row's own stored `prev_hash` instead sidesteps the assumption
+   * entirely: `current_hash == digest(prev_hash || payload)` holds
+   * regardless of `id`/commit-order divergence, so this is not just
+   * simpler than the window-function version but strictly more correct.
+   * Confirmed live: the old query flagged 290 "mismatches" in the
+   * higher-traffic tenant (scaling with concurrent write volume — 0 in the
+   * two lower-traffic tenants) that vanished entirely under this version,
+   * confirming they were false positives from the ordering assumption, not
+   * real tampering.
    *
-   * The window function runs over the WHOLE table (not pre-filtered to the
-   * checkpoint range) and the date filter is applied AFTER — filtering
-   * audit_log rows before computing LAG() would make the first row of each
-   * lane inside the window see the wrong prev_hash (the true previous row
-   * got filtered out), producing false-positive mismatches at every range
-   * boundary. This does mean a full-table hash recomputation on every call;
-   * a real production version would want to anchor incremental
-   * verification off consecutive checkpoints instead — documented
-   * limitation, out of scope for this pass.
+   * A genuine tamper — a row's stored `current_hash` no longer matching a
+   * fresh recomputation from its own `prev_hash` + payload — is still
+   * caught exactly the same as before; what changed is only how the
+   * "expected" hash is derived, not what counts as a mismatch. Needs no
+   * window function, so (unlike the old version) the date-range filter
+   * applies directly in the WHERE clause — no whole-table scan required.
    *
    * Checkpoint verification is scoped to anchor_hash self-consistency
    * (`sha256(lane_hashes::text) == anchor_hash`, computed by Postgres
@@ -134,6 +165,16 @@ export class AuditExportController {
    * It does NOT additionally cross-check that lane_hashes reflects the true
    * per-lane head as of checkpoint_at — documented as a further limitation
    * of this pass, not implemented here.
+   *
+   * A "verify from genesis" call (no fromCheckpointId) may still surface a
+   * handful of pre-existing mismatches from data written before this
+   * self-consistency fix shipped, if that data itself predates any
+   * algorithm change made along the way — this is a property of one-way
+   * hashing (there's no way to know retroactively which historical rows
+   * used an earlier version of the payload/algorithm) and does not
+   * indicate ongoing risk. Once a checkpoint exists, "verify since
+   * checkpoint" never re-examines rows older than it, so this class of
+   * false positive can only ever show up in a genesis-to-now verify.
    */
   @Get('verify')
   @RequirePermission('audit_log', 'read')
@@ -157,21 +198,22 @@ export class AuditExportController {
 
     const [mismatchRows, rowsChecked] = await Promise.all([
       queryRawWithRlsContext<HashMismatchRow>(Prisma.sql`
-        WITH recomputed AS (
-          SELECT id, current_hash, chain_lane, entity_type, entity_id, created_at,
-            encode(digest(
-              COALESCE(LAG(current_hash) OVER (PARTITION BY chain_lane ORDER BY id), '') || jsonb_build_object(
-                'id', id, 'entity_type', entity_type, 'entity_id', entity_id, 'action', action,
-                'actor_user_id', actor_user_id, 'actor_system_job', actor_system_job, 'actor_ip', actor_ip,
-                'changed_fields', changed_fields, 'chain_lane', chain_lane, 'created_at', created_at
-              )::text, 'sha256'), 'hex') AS expected_hash
-          FROM audit_log
-        )
-        SELECT id, entity_type, entity_id, current_hash AS stored_hash, expected_hash AS recomputed_hash
-        FROM recomputed
-        WHERE current_hash <> expected_hash
-          AND (${rangeStart}::timestamptz IS NULL OR created_at > ${rangeStart}::timestamptz)
+        SELECT id, entity_type, entity_id, current_hash AS stored_hash,
+          encode(digest(
+            COALESCE(prev_hash, '') || jsonb_build_object(
+              'id', id, 'entity_type', entity_type, 'entity_id', entity_id, 'action', action,
+              'actor_user_id', actor_user_id, 'actor_system_job', actor_system_job, 'actor_ip', actor_ip,
+              'changed_fields', changed_fields, 'chain_lane', chain_lane, 'created_at', created_at
+            )::text, 'sha256'), 'hex') AS recomputed_hash
+        FROM audit_log
+        WHERE (${rangeStart}::timestamptz IS NULL OR created_at > ${rangeStart}::timestamptz)
           AND created_at <= ${rangeEnd}::timestamptz
+          AND current_hash <> encode(digest(
+            COALESCE(prev_hash, '') || jsonb_build_object(
+              'id', id, 'entity_type', entity_type, 'entity_id', entity_id, 'action', action,
+              'actor_user_id', actor_user_id, 'actor_system_job', actor_system_job, 'actor_ip', actor_ip,
+              'changed_fields', changed_fields, 'chain_lane', chain_lane, 'created_at', created_at
+            )::text, 'sha256'), 'hex')
         ORDER BY id
         LIMIT 100
       `),

@@ -6,6 +6,8 @@
  * imported from (crm) since that module's _lib directory is off-limits to
  * this batch (each Batch 2 agent owns only its own route group).
  */
+import { csrfHeaders } from '@/lib/csrf';
+
 export class ApiRequestError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -33,7 +35,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const res = await fetch(path, {
     ...init,
     credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: { 'Content-Type': 'application/json', ...csrfHeaders(init?.method), ...(init?.headers ?? {}) },
   });
   if (!res.ok) {
     throw new ApiRequestError(await parseErrorMessage(res), res.status);

@@ -27,6 +27,13 @@ COPY backend/worker/package.json backend/worker/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/db-platform/package.json packages/db-platform/package.json
 COPY packages/config/package.json packages/config/package.json
+# packages/automation — the shared automation core (entity registry,
+# condition engine, action catalog, cron helpers). backend/api and
+# backend/worker both depend on it and have no import path between their
+# own src/ trees, which is why it is a workspace package rather than
+# duplicated code; it must be listed here like every other manifest or
+# pnpm install cannot resolve the workspace dependency.
+COPY packages/automation/package.json packages/automation/package.json
 # packages/reports' own manifest must be present here too — see
 # backend/api/Dockerfile's `deps` stage comment for why (same
 # --frozen-lockfile dependency-graph reasoning): backend/worker/package.json

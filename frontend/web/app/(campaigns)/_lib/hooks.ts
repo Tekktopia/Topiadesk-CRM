@@ -3,6 +3,7 @@
 import { useMutation, useQueries, useQuery, useQueryClient, type Query } from '@tanstack/react-query';
 import { toast } from '@topiadesk/ui';
 import { apiFetch, ApiRequestError, buildQuery } from './api';
+import { normalizeSegmentFilters } from './types';
 import type {
   AbTestDecideWinnerResponse,
   AudienceSegment,
@@ -42,6 +43,7 @@ export function useAudienceSegments() {
   return useQuery({
     queryKey: ['campaigns', 'audience-segments'],
     queryFn: () => apiFetch<AudienceSegment[]>('/api/audience-segments'),
+    select: (data) => data.map((s) => ({ ...s, filters: normalizeSegmentFilters(s.filters) })),
   });
 }
 
@@ -50,6 +52,7 @@ export function useAudienceSegment(id: string | undefined) {
     queryKey: ['campaigns', 'audience-segments', id],
     queryFn: () => apiFetch<AudienceSegment>(`/api/audience-segments/${id}`),
     enabled: Boolean(id),
+    select: (s) => ({ ...s, filters: normalizeSegmentFilters(s.filters) }),
   });
 }
 

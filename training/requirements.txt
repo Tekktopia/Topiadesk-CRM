@@ -1,0 +1,42 @@
+# CPU-only training stack. Pin exact versions once the venv is actually
+# built (Stage 0) — these are reasonable starting points, not guaranteed
+# to be the latest compatible set; `pip install -r requirements.txt` will
+# resolve real transitive versions, and locking those (e.g. via
+# `pip freeze > requirements.lock.txt`) is worth doing once training
+# actually runs successfully once, so the exact-working set is reproducible.
+
+# torch==2.2.2, NOT the >=2.3 originally planned: PyPI stopped publishing
+# torch wheels for Intel Mac (x86_64) beyond 2.2.x (confirmed live — pip's
+# own error listed 2.0.0 through 2.2.2 as the only available versions for
+# this exact platform/Python combination) — Apple Silicon is now PyTorch's
+# only actively-supported Mac target. 2.2.2 is the newest available here.
+torch==2.2.2              # CPU build — do NOT install the CUDA variant, this machine has no GPU
+# torch 2.2.2 was built against NumPy 1.x's C ABI; without this pin, pip
+# installs whatever NumPy `datasets`/etc. pull in (2.4.6, confirmed live),
+# which torch loads with "Failed to initialize NumPy: _ARRAY_API not
+# found" — a real "may crash" risk per NumPy's own warning, not cosmetic.
+numpy<2,>=1.24
+transformers>=4.44,<5.0  # Python HF library — distinct package from @huggingface/transformers (JS) used in serving
+peft>=0.12,<1.0          # LoRA
+trl>=0.10,<1.0           # SFTTrainer
+datasets>=2.20,<3.0
+# >=1.0, not the originally planned >=0.33,<1.0: the pinned floor resolved
+# to accelerate 0.34.2 which is too old for transformers 4.53.3's actual
+# API — confirmed live, `Accelerator.unwrap_model()` doesn't accept the
+# `keep_torch_compile` kwarg transformers' Trainer passes it. 1.14.0 (the
+# latest at install time) is confirmed working.
+accelerate>=1.0
+
+# ONNX export (Stage 4) — installed separately from transformers.js's own
+# conversion tooling per the approved plan; see export/README or
+# convert_to_onnx.sh for the exact pinned versions that tool itself
+# requires, verified against @huggingface/transformers@^4.2.0 (the npm
+# package backend/api actually serves with) at implementation time.
+optimum[exporters]>=1.21,<2.0
+onnx>=1.16,<2.0
+onnxruntime>=1.18,<2.0
+
+# Dev/inspection convenience
+tqdm
+psycopg2-binary>=2.9,<3.0  # export_kb_articles.py's read-only dev-DB query
+python-dotenv>=1.0,<2.0    # loads the repo root .env for DB credentials, no hardcoded secrets

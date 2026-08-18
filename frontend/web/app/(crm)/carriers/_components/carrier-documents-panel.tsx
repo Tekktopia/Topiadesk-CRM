@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from '@topiadesk/ui';
 import { Download, FileText, Link2Off } from 'lucide-react';
 import { formatDate } from '../../_lib/format';
+import { csrfHeaders } from '@/lib/csrf';
 import { CarrierUploadDocumentDialog } from './carrier-upload-document-dialog';
 
 interface CarrierDocumentRow {
@@ -45,7 +46,7 @@ export function CarrierDocumentsPanel({ carrierId }: { carrierId: string }) {
 
   async function unlink(linkId: string) {
     try {
-      const res = await fetch(`/api/documents/links/${linkId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/documents/links/${linkId}`, { method: 'DELETE', headers: csrfHeaders('DELETE') });
       if (!res.ok) throw new Error('Failed to unlink document');
       toast.success('Document unlinked.');
       invalidate();

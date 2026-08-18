@@ -12,6 +12,7 @@ import { canWriteAdmin } from '../_lib/permissions';
 import type { OrgSettingDto } from '../_lib/types';
 import { RenewalThresholdsCard, MfaRolesCard } from './known-setting-editors';
 import { GenericSettingDialog } from './generic-setting-dialog';
+import { BrandingCard } from './branding-card';
 
 const KNOWN_KEYS = new Set(['renewal.default_alert_thresholds_days', 'security.mfa_required_roles']);
 
@@ -54,6 +55,7 @@ export default function OrgSettingsPage() {
       ) : (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <BrandingCard canWrite={canWrite} />
             <RenewalThresholdsCard setting={renewalThresholds} canWrite={canWrite} />
             <MfaRolesCard setting={mfaRoles} canWrite={canWrite} />
           </div>

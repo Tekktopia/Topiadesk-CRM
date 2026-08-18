@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { MoreHorizontal, Plus } from 'lucide-react';
+import { Download, MoreHorizontal, Plus, Search, X } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -14,18 +14,28 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  Input,
   type RowSelectionState,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Tabs,
   TabsList,
   TabsTrigger,
 } from '@topiadesk/ui';
 import { ConfirmDialog } from '../../_components/confirm-dialog';
+import { CustomFieldStatsStrip } from '../../_components/custom-field-stats-strip';
 import { EmptyState } from '../../_components/empty-state';
 import { PageHeader } from '../../_components/page-header';
 import { CUSTOM_FIELD_ENTITY_TYPES, humanize } from '../../_lib/constants';
-import { useCustomFieldDefinitions, useDeactivateCustomFieldDefinition } from '../../_lib/hooks';
+import { useCustomFieldDefinitions, useCustomFieldDefinitionStats, useDeactivateCustomFieldDefinition } from '../../_lib/hooks';
+import { useDebouncedValue } from '../../_lib/use-debounced-value';
 import type { CustomFieldDefinition, CustomFieldEntityType } from '../../_lib/types';
 import { CustomFieldFormDialog } from './custom-field-form-dialog';
+
+const UNSET = '__any';
 
 export function CustomFieldsView() {
   const [entityType, setEntityType] = React.useState<CustomFieldEntityType>('ACCOUNT');
@@ -38,11 +48,39 @@ export function CustomFieldsView() {
   // `rowSelection` state is left undefined instead of `{}` — see the same
   // note in carriers-list-view.tsx.
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+  const [search, setSearch] = React.useState('');
+  const [status, setStatus] = React.useState<string>(UNSET);
+  const debouncedSearch = useDebouncedValue(search, 300);
 
-  const { data, isLoading, isError } = useCustomFieldDefinitions(entityType);
+  const query = React.useMemo(
+    () => ({
+      entityType,
+      q: debouncedSearch || undefined,
+      isActive: status === UNSET ? undefined : status,
+    }),
+    [entityType, debouncedSearch, status],
+  );
+
+  const { data, isLoading, isError } = useCustomFieldDefinitions(query);
+  // Deliberately unfiltered by entityType: the strip's job is to describe
+  // the whole custom schema (which record types are extended, how many
+  // fields users are forced to fill) — scoping it to the open tab would make
+  // "Entities extended" always read 1.
+  const { data: stats, isLoading: statsLoading } = useCustomFieldDefinitionStats({});
   const deactivate = useDeactivateCustomFieldDefinition();
 
-  const rows = (data ?? []).slice().sort((a, b) => a.displayOrder - b.displayOrder);
+  // Memoized for the same reason as opportunities-table-view's `filtered`:
+  // .slice().sort() is a new array on every render.
+  const rows = React.useMemo(() => (data ?? []).slice().sort((a, b) => a.displayOrder - b.displayOrder), [data]);
+  const hasActiveFilters = Boolean(debouncedSearch) || status !== UNSET;
+
+  function handleExport() {
+    const qs = new URLSearchParams();
+    if (query.entityType) qs.set('entityType', query.entityType);
+    if (query.q) qs.set('q', query.q);
+    if (query.isActive) qs.set('isActive', query.isActive);
+    window.location.href = `/api/crm/custom-field-definitions/export?${qs.toString()}`;
+  }
 
   const columns = React.useMemo<ColumnDef<CustomFieldDefinition>[]>(
     () => [
@@ -119,11 +157,18 @@ export function CustomFieldsView() {
         title="Custom Fields"
         description="Extra fields rendered on the Account, Contact, Lead, and Opportunity create/edit forms, stored per record in a jsonb column."
         actions={
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus aria-hidden /> New field
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleExport} disabled={rows.length === 0}>
+              <Download aria-hidden /> Export
+            </Button>
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus aria-hidden /> New field
+            </Button>
+          </div>
         }
       />
+
+      <CustomFieldStatsStrip stats={stats} isLoading={statsLoading} />
 
       <Tabs value={entityType} onValueChange={(v) => setEntityType(v as CustomFieldEntityType)}>
         <TabsList>
@@ -135,12 +180,47 @@ export function CustomFieldsView() {
         </TabsList>
       </Tabs>
 
+      <Card>
+        <CardContent className="flex flex-wrap items-center gap-3 pt-6">
+          <div className="relative min-w-[16rem] flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Input placeholder="Search label or key…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
+          </div>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger className="w-44" aria-label="Filter by status">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={UNSET}>All statuses</SelectItem>
+              <SelectItem value="true">Active</SelectItem>
+              <SelectItem value="false">Deactivated</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasActiveFilters ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearch('');
+                setStatus(UNSET);
+              }}
+            >
+              <X aria-hidden /> Clear
+            </Button>
+          ) : null}
+        </CardContent>
+      </Card>
+
       {!isLoading && !isError && rows.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
             <EmptyState
-              title={`No custom fields for ${humanize(entityType)} yet`}
-              description="Add one to start capturing entity-specific data on the create/edit form."
+              title={hasActiveFilters ? 'No fields match these filters' : `No custom fields for ${humanize(entityType)} yet`}
+              description={
+                hasActiveFilters
+                  ? 'Try a different search or status.'
+                  : 'Add one to start capturing entity-specific data on the create/edit form.'
+              }
               action={
                 <Button variant="outline" onClick={() => setCreateOpen(true)}>
                   <Plus aria-hidden /> New field

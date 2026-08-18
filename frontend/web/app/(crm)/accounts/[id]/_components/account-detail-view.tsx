@@ -6,15 +6,19 @@ import { useRouter } from 'next/navigation';
 import {
   Activity as ActivityIcon,
   AlertTriangle,
+  ArchiveRestore,
+  ArrowRightLeft,
   Briefcase,
   Building2,
   CalendarClock,
   CheckSquare,
+  FileText,
   MoreHorizontal,
   Network,
   Pencil,
   Plus,
   Receipt,
+  ShieldAlert,
   Sparkles,
   ShieldCheck,
   Trash2,
@@ -24,6 +28,8 @@ import {
 } from 'lucide-react';
 import {
   ActivityTimeline,
+  Avatar,
+  AvatarFallback,
   Badge,
   Button,
   Card,
@@ -35,6 +41,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  GaugeChart,
+  GradientStatTile,
   RecordHistory,
   Select,
   SelectContent,
@@ -58,11 +66,12 @@ import {
 } from '@topiadesk/ui';
 import { ConfirmDialog } from '../../../_components/confirm-dialog';
 import { EmptyState } from '../../../_components/empty-state';
-import { PageHeader } from '../../../_components/page-header';
 import {
   accountStatusLabel,
   accountStatusVariant,
   accountTypeLabel,
+  claimStatusLabel,
+  claimStatusVariant,
   healthScoreLabel,
   healthScoreVariant,
   kycStatusLabel,
@@ -76,12 +85,13 @@ import {
   taskStatusLabel,
   taskStatusVariant,
 } from '../../../_lib/constants';
-import { formatCurrency, formatDate, fullName } from '../../../_lib/format';
+import { formatCurrency, formatDate, fullName, initials } from '../../../_lib/format';
 import { renewalStatusVariant } from '@/app/(policy)/lib/format';
 import { useCan, useSlaPolicies } from '@/app/(cases)/_lib/hooks';
 import type { SlaPolicy } from '@/app/(cases)/_lib/types';
 import {
   useAccount,
+  useAccountClaims,
   useAccountGroupRollup,
   useAccountRelationships,
   useAccountRenewals,
@@ -96,8 +106,10 @@ import {
   useDeleteContact,
   useDeleteSite,
   useDirectoryUsers,
+  useIndustry,
   useOpportunities,
   useRemoveAccountSlaOverride,
+  useRestoreAccount,
   useSites,
   useTasksForEntity,
   useUpsertAccountSlaOverride,
@@ -108,22 +120,29 @@ import { AccountRelationshipFormDialog } from '../../_components/account-relatio
 import { ContactFormDialog } from '../../_components/contact-form-dialog';
 import { ConsentDialog } from './consent-dialog';
 import { SiteFormDialog } from '../../_components/site-form-dialog';
+import { AccountDocumentsPanel } from './account-documents-panel';
 import { AccountRelationshipGraph } from './account-relationship-graph';
 import { AiInsightPanel } from './ai-insight-panel';
 import { LoyaltyTab } from './loyalty-tab';
+import { TransferOwnerDialog } from './transfer-owner-dialog';
 
 export function AccountDetailView({ accountId }: { accountId: string }) {
   const router = useRouter();
+  const canWrite = useCan('account', 'write');
   const { data: account, isLoading } = useAccount(accountId);
   const { data: groupRollup } = useAccountGroupRollup(accountId);
+  const { usersById } = useDirectoryUsers();
+  const { data: industry } = useIndustry(account?.industryId ?? undefined);
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [transferOpen, setTransferOpen] = React.useState(false);
   const deleteAccount = useDeleteAccount();
+  const restoreAccount = useRestoreAccount();
 
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-9 w-64" />
+        <Skeleton className="h-28 w-full" />
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-24 w-full" />
@@ -138,39 +157,83 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
     return <EmptyState title="Account not found" description="It may have been deleted, or you may not have access to it." />;
   }
 
+  const owner = usersById.get(account.ownerId);
+
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={
-          <span className="flex flex-wrap items-center gap-2">
-            {account.name}
-            <Badge variant={accountStatusVariant(account.status)}>{accountStatusLabel(account.status)}</Badge>
-            <Badge variant={riskRatingVariant(account.riskRating)}>{riskRatingLabel(account.riskRating)} risk</Badge>
-            <Badge variant={kycStatusVariant(account.kycStatus)}>KYC {kycStatusLabel(account.kycStatus)}</Badge>
-            <Badge variant={healthScoreVariant(account.healthScore)}>Health {healthScoreLabel(account.healthScore)}</Badge>
-          </span>
-        }
-        description={`${accountTypeLabel(account.accountType)} account · ${[account.city, account.country].filter(Boolean).join(', ') || 'No location on file'}`}
-        actions={
-          <>
-            <Button variant="outline" onClick={() => setEditOpen(true)}>
-              <Pencil aria-hidden /> Edit
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Account actions">
-                  <MoreHorizontal aria-hidden />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleteOpen(true)}>
-                  <Trash2 aria-hidden /> Delete account
+      {account.isArchived ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 px-4 py-3">
+          <p className="text-sm text-muted-foreground">This account is archived — hidden from the default list and read-only in most views.</p>
+          <Button size="sm" variant="outline" onClick={() => restoreAccount.mutate(account.id)} disabled={restoreAccount.isPending}>
+            <ArchiveRestore aria-hidden /> Restore
+          </Button>
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap items-start justify-between gap-4 rounded-lg bg-gradient-to-r from-brand-700 to-navy-700 p-6 text-white">
+        <div className="flex items-start gap-4">
+          <Avatar className="h-14 w-14 border-2 border-white/30">
+            <AvatarFallback className="bg-white/15 text-lg font-semibold text-white">{initials(account.name)}</AvatarFallback>
+          </Avatar>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight">{account.name}</h1>
+              <Badge variant={accountStatusVariant(account.status)}>{accountStatusLabel(account.status)}</Badge>
+              <Badge variant={riskRatingVariant(account.riskRating)}>{riskRatingLabel(account.riskRating)} risk</Badge>
+              <Badge variant={kycStatusVariant(account.kycStatus)}>KYC {kycStatusLabel(account.kycStatus)}</Badge>
+              <Badge variant={healthScoreVariant(account.healthScore)}>Health {healthScoreLabel(account.healthScore)}</Badge>
+            </div>
+            <p className="text-sm text-white/80">
+              {accountTypeLabel(account.accountType)} account · {[account.city, account.country].filter(Boolean).join(', ') || 'No location on file'}
+              {owner ? ` · Owned by ${owner.fullName}` : null}
+            </p>
+            {account.tags.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {account.tags.map((tag) => (
+                  <Badge key={tag} variant="outline" className="border-white/30 bg-white/10 font-normal text-white">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="secondary" onClick={() => setEditOpen(true)} disabled={!canWrite} title={!canWrite ? 'You do not have permission to edit accounts' : undefined}>
+            <Pencil aria-hidden /> Edit
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary" size="icon" aria-label="Account actions">
+                <MoreHorizontal aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setTransferOpen(true)}>
+                <ArrowRightLeft aria-hidden /> Transfer ownership
+              </DropdownMenuItem>
+              {account.isArchived ? (
+                <DropdownMenuItem onSelect={() => restoreAccount.mutate(account.id)}>
+                  <ArchiveRestore aria-hidden /> Restore account
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </>
-        }
-      />
+              ) : (
+                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleteOpen(true)}>
+                  <Trash2 aria-hidden /> Archive account
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <GradientStatTile accent="blue" label="Total sum insured" value={formatCurrency(account.financials.totalSumInsured)} icon={<Wallet />} />
+        <GradientStatTile accent="teal" label="Outstanding premium" value={formatCurrency(account.financials.totalOutstandingPremium)} icon={<Receipt />} />
+        <GradientStatTile accent="violet" label="Won opportunity value" value={formatCurrency(account.financials.wonOpportunityValue)} icon={<Trophy />} />
+        <Card className="flex items-center justify-center p-0">
+          <GaugeChart label="Health score" valuePercent={account.healthScore ?? 0} height={110} />
+        </Card>
+      </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <StatTile label="Contacts" value={account.counts.contacts} icon={<Users />} />
@@ -179,16 +242,6 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
         <StatTile label="Policies" value={account.counts.policies} icon={<ShieldCheck />} />
         <StatTile label="Activities" value={account.counts.activities} icon={<ActivityIcon />} />
         <StatTile label="Relationships" value={account.counts.relationships} icon={<Network />} />
-      </div>
-
-      {/* Roll-up sums, kept in a separate row from the counts above — different
-          units (money, not row counts) warrant a visual break, not a 10-tile
-          single grid. `null` (no policies/premiums/won opportunities) renders
-          via formatCurrency's own "—" fallback rather than a fake $0. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatTile label="Total sum insured" value={formatCurrency(account.financials.totalSumInsured)} icon={<Wallet />} />
-        <StatTile label="Outstanding premium" value={formatCurrency(account.financials.totalOutstandingPremium)} icon={<Receipt />} />
-        <StatTile label="Won opportunity value" value={formatCurrency(account.financials.wonOpportunityValue)} icon={<Trophy />} />
       </div>
 
       {/* Group Premium Rollup — this account's parent/subsidiary tree
@@ -230,6 +283,12 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
             <CalendarClock className="h-3.5 w-3.5" aria-hidden /> Renewals
           </TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="documents" className="gap-1.5">
+            <FileText className="h-3.5 w-3.5" aria-hidden /> Documents
+          </TabsTrigger>
+          <TabsTrigger value="claims" className="gap-1.5">
+            <ShieldAlert className="h-3.5 w-3.5" aria-hidden /> Claims
+          </TabsTrigger>
           <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
           <TabsTrigger value="ai-insights" className="gap-1.5">
             <Sparkles className="h-3.5 w-3.5" aria-hidden /> AI Insights
@@ -251,14 +310,19 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
                 value={account.healthScoreComputedAt ? `${healthScoreLabel(account.healthScore)} · as of ${formatDate(account.healthScoreComputedAt)}` : healthScoreLabel(account.healthScore)}
               />
               <Field label="City" value={account.city ?? '—'} />
+              <Field label="State" value={account.state ?? '—'} />
               <Field label="Country" value={account.country ?? '—'} />
-              <Field label="Industry ID" value={account.industryId ?? '—'} mono />
-              <Field label="Owner ID" value={account.ownerId} mono />
+              <Field label="Industry" value={industry?.name ?? (account.industryId ? '—' : 'Not set')} />
+              <Field label="Owner" value={owner?.fullName ?? account.ownerId} mono={!owner} />
+              <Field label="Source" value={account.source ?? '—'} />
               <Field label="KYC status" value={kycStatusLabel(account.kycStatus)} />
               <Field label="KYC expiry" value={account.kycExpiryDate ? formatDate(account.kycExpiryDate) : '—'} />
               <Field label="NAICOM ID" value={account.naicomId ?? '—'} />
               <Field label="Created" value={formatDate(account.createdAt)} />
               <Field label="Last updated" value={formatDate(account.updatedAt)} />
+              <div className="sm:col-span-2 lg:col-span-3">
+                <Field label="Notes" value={account.notes ?? '—'} />
+              </div>
             </CardContent>
           </Card>
 
@@ -293,6 +357,21 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
           <ActivityTab accountId={accountId} />
         </TabsContent>
 
+        <TabsContent value="documents">
+          <Card>
+            <CardHeader>
+              <CardTitle>Documents</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AccountDocumentsPanel accountId={accountId} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="claims">
+          <ClaimsTab accountId={accountId} />
+        </TabsContent>
+
         <TabsContent value="loyalty">
           <LoyaltyTab accountId={accountId} />
         </TabsContent>
@@ -314,12 +393,13 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
       </Tabs>
 
       <AccountFormDialog open={editOpen} onOpenChange={setEditOpen} account={account} />
+      <TransferOwnerDialog open={transferOpen} onOpenChange={setTransferOpen} accountId={accountId} currentOwnerId={account.ownerId} />
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title={`Delete "${account.name}"?`}
-        description="This permanently removes the account and cannot be undone."
-        confirmLabel="Delete account"
+        title={`Archive "${account.name}"?`}
+        description="Archived accounts are hidden from the default list but can be restored at any time — nothing is permanently deleted."
+        confirmLabel="Archive account"
         destructive
         isPending={deleteAccount.isPending}
         onConfirm={() =>
@@ -380,17 +460,22 @@ function ContactsTab({ accountId }: { accountId: string }) {
               {data.map((contact) => (
                 <TableRow key={contact.id}>
                   <TableCell className="font-medium text-foreground">
-                    {fullName(contact.firstName, contact.lastName)}
-                    {contact.householdRole ? (
-                      <Badge variant="outline" className="ml-2 font-normal">
-                        {contact.householdRole}
-                      </Badge>
-                    ) : null}
-                    {contact.anonymizedAt ? (
-                      <Badge variant="secondary" className="ml-2 font-normal">
-                        Data erased
-                      </Badge>
-                    ) : null}
+                    <span className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-[10px]">{initials(fullName(contact.firstName, contact.lastName))}</AvatarFallback>
+                      </Avatar>
+                      {fullName(contact.firstName, contact.lastName)}
+                      {contact.householdRole ? (
+                        <Badge variant="outline" className="font-normal">
+                          {contact.householdRole}
+                        </Badge>
+                      ) : null}
+                      {contact.anonymizedAt ? (
+                        <Badge variant="secondary" className="font-normal">
+                          Data erased
+                        </Badge>
+                      ) : null}
+                    </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{contact.title ?? '—'}</TableCell>
                   <TableCell className="text-muted-foreground">{contact.email ?? '—'}</TableCell>
@@ -915,6 +1000,61 @@ function RenewalsTab({ accountId }: { accountId: string }) {
   );
 }
 
+/** Claim has no direct accountId FK (Claim -> Policy -> Account) — the join is stitched server-side by GET /crm/accounts/:id/claims, not client-filtered here. */
+function ClaimsTab({ accountId }: { accountId: string }) {
+  const { data, isLoading } = useAccountClaims(accountId);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Claims</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-32 w-full" />
+        ) : !data || data.length === 0 ? (
+          <EmptyState title="No claims yet" description="Claims filed against any policy on this account will show up here." />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Claim</TableHead>
+                <TableHead>Policy</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Priority</TableHead>
+                <TableHead>Date of loss</TableHead>
+                <TableHead>Reserve</TableHead>
+                <TableHead>Settled</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((claim) => (
+                <TableRow key={claim.id}>
+                  <TableCell className="font-medium text-foreground">{claim.claimNumber}</TableCell>
+                  <TableCell>
+                    <Link href={`/policies/${claim.policyId}`} className="text-muted-foreground hover:underline">
+                      {claim.policyNumber}
+                    </Link>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={claimStatusVariant(claim.status)}>{claimStatusLabel(claim.status)}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={taskPriorityVariant(claim.priority)}>{taskPriorityLabel(claim.priority)}</Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(claim.dateOfLoss)}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatCurrency(claim.reserveAmount)}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatCurrency(claim.settledAmount)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function ActivityTab({ accountId }: { accountId: string }) {
   const { data, isLoading } = useActivities({ accountId });
   const { usersById } = useDirectoryUsers();
@@ -929,7 +1069,7 @@ function ActivityTab({ accountId }: { accountId: string }) {
     occurredAt: a.occurredAt,
     durationMinutes: a.durationMinutes,
     outcome: a.outcome,
-    authorName: usersById.get(a.createdById)?.fullName ?? null,
+    authorName: a.createdById ? (usersById.get(a.createdById)?.fullName ?? null) : null,
   }));
 
   async function handleLogActivity(values: LogActivityFormValues) {

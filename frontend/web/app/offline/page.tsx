@@ -19,7 +19,6 @@ export default function OfflinePage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
       <script
-        // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{
           __html: "window.addEventListener('online', function () { window.location.reload(); });",
         }}

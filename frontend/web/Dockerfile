@@ -29,6 +29,13 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY frontend/web/package.json frontend/web/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY packages/shared-types/package.json packages/shared-types/package.json
+# packages/automation — the shared automation core (entity registry,
+# condition engine, action catalog, cron helpers). backend/api and
+# backend/worker both depend on it and have no import path between their
+# own src/ trees, which is why it is a workspace package rather than
+# duplicated code; it must be listed here like every other manifest or
+# pnpm install cannot resolve the workspace dependency.
+COPY packages/automation/package.json packages/automation/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS builder

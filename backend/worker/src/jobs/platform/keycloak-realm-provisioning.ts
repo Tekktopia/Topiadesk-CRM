@@ -1,4 +1,5 @@
 import { loadEnv } from '@topiadesk/config';
+import { masterFetch, safeBody } from '../../keycloak-master-client.util';
 
 /**
  * Creates a Keycloak realm (+ CRM role set + a `topiadesk-web`-shaped
@@ -22,60 +23,6 @@ import { loadEnv } from '@topiadesk/config';
  */
 
 const TENANT_REALM_NAME_PATTERN = /^tenant_[a-z0-9_]+$/;
-
-interface CachedMasterToken {
-  accessToken: string;
-  expiresAtMs: number;
-}
-
-let masterTokenCache: CachedMasterToken | undefined;
-
-function requireMasterCredentials(): { username: string; password: string } {
-  const env = loadEnv();
-  if (!env.KEYCLOAK_ADMIN || !env.KEYCLOAK_ADMIN_PASSWORD) {
-    throw new Error('KEYCLOAK_ADMIN/KEYCLOAK_ADMIN_PASSWORD are not configured — tenant realm provisioning requires master-realm credentials.');
-  }
-  return { username: env.KEYCLOAK_ADMIN, password: env.KEYCLOAK_ADMIN_PASSWORD };
-}
-
-function keycloakBaseUrl(): string {
-  // Same internal-vs-public-hostname reasoning as KeycloakAdminService's
-  // adminBaseUrl(): *.topiadesk.localhost only resolves via host-machine/
-  // browser DNS, not Docker Compose's embedded DNS.
-  const env = loadEnv();
-  return env.KEYCLOAK_INTERNAL_URL ?? env.KEYCLOAK_URL;
-}
-
-async function getMasterAccessToken(): Promise<string> {
-  const now = Date.now();
-  if (masterTokenCache && masterTokenCache.expiresAtMs > now + 5000) {
-    return masterTokenCache.accessToken;
-  }
-  const { username, password } = requireMasterCredentials();
-  const res = await fetch(`${keycloakBaseUrl()}/realms/master/protocol/openid-connect/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'password', client_id: 'admin-cli', username, password }),
-  });
-  if (!res.ok) {
-    throw new Error(`Keycloak master-realm token request failed (${res.status}): ${await safeBody(res)}`);
-  }
-  const json = (await res.json()) as { access_token: string; expires_in: number };
-  masterTokenCache = { accessToken: json.access_token, expiresAtMs: now + json.expires_in * 1000 };
-  return json.access_token;
-}
-
-async function masterFetch(path: string, init: RequestInit): Promise<Response> {
-  const token = await getMasterAccessToken();
-  return fetch(`${keycloakBaseUrl()}${path}`, {
-    ...init,
-    headers: { ...init.headers, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-  });
-}
-
-async function safeBody(res: Response): Promise<string> {
-  return (await res.text().catch(() => '')).slice(0, 500);
-}
 
 /**
  * The 4 CRM roles, verbatim from infra/keycloak/realm-export.json's own
@@ -144,6 +91,17 @@ export async function createTenantRealm(opts: { realmName: string; displayName: 
       failureFactor: 5,
       waitIncrementSeconds: 60,
       maxFailureWaitSeconds: 900,
+      // Persists LOGIN/LOGIN_ERROR (etc.) events so jobs/security-monitoring/
+      // detect-anomalies.job.ts's admin-events poll has something to read —
+      // a security-audit finding: bruteForceProtected above blocks a brute
+      // force in progress, but nothing was watching for one at all before
+      // this (no alert, no record). 30 days is enough for the job's own
+      // 15-minute lookback window with room to spare for catching up after
+      // any real downtime.
+      eventsEnabled: true,
+      eventsExpiration: 60 * 60 * 24 * 30,
+      enabledEventTypes: ['LOGIN', 'LOGIN_ERROR'],
+      adminEventsEnabled: false,
       passwordPolicy: 'length(12) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1) and notUsername',
       otpPolicyType: 'totp',
       otpPolicyAlgorithm: 'HmacSHA1',
@@ -171,6 +129,29 @@ export async function createTenantRealm(opts: { realmName: string; displayName: 
           },
           redirectUris: [`${tenantWebOrigin}/*`],
           webOrigins: [tenantWebOrigin],
+          // Without this, jwt-verifier.ts's audience check (added for the
+          // security-audit "JWT audience never validated" finding) rejects
+          // every token from this realm outright — see that config field's
+          // own doc comment. `included.custom.audience`, NOT
+          // `included.client.audience`: unlike the static "topiadesk"
+          // realm (infra/keycloak/realm-export.json), a per-tenant realm
+          // never gets its own `topiadesk-api` CLIENT (only `topiadesk-web`
+          // above) — the API is one shared app across every tenant realm,
+          // so this embeds the literal string instead of referencing a
+          // client that doesn't exist here.
+          protocolMappers: [
+            {
+              name: 'topiadesk-api-audience',
+              protocol: 'openid-connect',
+              protocolMapper: 'oidc-audience-mapper',
+              consentRequired: false,
+              config: {
+                'included.custom.audience': 'topiadesk-api',
+                'id.token.claim': 'false',
+                'access.token.claim': 'true',
+              },
+            },
+          ],
         },
       ],
     }),

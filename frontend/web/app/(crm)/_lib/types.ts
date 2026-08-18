@@ -44,10 +44,40 @@ export interface Account {
   /** Composite relationship-health signal — see refresh-health-score.job.ts. Distinct from riskRating (manual underwriting risk). */
   healthScore: number | null;
   healthScoreComputedAt: string | null;
+  source: string | null;
+  notes: string | null;
+  state: string | null;
+  tags: string[];
+  isArchived: boolean;
   /** Phase 2 — jsonb, keyed by active CustomFieldDefinition.key for entityType=ACCOUNT. */
   customFields: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Industry {
+  id: string;
+  name: string;
+  parentIndustryId: string | null;
+}
+
+export interface AccountClaimRow {
+  id: string;
+  claimNumber: string;
+  status: string;
+  priority: string;
+  dateOfLoss: string;
+  dateReported: string;
+  reserveAmount: string | null;
+  settledAmount: string | null;
+  policyId: string;
+  policyNumber: string;
+}
+
+export interface AccountImportResult {
+  created: number;
+  updated: number;
+  errors: { row: number; message: string }[];
 }
 
 export interface ContactSummary {
@@ -144,6 +174,7 @@ export interface AccountRenewalRow {
 }
 
 export type AccountQuery = NonNullable<Paths['/crm/accounts']['get']['parameters']['query']>;
+export type AccountStats = Paths['/crm/accounts/stats']['get']['responses']['200']['content']['application/json'];
 // `& { customFields?: ... }` because ApiPaths (packages/shared-types/src/api-client/schema.d.ts)
 // hasn't been regenerated against the Phase 2 OpenAPI schema yet — customFields
 // is a real, accepted field on CreateAccountDto/UpdateAccountDto
@@ -197,6 +228,26 @@ export interface DataSubjectRequest {
   processedAt: string | null;
   createdAt: string;
 }
+/**
+ * `deadlineDays` comes from the API rather than being hardcoded here so the
+ * copy in the UI ("30-day window") can never drift from the constant the
+ * overdue count is actually computed against.
+ */
+export interface DataSubjectRequestStats {
+  total: number;
+  pending: number;
+  completed: number;
+  rejected: number;
+  overdue: number;
+  dueSoon: number;
+  deadlineDays: number;
+}
+export type DataSubjectRequestQuery = {
+  contactId?: string;
+  status?: string;
+  requestType?: DataSubjectRequestType;
+};
+
 export interface CreateDataSubjectRequestInput {
   contactId: string;
   requestType: DataSubjectRequestType;
@@ -231,6 +282,7 @@ export interface CurrentConsent {
 }
 
 export type ContactQuery = NonNullable<Paths['/crm/contacts']['get']['parameters']['query']>;
+export type ContactStats = Paths['/crm/contacts/stats']['get']['responses']['200']['content']['application/json'];
 // See CreateAccountInput's comment — ApiPaths hasn't been regenerated for Phase 2's customFields/siteId.
 export type CreateContactInput = Paths['/crm/contacts']['post']['requestBody']['content']['application/json'] & {
   customFields?: Record<string, unknown>;
@@ -274,6 +326,9 @@ export type UpdateSiteInput = Partial<CreateSiteInput>;
 // -- Carriers ---------------------------------------------------------------
 
 export type CarrierPanelStatus = 'PROSPECTIVE' | 'ACTIVE' | 'SUSPENDED' | 'TERMINATED';
+
+export type CarrierQuery = NonNullable<Paths['/crm/carriers']['get']['parameters']['query']>;
+export type CarrierStats = Paths['/crm/carriers/stats']['get']['responses']['200']['content']['application/json'];
 
 export interface Carrier {
   id: string;
@@ -354,6 +409,7 @@ export interface ConvertLeadResponse {
 }
 
 export type LeadQuery = NonNullable<Paths['/crm/leads']['get']['parameters']['query']>;
+export type LeadStats = Paths['/crm/leads/stats']['get']['responses']['200']['content']['application/json'];
 // See CreateAccountInput's comment — ApiPaths hasn't been regenerated for Phase 2's customFields.
 export type CreateLeadInput = Paths['/crm/leads']['post']['requestBody']['content']['application/json'] & {
   customFields?: Record<string, unknown>;
@@ -452,6 +508,8 @@ export interface StageHistoryEntry {
 }
 
 export type OpportunityQuery = NonNullable<Paths['/crm/opportunities']['get']['parameters']['query']>;
+export type PipelineUsage = Paths['/crm/pipelines/{id}/usage']['get']['responses']['200']['content']['application/json'];
+export type OpportunityStats = Paths['/crm/opportunities/stats']['get']['responses']['200']['content']['application/json'];
 // See CreateAccountInput's comment — ApiPaths hasn't been regenerated for
 // Phase 2's customFields, or (same reasoning) for `currency` (multi-currency
 // support, added directly to CreateOpportunityDto/UpdateOpportunityDto).
@@ -491,12 +549,17 @@ export interface Activity {
   leadId: string | null;
   opportunityId: string | null;
   policyId: string | null;
-  type: 'CALL' | 'EMAIL' | 'MEETING' | 'NOTE' | 'WHATSAPP' | 'PORTAL_MESSAGE' | 'SMS';
+  type: 'CALL' | 'EMAIL' | 'MEETING' | 'NOTE' | 'WHATSAPP' | 'PORTAL_MESSAGE' | 'SMS' | 'SOCIAL' | 'LIVE_CHAT';
   direction: 'INBOUND' | 'OUTBOUND' | 'INTERNAL';
   subject: string;
   body: string | null;
   occurredAt: string;
-  createdById: string;
+  /** Null when an integration wrote the row rather than a person — inbound
+   * email/WhatsApp do exactly that, so this was never safely non-null. */
+  createdById: string | null;
+  /** Non-null once the message was actually transmitted; such activities
+   * cannot be corrected or deleted (see the activities controller). */
+  externalMessageId: string | null;
   durationMinutes: number | null;
   outcome: string | null;
   createdAt: string;
@@ -504,6 +567,34 @@ export interface Activity {
 
 export type ActivityQuery = NonNullable<Paths['/crm/activities']['get']['parameters']['query']>;
 export type CreateActivityInput = Paths['/crm/activities']['post']['requestBody']['content']['application/json'];
+
+/**
+ * Team-activity aggregates. `loggedByPeople` is what separates "the team was
+ * busy" from "two people were busy" — a total alone hides that.
+ */
+export interface ActivityStats {
+  total: number;
+  inbound: number;
+  outbound: number;
+  loggedByPeople: number;
+  accountsTouched: number;
+  systemLogged: number;
+}
+
+/** Correction only — type/direction are deliberately not editable (SLA history). */
+export interface UpdateActivityInput {
+  accountId?: string;
+  contactId?: string;
+  leadId?: string;
+  opportunityId?: string;
+  policyId?: string;
+  subject?: string;
+  body?: string;
+  occurredAt?: string;
+  outcome?: string;
+  durationMinutes?: number;
+}
+
 
 // -- Tasks ----------------------------------------------------------------
 
@@ -526,6 +617,7 @@ export interface Task {
 }
 
 export type TaskQuery = NonNullable<Paths['/crm/tasks']['get']['parameters']['query']>;
+export type TaskStats = Paths['/crm/tasks/stats']['get']['responses']['200']['content']['application/json'];
 export type CreateTaskInput = Paths['/crm/tasks']['post']['requestBody']['content']['application/json'];
 export type UpdateTaskInput = Paths['/crm/tasks/{id}']['patch']['requestBody']['content']['application/json'];
 
@@ -599,6 +691,26 @@ export interface CustomFieldDefinition {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface CustomFieldEntityCount {
+  entityType: CustomFieldEntityType;
+  total: number;
+  active: number;
+}
+export interface CustomFieldDefinitionStats {
+  total: number;
+  active: number;
+  inactive: number;
+  required: number;
+  byEntityType: CustomFieldEntityCount[];
+}
+export type CustomFieldDefinitionQuery = {
+  entityType?: CustomFieldEntityType;
+  fieldType?: CustomFieldType;
+  /** 'true' | 'false' — a string, matching the query param the API validates. */
+  isActive?: string;
+  q?: string;
+};
 
 export interface CreateCustomFieldDefinitionInput {
   entityType: CustomFieldEntityType;
@@ -706,6 +818,25 @@ export interface SalesQuota {
   updatedAt: string;
 }
 
+/**
+ * `currentTargetTotal` is a decimal string, not a number, for the same
+ * reason SalesQuota.targetAmount is: summing 15,2 money through IEEE-754
+ * silently loses precision at scale.
+ */
+export interface SalesQuotaStats {
+  total: number;
+  current: number;
+  individual: number;
+  currentTargetTotal: string;
+}
+export type SalesQuotaQuery = {
+  scopeType?: QuotaScopeType;
+  userId?: string;
+  periodType?: QuotaPeriodType;
+  /** 'true' to keep only quotas whose period brackets today. */
+  currentOnly?: string;
+};
+
 export interface CreateSalesQuotaInput {
   scopeType: QuotaScopeType;
   userId?: string;
@@ -795,6 +926,15 @@ export interface BulkAssignInput {
   accountId?: string;
   /** Lead bulk/assign body key. */
   assignedToId?: string;
+  /** Task bulk/assign body key. */
+  assigneeId?: string;
+}
+
+/** Task bulk/update body — status and/or priority applied across the selected ids. */
+export interface BulkUpdateTasksInput {
+  ids: string[];
+  status?: Task['status'];
+  priority?: Task['priority'];
 }
 
 export interface BulkDeleteInput {
@@ -812,6 +952,27 @@ export interface LoyaltyAccount {
   updatedAt: string;
 }
 
+/**
+ * `pointsOutstanding` is a liability, not a score — unredeemed points the
+ * business still owes. `tierBreakdown` is a list because tier is free text
+ * (tenants define their own), not a fixed enum.
+ */
+export interface LoyaltyTierCount {
+  tier: string;
+  members: number;
+}
+export interface LoyaltyStats {
+  members: number;
+  enrolledLast30Days: number;
+  pointsOutstanding: number;
+  tierBreakdown: LoyaltyTierCount[];
+}
+export type LoyaltyAccountQuery = {
+  search?: string;
+  tier?: string;
+  take?: number;
+};
+
 export interface LoyaltyTransaction {
   id: string;
   loyaltyAccountId: string;
@@ -822,4 +983,110 @@ export interface LoyaltyTransaction {
   createdById: string | null;
   createdByName?: string | null;
   createdAt: string;
+}
+
+// -- Cross-sell whitespace ---------------------------------------------------
+
+export interface CrossSellRow {
+  accountId: string;
+  accountName: string;
+  status: string;
+  ownerName: string | null;
+  linesHeld: string[];
+  /** Lines the firm can place that this client does NOT hold. */
+  linesMissing: string[];
+  policyCount: number;
+  premiumBase: number;
+  baseCurrency: string;
+}
+
+export interface CrossSellLine {
+  line: string;
+  accountsHolding: number;
+  accountsMissing: number;
+}
+
+export interface CrossSellStats {
+  accounts: number;
+  accountsWithCover: number;
+  accountsWithGaps: number;
+  linesAvailable: number;
+  averageLinesPerAccount: number;
+  biggestGapLine: string | null;
+  biggestGapCount: number;
+  lines: CrossSellLine[];
+}
+
+export type CrossSellQuery = {
+  missingLine?: string;
+  holdsLine?: string;
+  status?: string;
+  ownerId?: string;
+  minLinesHeld?: number;
+  take?: number;
+};
+
+// -- Territories / books of business -----------------------------------------
+
+export type TerritoryType = 'GEOGRAPHIC' | 'INDUSTRY' | 'PRODUCT' | 'NAMED_ACCOUNTS';
+
+export interface TerritoryMember {
+  userId: string;
+  fullName: string | null;
+}
+
+export interface Territory {
+  id: string;
+  name: string;
+  description: string | null;
+  type: TerritoryType;
+  parentId: string | null;
+  parentName: string | null;
+  managerId: string | null;
+  managerName: string | null;
+  isActive: boolean;
+  members: TerritoryMember[];
+  /** Clients sitting in this book — what makes a territory real rather than decorative. */
+  accountCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TerritoryStats {
+  total: number;
+  active: number;
+  /** A book nobody works. */
+  withoutMembers: number;
+  /** Clients in nobody's book — the ones that quietly go unserviced. */
+  unassignedAccounts: number;
+  assignedAccounts: number;
+}
+
+export type TerritoryQuery = {
+  type?: TerritoryType;
+  managerId?: string;
+  memberId?: string;
+  /** 'true' | 'false' — a string, matching how the API models boolean flags. */
+  isActive?: string;
+  q?: string;
+  take?: number;
+};
+
+export interface CreateTerritoryInput {
+  name: string;
+  description?: string;
+  type: TerritoryType;
+  parentId?: string;
+  managerId?: string;
+  memberIds?: string[];
+}
+
+export interface UpdateTerritoryInput {
+  name?: string;
+  description?: string;
+  type?: TerritoryType;
+  parentId?: string;
+  managerId?: string;
+  memberIds?: string[];
+  isActive?: string;
 }

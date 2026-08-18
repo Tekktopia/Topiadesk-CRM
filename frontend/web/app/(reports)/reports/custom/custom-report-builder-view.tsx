@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@topiadesk/ui';
+import { csrfHeaders } from '@/lib/csrf';
 
 interface CustomReportField {
   key: string;
@@ -104,7 +105,7 @@ export function CustomReportBuilderView() {
     mutationFn: async (): Promise<CustomReportResult> => {
       const res = await fetch('/api/reports/custom/run', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeaders('POST') },
         body: JSON.stringify({
           entity: entityKey,
           fields: Array.from(selectedFields),

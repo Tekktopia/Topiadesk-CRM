@@ -5,7 +5,14 @@ import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
-import { assertFieldsWritable, redactHiddenFields, redactHiddenFieldsMany, resolveFieldVisibilities } from '../../common/field-permissions/field-visibility.util';
+import {
+  assertFieldsWritable,
+  redactHiddenFields,
+  redactHiddenFieldsMany,
+  resolveFieldVisibilities,
+  sensitiveFieldsExposed,
+} from '../../common/field-permissions/field-visibility.util';
+import { AuditService } from '../../common/audit/audit.service';
 import { CreatePremiumDto } from './dto/create-premium.dto';
 import { UpdatePremiumDto } from './dto/update-premium.dto';
 import { PaystackInitializeResponseDto, PremiumAgingRowDto, PremiumResponseDto } from './dto/premium-response.dto';
@@ -117,7 +124,10 @@ export class PolicyPremiumController {
 @UseGuards(PermissionGuard)
 @Controller('premiums')
 export class PremiumController {
-  constructor(private readonly paystack: PaystackService) {}
+  constructor(
+    private readonly paystack: PaystackService,
+    private readonly auditService: AuditService,
+  ) {}
 
   @Get('aging')
   @RequirePermission('policy', 'read')
@@ -175,7 +185,17 @@ export class PremiumController {
   async findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthenticatedUser): Promise<PremiumResponseDto> {
     const premium = await getPrismaClient().premium.findUnique({ where: { id } });
     if (!premium) throw new NotFoundException('Premium not found');
-    return redactHiddenFields(toPremiumDto(premium), await resolveFieldVisibilities(user, 'premium'));
+    const visibilities = await resolveFieldVisibilities(user, 'premium');
+    const exposedSensitiveFields = sensitiveFieldsExposed('premium', visibilities);
+    if (exposedSensitiveFields.length > 0) {
+      await this.auditService.recordEvent({
+        action: 'VIEW_SENSITIVE',
+        entityType: 'premium',
+        entityId: id,
+        changedFields: { fields: exposedSensitiveFields },
+      });
+    }
+    return redactHiddenFields(toPremiumDto(premium), visibilities);
   }
 
   @Post(':id/paystack/initialize')

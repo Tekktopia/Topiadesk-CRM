@@ -24,6 +24,12 @@ export const NOTIFY_TEAM_ASSIGNMENT_QUEUE_NAME = 'notify-team-assignment';
 export interface NotifyTeamAssignmentJobData {
   caseId: string;
   teamId: string;
+  /** Which tenant's schema the Case/Team rows live in. Without it this job
+   * ran against `public` and silently found nothing for every real tenant —
+   * returning 'skipped' as a COMPLETED job, so team-assignment notifications
+   * were quietly dropped org-wide. Optional so jobs enqueued before this
+   * field existed still parse. */
+  tenantSchema?: string | null;
 }
 
 export interface NotifyTeamAssignmentResult {
@@ -32,7 +38,7 @@ export interface NotifyTeamAssignmentResult {
 }
 
 export async function notifyTeamAssignment(data: NotifyTeamAssignmentJobData): Promise<NotifyTeamAssignmentResult> {
-  return runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+  return runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema: data.tenantSchema ?? null }, async () => {
     const prisma = getPrismaClient();
     const [kase, team, members] = await Promise.all([
       prisma.case.findUnique({ where: { id: data.caseId } }),
@@ -40,6 +46,10 @@ export async function notifyTeamAssignment(data: NotifyTeamAssignmentJobData): P
       prisma.teamMember.findMany({ where: { teamId: data.teamId }, select: { userId: true } }),
     ]);
     if (!kase || !team || members.length === 0) {
+      console.warn(
+        `[case-management] notify-team-assignment skipped — case ${data.caseId} / team ${data.teamId} in schema ` +
+          `"${data.tenantSchema ?? 'public'}" (case=${Boolean(kase)}, team=${Boolean(team)}, members=${members.length})`,
+      );
       return { status: 'skipped', recipientCount: 0 };
     }
 

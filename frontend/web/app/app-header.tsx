@@ -17,12 +17,14 @@ import {
   Mail,
   Moon,
   Plus,
+  Sparkles,
   Sun,
   UserPlus,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Badge, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Skeleton } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
+import { csrfHeaders } from '@/lib/csrf';
 import { AccountMenu } from './account-menu';
 import { activeNavItem, activeNavModule } from './nav-modules';
 import { CommandPalette } from './command-palette';
@@ -100,6 +102,25 @@ function QuickCreateMenu() {
   );
 }
 
+function isToday(iso: string): boolean {
+  const d = new Date(iso);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+}
+
+/** Today first (most recent activity), then everything else — a flat list
+ * of even 10-15 items is hard to scan without some anchor for "how old is
+ * this", and Today/Earlier is the smallest grouping that actually helps
+ * without needing a full calendar-relative scheme for a 80px-tall preview. */
+function groupByDay(notifications: NotificationRow[]): { label: string; items: NotificationRow[] }[] {
+  const today = notifications.filter((n) => isToday(n.createdAt));
+  const earlier = notifications.filter((n) => !isToday(n.createdAt));
+  const groups: { label: string; items: NotificationRow[] }[] = [];
+  if (today.length > 0) groups.push({ label: 'Today', items: today });
+  if (earlier.length > 0) groups.push({ label: 'Earlier', items: earlier });
+  return groups;
+}
+
 function NotificationBell() {
   const queryClient = useQueryClient();
   const { data: notifications = [] } = useQuery({
@@ -112,9 +133,10 @@ function NotificationBell() {
     refetchInterval: 60_000,
   });
   const unreadCount = notifications.filter((n) => !n.readAt).length;
+  const groups = groupByDay(notifications);
 
   const markRead = useMutation({
-    mutationFn: (id: string) => fetch(`/api/notifications/${id}/read`, { method: 'PATCH' }),
+    mutationFn: (id: string) => fetch(`/api/notifications/${id}/read`, { method: 'PATCH', headers: csrfHeaders('PATCH') }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications', 'mine'] }),
   });
 
@@ -137,24 +159,35 @@ function NotificationBell() {
           <div className="px-2 py-6 text-center text-sm text-muted-foreground">You&apos;re all caught up.</div>
         ) : (
           <div className="max-h-96 overflow-y-auto">
-            {notifications.map((n) => (
-              <DropdownMenuItem
-                key={n.id}
-                onClick={() => {
-                  if (!n.readAt) markRead.mutate(n.id);
-                }}
-                className="flex flex-col items-start gap-0.5 whitespace-normal py-2"
-              >
-                <div className="flex w-full items-center gap-2">
-                  {!n.readAt ? <Circle className="h-1.5 w-1.5 shrink-0 fill-accent text-accent" aria-hidden /> : null}
-                  <span className={`text-sm ${n.readAt ? 'text-muted-foreground' : 'font-medium'}`}>{n.title}</span>
-                </div>
-                <span className="line-clamp-2 pl-3.5 text-xs text-muted-foreground">{n.body}</span>
-                <span className="pl-3.5 text-[11px] text-muted-foreground">{relativeTime(n.createdAt)}</span>
-              </DropdownMenuItem>
+            {groups.map((group) => (
+              <div key={group.label}>
+                <p className="px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{group.label}</p>
+                {group.items.map((n) => (
+                  <DropdownMenuItem
+                    key={n.id}
+                    onClick={() => {
+                      if (!n.readAt) markRead.mutate(n.id);
+                    }}
+                    className="flex flex-col items-start gap-0.5 whitespace-normal py-2"
+                  >
+                    <div className="flex w-full items-center gap-2">
+                      {!n.readAt ? <Circle className="h-1.5 w-1.5 shrink-0 fill-accent text-accent" aria-hidden /> : null}
+                      <span className={`text-sm ${n.readAt ? 'text-muted-foreground' : 'font-medium'}`}>{n.title}</span>
+                    </div>
+                    <span className="line-clamp-2 pl-3.5 text-xs text-muted-foreground">{n.body}</span>
+                    <span className="pl-3.5 text-[11px] text-muted-foreground">{relativeTime(n.createdAt)}</span>
+                  </DropdownMenuItem>
+                ))}
+              </div>
             ))}
           </div>
         )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/admin/notifications" className="flex w-full cursor-pointer items-center justify-center text-sm font-medium text-primary">
+            View all notifications
+          </Link>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -207,6 +240,13 @@ export function AppHeader() {
 
       <div className="flex items-center gap-1">
         {user ? <QuickCreateMenu /> : null}
+        {user ? (
+          <Button variant="ghost" size="icon" aria-label="AI Copilot" asChild>
+            <Link href="/copilot">
+              <Sparkles className="h-4 w-4" aria-hidden />
+            </Link>
+          </Button>
+        ) : null}
         {user ? <NotificationBell /> : null}
         <HelpMenu />
 

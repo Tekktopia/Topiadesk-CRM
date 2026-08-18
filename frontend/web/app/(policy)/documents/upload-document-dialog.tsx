@@ -21,6 +21,7 @@ import {
 } from '@topiadesk/ui';
 import { Upload } from 'lucide-react';
 import type { DocumentCategoryDto } from '@/app/(policy)/lib/types';
+import { csrfHeaders } from '@/lib/csrf';
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: 'same-origin' });
@@ -63,14 +64,14 @@ export function UploadDocumentDialog({ linkToPolicyId, onUploaded }: { linkToPol
       formData.append('file', file);
       if (categoryId !== NO_CATEGORY) formData.append('categoryId', categoryId);
 
-      const uploadRes = await fetch('/api/documents', { method: 'POST', body: formData });
+      const uploadRes = await fetch('/api/documents', { method: 'POST', headers: csrfHeaders('POST'), body: formData });
       const uploaded = (await uploadRes.json().catch(() => null)) as { id?: string; message?: string } | null;
       if (!uploadRes.ok || !uploaded?.id) throw new Error(uploaded?.message ?? 'Upload failed');
 
       if (linkToPolicyId) {
         const linkRes = await fetch(`/api/documents/${uploaded.id}/links`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...csrfHeaders('POST') },
           body: JSON.stringify({ entityType: 'POLICY', entityId: linkToPolicyId }),
         });
         if (!linkRes.ok) {

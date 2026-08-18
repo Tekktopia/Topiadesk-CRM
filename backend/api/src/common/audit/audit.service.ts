@@ -23,6 +23,19 @@ import { getPrismaClient, getRlsContext, runWithRlsContext, SYSTEM_JOB_CONTEXT, 
  * The real actor is still captured correctly: `ctx` is read from the
  * caller's own context BEFORE switching, and its values (not
  * SYSTEM_JOB_CONTEXT's empty ones) are what get written to the row.
+ *
+ * The bare SYSTEM_JOB_CONTEXT constant also carries `tenantSchema: null`
+ * (see its own doc comment) — passing it unmodified here silently resets
+ * the Prisma client's search_path to the DEFAULT_SCHEMA ('public') for
+ * this call, regardless of which tenant schema the caller was actually
+ * bound to. That only went unnoticed because the original seed tenant's
+ * own schemaName IS 'public', so testing against it never exposed the
+ * mismatch. Every other (properly schema-isolated) tenant hit a genuine
+ * `actor_user_id` foreign-key violation on this insert instead — writing
+ * a real tenant-local user id against `public.audit_log`, which only
+ * knows about `public.users`. Preserving the caller's tenantSchema below
+ * fixes this while still getting SYSTEM_JOB's elevated role for the
+ * audit_log_select bypass described above.
  */
 @Injectable()
 export class AuditService {
@@ -34,7 +47,7 @@ export class AuditService {
   }): Promise<void> {
     const ctx = getRlsContext();
     const prisma = getPrismaClient();
-    await runWithRlsContext(SYSTEM_JOB_CONTEXT, () =>
+    await runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema: ctx?.tenantSchema ?? null }, () =>
       prisma.auditLog.create({
         data: {
           entityType: params.entityType,

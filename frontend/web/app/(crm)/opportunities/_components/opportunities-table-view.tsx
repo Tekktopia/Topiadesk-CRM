@@ -61,19 +61,31 @@ export function OpportunitiesTableView({
   const bulkDelete = useBulkDeleteOpportunities();
   const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
 
-  const stagesById = new Map(stages.map((s) => [s.id, s]));
+  // Memoized on `stages` rather than rebuilt inline: this Map is a dependency
+  // of the `columns` memo below, and a fresh Map every render makes that memo
+  // hand TanStack Table a brand-new columns array on every render — the
+  // unstable-deps render loop documented on useDirectoryUsers() in
+  // _lib/hooks.ts, which has already caused a real freeze in this codebase.
+  const stagesById = React.useMemo(() => new Map(stages.map((s) => [s.id, s])), [stages]);
   const owners = [...new Map(opportunities.map((o) => [o.ownerId, usersById.get(o.ownerId)?.fullName ?? o.ownerId])).entries()];
 
-  const filtered = opportunities.filter((o) => {
-    if (stageFilter !== ALL && o.pipelineStageId !== stageFilter) return false;
-    if (ownerFilter !== ALL && o.ownerId !== ownerFilter) return false;
-    if (search.trim()) {
-      const needle = search.trim().toLowerCase();
-      const haystack = `${o.name} ${accountsById.get(o.accountId)?.name ?? ''}`.toLowerCase();
-      if (!haystack.includes(needle)) return false;
-    }
-    return true;
-  });
+  // Memoized: an inline .filter() returns a new array on EVERY render, and
+  // an unstable `data` reference is what drove DataTable's pagination into a
+  // render loop (see the stableData/autoResetPageIndex notes there).
+  const filtered = React.useMemo(
+    () =>
+      opportunities.filter((o) => {
+        if (stageFilter !== ALL && o.pipelineStageId !== stageFilter) return false;
+        if (ownerFilter !== ALL && o.ownerId !== ownerFilter) return false;
+        if (search.trim()) {
+          const needle = search.trim().toLowerCase();
+          const haystack = `${o.name} ${accountsById.get(o.accountId)?.name ?? ''}`.toLowerCase();
+          if (!haystack.includes(needle)) return false;
+        }
+        return true;
+      }),
+    [opportunities, stageFilter, ownerFilter, search, accountsById],
+  );
 
   const columns = React.useMemo<ColumnDef<Opportunity>[]>(
     () => [

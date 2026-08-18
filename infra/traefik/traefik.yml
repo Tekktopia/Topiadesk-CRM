@@ -52,27 +52,38 @@ providers:
     watch: true
 
 # --- TLS ---------------------------------------------------------------------
-# Local dev / prod-like local run: no certificatesResolvers router uses this
-# by default, so every `websecure` router falls back to Traefik's own
-# built-in on-the-fly self-signed "default certificate" — this is the
-# "Traefik's own self-signed cert generation" mentioned in the infra spec;
-# no manual cert step is required to get `https://*.topiadesk.localhost`
-# working (browsers will show an untrusted-cert warning, which is expected
-# and fine for local dev — trust the mkcert-style cert or click through).
+# Local dev / prod-like local run: no certificatesResolvers configured. A
+# real, mkcert-generated certificate for *.topiadesk.localhost is now wired
+# up via dynamic.yml's `tls.certificates` (see that file's own comment for
+# the regeneration command and why it's needed — a self-signed fallback is
+# fine for normal page loads but a hard blocker for Service Worker
+# registration specifically). If that certificate is ever missing/not yet
+# generated on a fresh machine, every `websecure` router silently falls
+# back to Traefik's own built-in self-signed "default certificate" instead
+# (browsers show an untrusted-cert warning — fine for page loads, but
+# service workers won't register until the real cert exists).
 #
-# Real production TLS (Let's Encrypt): uncomment the resolver below AND add
-# `traefik.http.routers.<name>.tls.certresolver=le` to the relevant service
-# labels in docker-compose.yml. Requires: a real public DNS record pointing
-# at this host, and port 80 reachable from the internet for the HTTP-01
-# challenge. TRAEFIK_ACME_EMAIL (.env.example) is already wired for this.
+# Real production TLS (Let's Encrypt): DELIBERATELY NOT enabled here.
+# `certificatesResolvers` was briefly turned on directly in this file and it
+# is NOT inert just because no router references it — Traefik runs its ACME
+# renewal-check goroutine and registers the TLS-ALPN-01 challenge handler on
+# the `websecure` entrypoint unconditionally at startup, the moment the
+# resolver is *defined*, regardless of whether any router's label uses
+# `tls.certresolver=le`. In an environment with no real public DNS and no
+# outbound path to acme-v02.api.letsencrypt.org (this one), that renewal
+# check hangs and the TLS-ALPN-01 handler sits on the same port real HTTPS
+# traffic uses — every websecure TLS handshake stalled and the whole app
+# became unreachable. Found live: 2026-08-14.
 #
-# certificatesResolvers:
-#   le:
-#     acme:
-#       email: "${TRAEFIK_ACME_EMAIL}"
-#       storage: /letsencrypt/acme.json
-#       httpChallenge:
-#         entryPoint: web
+# To actually go live with real TLS, define `certificatesResolvers` in a
+# SEPARATE static-config file loaded only for a real deployment (e.g. via
+# Traefik's `TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_*` env vars set only in
+# that environment, not in this repo's default compose stack), alongside
+# `docker-compose.prod-tls.yml`'s `tls.certresolver=le` router labels (see
+# that file) — never uncomment a static resolver block in this shared file
+# again. Requires a real public DNS record pointing at that host and port 80
+# reachable from the internet for the HTTP-01 challenge. TRAEFIK_ACME_EMAIL
+# (.env.example) is already wired for when that's set up.
 
 log:
   level: INFO

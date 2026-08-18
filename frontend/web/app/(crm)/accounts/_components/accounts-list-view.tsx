@@ -3,8 +3,10 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { CopyX, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
+import { ArchiveRestore, CopyX, Download, MoreHorizontal, Plus, Trash2, Upload } from 'lucide-react';
 import {
+  Avatar,
+  AvatarFallback,
   Badge,
   Button,
   Card,
@@ -29,6 +31,7 @@ import { useCurrentUser } from '@/lib/auth/use-current-user';
 import { useQuickCreateParam } from '@/lib/use-quick-create-param';
 import { BulkActionToolbar } from '../../_components/bulk-action-toolbar';
 import { EmptyState } from '../../_components/empty-state';
+import { IndustryCombobox } from '../../_components/industry-combobox';
 import { PageHeader } from '../../_components/page-header';
 import { SavedViewBar } from '../../_components/saved-view-bar';
 import {
@@ -42,17 +45,30 @@ import {
   riskRatingLabel,
   riskRatingVariant,
 } from '../../_lib/constants';
-import { formatDate } from '../../_lib/format';
-import { useAccounts, useBulkAssignAccounts, useBulkDeleteAccounts, useDeleteAccount } from '../../_lib/hooks';
+import { formatDate, initials } from '../../_lib/format';
+import { useCan } from '@/app/(cases)/_lib/hooks';
+import {
+  useAccountStats,
+  useAccounts,
+  useAccountsCount,
+  useBulkAssignAccounts,
+  useBulkDeleteAccounts,
+  useDeleteAccount,
+  useDirectoryUsers,
+  useImportAccountsCsv,
+  useRestoreAccount,
+} from '../../_lib/hooks';
 import { useDebouncedValue } from '../../_lib/use-debounced-value';
 import type { Account, AccountQuery, FilterTree } from '../../_lib/types';
 import { AccountFormDialog } from './account-form-dialog';
+import { AccountStatsStrip } from './account-stats-strip';
 import { ConfirmDialog } from '../../_components/confirm-dialog';
 
 const UNSET = '__any';
 
 export function AccountsListView() {
   const { user } = useCurrentUser();
+  const canWrite = useCan('account', 'write');
   const searchParams = useSearchParams();
   // Dashboard drill-down entry point (e.g. the "Active clients" KPI tile
   // linking to /accounts?status=CLIENT) — read once as the initial value,
@@ -62,8 +78,10 @@ export function AccountsListView() {
   const [search, setSearch] = React.useState('');
   const [status, setStatus] = React.useState<string>(() => searchParams.get('status') ?? UNSET);
   const [riskRating, setRiskRating] = React.useState<string>(UNSET);
-  const [industryId, setIndustryId] = React.useState('');
+  const [industry, setIndustry] = React.useState<{ id: string; name: string } | null>(null);
+  const [tag, setTag] = React.useState('');
   const [mineOnly, setMineOnly] = React.useState(false);
+  const [includeArchived, setIncludeArchived] = React.useState(false);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Account | null>(null);
   const [deleting, setDeleting] = React.useState<Account | null>(null);
@@ -72,24 +90,45 @@ export function AccountsListView() {
   const [savedViewRows, setSavedViewRows] = React.useState<Account[] | null>(null);
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 20 });
+  const importInputRef = React.useRef<HTMLInputElement>(null);
   useQuickCreateParam(() => setCreateOpen(true));
 
   const debouncedSearch = useDebouncedValue(search, 300);
+  const debouncedTag = useDebouncedValue(tag, 300);
 
+  const FETCH_CAP = 100;
   const query: AccountQuery = {
     q: debouncedSearch || undefined,
     status: status === UNSET ? undefined : (status as AccountQuery['status']),
     riskRating: riskRating === UNSET ? undefined : (riskRating as AccountQuery['riskRating']),
-    industryId: industryId || undefined,
+    industryId: industry?.id,
+    tag: debouncedTag || undefined,
     ownerId: mineOnly && user ? user.id : undefined,
-    take: 100,
+    // Sent as the literal string 'true', or omitted entirely — never as a
+    // boolean `false`. The API models this flag as a string on purpose: the
+    // global ValidationPipe's enableImplicitConversion casts a
+    // boolean-typed query param with Boolean(), so the string "false"
+    // arrived as `true` and archived accounts were shown even with the box
+    // unchecked (see AccountQueryDto.includeArchived).
+    includeArchived: includeArchived ? 'true' : undefined,
+    take: FETCH_CAP,
   };
 
   const { data: liveData, isLoading, isError } = useAccounts(query);
-  const data = savedViewRows ?? liveData ?? [];
+  const { data: countData } = useAccountsCount(query);
+  const { data: stats, isLoading: statsLoading } = useAccountStats(query);
+  // Stable reference: `x ?? []` mints a new array on every render while the
+  // query has no data (i.e. right after a filter change), which is what drove
+  // DataTable's pagination into a render loop. See data-table.tsx.
+  const data = React.useMemo(() => savedViewRows ?? liveData ?? [], [savedViewRows, liveData]);
+  const realTotal = savedViewRows ? savedViewRows.length : (countData?.count ?? data.length);
+  const isTruncated = !savedViewRows && realTotal > data.length;
+  const { usersById } = useDirectoryUsers();
   const deleteAccount = useDeleteAccount();
+  const restoreAccount = useRestoreAccount();
   const bulkAssign = useBulkAssignAccounts();
   const bulkDelete = useBulkDeleteAccounts();
+  const importCsv = useImportAccountsCsv();
 
   /** Manual filter edits always drop back to the live query — a stale saved-view result would silently ignore them. */
   function withViewReset<T>(setter: (value: T) => void): (value: T) => void {
@@ -108,9 +147,28 @@ export function AccountsListView() {
     if (debouncedSearch) conditions.push({ field: 'name', operator: 'contains', value: debouncedSearch });
     if (status !== UNSET) conditions.push({ field: 'status', operator: 'eq', value: status });
     if (riskRating !== UNSET) conditions.push({ field: 'riskRating', operator: 'eq', value: riskRating });
-    if (industryId) conditions.push({ field: 'industryId', operator: 'eq', value: industryId });
+    if (industry) conditions.push({ field: 'industryId', operator: 'eq', value: industry.id });
     if (mineOnly && user) conditions.push({ field: 'ownerId', operator: 'eq', value: user.id });
     return { op: 'AND', conditions };
+  }
+
+  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    importCsv.mutate(file);
+  }
+
+  function handleExport() {
+    const qs = new URLSearchParams();
+    if (query.q) qs.set('q', query.q);
+    if (query.status) qs.set('status', query.status);
+    if (query.riskRating) qs.set('riskRating', query.riskRating);
+    if (query.industryId) qs.set('industryId', query.industryId);
+    if (query.tag) qs.set('tag', query.tag);
+    if (query.ownerId) qs.set('ownerId', query.ownerId);
+    if (query.includeArchived) qs.set('includeArchived', 'true');
+    window.location.href = `/api/crm/accounts/export?${qs.toString()}`;
   }
 
   const selectedIds = React.useMemo(() => Object.keys(rowSelection).filter((id) => rowSelection[id]), [rowSelection]);
@@ -123,8 +181,16 @@ export function AccountsListView() {
         header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
         meta: { label: 'Name' },
         cell: ({ row }) => (
-          <Link href={`/accounts/${row.original.id}`} className="font-medium text-foreground hover:underline">
+          <Link href={`/accounts/${row.original.id}`} className="flex items-center gap-2 font-medium text-foreground hover:underline">
+            <Avatar className="h-6 w-6">
+              <AvatarFallback className="text-[10px]">{initials(row.original.name)}</AvatarFallback>
+            </Avatar>
             {row.original.name}
+            {row.original.isArchived ? (
+              <Badge variant="outline" className="font-normal">
+                Archived
+              </Badge>
+            ) : null}
           </Link>
         ),
       },
@@ -160,6 +226,31 @@ export function AccountsListView() {
         ),
       },
       {
+        id: 'owner',
+        header: 'Owner',
+        meta: { label: 'Owner' },
+        accessorFn: (a) => usersById.get(a.ownerId)?.fullName ?? a.ownerId,
+        cell: ({ getValue }) => <span className="text-muted-foreground">{getValue<string>()}</span>,
+      },
+      {
+        id: 'tags',
+        header: 'Tags',
+        meta: { label: 'Tags' },
+        accessorFn: (a) => a.tags.join(', '),
+        cell: ({ row }) =>
+          row.original.tags.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {row.original.tags.map((t) => (
+                <Badge key={t} variant="outline" className="font-normal">
+                  {t}
+                </Badge>
+              ))}
+            </div>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
         id: 'location',
         header: 'Location',
         meta: { label: 'Location' },
@@ -186,35 +277,56 @@ export function AccountsListView() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={() => setEditing(row.original)}>Edit</DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleting(row.original)}>
-                <Trash2 aria-hidden /> Delete
-              </DropdownMenuItem>
+              {row.original.isArchived ? (
+                <DropdownMenuItem onSelect={() => restoreAccount.mutate(row.original.id)}>
+                  <ArchiveRestore aria-hidden /> Restore
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleting(row.original)}>
+                  <Trash2 aria-hidden /> Archive
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         ),
       },
     ],
-    [],
+    // restoreAccount.mutate specifically, not the whole useMutation() result
+    // object — that object is reconstructed every render even though
+    // .mutate itself is a stable reference, so depending on the object
+    // would defeat this memo the same way the unmemoized usersById Map did
+    // (see that hook's fix in _lib/hooks.ts).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [usersById, restoreAccount.mutate],
   );
 
   return (
     <div className="space-y-6">
+      <input ref={importInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImportFile} />
       <PageHeader
         title="Accounts"
         description="Client and prospect organizations your team manages."
         actions={
           <>
+            <Button variant="outline" onClick={handleExport}>
+              <Download aria-hidden /> Export CSV
+            </Button>
+            <Button variant="outline" onClick={() => importInputRef.current?.click()} disabled={importCsv.isPending}>
+              <Upload aria-hidden /> {importCsv.isPending ? 'Importing…' : 'Import CSV'}
+            </Button>
             <Button variant="outline" asChild>
               <Link href="/duplicates?entity=ACCOUNT">
                 <CopyX aria-hidden /> Find duplicates
               </Link>
             </Button>
-            <Button onClick={() => setCreateOpen(true)}>
+            <Button onClick={() => setCreateOpen(true)} disabled={!canWrite} title={!canWrite ? 'You do not have permission to create accounts' : undefined}>
               <Plus aria-hidden /> New account
             </Button>
           </>
         }
       />
+
+      <AccountStatsStrip stats={stats} isLoading={statsLoading} />
 
       <SavedViewBar<Account> entityType="ACCOUNT" buildFilters={buildFilters} onApply={setSavedViewRows} />
 
@@ -264,15 +376,14 @@ export function AccountsListView() {
             </Select>
           </div>
           <div className="w-full space-y-1.5 sm:w-44">
-            <label className="text-xs font-medium text-muted-foreground" htmlFor="account-industry">
-              Industry ID
+            <label className="text-xs font-medium text-muted-foreground">Industry</label>
+            <IndustryCombobox value={industry} onChange={withViewReset(setIndustry)} placeholder="Any industry" />
+          </div>
+          <div className="w-full space-y-1.5 sm:w-40">
+            <label className="text-xs font-medium text-muted-foreground" htmlFor="account-tag">
+              Tag
             </label>
-            <Input
-              id="account-industry"
-              placeholder="Optional UUID"
-              value={industryId}
-              onChange={(e) => withViewReset(setIndustryId)(e.target.value)}
-            />
+            <Input id="account-tag" placeholder="e.g. high-value" value={tag} onChange={(e) => withViewReset(setTag)(e.target.value)} />
           </div>
           <label className="flex items-center gap-2 pb-2 text-sm text-foreground">
             <input
@@ -283,6 +394,15 @@ export function AccountsListView() {
               disabled={!user}
             />
             My accounts only
+          </label>
+          <label className="flex items-center gap-2 pb-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-input accent-primary"
+              checked={includeArchived}
+              onChange={(e) => withViewReset(setIncludeArchived)(e.target.checked)}
+            />
+            Include archived
           </label>
         </CardContent>
       </Card>
@@ -305,7 +425,7 @@ export function AccountsListView() {
               title="No accounts match these filters"
               description="Try clearing a filter, or create a new account to get started."
               action={
-                <Button variant="outline" onClick={() => setCreateOpen(true)}>
+                <Button variant="outline" onClick={() => setCreateOpen(true)} disabled={!canWrite} title={!canWrite ? 'You do not have permission to create accounts' : undefined}>
                   <Plus aria-hidden /> New account
                 </Button>
               }
@@ -313,19 +433,26 @@ export function AccountsListView() {
           </CardContent>
         </Card>
       ) : (
-        <DataTable<Account, unknown>
-          columns={columns}
-          data={data}
-          getRowId={(a) => a.id}
-          isLoading={isLoading}
-          isError={isError}
-          rowSelection={rowSelection}
-          onRowSelectionChange={setRowSelection}
-          pagination={pagination}
-          onPaginationChange={setPagination}
-          totalRowCount={data.length}
-          enableColumnVisibility
-        />
+        <>
+          {isTruncated ? (
+            <p className="text-xs text-muted-foreground">
+              Showing the first {data.length} of {realTotal} matching accounts — narrow your filters to see the rest.
+            </p>
+          ) : null}
+          <DataTable<Account, unknown>
+            columns={columns}
+            data={data}
+            getRowId={(a) => a.id}
+            isLoading={isLoading}
+            isError={isError}
+            rowSelection={rowSelection}
+            onRowSelectionChange={setRowSelection}
+            pagination={pagination}
+            onPaginationChange={setPagination}
+            totalRowCount={realTotal}
+            enableColumnVisibility
+          />
+        </>
       )}
 
       <AccountFormDialog open={createOpen} onOpenChange={setCreateOpen} />
@@ -335,9 +462,9 @@ export function AccountsListView() {
       <ConfirmDialog
         open={Boolean(deleting)}
         onOpenChange={(open) => !open && setDeleting(null)}
-        title={`Delete "${deleting?.name}"?`}
-        description="This permanently removes the account. This cannot be undone."
-        confirmLabel="Delete account"
+        title={`Archive "${deleting?.name}"?`}
+        description="Archived accounts are hidden from the default list but can be restored at any time — nothing is permanently deleted."
+        confirmLabel="Archive account"
         destructive
         isPending={deleteAccount.isPending}
         onConfirm={() => {

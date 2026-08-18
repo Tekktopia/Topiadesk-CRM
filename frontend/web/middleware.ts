@@ -1,9 +1,12 @@
 import type { NextRequest} from 'next/server';
 import { NextResponse } from 'next/server';
-import { OAUTH_TXN_COOKIE_NAME, SESSION_COOKIE_NAME } from '@/lib/auth/constants';
+import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME, OAUTH_TXN_COOKIE_NAME, SESSION_COOKIE_NAME } from '@/lib/auth/constants';
 import { decryptPayload } from '@/lib/auth/crypto';
 import type { SessionCookiePayload } from '@/lib/auth/types';
 import { getWebEnv } from '@/lib/env';
+
+/** State-changing methods only — GET/HEAD/OPTIONS never mutate anything, so there's nothing for a forged cross-site request to exploit. */
+const CSRF_PROTECTED_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
  * Route guard: redirects any request without a valid `td_session` cookie
@@ -66,6 +69,15 @@ import { getWebEnv } from '@/lib/env';
  * expires while genuinely offline. It has no data of its own to protect
  * (see app-shell.tsx's PUBLIC_PATH_PREFIXES for its matching exclusion).
  *
+ * `/manifest.webmanifest` (app/manifest.ts, Next.js's native manifest
+ * route — not a static file, so it isn't caught by the extension list
+ * below) is excluded for the same reason as `/offline`: the browser
+ * fetches it directly via `<link rel="manifest">` without the session
+ * cookie attached, so without this exclusion every fetch got redirected
+ * into a full Keycloak OAuth /auth redirect that the browser then blocked
+ * as a cross-origin CORS failure — found live, spamming the console on
+ * every navigation and contributing to the app feeling sluggish.
+ *
  * `/` (exact root only, not a prefix — see the dedicated check below,
  * kept separate from the matcher's static exclusion list since "public
  * unless a valid session says otherwise" is different logic from "always
@@ -92,6 +104,18 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
       if (isEntryChooser) {
         return NextResponse.redirect(new URL('/dashboard', request.url));
       }
+      // Double-submit CSRF check — only for state-changing BFF calls; a
+      // forged cross-site request can make the browser send td_session
+      // (SameSite=Lax still allows it on some request types) but can never
+      // read td_csrf's value (same-origin policy) to echo it back in the
+      // header, so a mismatch/missing header means "not really us."
+      if (request.nextUrl.pathname.startsWith('/api/') && CSRF_PROTECTED_METHODS.has(request.method)) {
+        const cookieToken = request.cookies.get(CSRF_COOKIE_NAME)?.value;
+        const headerToken = request.headers.get(CSRF_HEADER_NAME);
+        if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+          return NextResponse.json({ statusCode: 403, message: 'CSRF token missing or invalid' }, { status: 403 });
+        }
+      }
       return NextResponse.next();
     }
   }
@@ -116,7 +140,17 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except:
-     * - /api/auth/* (login/callback/logout/session — must stay public)
+     * - /api/auth/(login|callback|logout|session) specifically — must stay
+     *   public (a request with no session cookie at all needs to reach
+     *   these). Every OTHER /api/auth/* route (presence, avatar, profile,
+     *   api-keys, account-console-url) is deliberately NOT excluded here —
+     *   those only ever make sense for an already-authenticated caller, so
+     *   they get both the normal session gate AND (for their mutating
+     *   methods) the CSRF double-submit check below. A blanket `api/auth`
+     *   exclusion here was a real gap found live: it silently exempted
+     *   PATCH /api/auth/presence and POST/DELETE /api/auth/avatar from
+     *   CSRF enforcement entirely, since the check below never even ran
+     *   for them.
      * - /survey-respond/* (public survey response page) and
      *   /api/surveys/responses/* (its BFF submit route) — token-verified,
      *   not session-verified
@@ -130,10 +164,12 @@ export const config = {
      *   own portal_session cookie, checked at the page level, not here
      * - /offline (service worker's precached fallback page) — see the
      *   header comment above
+     * - /manifest.webmanifest (the PWA manifest route) — see the header
+     *   comment above
      * - Next internals (_next/static, _next/image)
      * - common static file extensions
      * - favicon.ico
      */
-    '/((?!api/auth|survey-respond|api/surveys/responses|api/public|kb|portal|api/portal|offline|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).*)',
+    '/((?!api/auth/(?:login|callback|logout|session)|survey-respond|api/surveys/responses|api/public|kb|portal|api/portal|offline|manifest\\.webmanifest|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).*)',
   ],
 };

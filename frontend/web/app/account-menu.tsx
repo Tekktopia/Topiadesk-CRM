@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '@topiadesk/ui';
 import { openKeyboardShortcuts } from './keyboard-shortcuts-dialog';
+import { csrfHeaders } from '@/lib/csrf';
 
 interface HeaderUser {
   fullName: string;
@@ -67,7 +68,7 @@ function useSetPresence() {
     mutationFn: (value: 'ONLINE' | 'AWAY' | 'OFFLINE') =>
       fetch('/api/auth/presence', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeaders('PATCH') },
         body: JSON.stringify({ presenceStatus: value }),
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['auth', 'current-user'] }),
@@ -92,6 +93,29 @@ export function bumpAvatarCacheBust(): void {
 }
 export function getAvatarCacheBust(): number {
   return avatarCacheBust;
+}
+
+/**
+ * Tells the service worker to drop the offline page/API caches before the
+ * browser follows the sign-out link. Those caches hold this user's
+ * authenticated documents and API responses (see public/sw.js's own
+ * PURGE_SESSION_CACHES comment) and previously survived logout entirely,
+ * so on a shared phone the next person could open the installed PWA
+ * offline and read them.
+ *
+ * Deliberately fire-and-forget rather than awaited-then-navigate: the
+ * anchor's normal navigation must not be blocked or cancelled, since
+ * failing to sign out is far worse than a cache that outlives the session
+ * by a moment. postMessage is synchronous enough to reach an active worker
+ * before unload in practice, and the server-side session teardown is what
+ * actually ends the session either way.
+ */
+function purgeOfflineCachesBeforeSignOut(): void {
+  try {
+    navigator.serviceWorker?.controller?.postMessage({ type: 'PURGE_SESSION_CACHES' });
+  } catch {
+    // No SW support, or no active controller — nothing cached to purge.
+  }
 }
 
 function AccountAvatar({ user, className }: { user: HeaderUser; className?: string }) {
@@ -234,7 +258,11 @@ export function AccountMenu({
 
         <div className="p-1">
           <DropdownMenuItem asChild>
-            <a href="/api/auth/logout" className="flex w-full cursor-pointer items-center gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive">
+            <a
+              href="/api/auth/logout"
+              onClick={purgeOfflineCachesBeforeSignOut}
+              className="flex w-full cursor-pointer items-center gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
+            >
               <LogOut className="h-4 w-4" aria-hidden />
               Sign out
             </a>

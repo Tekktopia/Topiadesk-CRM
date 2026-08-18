@@ -15,9 +15,9 @@
 import { createHash } from 'node:crypto';
 import { Queue, Worker, type Job } from 'bullmq';
 import type Redis from 'ioredis';
-import { loadEnv } from '@topiadesk/config';
 import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT } from '@topiadesk/db';
 import { sendMail } from '../scheduled-reports/mailer';
+import { tenantBaseUrl } from '../tenant-url.util';
 
 export const PORTAL_LOGIN_QUEUE_NAME = 'portal-login';
 
@@ -27,6 +27,10 @@ export const PORTAL_LOGIN_QUEUE_NAME = 'portal-login';
 export interface SendPortalLoginLinkJobData {
   email: string;
   token: string;
+  /** Which tenant's schema the token lives in. Without it the lookup below
+   * runs against `public` and finds nothing for every real tenant — the job
+   * then reports 'skipped-consumed-or-expired' and no email is ever sent. */
+  tenantSchema?: string | null;
 }
 
 function hashPortalToken(token: string): string {
@@ -36,7 +40,7 @@ function hashPortalToken(token: string): string {
 type SendResult = { status: 'sent' | 'skipped-consumed-or-expired' };
 
 export async function sendPortalLoginLink(data: SendPortalLoginLinkJobData): Promise<SendResult> {
-  return runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+  return runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema: data.tenantSchema ?? null }, async () => {
     const prisma = getPrismaClient();
     const loginToken = await prisma.portalLoginToken.findUnique({
       where: { tokenHash: hashPortalToken(data.token) },
@@ -49,8 +53,8 @@ export async function sendPortalLoginLink(data: SendPortalLoginLinkJobData): Pro
       return { status: 'skipped-consumed-or-expired' };
     }
 
-    const env = loadEnv();
-    const link = `${env.APP_URL}/portal/auth/${data.token}`;
+    // The tenant's own origin, never APP_URL — see tenant-url.util.ts.
+    const link = `${await tenantBaseUrl(data.tenantSchema ?? null)}/portal/auth/${data.token}`;
     const firstName = loginToken.contact.firstName || 'there';
     const accountName = loginToken.contact.account?.name;
     await sendMail({

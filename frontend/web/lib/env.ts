@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * frontend/web's own env schema — deliberately NOT importing `loadEnv` from
  * `@topiadesk/config`: that package's schema requires backend-only vars
- * (DATABASE_URL, MINIO_*, SMTP_*, ANTHROPIC_API_KEY, ...) that a frontend
+ * (DATABASE_URL, MINIO_*, SMTP_*, ...) that a frontend
  * process has no business needing just to boot, and would make
  * `pnpm --filter @topiadesk/web dev` fail without a fully populated root
  * `.env`. This mirrors only the vars frontend/web actually reads (all sourced

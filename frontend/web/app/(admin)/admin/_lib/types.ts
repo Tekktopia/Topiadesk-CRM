@@ -69,6 +69,8 @@ export interface CreateUserBody {
   branchId?: string;
   managerId?: string;
   positionTitle?: string;
+  /** Set a specific sign-in password instead of auto-generating one. */
+  password?: string;
 }
 
 export interface CreateUserResponse {
@@ -377,6 +379,13 @@ export interface AuditVerifyResponseDto {
   verified: boolean;
 }
 
+// GET /identity/audit-log/checkpoints — same "no structured schema, hand-typed" reasoning as AuditVerifyResponseDto above.
+export interface AuditCheckpointDto {
+  id: string;
+  checkpointAt: string;
+  anchorHash: string;
+}
+
 // -- SCIM tokens --------------------------------------------------------------
 type RawScimTokenDto = Json200<'/identity/scim-tokens', 'get'>[number];
 export type ScimTokenDto = Omit<RawScimTokenDto, 'lastUsedAt'> & { lastUsedAt: NullableString };
@@ -437,7 +446,99 @@ export type AutomationRuleDto = Omit<RawAutomationRuleDto, 'conditions' | 'actio
   conditions: unknown;
   actions: unknown[];
   steps?: unknown[] | null;
+  // Scheduling + last-run observability, added with the scheduled automation
+  // engine. Hand-declared rather than waiting on an ApiPaths regeneration,
+  // same as the overrides above — and the nullable ones would collapse to
+  // `{} | null` through the generator anyway.
+  scheduleCron?: string | null;
+  scheduleTimezone?: string;
+  nextRunAt?: string | null;
+  lastRunAt?: string | null;
+  lastRunStatus?: 'OK' | 'FAILED' | 'SKIPPED' | null;
+  lastRunError?: string | null;
+  lastMatchCount?: number | null;
 };
+
+/**
+ * The rule builder's vocabulary, from GET /crm/automation-rules/catalog.
+ *
+ * Hand-written for the same reason as the DTOs around it, but the important
+ * property is that these are the SHAPE of data the backend serves from the
+ * shared @topiadesk/automation package — the builder never hardcodes which
+ * fields or actions exist, so it cannot offer something the engine will then
+ * silently ignore.
+ */
+export type AutomationFieldKind = 'enum' | 'string' | 'date' | 'number' | 'boolean' | 'uuid';
+
+export interface AutomationFieldDto {
+  name: string;
+  label: string;
+  kind: AutomationFieldKind;
+  enumValues?: string[];
+  refersTo?: string;
+}
+
+export interface AutomationEntityTypeDto {
+  entityType: string;
+  label: string;
+  pluralLabel: string;
+  fields: AutomationFieldDto[];
+}
+
+export interface AutomationActionParamDto {
+  name: string;
+  label: string;
+  kind: 'string' | 'text' | 'enum' | 'uuid' | 'number' | 'boolean' | 'duration' | 'field';
+  required: boolean;
+  enumValues?: string[];
+  refersTo?: string;
+  help?: string;
+}
+
+export interface AutomationActionDto {
+  actionType: string;
+  label: string;
+  description: string;
+  appliesTo: string[];
+  external: boolean;
+  params: AutomationActionParamDto[];
+}
+
+export interface AutomationCatalogDto {
+  entityTypes: AutomationEntityTypeDto[];
+  actions: AutomationActionDto[];
+  operators: string[];
+  schedulePresets: { key: string; label: string; cron: string }[];
+}
+
+/** One row of a rule's condition list. */
+export interface AutomationConditionRule {
+  field: string;
+  operator: string;
+  value?: unknown;
+  unit?: 'MINUTES' | 'HOURS' | 'DAYS';
+}
+
+export interface AutomationConditionsShape {
+  entityType?: string;
+  eventTypes?: string[];
+  match?: 'ALL' | 'ANY';
+  rules?: AutomationConditionRule[];
+  maxEntitiesPerRun?: number;
+  repeat?: 'ONCE_PER_RECORD' | 'EVERY_RUN' | { cooldownHours: number };
+}
+
+/** Result of POST /crm/automation-rules/simulate — a dry run. */
+export interface AutomationSimulationDto {
+  valid: boolean;
+  issues: { field: string; message: string }[];
+  matchCount: number;
+  exceedsCap: boolean;
+  alreadyHandledCount: number;
+  sample: { id: string; label: string }[];
+  plannedActions: string[];
+  schedulePreview?: string[] | null;
+}
 
 /**
  * GET /crm/automation-rules/:id/execution-log — hand-written rather than
@@ -469,6 +570,9 @@ export type CreateAutomationRuleBody = Omit<RawCreateAutomationRuleBody, 'condit
   actions: unknown[];
   steps?: unknown[];
   isActive?: boolean;
+  /** SCHEDULE rules only — required for them, rejected as meaningless on ENTITY_EVENT. */
+  scheduleCron?: string;
+  scheduleTimezone?: string;
 };
 
 type RawUpdateAutomationRuleBody = JsonBody<'/crm/automation-rules/{id}', 'patch'>;
@@ -481,3 +585,48 @@ export type UpdateAutomationRuleBody = Omit<RawUpdateAutomationRuleBody, 'condit
 
 // -- Force logout ---------------------------------------------------------------
 export type ForceLogoutResponseDto = Json200<'/identity/users/{id}/force-logout', 'post'>;
+
+// -- Outbound mail settings ---------------------------------------------------
+
+export type MailProvider =
+  | 'BREVO'
+  | 'SENDGRID'
+  | 'MAILJET'
+  | 'MICROSOFT365'
+  | 'GOOGLE_WORKSPACE'
+  | 'AMAZON_SES'
+  | 'CUSTOM';
+
+export interface MailSettings {
+  /** False when no row exists — the system is running on the SMTP_* env vars. */
+  configured: boolean;
+  provider: MailProvider | null;
+  host: string | null;
+  port: number | null;
+  secure: boolean;
+  username: string | null;
+  /** Whether a password is stored. The value itself is never returned. */
+  hasPassword: boolean;
+  fromName: string | null;
+  fromEmail: string | null;
+  replyToEmail: string | null;
+  isActive: boolean;
+  lastTestedAt: string | null;
+  lastTestError: string | null;
+  /** Where mail is going right now, so the screen never has to infer it. */
+  effectiveTransport: string;
+}
+
+export interface UpsertMailSettingsInput {
+  provider: MailProvider;
+  host: string;
+  port: number;
+  secure: boolean;
+  username?: string;
+  /** Omit to KEEP the stored password; empty string clears it. */
+  password?: string;
+  fromName: string;
+  fromEmail: string;
+  replyToEmail?: string;
+  isActive?: boolean;
+}

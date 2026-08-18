@@ -78,6 +78,12 @@ export class RlsContextMiddleware implements NestMiddleware {
         jwksUri: `${base}/realms/${realmName}/protocol/openid-connect/certs`,
         issuerUrl: `${base}/realms/${realmName}`,
         internalUrl: this.env.KEYCLOAK_INTERNAL_URL,
+        // Every tenant realm's topiadesk-web client carries this in its
+        // token audience via an Audience protocol mapper — the static
+        // "topiadesk" realm's (infra/keycloak/realm-export.json) and every
+        // dynamically-provisioned tenant realm's (keycloak-realm-
+        // provisioning.ts) alike.
+        audience: 'topiadesk-api',
       });
       this.verifiersByRealm.set(realmName, verifier);
     }

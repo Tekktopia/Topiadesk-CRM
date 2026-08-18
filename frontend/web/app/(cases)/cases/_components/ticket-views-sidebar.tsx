@@ -57,7 +57,7 @@ function SaveViewDialog({ open, onOpenChange, currentFilters }: { open: boolean;
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Save current filters as a view</DialogTitle>
-          <DialogDescription>Captures every active filter and sort — reapply it any time from "My Views".</DialogDescription>
+          <DialogDescription>Captures every active filter and sort — reapply it any time from &ldquo;My Views&rdquo;.</DialogDescription>
         </DialogHeader>
         <form
           className="flex flex-col gap-4"

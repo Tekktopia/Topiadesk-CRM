@@ -356,6 +356,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/identity/field-permissions/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["FieldPermissionsController_catalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/identity/field-permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["FieldPermissionsController_list"];
+        put?: never;
+        post: operations["FieldPermissionsController_upsert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/identity/field-permissions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["FieldPermissionsController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/identity/me/api-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ApiKeysController_list"];
+        put?: never;
+        post: operations["ApiKeysController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/identity/me/api-keys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ApiKeysController_revoke"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/identity/exchange-rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExchangeRatesController_list"];
+        put?: never;
+        post: operations["ExchangeRatesController_upsert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/identity/exchange-rates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ExchangeRatesController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/identity/departments": {
         parameters: {
             query?: never;
@@ -724,6 +836,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/identity/audit-log/checkpoints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AuditExportController_checkpoints"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/identity/audit-log/export": {
         parameters: {
             query?: never;
@@ -772,6 +900,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/identity/branding/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TenantBrandingController_get"];
+        put?: never;
+        post: operations["TenantBrandingController_upload"];
+        delete: operations["TenantBrandingController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/tenant-branding/{realmName}/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicTenantBrandingController_logo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/crm/accounts": {
         parameters: {
             query?: never;
@@ -782,6 +942,70 @@ export interface paths {
         get: operations["AccountsController_list"];
         put?: never;
         post: operations["AccountsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/accounts/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AccountsController_count"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/accounts/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AccountsController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/accounts/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AccountsController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/accounts/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AccountsController_import"];
         delete?: never;
         options?: never;
         head?: never;
@@ -852,6 +1076,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/crm/accounts/{id}/claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AccountsController_listClaims"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/crm/accounts/{id}/group-rollup": {
         parameters: {
             query?: never;
@@ -911,6 +1151,38 @@ export interface paths {
         put?: never;
         post?: never;
         delete: operations["AccountsController_removeSlaOverride"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/accounts/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AccountsController_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/accounts/{id}/transfer-owner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AccountsController_transferOwner"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1022,6 +1294,54 @@ export interface paths {
         get: operations["ContactsController_list"];
         put?: never;
         post: operations["ContactsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/contacts/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContactsController_count"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/contacts/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContactsController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/contacts/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContactsController_export"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1140,6 +1460,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/crm/carriers/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CarriersController_count"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/carriers/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CarriersController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/carriers/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CarriersController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/crm/carriers/{id}": {
         parameters: {
             query?: never;
@@ -1228,6 +1596,54 @@ export interface paths {
             cookie?: never;
         };
         get: operations["LeadsController_checkDuplicates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/leads/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LeadsController_count"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/leads/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LeadsController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/leads/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LeadsController_export"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1380,6 +1796,38 @@ export interface paths {
         patch: operations["LeadSourcesController_update"];
         trace?: never;
     };
+    "/crm/industries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["IndustriesController_list"];
+        put?: never;
+        post: operations["IndustriesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/industries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["IndustriesController_getOne"];
+        put?: never;
+        post?: never;
+        delete: operations["IndustriesController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["IndustriesController_update"];
+        trace?: never;
+    };
     "/crm/pipelines": {
         parameters: {
             query?: never;
@@ -1410,6 +1858,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["PipelinesController_update"];
+        trace?: never;
+    };
+    "/crm/pipelines/{id}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PipelinesController_usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/crm/pipelines/{id}/stages": {
@@ -1470,6 +1934,54 @@ export interface paths {
         get: operations["OpportunitiesController_list"];
         put?: never;
         post: operations["OpportunitiesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/opportunities/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OpportunitiesController_count"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/opportunities/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OpportunitiesController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/opportunities/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OpportunitiesController_export"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1652,6 +2164,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/crm/tasks/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TasksController_count"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/tasks/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TasksController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/tasks/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TasksController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/crm/tasks/mine": {
         parameters: {
             query?: never;
@@ -1748,6 +2308,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/crm/custom-field-definitions/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomFieldDefinitionsController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/custom-field-definitions/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomFieldDefinitionsController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/crm/custom-field-definitions/{id}": {
         parameters: {
             query?: never;
@@ -1828,6 +2420,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/crm/sales-quotas/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesQuotasController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/sales-quotas/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesQuotasController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/crm/sales-quotas/{id}": {
         parameters: {
             query?: never;
@@ -1892,6 +2516,22 @@ export interface paths {
         patch: operations["AutomationRulesController_update"];
         trace?: never;
     };
+    "/crm/automation-rules/{id}/execution-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AutomationRulesController_executionLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/crm/accounts/{accountId}/sites": {
         parameters: {
             query?: never;
@@ -1922,6 +2562,166 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["SitesController_update"];
+        trace?: never;
+    };
+    "/crm/data-subject-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DataSubjectRequestsController_list"];
+        put?: never;
+        post: operations["DataSubjectRequestsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/data-subject-requests/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DataSubjectRequestsController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/data-subject-requests/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DataSubjectRequestsController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/data-subject-requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DataSubjectRequestsController_getOne"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/data-subject-requests/{id}/process": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DataSubjectRequestsController_process"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/data-subject-requests/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DataSubjectRequestsController_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/consent-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ConsentRecordsController_list"];
+        put?: never;
+        post: operations["ConsentRecordsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/consent-records/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ConsentRecordsController_current"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/compliance/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ComplianceController_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/crm/compliance/kyc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ComplianceController_kyc"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/policies/approval-threshold-rules": {
@@ -2372,6 +3172,38 @@ export interface paths {
         patch: operations["PolicyAssetController_update"];
         trace?: never;
     };
+    "/policies/{policyId}/signature-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SignatureRequestsController_list"];
+        put?: never;
+        post: operations["SignatureRequestsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/policies/{policyId}/signature-requests/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SignatureRequestsController_voidRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/documents/categories": {
         parameters: {
             query?: never;
@@ -2724,6 +3556,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/integrations/teams-actions/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TeamsActionsController_handle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/notifications": {
         parameters: {
             query?: never;
@@ -2754,6 +3602,54 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["NotificationsController_markRead"];
+        trace?: never;
+    };
+    "/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["NotificationsController_markAllRead"];
+        trace?: never;
+    };
+    "/notifications/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["NotificationsController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/bulk-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["NotificationsController_bulkDelete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/notifications/admin": {
@@ -2798,22 +3694,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["AiGatewayController_summarize"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/ai/reply-draft": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["AiGatewayController_replyDraft"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2900,17 +3780,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/ai/usage-summary": {
+    "/ai/chat/sessions": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["AiGatewayController_usageSummary"];
+        get: operations["AiChatController_listSessions"];
+        put?: never;
+        post: operations["AiChatController_createSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/chat/sessions/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AiChatController_getMessages"];
+        put?: never;
+        post: operations["AiChatController_sendMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/chat/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        delete: operations["AiChatController_deleteSession"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2940,6 +3852,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["DashboardsController_getSalesForecast"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboards/operational-kpis/renewal-forecast": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DashboardsController_getRenewalForecast"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3134,6 +4062,54 @@ export interface paths {
         get: operations["ClaimsController_list"];
         put?: never;
         post: operations["ClaimsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/claims/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClaimsController_count"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/claims/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClaimsController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/claims/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClaimsController_export"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3356,6 +4332,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["CasesController_count"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CasesController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CasesController_export"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5028,6 +6036,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/loyalty-accounts/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoyaltyAccountsController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/loyalty-accounts/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["LoyaltyAccountsController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/loyalty-accounts/by-account/{accountId}": {
         parameters: {
             query?: never;
@@ -5900,11 +6940,13 @@ export interface components {
             departmentName: Record<string, never> | null;
             branchId: Record<string, never> | null;
             branchName: Record<string, never> | null;
+            kpiTilePreferences: string[] | null;
             permissions: components["schemas"]["ResolvedPermissionDto"][];
         };
         UpdateMyProfileDto: {
             fullName?: string;
             phone?: Record<string, never> | null;
+            kpiTilePreferences?: string[];
         };
         UpdateMyPresenceDto: {
             /** @enum {string} */
@@ -5941,6 +6983,8 @@ export interface components {
             managerId?: string;
             /** @description Free text — e.g. "Team Lead", "Supervisor" */
             positionTitle?: string;
+            /** @description Set a specific sign-in password instead of auto-generating one. Skips the forced password-change on next sign-in (MFA setup is still required). */
+            password?: string;
         };
         CreateUserResponseDto: {
             user: components["schemas"]["UserResponseDto"];
@@ -6043,6 +7087,66 @@ export interface components {
         };
         GrantPermissionDto: {
             permissionId: string;
+        };
+        FieldPermissionResponseDto: {
+            id: string;
+            roleId: string;
+            resource: string;
+            fieldName: string;
+            /** @enum {string} */
+            visibility: "HIDDEN" | "READ_ONLY";
+            /** Format: date-time */
+            createdAt: string;
+        };
+        UpsertFieldPermissionDto: {
+            roleId: string;
+            /** @enum {string} */
+            resource: "account" | "contact" | "premium";
+            fieldName: string;
+            /** @enum {string} */
+            visibility: "HIDDEN" | "READ_ONLY";
+        };
+        ApiKeyResponseDto: {
+            id: string;
+            name: string;
+            tokenLastFour: string;
+            isActive: boolean;
+            lastUsedAt: Record<string, never> | null;
+            expiresAt: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreateApiKeyDto: {
+            /** @description What this key is for, e.g. "Zapier integration" — shown in the list so you can tell your keys apart. */
+            name: string;
+            /** @description Omit for a key that never expires. */
+            expiresAt?: string;
+        };
+        ApiKeyCreatedResponseDto: {
+            id: string;
+            name: string;
+            tokenLastFour: string;
+            isActive: boolean;
+            lastUsedAt: Record<string, never> | null;
+            expiresAt: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description The raw bearer key — copy it now, it is never shown again. */
+            token: string;
+        };
+        ExchangeRateResponseDto: {
+            id: string;
+            currencyCode: string;
+            rateToBase: string;
+            updatedById: Record<string, never> | null;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        UpsertExchangeRateDto: {
+            /** @description ISO 4217 code, e.g. "USD". The org base currency (NGN) never has its own row — its implicit rate is 1. */
+            currencyCode: string;
+            /** @description How many NGN one unit of currencyCode is worth, e.g. 1600 for USD. */
+            rateToBase: number;
         };
         DepartmentResponseDto: {
             id: string;
@@ -6314,6 +7418,13 @@ export interface components {
             kycStatus: string;
             kycExpiryDate: Record<string, never> | null;
             naicomId: Record<string, never> | null;
+            healthScore: Record<string, never> | null;
+            healthScoreComputedAt: Record<string, never> | null;
+            source: Record<string, never> | null;
+            notes: Record<string, never> | null;
+            state: Record<string, never> | null;
+            tags: string[];
+            isArchived: boolean;
             customFields: {
                 [key: string]: unknown;
             };
@@ -6321,6 +7432,26 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        AccountStatsResponseDto: {
+            total: number;
+            clients: number;
+            prospects: number;
+            /** @description Scored accounts with healthScore below 40. */
+            atRisk: number;
+            /** @description Mean healthScore across scored accounts, rounded; 0 when none are scored. */
+            averageHealthScore: number;
+            /** @description Accounts whose KYC has expired — blocks new policy versions. */
+            kycExpired: number;
+        };
+        AccountImportRowErrorDto: {
+            row: number;
+            message: string;
+        };
+        AccountImportResultDto: {
+            created: number;
+            updated: number;
+            errors: components["schemas"]["AccountImportRowErrorDto"][];
         };
         DuplicateMatchDto: {
             id: string;
@@ -6373,6 +7504,13 @@ export interface components {
             kycStatus: string;
             kycExpiryDate: Record<string, never> | null;
             naicomId: Record<string, never> | null;
+            healthScore: Record<string, never> | null;
+            healthScoreComputedAt: Record<string, never> | null;
+            source: Record<string, never> | null;
+            notes: Record<string, never> | null;
+            state: Record<string, never> | null;
+            tags: string[];
+            isArchived: boolean;
             customFields: {
                 [key: string]: unknown;
             };
@@ -6397,7 +7535,7 @@ export interface components {
             entityType: string;
             entityId: string;
             /** @enum {string} */
-            action: "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGIN_FAILED" | "PERMISSION_CHANGE" | "EXPORT" | "VIEW_SENSITIVE" | "FORCE_LOGOUT";
+            action: "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGIN_FAILED" | "PERMISSION_CHANGE" | "EXPORT" | "VIEW_SENSITIVE" | "FORCE_LOGOUT" | "ACCESS_DENIED" | "SECURITY_ALERT" | "OWNERSHIP_TRANSFERRED";
             actorUserId: Record<string, never> | null;
             actorUser: components["schemas"]["AuditLogActorDto"] | null;
             actorSystemJob: Record<string, never> | null;
@@ -6420,6 +7558,20 @@ export interface components {
             renewalDueDate: Record<string, never> | null;
             nextAlertDueAt: Record<string, never> | null;
             assignedToId: Record<string, never> | null;
+        };
+        AccountClaimRowDto: {
+            id: string;
+            claimNumber: string;
+            status: string;
+            priority: string;
+            /** Format: date-time */
+            dateOfLoss: string;
+            /** Format: date-time */
+            dateReported: string;
+            reserveAmount: Record<string, never> | null;
+            settledAmount: Record<string, never> | null;
+            policyId: string;
+            policyNumber: string;
         };
         AccountGroupRollupDto: {
             accountCount: number;
@@ -6462,11 +7614,14 @@ export interface components {
             /** @enum {string} */
             kycStatus?: "NOT_STARTED" | "PENDING" | "VERIFIED" | "EXPIRED" | "REJECTED";
             kycExpiryDate?: string;
+            /** @description NAICOM (insurance regulator) ID — alphanumeric, 4-20 chars */
             naicomId?: string;
             parentAccountId?: string;
             ownerId?: string;
             source?: string;
             notes?: string;
+            /** @description Free-form labels, e.g. "high-value", "at-risk-renewal" */
+            tags?: string[];
             customFields?: {
                 [key: string]: unknown;
             };
@@ -6490,14 +7645,22 @@ export interface components {
             /** @enum {string} */
             kycStatus?: "NOT_STARTED" | "PENDING" | "VERIFIED" | "EXPIRED" | "REJECTED";
             kycExpiryDate?: string;
+            /** @description NAICOM (insurance regulator) ID — alphanumeric, 4-20 chars */
             naicomId?: string;
             parentAccountId?: string;
             ownerId?: string;
             source?: string;
             notes?: string;
+            /** @description Free-form labels, e.g. "high-value", "at-risk-renewal" */
+            tags?: string[];
             customFields?: {
                 [key: string]: unknown;
             };
+        };
+        TransferAccountOwnerDto: {
+            newOwnerId: string;
+            /** @description Captured on the OWNERSHIP_TRANSFERRED audit row */
+            reason?: string;
         };
         BulkAssignAccountsDto: {
             ids: string[];
@@ -6567,11 +7730,23 @@ export interface components {
             idType: Record<string, never> | null;
             idNumber: Record<string, never> | null;
             isPrimary: boolean;
+            anonymizedAt: Record<string, never> | null;
             customFields: {
                 [key: string]: unknown;
             };
             /** Format: date-time */
             createdAt: string;
+        };
+        ContactStatsResponseDto: {
+            total: number;
+            /** @description Contacts flagged as the primary contact for their account. */
+            primary: number;
+            /** @description Contacts with an email address, a phone number, or both. */
+            reachable: number;
+            /** @description Contacts with neither email nor phone on file. */
+            unreachable: number;
+            /** @description Contacts erased under a data-subject request. */
+            anonymized: number;
         };
         CreateContactDto: {
             accountId?: string;
@@ -6639,6 +7814,21 @@ export interface components {
             commissionTerms: Record<string, never> | null;
             /** Format: date-time */
             createdAt: string;
+        };
+        CarrierStatsResponseDto: {
+            total: number;
+            /** @description Carriers with panelStatus = ACTIVE. */
+            activeOnPanel: number;
+            /** @description Carriers still being evaluated (PROSPECTIVE). */
+            prospective: number;
+            /** @description SUSPENDED or TERMINATED — cannot take new business. */
+            offPanel: number;
+            /** @description Policies placed with the matching carriers. */
+            policiesPlaced: number;
+            /** @description ISO 4217 code totalGrossPremium is expressed in. */
+            baseCurrency: string;
+            /** @description Gross premium placed with the matching carriers, in baseCurrency. */
+            totalGrossPremium: number;
         };
         CarrierPolicyRowDto: {
             id: string;
@@ -6713,6 +7903,20 @@ export interface components {
             };
             /** Format: date-time */
             createdAt: string;
+        };
+        LeadStatsResponseDto: {
+            total: number;
+            newCount: number;
+            contacted: number;
+            qualified: number;
+            converted: number;
+            disqualified: number;
+            /** @description Mean score across all matching leads, rounded to a whole number. */
+            averageScore: number;
+            /** @description Converted / total, as a 0-100 percentage rounded to one decimal. */
+            conversionRate: number;
+            /** @description Leads created in the last 7 days. */
+            createdLast7Days: number;
         };
         CreateLeadDto: {
             /** @description A LeadSource.code — see GET /crm/lead-sources for the admin-managed list */
@@ -6819,6 +8023,19 @@ export interface components {
             isActive?: boolean;
             sortOrder?: number;
         };
+        IndustryResponseDto: {
+            id: string;
+            name: string;
+            parentIndustryId: Record<string, never> | null;
+        };
+        CreateIndustryDto: {
+            name: string;
+            parentIndustryId?: string;
+        };
+        UpdateIndustryDto: {
+            name?: string;
+            parentIndustryId?: string;
+        };
         PipelineResponseDto: {
             id: string;
             name: string;
@@ -6857,6 +8074,24 @@ export interface components {
             /** @default true */
             isActive: boolean;
         };
+        PipelineStageUsageDto: {
+            stageId: string;
+            stageName: string;
+            /** @description Opportunities currently sitting in this stage — blocks deletion when > 0. */
+            opportunityCount: number;
+            /** @description Sum of those deals, in baseCurrency. */
+            openValue: number;
+        };
+        PipelineUsageResponseDto: {
+            pipelineId: string;
+            /** @description ISO 4217 code every value figure is expressed in. */
+            baseCurrency: string;
+            /** @description Deals across every stage of this pipeline. */
+            totalOpportunities: number;
+            /** @description Sum across every stage, in baseCurrency. */
+            totalValue: number;
+            stages: components["schemas"]["PipelineStageUsageDto"][];
+        };
         CreatePipelineStageDto: {
             name: string;
             order: number;
@@ -6885,6 +8120,7 @@ export interface components {
             pipelineStageId: string;
             /** @description Decimal serialized as string */
             amount: string;
+            currency: string;
             probability: number;
             /** Format: date-time */
             expectedCloseDate: string;
@@ -6893,6 +8129,8 @@ export interface components {
             lostReason: Record<string, never> | null;
             ownerId: string;
             lineOfBusiness: Record<string, never> | null;
+            dealHealthScore: Record<string, never> | null;
+            dealHealthScoreComputedAt: Record<string, never> | null;
             customFields: {
                 [key: string]: unknown;
             };
@@ -6900,6 +8138,27 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        OpportunityStatsResponseDto: {
+            /** @description ISO 4217 code every *Value field below is expressed in. */
+            baseCurrency: string;
+            totalCount: number;
+            /** @description Deals in a stage that is neither won nor lost. */
+            openCount: number;
+            wonCount: number;
+            lostCount: number;
+            /** @description Sum of open deal amounts, base currency. */
+            openValue: number;
+            /** @description Sum of open amount x probability/100 — the forecastable figure. */
+            weightedValue: number;
+            /** @description Sum of won deal amounts, base currency. */
+            wonValue: number;
+            /** @description won / (won + lost), as a 0-100 percentage rounded to one decimal. */
+            winRate: number;
+            /** @description Mean open deal size, base currency. */
+            averageDealSize: number;
+            /** @description Open deals whose expectedCloseDate has already passed. */
+            overdueCount: number;
         };
         StageHistoryEntryDto: {
             /** Format: date-time */
@@ -6916,6 +8175,11 @@ export interface components {
             pipelineStageId: string;
             /** @description Decimal amount, e.g. "45000000.00" */
             amount: string;
+            /**
+             * @description ISO 4217 code — see ExchangeRate for how non-NGN amounts get normalized in dashboard/report totals.
+             * @default NGN
+             */
+            currency: string;
             /** @description Defaults to the target stage defaultProbability */
             probability?: number;
             expectedCloseDate: string;
@@ -6935,6 +8199,11 @@ export interface components {
             pipelineStageId?: string;
             /** @description Decimal amount, e.g. "45000000.00" */
             amount?: string;
+            /**
+             * @description ISO 4217 code — see ExchangeRate for how non-NGN amounts get normalized in dashboard/report totals.
+             * @default NGN
+             */
+            currency: string;
             /** @description Defaults to the target stage defaultProbability */
             probability?: number;
             expectedCloseDate?: string;
@@ -7051,6 +8320,18 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        TaskStatsResponseDto: {
+            total: number;
+            /** @description Neither COMPLETED nor CANCELLED. */
+            open: number;
+            completed: number;
+            /** @description Still open with a dueDate strictly before today. */
+            overdue: number;
+            /** @description Still open and due today. */
+            dueToday: number;
+            /** @description Still open with no dueDate set. */
+            noDueDate: number;
+        };
         CreateTaskDto: {
             title: string;
             description?: string;
@@ -7116,6 +8397,22 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        CustomFieldEntityCountDto: {
+            /** @enum {string} */
+            entityType: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY";
+            total: number;
+            active: number;
+        };
+        CustomFieldDefinitionStatsResponseDto: {
+            /** @description Definitions matching the current filter. */
+            total: number;
+            active: number;
+            /** @description Soft-deleted — retained so existing jsonb values are never orphaned. */
+            inactive: number;
+            /** @description Active definitions users are forced to fill in. */
+            required: number;
+            byEntityType: components["schemas"]["CustomFieldEntityCountDto"][];
         };
         CreateCustomFieldDefinitionDto: {
             /** @enum {string} */
@@ -7239,6 +8536,15 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        SalesQuotaStatsResponseDto: {
+            total: number;
+            /** @description Quotas whose periodStart..periodEnd covers today. */
+            current: number;
+            /** @description Quotas assigned to an individual rep (scopeType = USER). */
+            individual: number;
+            /** @description Sum of targetAmount across CURRENT quotas only — the number being carried this period. */
+            currentTargetTotal: string;
+        };
         CreateSalesQuotaDto: {
             /** @enum {string} */
             scopeType: "USER" | "DEPARTMENT" | "BRANCH" | "ORG";
@@ -7306,6 +8612,21 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        AutomationExecutionLogResponseDto: {
+            id: string;
+            ruleId: Record<string, never> | null;
+            ruleName: string;
+            entityType: string;
+            entityId: Record<string, never> | null;
+            triggerSource: string;
+            /** @enum {string} */
+            status: "SUCCESS" | "PARTIAL_FAILURE" | "FAILED";
+            actionResults: {
+                [key: string]: unknown;
+            }[];
+            /** Format: date-time */
+            createdAt: string;
         };
         CreateAutomationRuleDto: {
             name: string;
@@ -7392,6 +8713,86 @@ export interface components {
             postalCode?: string;
             /** @default false */
             isPrimary: boolean;
+        };
+        DataSubjectRequestResponseDto: {
+            id: string;
+            contactId: string;
+            /** @enum {string} */
+            requestType: "EXPORT" | "DELETE";
+            /** @enum {string} */
+            status: "PENDING" | "COMPLETED" | "REJECTED";
+            notes: Record<string, never> | null;
+            requestedById: string;
+            exportData: {
+                [key: string]: unknown;
+            } | null;
+            processedById: Record<string, never> | null;
+            processedAt: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        DataSubjectRequestStatsResponseDto: {
+            total: number;
+            pending: number;
+            completed: number;
+            rejected: number;
+            /** @description PENDING for longer than 30 days — past the statutory response window. */
+            overdue: number;
+            /** @description PENDING and within 7 days of the deadline. */
+            dueSoon: number;
+            /** @description The deadline in days this endpoint measured against, so the UI never hardcodes it separately. */
+            deadlineDays: number;
+        };
+        CreateDataSubjectRequestDto: {
+            contactId: string;
+            /** @enum {string} */
+            requestType: "EXPORT" | "DELETE";
+            notes?: string;
+        };
+        RejectDataSubjectRequestDto: {
+            reason: string;
+        };
+        ConsentRecordResponseDto: {
+            id: string;
+            contactId: string;
+            consentType: string;
+            granted: boolean;
+            source: string;
+            notes: Record<string, never> | null;
+            recordedById: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CurrentConsentDto: {
+            consentType: string;
+            granted: boolean;
+            source: string;
+            /** Format: date-time */
+            recordedAt: string;
+        };
+        CreateConsentRecordDto: {
+            contactId: string;
+            /** @description Free text, e.g. "Marketing Email", "Data Processing", "Third-Party Sharing" — no fixed catalog. */
+            consentType: string;
+            granted: boolean;
+            /** @description How this was captured, e.g. "Web form", "Verbal", "Portal", "Paper form". */
+            source: string;
+            notes?: string;
+        };
+        ComplianceSummaryResponseDto: {
+            openDsrCount: number;
+            kycExpiringCount: number;
+            kycAttentionCount: number;
+            consentRecordsThisWeek: number;
+            latestCheckpointAt: Record<string, never> | null;
+        };
+        KycAccountRowDto: {
+            id: string;
+            name: string;
+            kycStatus: string;
+            kycExpiryDate: Record<string, never> | null;
+            /** @enum {string} */
+            urgency: "EXPIRED" | "EXPIRING_SOON" | "NOT_VERIFIED";
         };
         ApprovalThresholdRuleResponseDto: {
             id: string;
@@ -7813,6 +9214,30 @@ export interface components {
             latitude?: string;
             longitude?: string;
         };
+        SignatureRequestResponseDto: {
+            id: string;
+            documentId: string;
+            documentVersionId: string;
+            policyId: string;
+            signerName: string;
+            signerEmail: string;
+            /** @enum {string} */
+            status: "SENT" | "VIEWED" | "SIGNED" | "DECLINED" | "EXPIRED";
+            externalEnvelopeId: string;
+            sentById: string;
+            /** Format: date-time */
+            sentAt: string;
+            viewedAt: Record<string, never> | null;
+            signedAt: Record<string, never> | null;
+            declinedAt: Record<string, never> | null;
+            declineReason: Record<string, never> | null;
+        };
+        CreateSignatureRequestDto: {
+            /** @description A Document already linked to this policy (see DocumentLink) — its current version is what gets sent. */
+            documentId: string;
+            signerName: string;
+            signerEmail: string;
+        };
         DocumentCategoryResponseDto: {
             id: string;
             name: string;
@@ -7853,6 +9278,9 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            linkId?: string | null;
+            /** Format: date-time */
+            linkedAt?: string | null;
         };
         BulkArchiveDocumentsDto: {
             ids: string[];
@@ -7902,7 +9330,7 @@ export interface components {
         CreateConnectorDto: {
             name: string;
             /** @enum {string} */
-            connectorType: "CORE_BROKING_SYSTEM" | "ERP" | "MOCK_STUB" | "TEAMS_WEBHOOK" | "SEAMLESSHR" | "PAYSTACK" | "DOJAH" | "WHATSAPP_CLOUD";
+            connectorType: "CORE_BROKING_SYSTEM" | "ERP" | "MOCK_STUB" | "TEAMS_WEBHOOK" | "SEAMLESSHR" | "PAYSTACK" | "DOJAH" | "WHATSAPP_CLOUD" | "DOCUSIGN";
             /** @enum {string} */
             syncDirection: "INBOUND" | "OUTBOUND" | "BIDIRECTIONAL";
             /** @default true */
@@ -7918,7 +9346,7 @@ export interface components {
         UpdateConnectorDto: {
             name?: string;
             /** @enum {string} */
-            connectorType?: "CORE_BROKING_SYSTEM" | "ERP" | "MOCK_STUB" | "TEAMS_WEBHOOK" | "SEAMLESSHR" | "PAYSTACK" | "DOJAH" | "WHATSAPP_CLOUD";
+            connectorType?: "CORE_BROKING_SYSTEM" | "ERP" | "MOCK_STUB" | "TEAMS_WEBHOOK" | "SEAMLESSHR" | "PAYSTACK" | "DOJAH" | "WHATSAPP_CLOUD" | "DOCUSIGN";
             /** @enum {string} */
             syncDirection?: "INBOUND" | "OUTBOUND" | "BIDIRECTIONAL";
             /** @default true */
@@ -8031,6 +9459,14 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        BulkNotificationIdsDto: {
+            ids: string[];
+        };
+        NotificationBulkActionResponseDto: {
+            requested: string[];
+            affected: string[];
+            skipped: string[];
+        };
         AdminNotificationRecipientDto: {
             id: string;
             fullName: string;
@@ -8057,14 +9493,6 @@ export interface components {
             entityType: string;
             text: string;
         };
-        ReplyDraftRequestDto: {
-            entityId: string;
-            entityType: string;
-            /** @description The customer message / interaction text to draft a reply to */
-            contextText: string;
-            /** @description Optional tone/content guidance, e.g. "keep it short", "offer a callback" */
-            instructions?: string;
-        };
         SentimentRequestDto: {
             entityId: string;
             entityType: string;
@@ -8089,6 +9517,9 @@ export interface components {
             entityTypes?: ("account" | "knowledge_article")[];
             /** @default 10 */
             limit: number;
+        };
+        SendChatMessageDto: {
+            content: string;
         };
         DepartmentPipelineBreakdownDto: {
             departmentId: string;
@@ -8115,6 +9546,18 @@ export interface components {
             wonThisMonthValue: string;
             /** @description won / (won + lost) among all opportunities with a non-null actualCloseDate, all-time. Null when there are none yet. */
             winRate: Record<string, never> | null;
+            /** @description All accounts, any status (activeClients above is CLIENT-status only) */
+            totalAccounts: number;
+            /** @description Leads with createdAt in the current calendar month */
+            newLeadsThisMonth: number;
+            /** @description CONVERTED leads / all-time lead count. Null when there are no leads yet. */
+            leadConversionRate: Record<string, never> | null;
+            /** @description Policies with status BOUND, ISSUED, or RENEWED and expiryDate in the future */
+            activePolicies: number;
+            /** @description pipelineValue / openOpportunities. "0.00" when there are no open opportunities. */
+            avgDealSize: string;
+            /** @description Opportunities with pipelineStage.isLost and actualCloseDate in the current calendar month */
+            lostThisMonthCount: number;
             byDepartment: components["schemas"]["DepartmentPipelineBreakdownDto"][];
             /** @description Top 5 lost reasons by count, all-time, plus an "Other" bucket for the rest */
             lossReasonBreakdown: components["schemas"]["LossReasonBreakdownDto"][];
@@ -8136,6 +9579,26 @@ export interface components {
             groups: components["schemas"]["SalesForecastGroupDto"][];
             totalWeightedAmount: string;
             totalUnweightedAmount: string;
+        };
+        RenewalForecastGroupDto: {
+            key: string;
+            label: Record<string, never> | null;
+            count: number;
+            /** @description sum(grossPremium * statusWeight), decimal serialized as string — see RENEWAL_STATUS_WEIGHTS */
+            weightedAmount: string;
+            /** @description sum(grossPremium), decimal serialized as string */
+            unweightedAmount: string;
+        };
+        RenewalForecastResponseDto: {
+            /** @description e.g. "2026-08" or "2026-Q3" */
+            period: string;
+            periodStart: string;
+            periodEnd: string;
+            groups: components["schemas"]["RenewalForecastGroupDto"][];
+            totalWeightedAmount: string;
+            totalUnweightedAmount: string;
+            /** @description Sum of unweightedAmount across only AT_RISK-weighted groups (see RENEWAL_STATUS_WEIGHTS) — the headline "premium at risk" figure. */
+            atRiskAmount: string;
         };
         DealsTrendMonthDto: {
             /** @description e.g. "2026-01" */
@@ -8288,6 +9751,21 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        ClaimStatsResponseDto: {
+            total: number;
+            /** @description Not SETTLED, REPUDIATED or WITHDRAWN — REOPENED counts as open. */
+            open: number;
+            settled: number;
+            repudiated: number;
+            /** @description Claims that have been reopened at least once. */
+            reopened: number;
+            /** @description ISO 4217 code both money figures are expressed in. */
+            baseCurrency: string;
+            /** @description Sum of reserveAmount on OPEN claims — live exposure, in baseCurrency. */
+            outstandingReserve: number;
+            /** @description Sum of settledAmount across settled claims, in baseCurrency. */
+            totalSettled: number;
+        };
         BulkAssignClaimsDto: {
             ids: string[];
             adjusterId: string;
@@ -8374,6 +9852,9 @@ export interface components {
             createdBySystemJob: Record<string, never> | null;
             /** @description Only set for OUTBOUND comments on a Case — whether the customer-facing email actually sent. */
             emailDeliveryStatus?: Record<string, never> | null;
+            /** @description Actual recipients once the email sends (explicit or auto-resolved) — empty until then. */
+            emailTo: string[];
+            emailCc: string[];
             /** Format: date-time */
             createdAt: string;
         };
@@ -8392,6 +9873,8 @@ export interface components {
             direction: "INBOUND" | "OUTBOUND" | "INTERNAL";
             /** @description Defaults to now */
             occurredAt?: string;
+            emailTo?: string[];
+            emailCc?: string[];
         };
         CaseWatcherResponseDto: {
             id: string;
@@ -8433,6 +9916,19 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        CaseStatsResponseDto: {
+            total: number;
+            /** @description status = NEW — untriaged. */
+            newCount: number;
+            /** @description Any non-terminal status, including PENDING_* and REOPENED. */
+            open: number;
+            resolved: number;
+            closed: number;
+            /** @description Open tickets with no assignee — nobody owns them. */
+            unassigned: number;
+            /** @description Tickets with a RUNNING SLA clock already past its dueAt. */
+            breaching: number;
         };
         BulkAssignCasesDto: {
             ids: string[];
@@ -9667,6 +11163,19 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        LoyaltyTierCountDto: {
+            tier: string;
+            members: number;
+        };
+        LoyaltyStatsResponseDto: {
+            /** @description Accounts enrolled in the programme. */
+            members: number;
+            /** @description Members enrolled in the last 30 days. */
+            enrolledLast30Days: number;
+            /** @description Net unredeemed points across the programme — an outstanding liability. */
+            pointsOutstanding: number;
+            tierBreakdown: components["schemas"]["LoyaltyTierCountDto"][];
+        };
         LoyaltyTransactionResponseDto: {
             id: string;
             loyaltyAccountId: string;
@@ -9716,6 +11225,9 @@ export interface components {
             label: string;
             linkPath: Record<string, never> | null;
             isMine: boolean;
+            decidedAt: Record<string, never> | null;
+            decisionNote: Record<string, never> | null;
+            approvedByName: Record<string, never> | null;
         };
         ApprovalDelegationResponseDto: {
             id: string;
@@ -10899,6 +12411,211 @@ export interface operations {
             };
         };
     };
+    FieldPermissionsController_catalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"];
+                };
+            };
+        };
+    };
+    FieldPermissionsController_list: {
+        parameters: {
+            query?: {
+                roleId?: string;
+                resource?: "account" | "contact" | "premium";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldPermissionResponseDto"][];
+                };
+            };
+        };
+    };
+    FieldPermissionsController_upsert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertFieldPermissionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldPermissionResponseDto"];
+                };
+            };
+        };
+    };
+    FieldPermissionsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ApiKeysController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyResponseDto"][];
+                };
+            };
+        };
+    };
+    ApiKeysController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateApiKeyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyCreatedResponseDto"];
+                };
+            };
+        };
+    };
+    ApiKeysController_revoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ExchangeRatesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExchangeRateResponseDto"][];
+                };
+            };
+        };
+    };
+    ExchangeRatesController_upsert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertExchangeRateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExchangeRateResponseDto"];
+                };
+            };
+        };
+    };
+    ExchangeRatesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     DepartmentsController_list: {
         parameters: {
             query?: never;
@@ -11898,6 +13615,26 @@ export interface operations {
             };
         };
     };
+    AuditExportController_checkpoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description AuditCheckpointDto[] */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
     AuditExportController_export: {
         parameters: {
             query: {
@@ -12004,6 +13741,84 @@ export interface operations {
             };
         };
     };
+    TenantBrandingController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TenantBrandingController_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        uploaded?: boolean;
+                    };
+                };
+            };
+        };
+    };
+    TenantBrandingController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        deleted?: boolean;
+                    };
+                };
+            };
+        };
+    };
+    PublicTenantBrandingController_logo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                realmName: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AccountsController_list: {
         parameters: {
             query?: {
@@ -12013,6 +13828,10 @@ export interface operations {
                 ownerId?: string;
                 /** @description Case-insensitive substring match on name */
                 q?: string;
+                /** @description Matches accounts carrying this tag */
+                tag?: string;
+                /** @description Include soft-archived accounts (excluded by default). Send 'true' to include. */
+                includeArchived?: string;
                 take?: number;
                 skip?: number;
             };
@@ -12051,6 +13870,119 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountResponseDto"];
+                };
+            };
+        };
+    };
+    AccountsController_count: {
+        parameters: {
+            query?: {
+                status?: "PROSPECT" | "CLIENT" | "FORMER_CLIENT";
+                industryId?: string;
+                riskRating?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+                ownerId?: string;
+                /** @description Case-insensitive substring match on name */
+                q?: string;
+                /** @description Matches accounts carrying this tag */
+                tag?: string;
+                /** @description Include soft-archived accounts (excluded by default). Send 'true' to include. */
+                includeArchived?: string;
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": number;
+                };
+            };
+        };
+    };
+    AccountsController_stats: {
+        parameters: {
+            query?: {
+                status?: "PROSPECT" | "CLIENT" | "FORMER_CLIENT";
+                industryId?: string;
+                riskRating?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+                ownerId?: string;
+                /** @description Case-insensitive substring match on name */
+                q?: string;
+                /** @description Matches accounts carrying this tag */
+                tag?: string;
+                /** @description Include soft-archived accounts (excluded by default). Send 'true' to include. */
+                includeArchived?: string;
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountStatsResponseDto"];
+                };
+            };
+        };
+    };
+    AccountsController_export: {
+        parameters: {
+            query?: {
+                status?: "PROSPECT" | "CLIENT" | "FORMER_CLIENT";
+                industryId?: string;
+                riskRating?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+                ownerId?: string;
+                /** @description Case-insensitive substring match on name */
+                q?: string;
+                /** @description Matches accounts carrying this tag */
+                tag?: string;
+                /** @description Include soft-archived accounts (excluded by default). Send 'true' to include. */
+                includeArchived?: string;
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AccountsController_import: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountImportResultDto"];
                 };
             };
         };
@@ -12185,6 +14117,27 @@ export interface operations {
             };
         };
     };
+    AccountsController_listClaims: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountClaimRowDto"][];
+                };
+            };
+        };
+    };
     AccountsController_groupRollup: {
         parameters: {
             query?: never;
@@ -12290,6 +14243,52 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    AccountsController_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponseDto"];
+                };
+            };
+        };
+    };
+    AccountsController_transferOwner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferAccountOwnerDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponseDto"];
+                };
             };
         };
     };
@@ -12482,6 +14481,14 @@ export interface operations {
             query?: {
                 accountId?: string;
                 carrierId?: string;
+                /** @description Free-text search across first/last name, email, phone and job title. */
+                q?: string;
+                /** @description Only primary contacts when 'true', only non-primary when 'false'. Omit for both. */
+                isPrimary?: string;
+                /** @description Max rows to return (default 50). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
             };
             header?: never;
             path?: never;
@@ -12519,6 +14526,94 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ContactResponseDto"];
                 };
+            };
+        };
+    };
+    ContactsController_count: {
+        parameters: {
+            query?: {
+                accountId?: string;
+                carrierId?: string;
+                /** @description Free-text search across first/last name, email, phone and job title. */
+                q?: string;
+                /** @description Only primary contacts when 'true', only non-primary when 'false'. Omit for both. */
+                isPrimary?: string;
+                /** @description Max rows to return (default 50). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": number;
+                };
+            };
+        };
+    };
+    ContactsController_stats: {
+        parameters: {
+            query?: {
+                accountId?: string;
+                carrierId?: string;
+                /** @description Free-text search across first/last name, email, phone and job title. */
+                q?: string;
+                /** @description Only primary contacts when 'true', only non-primary when 'false'. Omit for both. */
+                isPrimary?: string;
+                /** @description Max rows to return (default 50). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactStatsResponseDto"];
+                };
+            };
+        };
+    };
+    ContactsController_export: {
+        parameters: {
+            query?: {
+                accountId?: string;
+                carrierId?: string;
+                /** @description Free-text search across first/last name, email, phone and job title. */
+                q?: string;
+                /** @description Only primary contacts when 'true', only non-primary when 'false'. Omit for both. */
+                isPrimary?: string;
+                /** @description Max rows to return (default 50). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -12707,7 +14802,18 @@ export interface operations {
     };
     CarriersController_list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Free-text search across carrier name, A.M. Best rating and treaty type. */
+                q?: string;
+                carrierType?: "INSURER" | "REINSURER" | "BOTH";
+                panelStatus?: "PROSPECTIVE" | "ACTIVE" | "SUSPENDED" | "TERMINATED";
+                /** @description Matches carriers writing this line of business (exact tag match on linesOfBusiness). */
+                lineOfBusiness?: string;
+                /** @description Max rows to return (default 100). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -12744,6 +14850,94 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CarrierResponseDto"];
                 };
+            };
+        };
+    };
+    CarriersController_count: {
+        parameters: {
+            query?: {
+                /** @description Free-text search across carrier name, A.M. Best rating and treaty type. */
+                q?: string;
+                carrierType?: "INSURER" | "REINSURER" | "BOTH";
+                panelStatus?: "PROSPECTIVE" | "ACTIVE" | "SUSPENDED" | "TERMINATED";
+                /** @description Matches carriers writing this line of business (exact tag match on linesOfBusiness). */
+                lineOfBusiness?: string;
+                /** @description Max rows to return (default 100). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": number;
+                };
+            };
+        };
+    };
+    CarriersController_stats: {
+        parameters: {
+            query?: {
+                /** @description Free-text search across carrier name, A.M. Best rating and treaty type. */
+                q?: string;
+                carrierType?: "INSURER" | "REINSURER" | "BOTH";
+                panelStatus?: "PROSPECTIVE" | "ACTIVE" | "SUSPENDED" | "TERMINATED";
+                /** @description Matches carriers writing this line of business (exact tag match on linesOfBusiness). */
+                lineOfBusiness?: string;
+                /** @description Max rows to return (default 100). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierStatsResponseDto"];
+                };
+            };
+        };
+    };
+    CarriersController_export: {
+        parameters: {
+            query?: {
+                /** @description Free-text search across carrier name, A.M. Best rating and treaty type. */
+                q?: string;
+                carrierType?: "INSURER" | "REINSURER" | "BOTH";
+                panelStatus?: "PROSPECTIVE" | "ACTIVE" | "SUSPENDED" | "TERMINATED";
+                /** @description Matches carriers writing this line of business (exact tag match on linesOfBusiness). */
+                lineOfBusiness?: string;
+                /** @description Max rows to return (default 100). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -12883,6 +15077,18 @@ export interface operations {
                 source?: string;
                 assignedToId?: string;
                 minScore?: number;
+                /** @description Free-text search across first/last name, email, company and phone. */
+                q?: string;
+                /** @description Upper bound of the score band, paired with minScore. */
+                maxScore?: number;
+                /** @description Only leads created on/after this instant (ISO 8601). */
+                createdFrom?: string;
+                /** @description Only leads created on/before this instant (ISO 8601). */
+                createdTo?: string;
+                /** @description Max rows to return (default 50). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
             };
             header?: never;
             path?: never;
@@ -12945,6 +15151,115 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DuplicateGroupDto"][];
                 };
+            };
+        };
+    };
+    LeadsController_count: {
+        parameters: {
+            query?: {
+                status?: "NEW" | "CONTACTED" | "QUALIFIED" | "DISQUALIFIED" | "CONVERTED";
+                /** @description A LeadSource.code */
+                source?: string;
+                assignedToId?: string;
+                minScore?: number;
+                /** @description Free-text search across first/last name, email, company and phone. */
+                q?: string;
+                /** @description Upper bound of the score band, paired with minScore. */
+                maxScore?: number;
+                /** @description Only leads created on/after this instant (ISO 8601). */
+                createdFrom?: string;
+                /** @description Only leads created on/before this instant (ISO 8601). */
+                createdTo?: string;
+                /** @description Max rows to return (default 50). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": number;
+                };
+            };
+        };
+    };
+    LeadsController_stats: {
+        parameters: {
+            query?: {
+                status?: "NEW" | "CONTACTED" | "QUALIFIED" | "DISQUALIFIED" | "CONVERTED";
+                /** @description A LeadSource.code */
+                source?: string;
+                assignedToId?: string;
+                minScore?: number;
+                /** @description Free-text search across first/last name, email, company and phone. */
+                q?: string;
+                /** @description Upper bound of the score band, paired with minScore. */
+                maxScore?: number;
+                /** @description Only leads created on/after this instant (ISO 8601). */
+                createdFrom?: string;
+                /** @description Only leads created on/before this instant (ISO 8601). */
+                createdTo?: string;
+                /** @description Max rows to return (default 50). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadStatsResponseDto"];
+                };
+            };
+        };
+    };
+    LeadsController_export: {
+        parameters: {
+            query?: {
+                status?: "NEW" | "CONTACTED" | "QUALIFIED" | "DISQUALIFIED" | "CONVERTED";
+                /** @description A LeadSource.code */
+                source?: string;
+                assignedToId?: string;
+                minScore?: number;
+                /** @description Free-text search across first/last name, email, company and phone. */
+                q?: string;
+                /** @description Upper bound of the score band, paired with minScore. */
+                maxScore?: number;
+                /** @description Only leads created on/after this instant (ISO 8601). */
+                createdFrom?: string;
+                /** @description Only leads created on/before this instant (ISO 8601). */
+                createdTo?: string;
+                /** @description Max rows to return (default 50). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -13264,6 +15579,116 @@ export interface operations {
             };
         };
     };
+    IndustriesController_list: {
+        parameters: {
+            query?: {
+                /** @description Case-insensitive name search, powers the Account form's industry picker */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndustryResponseDto"][];
+                };
+            };
+        };
+    };
+    IndustriesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIndustryDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndustryResponseDto"];
+                };
+            };
+        };
+    };
+    IndustriesController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndustryResponseDto"];
+                };
+            };
+        };
+    };
+    IndustriesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    IndustriesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateIndustryDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndustryResponseDto"];
+                };
+            };
+        };
+    };
     PipelinesController_list: {
         parameters: {
             query?: never;
@@ -13371,6 +15796,27 @@ export interface operations {
             };
         };
     };
+    PipelinesController_usage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineUsageResponseDto"];
+                };
+            };
+        };
+    };
     PipelinesController_createStage: {
         parameters: {
             query?: never;
@@ -13472,9 +15918,23 @@ export interface operations {
                 pipelineId?: string;
                 pipelineStageId?: string;
                 ownerId?: string;
-                /** @description true = stage.isWon=false AND isLost=false */
-                isOpen?: boolean;
+                /** @description 'true' = stage.isWon=false AND isLost=false */
+                isOpen?: string;
                 lineOfBusiness?: string;
+                /** @description Free-text search across the opportunity name. */
+                q?: string;
+                /** @description Lower bound on deal amount, in the deal's own currency. */
+                minAmount?: number;
+                /** @description Upper bound on deal amount, in the deal's own currency. */
+                maxAmount?: number;
+                /** @description Only deals expected to close on/after this date (ISO 8601). */
+                closeFrom?: string;
+                /** @description Only deals expected to close on/before this date (ISO 8601). */
+                closeTo?: string;
+                /** @description Max rows to return (default 200). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
             };
             header?: never;
             path?: never;
@@ -13512,6 +15972,127 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["OpportunityResponseDto"];
                 };
+            };
+        };
+    };
+    OpportunitiesController_count: {
+        parameters: {
+            query?: {
+                accountId?: string;
+                pipelineId?: string;
+                pipelineStageId?: string;
+                ownerId?: string;
+                /** @description 'true' = stage.isWon=false AND isLost=false */
+                isOpen?: string;
+                lineOfBusiness?: string;
+                /** @description Free-text search across the opportunity name. */
+                q?: string;
+                /** @description Lower bound on deal amount, in the deal's own currency. */
+                minAmount?: number;
+                /** @description Upper bound on deal amount, in the deal's own currency. */
+                maxAmount?: number;
+                /** @description Only deals expected to close on/after this date (ISO 8601). */
+                closeFrom?: string;
+                /** @description Only deals expected to close on/before this date (ISO 8601). */
+                closeTo?: string;
+                /** @description Max rows to return (default 200). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": number;
+                };
+            };
+        };
+    };
+    OpportunitiesController_stats: {
+        parameters: {
+            query?: {
+                accountId?: string;
+                pipelineId?: string;
+                pipelineStageId?: string;
+                ownerId?: string;
+                /** @description 'true' = stage.isWon=false AND isLost=false */
+                isOpen?: string;
+                lineOfBusiness?: string;
+                /** @description Free-text search across the opportunity name. */
+                q?: string;
+                /** @description Lower bound on deal amount, in the deal's own currency. */
+                minAmount?: number;
+                /** @description Upper bound on deal amount, in the deal's own currency. */
+                maxAmount?: number;
+                /** @description Only deals expected to close on/after this date (ISO 8601). */
+                closeFrom?: string;
+                /** @description Only deals expected to close on/before this date (ISO 8601). */
+                closeTo?: string;
+                /** @description Max rows to return (default 200). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityStatsResponseDto"];
+                };
+            };
+        };
+    };
+    OpportunitiesController_export: {
+        parameters: {
+            query?: {
+                accountId?: string;
+                pipelineId?: string;
+                pipelineStageId?: string;
+                ownerId?: string;
+                /** @description 'true' = stage.isWon=false AND isLost=false */
+                isOpen?: string;
+                lineOfBusiness?: string;
+                /** @description Free-text search across the opportunity name. */
+                q?: string;
+                /** @description Lower bound on deal amount, in the deal's own currency. */
+                minAmount?: number;
+                /** @description Upper bound on deal amount, in the deal's own currency. */
+                maxAmount?: number;
+                /** @description Only deals expected to close on/after this date (ISO 8601). */
+                closeFrom?: string;
+                /** @description Only deals expected to close on/before this date (ISO 8601). */
+                closeTo?: string;
+                /** @description Max rows to return (default 200). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -13862,6 +16443,15 @@ export interface operations {
                 dueBefore?: string;
                 dueAfter?: string;
                 caseId?: string;
+                /** @description Powers an Account detail page's Tasks tab — previously had to be client-filtered from the full list. */
+                accountId?: string;
+                /** @description Free-text search across task title and description. */
+                q?: string;
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                /** @description Max rows to return (default 100). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
             };
             header?: never;
             path?: never;
@@ -13902,6 +16492,106 @@ export interface operations {
             };
         };
     };
+    TasksController_count: {
+        parameters: {
+            query?: {
+                assigneeId?: string;
+                status?: "OPEN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+                dueBefore?: string;
+                dueAfter?: string;
+                caseId?: string;
+                /** @description Powers an Account detail page's Tasks tab — previously had to be client-filtered from the full list. */
+                accountId?: string;
+                /** @description Free-text search across task title and description. */
+                q?: string;
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                /** @description Max rows to return (default 100). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": number;
+                };
+            };
+        };
+    };
+    TasksController_stats: {
+        parameters: {
+            query?: {
+                assigneeId?: string;
+                status?: "OPEN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+                dueBefore?: string;
+                dueAfter?: string;
+                caseId?: string;
+                /** @description Powers an Account detail page's Tasks tab — previously had to be client-filtered from the full list. */
+                accountId?: string;
+                /** @description Free-text search across task title and description. */
+                q?: string;
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                /** @description Max rows to return (default 100). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskStatsResponseDto"];
+                };
+            };
+        };
+    };
+    TasksController_export: {
+        parameters: {
+            query?: {
+                assigneeId?: string;
+                status?: "OPEN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+                dueBefore?: string;
+                dueAfter?: string;
+                caseId?: string;
+                /** @description Powers an Account detail page's Tasks tab — previously had to be client-filtered from the full list. */
+                accountId?: string;
+                /** @description Free-text search across task title and description. */
+                q?: string;
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                /** @description Max rows to return (default 100). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     TasksController_listMine: {
         parameters: {
             query?: {
@@ -13910,6 +16600,15 @@ export interface operations {
                 dueBefore?: string;
                 dueAfter?: string;
                 caseId?: string;
+                /** @description Powers an Account detail page's Tasks tab — previously had to be client-filtered from the full list. */
+                accountId?: string;
+                /** @description Free-text search across task title and description. */
+                q?: string;
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                /** @description Max rows to return (default 100). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
             };
             header?: never;
             path?: never;
@@ -14065,6 +16764,11 @@ export interface operations {
         parameters: {
             query?: {
                 entityType?: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY";
+                fieldType?: "TEXT" | "TEXTAREA" | "NUMBER" | "DECIMAL" | "DATE" | "BOOLEAN" | "SELECT" | "MULTI_SELECT" | "USER_REFERENCE" | "URL";
+                /** @description Filter by soft-delete state. Omit to see both. */
+                isActive?: string;
+                /** @description Matches label or jsonb key (case-insensitive, substring). */
+                q?: string;
             };
             header?: never;
             path?: never;
@@ -14102,6 +16806,56 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CustomFieldDefinitionResponseDto"];
                 };
+            };
+        };
+    };
+    CustomFieldDefinitionsController_stats: {
+        parameters: {
+            query?: {
+                entityType?: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY";
+                fieldType?: "TEXT" | "TEXTAREA" | "NUMBER" | "DECIMAL" | "DATE" | "BOOLEAN" | "SELECT" | "MULTI_SELECT" | "USER_REFERENCE" | "URL";
+                /** @description Filter by soft-delete state. Omit to see both. */
+                isActive?: string;
+                /** @description Matches label or jsonb key (case-insensitive, substring). */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomFieldDefinitionStatsResponseDto"];
+                };
+            };
+        };
+    };
+    CustomFieldDefinitionsController_export: {
+        parameters: {
+            query?: {
+                entityType?: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY";
+                fieldType?: "TEXT" | "TEXTAREA" | "NUMBER" | "DECIMAL" | "DATE" | "BOOLEAN" | "SELECT" | "MULTI_SELECT" | "USER_REFERENCE" | "URL";
+                /** @description Filter by soft-delete state. Omit to see both. */
+                isActive?: string;
+                /** @description Matches label or jsonb key (case-insensitive, substring). */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14308,6 +17062,9 @@ export interface operations {
             query?: {
                 scopeType?: "USER" | "DEPARTMENT" | "BRANCH" | "ORG";
                 userId?: string;
+                periodType?: "MONTH" | "QUARTER" | "YEAR";
+                /** @description Only quotas whose period covers today — the ones actually being measured right now. */
+                currentOnly?: string;
             };
             header?: never;
             path?: never;
@@ -14345,6 +17102,54 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SalesQuotaResponseDto"];
                 };
+            };
+        };
+    };
+    SalesQuotasController_stats: {
+        parameters: {
+            query?: {
+                scopeType?: "USER" | "DEPARTMENT" | "BRANCH" | "ORG";
+                userId?: string;
+                periodType?: "MONTH" | "QUARTER" | "YEAR";
+                /** @description Only quotas whose period covers today — the ones actually being measured right now. */
+                currentOnly?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesQuotaStatsResponseDto"];
+                };
+            };
+        };
+    };
+    SalesQuotasController_export: {
+        parameters: {
+            query?: {
+                scopeType?: "USER" | "DEPARTMENT" | "BRANCH" | "ORG";
+                userId?: string;
+                periodType?: "MONTH" | "QUARTER" | "YEAR";
+                /** @description Only quotas whose period covers today — the ones actually being measured right now. */
+                currentOnly?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14543,6 +17348,27 @@ export interface operations {
             };
         };
     };
+    AutomationRulesController_executionLog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationExecutionLogResponseDto"][];
+                };
+            };
+        };
+    };
     SitesController_list: {
         parameters: {
             query?: never;
@@ -14631,6 +17457,269 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SiteResponseDto"];
+                };
+            };
+        };
+    };
+    DataSubjectRequestsController_list: {
+        parameters: {
+            query?: {
+                contactId?: string;
+                status?: "PENDING" | "COMPLETED" | "REJECTED";
+                requestType?: "EXPORT" | "DELETE";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequestResponseDto"][];
+                };
+            };
+        };
+    };
+    DataSubjectRequestsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDataSubjectRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequestResponseDto"];
+                };
+            };
+        };
+    };
+    DataSubjectRequestsController_stats: {
+        parameters: {
+            query?: {
+                contactId?: string;
+                status?: "PENDING" | "COMPLETED" | "REJECTED";
+                requestType?: "EXPORT" | "DELETE";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequestStatsResponseDto"];
+                };
+            };
+        };
+    };
+    DataSubjectRequestsController_export: {
+        parameters: {
+            query?: {
+                contactId?: string;
+                status?: "PENDING" | "COMPLETED" | "REJECTED";
+                requestType?: "EXPORT" | "DELETE";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DataSubjectRequestsController_getOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequestResponseDto"];
+                };
+            };
+        };
+    };
+    DataSubjectRequestsController_process: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequestResponseDto"];
+                };
+            };
+        };
+    };
+    DataSubjectRequestsController_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectDataSubjectRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequestResponseDto"];
+                };
+            };
+        };
+    };
+    ConsentRecordsController_list: {
+        parameters: {
+            query: {
+                contactId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentRecordResponseDto"][];
+                };
+            };
+        };
+    };
+    ConsentRecordsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateConsentRecordDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentRecordResponseDto"];
+                };
+            };
+        };
+    };
+    ConsentRecordsController_current: {
+        parameters: {
+            query: {
+                contactId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentConsentDto"][];
+                };
+            };
+        };
+    };
+    ComplianceController_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComplianceSummaryResponseDto"];
+                };
+            };
+        };
+    };
+    ComplianceController_kyc: {
+        parameters: {
+            query?: {
+                take?: number;
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KycAccountRowDto"][];
                 };
             };
         };
@@ -15746,6 +18835,74 @@ export interface operations {
             };
         };
     };
+    SignatureRequestsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignatureRequestResponseDto"][];
+                };
+            };
+        };
+    };
+    SignatureRequestsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSignatureRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignatureRequestResponseDto"];
+                };
+            };
+        };
+    };
+    SignatureRequestsController_voidRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policyId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignatureRequestResponseDto"];
+                };
+            };
+        };
+    };
     DocumentsController_listCategories: {
         parameters: {
             query?: never;
@@ -15789,6 +18946,8 @@ export interface operations {
             query: {
                 categoryId: string;
                 search: string;
+                entityType: string;
+                entityId: string;
             };
             header?: never;
             path?: never;
@@ -16366,9 +19525,33 @@ export interface operations {
             };
         };
     };
-    NotificationsController_listMine: {
+    TeamsActionsController_handle: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationsController_listMine: {
+        parameters: {
+            query?: {
+                type?: string;
+                isRead?: "true" | "false";
+                take?: number;
+                skip?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -16402,6 +19585,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotificationResponseDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_markAllRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count?: number;
+                    };
+                };
+            };
+        };
+    };
+    NotificationsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationsController_bulkDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkNotificationIdsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationBulkActionResponseDto"];
                 };
             };
         };
@@ -16461,27 +19707,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SummarizeRequestDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AiGatewayController_replyDraft: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReplyDraftRequestDto"];
             };
         };
         responses: {
@@ -16598,7 +19823,7 @@ export interface operations {
             };
         };
     };
-    AiGatewayController_usageSummary: {
+    AiChatController_listSessions: {
         parameters: {
             query?: never;
             header?: never;
@@ -16607,7 +19832,97 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description ChatSessionResponseDto[] */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AiChatController_createSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ChatSessionResponseDto */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AiChatController_getMessages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ChatMessageResponseDto[] */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AiChatController_sendMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendChatMessageDto"];
+            };
+        };
+        responses: {
+            /** @description SendChatMessageResponseDto */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AiChatController_deleteSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -16660,6 +19975,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesForecastResponseDto"];
+                };
+            };
+        };
+    };
+    DashboardsController_getRenewalForecast: {
+        parameters: {
+            query?: {
+                /** @description The current month/quarter containing today */
+                period?: "month" | "quarter";
+                /** @description Filters to one RenewalSchedule.assignedToId */
+                ownerId?: string;
+                /** @description Filters to one line of business — independent of groupBy, which pivots the results instead of narrowing them */
+                lineOfBusiness?: string;
+                groupBy?: "status" | "owner" | "lineOfBusiness";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenewalForecastResponseDto"];
                 };
             };
         };
@@ -16937,7 +20279,7 @@ export interface operations {
                 entityType?: string;
                 entityId?: string;
                 actorUserId?: string;
-                action?: "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGIN_FAILED" | "PERMISSION_CHANGE" | "EXPORT" | "VIEW_SENSITIVE" | "FORCE_LOGOUT";
+                action?: "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGIN_FAILED" | "PERMISSION_CHANGE" | "EXPORT" | "VIEW_SENSITIVE" | "FORCE_LOGOUT" | "ACCESS_DENIED" | "SECURITY_ALERT" | "OWNERSHIP_TRANSFERRED";
                 /** @description ISO 8601 — matches createdAt >= from */
                 from?: string;
                 /** @description ISO 8601 — matches createdAt <= to */
@@ -16969,6 +20311,18 @@ export interface operations {
                 adjusterId?: string;
                 policyId?: string;
                 assignedTeamId?: string;
+                /** @description Free-text search across claim number and cause of loss. */
+                q?: string;
+                /** @description Only claims whose catastrophe event is this one — the "how exposed are we to this storm" filter. */
+                catastropheEventId?: string;
+                /** @description Date of loss on/after this date (ISO 8601). */
+                lossFrom?: string;
+                /** @description Date of loss on/before this date (ISO 8601). */
+                lossTo?: string;
+                /** @description Max rows to return (default 100). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
             };
             header?: never;
             path?: never;
@@ -17009,6 +20363,115 @@ export interface operations {
             };
         };
     };
+    ClaimsController_count: {
+        parameters: {
+            query?: {
+                status?: "NOTIFIED" | "UNDER_REVIEW" | "ADJUSTED" | "SETTLED" | "REPUDIATED" | "REOPENED" | "WITHDRAWN";
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                adjusterId?: string;
+                policyId?: string;
+                assignedTeamId?: string;
+                /** @description Free-text search across claim number and cause of loss. */
+                q?: string;
+                /** @description Only claims whose catastrophe event is this one — the "how exposed are we to this storm" filter. */
+                catastropheEventId?: string;
+                /** @description Date of loss on/after this date (ISO 8601). */
+                lossFrom?: string;
+                /** @description Date of loss on/before this date (ISO 8601). */
+                lossTo?: string;
+                /** @description Max rows to return (default 100). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": number;
+                };
+            };
+        };
+    };
+    ClaimsController_stats: {
+        parameters: {
+            query?: {
+                status?: "NOTIFIED" | "UNDER_REVIEW" | "ADJUSTED" | "SETTLED" | "REPUDIATED" | "REOPENED" | "WITHDRAWN";
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                adjusterId?: string;
+                policyId?: string;
+                assignedTeamId?: string;
+                /** @description Free-text search across claim number and cause of loss. */
+                q?: string;
+                /** @description Only claims whose catastrophe event is this one — the "how exposed are we to this storm" filter. */
+                catastropheEventId?: string;
+                /** @description Date of loss on/after this date (ISO 8601). */
+                lossFrom?: string;
+                /** @description Date of loss on/before this date (ISO 8601). */
+                lossTo?: string;
+                /** @description Max rows to return (default 100). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimStatsResponseDto"];
+                };
+            };
+        };
+    };
+    ClaimsController_export: {
+        parameters: {
+            query?: {
+                status?: "NOTIFIED" | "UNDER_REVIEW" | "ADJUSTED" | "SETTLED" | "REPUDIATED" | "REOPENED" | "WITHDRAWN";
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                adjusterId?: string;
+                policyId?: string;
+                assignedTeamId?: string;
+                /** @description Free-text search across claim number and cause of loss. */
+                q?: string;
+                /** @description Only claims whose catastrophe event is this one — the "how exposed are we to this storm" filter. */
+                catastropheEventId?: string;
+                /** @description Date of loss on/after this date (ISO 8601). */
+                lossFrom?: string;
+                /** @description Date of loss on/before this date (ISO 8601). */
+                lossTo?: string;
+                /** @description Max rows to return (default 100). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     ClaimsController_listMine: {
         parameters: {
             query?: {
@@ -17017,6 +20480,18 @@ export interface operations {
                 adjusterId?: string;
                 policyId?: string;
                 assignedTeamId?: string;
+                /** @description Free-text search across claim number and cause of loss. */
+                q?: string;
+                /** @description Only claims whose catastrophe event is this one — the "how exposed are we to this storm" filter. */
+                catastropheEventId?: string;
+                /** @description Date of loss on/after this date (ISO 8601). */
+                lossFrom?: string;
+                /** @description Date of loss on/before this date (ISO 8601). */
+                lossTo?: string;
+                /** @description Max rows to return (default 100). */
+                take?: number;
+                /** @description Rows to skip, for pagination. */
+                skip?: number;
             };
             header?: never;
             path?: never;
@@ -17494,6 +20969,124 @@ export interface operations {
                         total?: number;
                     };
                 };
+            };
+        };
+    };
+    CasesController_stats: {
+        parameters: {
+            query?: {
+                status?: "NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED";
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                caseType?: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
+                assignedToId?: string;
+                assignedTeamId?: string;
+                accountId?: string;
+                categoryId?: string;
+                /** @description Children of this case — powers the ticket detail page's "Related tickets" table */
+                parentCaseId?: string;
+                /** @description Assignee IN-filter — repeat the query param once per id (ticket workspace's "Agents Include") */
+                assignedToIds?: string[];
+                /** @description Team IN-filter — repeat the query param once per id ("Groups Include") */
+                assignedTeamIds?: string[];
+                /** @description status IN-filter — repeat the query param once per value */
+                statuses?: ("NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED")[];
+                /** @description status NOT-IN filter — repeat the query param once per value ("unresolved", "open in my groups", etc.) */
+                excludeStatuses?: ("NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED")[];
+                /** @description priority IN-filter — repeat the query param once per value */
+                priorities?: ("LOW" | "MEDIUM" | "HIGH" | "URGENT")[];
+                /** @description Narrow to cases whose assignedTeamId is one of the caller's own teams — resolved server-side from TeamMember, never client-suppliable team ids */
+                myTeams?: string;
+                /** @description Maps to createdById — "tickets I raised" */
+                raisedByUserId?: string;
+                /** @description Cases with a CaseWatcher row for this user — "tickets I'm watching" */
+                watchingUserId?: string;
+                /** @description status=NEW, OR assignedToId=caller AND status not in RESOLVED/CLOSED — "new and my open tickets" */
+                newOrMine?: string;
+                /** @description Cases with at least one comment whose outbound email delivery failed */
+                undeliveredOnly?: string;
+                /** @description Filters on the RUNNING RESOLUTION SlaClock's dueAt */
+                resolutionDueBy?: "OVERDUE" | "DUE_TODAY" | "DUE_THIS_WEEK";
+                createdPreset?: "TODAY" | "YESTERDAY" | "THIS_WEEK" | "THIS_MONTH";
+                closedPreset?: "TODAY" | "YESTERDAY" | "THIS_WEEK" | "THIS_MONTH";
+                resolvedPreset?: "TODAY" | "YESTERDAY" | "THIS_WEEK" | "THIS_MONTH";
+                /** @description Case-insensitive match against subject/caseNumber */
+                search?: string;
+                skip?: number;
+                take?: number;
+                sortBy?: "createdAt" | "priority" | "status";
+                sortDir?: "asc" | "desc";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseStatsResponseDto"];
+                };
+            };
+        };
+    };
+    CasesController_export: {
+        parameters: {
+            query?: {
+                status?: "NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED";
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                caseType?: "ENQUIRY" | "SERVICE_REQUEST" | "COMPLAINT";
+                assignedToId?: string;
+                assignedTeamId?: string;
+                accountId?: string;
+                categoryId?: string;
+                /** @description Children of this case — powers the ticket detail page's "Related tickets" table */
+                parentCaseId?: string;
+                /** @description Assignee IN-filter — repeat the query param once per id (ticket workspace's "Agents Include") */
+                assignedToIds?: string[];
+                /** @description Team IN-filter — repeat the query param once per id ("Groups Include") */
+                assignedTeamIds?: string[];
+                /** @description status IN-filter — repeat the query param once per value */
+                statuses?: ("NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED")[];
+                /** @description status NOT-IN filter — repeat the query param once per value ("unresolved", "open in my groups", etc.) */
+                excludeStatuses?: ("NEW" | "OPEN" | "PENDING_CUSTOMER" | "PENDING_CARRIER" | "RESOLVED" | "CLOSED" | "REOPENED")[];
+                /** @description priority IN-filter — repeat the query param once per value */
+                priorities?: ("LOW" | "MEDIUM" | "HIGH" | "URGENT")[];
+                /** @description Narrow to cases whose assignedTeamId is one of the caller's own teams — resolved server-side from TeamMember, never client-suppliable team ids */
+                myTeams?: string;
+                /** @description Maps to createdById — "tickets I raised" */
+                raisedByUserId?: string;
+                /** @description Cases with a CaseWatcher row for this user — "tickets I'm watching" */
+                watchingUserId?: string;
+                /** @description status=NEW, OR assignedToId=caller AND status not in RESOLVED/CLOSED — "new and my open tickets" */
+                newOrMine?: string;
+                /** @description Cases with at least one comment whose outbound email delivery failed */
+                undeliveredOnly?: string;
+                /** @description Filters on the RUNNING RESOLUTION SlaClock's dueAt */
+                resolutionDueBy?: "OVERDUE" | "DUE_TODAY" | "DUE_THIS_WEEK";
+                createdPreset?: "TODAY" | "YESTERDAY" | "THIS_WEEK" | "THIS_MONTH";
+                closedPreset?: "TODAY" | "YESTERDAY" | "THIS_WEEK" | "THIS_MONTH";
+                resolvedPreset?: "TODAY" | "YESTERDAY" | "THIS_WEEK" | "THIS_MONTH";
+                /** @description Case-insensitive match against subject/caseNumber */
+                search?: string;
+                skip?: number;
+                take?: number;
+                sortBy?: "createdAt" | "priority" | "status";
+                sortDir?: "asc" | "desc";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19624,7 +23217,8 @@ export interface operations {
         parameters: {
             query?: {
                 type?: "CSAT" | "NPS" | "CES";
-                isActive?: boolean;
+                /** @description 'true' / 'false' */
+                isActive?: string;
             };
             header?: never;
             path?: never;
@@ -20917,8 +24511,12 @@ export interface operations {
     };
     LoyaltyAccountsController_list: {
         parameters: {
-            query: {
-                search: string;
+            query?: {
+                /** @description Matches the enrolled account name (case-insensitive, substring). */
+                search?: string;
+                /** @description Exact tier match. Free text, not an enum — tenants define their own tiers. */
+                tier?: string;
+                take?: number;
             };
             header?: never;
             path?: never;
@@ -20956,6 +24554,54 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["LoyaltyAccountResponseDto"];
                 };
+            };
+        };
+    };
+    LoyaltyAccountsController_stats: {
+        parameters: {
+            query?: {
+                /** @description Matches the enrolled account name (case-insensitive, substring). */
+                search?: string;
+                /** @description Exact tier match. Free text, not an enum — tenants define their own tiers. */
+                tier?: string;
+                take?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyStatsResponseDto"];
+                };
+            };
+        };
+    };
+    LoyaltyAccountsController_export: {
+        parameters: {
+            query?: {
+                /** @description Matches the enrolled account name (case-insensitive, substring). */
+                search?: string;
+                /** @description Exact tier match. Free text, not an enum — tenants define their own tiers. */
+                tier?: string;
+                take?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -21125,7 +24771,7 @@ export interface operations {
     ApprovalsController_list: {
         parameters: {
             query?: {
-                status?: "PENDING" | "APPROVED" | "REJECTED";
+                status?: "PENDING" | "APPROVED" | "REJECTED" | "DECIDED";
             };
             header?: never;
             path?: never;

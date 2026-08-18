@@ -2,32 +2,16 @@
 
 import * as React from 'react';
 import type { ComponentProps } from 'react';
-import Link from 'next/link';
-import { Briefcase, CalendarClock, LayoutGrid, Percent, Trophy, TrendingUp, Users } from 'lucide-react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  GradientStatTile,
-  LineChart,
-  PieChart,
-  Skeleton,
-  Button,
-  categoricalColor,
-  type BarChartDatum,
-  type LineSeriesSpec,
-} from '@topiadesk/ui';
+import { LayoutGrid } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, LineChart, PieChart, Skeleton, Button, categoricalColor, type BarChartDatum, type LineSeriesSpec } from '@topiadesk/ui';
 import { formatNaira } from '@/app/(policy)/lib/format';
 import { CustomDashboardSection } from './custom-dashboard-section';
+import { KpiStrip } from './kpi-strip';
 import { PipelineFunnelChart } from './pipeline-funnel-chart';
 import { RenewalTimeline } from './renewal-timeline';
 import { SalesForecastPanel } from './sales-forecast-panel';
 import { RenewalForecastPanel } from './renewal-forecast-panel';
 import { useDealsTrend, useOperationalKpis, usePipelineFunnel, useRenewals } from './dashboard-hooks';
-
-const GRADIENT_ACCENTS = ['violet', 'navy', 'blue', 'teal'] as const;
 
 /** Top-N by value + a folded "Other" bucket — same cap-and-fold shape (reports)/_components/report-chart.tsx's capToTopCategories uses for pie/donut, reused here since dashboard-view.tsx calls PieChart directly rather than through that dispatcher. */
 function capToTop(data: BarChartDatum[], max = 5): BarChartDatum[] {
@@ -120,36 +104,7 @@ export function DashboardView() {
       </div>
 
       <div className="space-y-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            {kpisQuery.isLoading ? (
-              Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-[104px] w-full rounded-lg" />)
-            ) : kpisQuery.isError || !kpis ? (
-              <Card className="sm:col-span-2 lg:col-span-3 xl:col-span-6">
-                <CardContent className="py-6 text-sm text-destructive">Couldn&apos;t load operational KPIs.</CardContent>
-              </Card>
-            ) : (
-              <>
-                <Link href="/opportunities?isOpen=true" className="block rounded-lg transition-transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-ring">
-                  <GradientStatTile accent={GRADIENT_ACCENTS[0]} label="Open opportunities" value={kpis.openOpportunities} icon={<Briefcase />} description="active pipeline stages" />
-                </Link>
-                <Link href="/opportunities?isOpen=true" className="block rounded-lg transition-transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-ring">
-                  <GradientStatTile accent={GRADIENT_ACCENTS[1]} label="Pipeline value" value={formatNaira(kpis.pipelineValue)} icon={<TrendingUp />} description="sum of open opportunities" />
-                </Link>
-                <GradientStatTile accent={GRADIENT_ACCENTS[2]} label="Renewals due (90d)" value={kpis.renewalsDueNext90Days} icon={<CalendarClock />} description="across all policies" />
-                <Link href="/accounts?status=CLIENT" className="block rounded-lg transition-transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-ring">
-                  <GradientStatTile accent={GRADIENT_ACCENTS[3]} label="Active clients" value={kpis.activeClients} icon={<Users />} description="accounts on CLIENT status" />
-                </Link>
-                <GradientStatTile accent={GRADIENT_ACCENTS[0]} label="Won this month" value={kpis.wonThisMonthCount} icon={<Trophy />} description={formatNaira(kpis.wonThisMonthValue)} />
-                <GradientStatTile
-                  accent={GRADIENT_ACCENTS[1]}
-                  label="Win rate"
-                  value={kpis.winRate === null ? '—' : `${Math.round(kpis.winRate * 100)}%`}
-                  icon={<Percent />}
-                  description="won vs. decided, all-time"
-                />
-              </>
-            )}
-          </div>
+        <KpiStrip kpis={kpis} isLoading={kpisQuery.isLoading} isError={kpisQuery.isError} />
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card>

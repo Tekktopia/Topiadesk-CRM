@@ -19,6 +19,8 @@ export interface AuthenticatedUser {
   departmentName: string | null;
   branchId: string | null;
   branchName: string | null;
+  /** Ordered kpi-tile-catalog.ts keys for the dashboard's KPI strip. Null means "use the default 6". */
+  kpiTilePreferences: string[] | null;
 }
 
 /** The real session contents — access/refresh/ID tokens plus their expiry.

@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, Res, StreamableFile, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { getPrismaClient, type Claim } from '@topiadesk/db';
+import type { Response } from 'express';
+import { getPrismaClient, type Claim, type ClaimStatus, type Prisma } from '@topiadesk/db';
 import { AuditLogResponseDto } from '../audit/dto/audit-log-response.dto';
 import { loadEntityHistory } from '../audit/entity-history';
 import { PermissionGuard } from '../../common/auth/permission.guard';
@@ -8,6 +9,8 @@ import { RequirePermission } from '../../common/auth/require-permission.decorato
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
 import { decimalToString } from '../policy/decimal.util';
+import { claimsToCsv } from './claim-csv';
+import { BASE_CURRENCY, loadExchangeRates, toBaseCurrency } from '../dashboards/currency.util';
 // NOT type-only imports: both services are constructor-injected below —
 // Nest's DI resolves constructor parameter types via emitDecoratorMetadata's
 // design:paramtypes, which needs the real class reference at runtime (same
@@ -24,6 +27,7 @@ import {
   ChangeClaimStatusDto,
   ClaimQueryDto,
   ClaimResponseDto,
+  ClaimStatsResponseDto,
   ClaimStatusHistoryResponseDto,
   CreateClaimDto,
   ReopenClaimDto,
@@ -68,17 +72,101 @@ export class ClaimsController {
   @ApiOkResponse({ type: [ClaimResponseDto] })
   async list(@Query() query: ClaimQueryDto): Promise<ClaimResponseDto[]> {
     const claims = await getPrismaClient().claim.findMany({
-      where: {
-        status: query.status,
-        priority: query.priority,
-        adjusterId: query.adjusterId,
-        policyId: query.policyId,
-        assignedTeamId: query.assignedTeamId,
-      },
+      where: claimListWhere(query),
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      // `take` was hardcoded at 100 with no skip — page 2 was unreachable.
+      take: query.take ?? 100,
+      skip: query.skip ?? 0,
     });
     return claims.map(toClaimDto);
+  }
+
+  // Must precede ':id' — Nest matches literal segments in declaration order
+  // ahead of a dynamic param competing for the same position.
+  @Get('count')
+  @RequirePermission('claim', 'read')
+  @ApiOkResponse({ type: Number })
+  async count(@Query() query: ClaimQueryDto): Promise<{ count: number }> {
+    const count = await getPrismaClient().claim.count({ where: claimListWhere(query) });
+    return { count };
+  }
+
+  /**
+   * Claims-desk aggregates — see ClaimStatsResponseDto for why reserve and
+   * settled are reported separately rather than as one total.
+   */
+  @Get('stats')
+  @RequirePermission('claim', 'read')
+  @ApiOkResponse({ type: ClaimStatsResponseDto })
+  async stats(@Query() query: ClaimQueryDto): Promise<ClaimStatsResponseDto> {
+    const prisma = getPrismaClient();
+    const where = claimListWhere(query);
+
+    // Claim has no currency column — it inherits the parent Policy's, so the
+    // policy currency has to travel with each row to normalize before summing.
+    const [rows, exchangeRates] = await Promise.all([
+      prisma.claim.findMany({
+        where,
+        select: {
+          status: true,
+          reserveAmount: true,
+          settledAmount: true,
+          reopenCount: true,
+          policy: { select: { currency: true } },
+        },
+      }),
+      loadExchangeRates(),
+    ]);
+
+    const TERMINAL: ClaimStatus[] = ['SETTLED', 'REPUDIATED', 'WITHDRAWN'];
+    let open = 0;
+    let settled = 0;
+    let repudiated = 0;
+    let reopened = 0;
+    let outstandingReserve = 0;
+    let totalSettled = 0;
+
+    for (const row of rows) {
+      const currency = row.policy.currency;
+      if (row.reopenCount > 0) reopened += 1;
+      if (row.status === 'SETTLED') {
+        settled += 1;
+        totalSettled += toBaseCurrency(Number(row.settledAmount ?? 0), currency, exchangeRates);
+      } else if (row.status === 'REPUDIATED') {
+        repudiated += 1;
+      }
+      if (!TERMINAL.includes(row.status)) {
+        open += 1;
+        // Reserve only counts while the claim is live — a settled claim's
+        // leftover reserve is not outstanding exposure.
+        outstandingReserve += toBaseCurrency(Number(row.reserveAmount ?? 0), currency, exchangeRates);
+      }
+    }
+
+    const round2 = (n: number): number => Math.round(n * 100) / 100;
+    return {
+      total: rows.length,
+      open,
+      settled,
+      repudiated,
+      reopened,
+      baseCurrency: BASE_CURRENCY,
+      outstandingReserve: round2(outstandingReserve),
+      totalSettled: round2(totalSettled),
+    };
+  }
+
+  @Get('export')
+  @RequirePermission('claim', 'read')
+  async export(@Query() query: ClaimQueryDto, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
+    const claims = await getPrismaClient().claim.findMany({
+      where: claimListWhere(query),
+      orderBy: { createdAt: 'desc' },
+      take: 10_000,
+    });
+    const csv = claimsToCsv(claims);
+    res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="claims.csv"' });
+    return new StreamableFile(Buffer.from(csv, 'utf-8'));
   }
 
   // Must precede ':id' — Nest matches literal segments in declaration order
@@ -298,4 +386,35 @@ export class ClaimsController {
     await this.watchers.remove({ claimId: id }, userId);
     return { deleted: true };
   }
+}
+
+/**
+ * Shared by list/count/stats/export so all four agree on what the current
+ * filter selects — same contract as the CRM modules' *ListWhere helpers.
+ */
+function claimListWhere(query: ClaimQueryDto): Prisma.ClaimWhereInput {
+  const q = query.q?.trim();
+  const hasLossBand = Boolean(query.lossFrom || query.lossTo);
+  return {
+    status: query.status,
+    priority: query.priority,
+    adjusterId: query.adjusterId,
+    policyId: query.policyId,
+    assignedTeamId: query.assignedTeamId,
+    catastropheEventId: query.catastropheEventId,
+    dateOfLoss: hasLossBand
+      ? {
+          gte: query.lossFrom ? new Date(query.lossFrom) : undefined,
+          lte: query.lossTo ? new Date(query.lossTo) : undefined,
+        }
+      : undefined,
+    ...(q
+      ? {
+          OR: [
+            { claimNumber: { contains: q, mode: 'insensitive' as const } },
+            { causeOfLoss: { contains: q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+  };
 }

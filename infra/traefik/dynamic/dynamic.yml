@@ -13,6 +13,25 @@ tls:
     default:
       minVersion: VersionTLS12
       sniStrict: false
+  # mkcert-generated, locally-trusted certificate for *.topiadesk.localhost
+  # (infra/traefik/certs/, git-ignored — generated per-machine, not
+  # committed). Without this, every websecure router falls back to
+  # Traefik's own self-signed default cert (see traefik.yml's own comment):
+  # fine for normal page loads (click through the browser warning), but a
+  # real, hard blocker for Service Worker registration specifically —
+  # browsers refuse to register a service worker over a connection with an
+  # untrusted certificate, no click-through override exists for that one
+  # case. Found live: 2026-08-15 (SW registration failing with an SSL
+  # certificate error in the browser console).
+  #
+  # Regenerate with (from infra/traefik/certs/):
+  #   mkcert -cert-file topiadesk-localhost.pem -key-file topiadesk-localhost-key.pem "topiadesk.localhost" "*.topiadesk.localhost"
+  # Requires `mkcert -install` to have been run once on this machine (adds
+  # mkcert's local CA to the system/browser trust stores — needs an
+  # interactive sudo password, so it can't be scripted/automated here).
+  certificates:
+    - certFile: /etc/traefik/certs/topiadesk-localhost.pem
+      keyFile: /etc/traefik/certs/topiadesk-localhost-key.pem
 
 http:
   middlewares:
@@ -26,3 +45,19 @@ http:
         referrerPolicy: "strict-origin-when-cross-origin"
         customResponseHeaders:
           X-Robots-Tag: "noindex, nofollow"
+    # Edge-level flood protection, per source IP — coarser and deliberately
+    # more generous than backend/api's own ThrottlerGuard (300 req/60s,
+    # per-authenticated-caller; see rate-limit-related security-audit
+    # finding). This one's job is stopping a true connection flood before
+    # it ever reaches the app (many legit users can share one IP behind
+    # NAT/corporate egress, so this can't be as tight as the app-level
+    # per-user limit without false-positiving on them). Not a substitute
+    # for a real WAF/DDoS service (Cloudflare, AWS WAF/Shield) in front of
+    # this host in production — that's a provider decision this generic
+    # config can't make, but this is real protection in the meantime and
+    # stays useful alongside one either way.
+    rate-limit:
+      rateLimit:
+        average: 50
+        burst: 100
+        period: 1s

@@ -233,6 +233,11 @@ enum DocumentEntityType {
   CLAIM
   CASE
   CARRIER
+  /// Evidence for a regulatory filing — the submitted return, the
+  /// regulator's acknowledgement, board minutes. Reuses DocumentLink rather
+  /// than a dedicated column so a filing can carry several artefacts and
+  /// inherits the existing retention/virus-scan/versioning machinery.
+  COMPLIANCE_FILING
 }
 
 enum RetentionAction {
@@ -250,6 +255,19 @@ enum AuditAction {
   EXPORT
   VIEW_SENSITIVE
   FORCE_LOGOUT
+  /// PermissionGuard's coarse "zero grant at any scope" denial — see that
+  /// guard's own call to AuditService.recordEvent(). Feeds
+  /// detect-anomalies.job.ts's permission-denied-burst check.
+  ACCESS_DENIED
+  /// Emitted by detect-anomalies.job.ts itself for a detected burst/
+  /// off-hours pattern (not a raw per-event log line like the others
+  /// above — one row per alert actually raised).
+  SECURITY_ALERT
+  /// Account.ownerId changed via the dedicated transfer-owner endpoint
+  /// (accounts.controller.ts) rather than a generic PATCH — kept distinct
+  /// from UPDATE so ownership moves are individually queryable/auditable,
+  /// and carries a reason in changedFields alongside fromOwnerId/toOwnerId.
+  OWNERSHIP_TRANSFERRED
 }
 
 enum ConnectorType {
@@ -365,6 +383,7 @@ enum AiFeature {
   AUTO_CATEGORIZATION
   SEMANTIC_EMBEDDING
   SEMANTIC_SEARCH
+  CHAT
 }
 
 enum DashboardVisibility {
@@ -442,34 +461,41 @@ model TeamMember {
 }
 
 model User {
-  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  keycloakSubjectId String         @unique @map("keycloak_subject_id")
-  email             String         @unique
-  fullName          String         @map("full_name")
-  phone             String?
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  keycloakSubjectId  String         @unique @map("keycloak_subject_id")
+  email              String         @unique
+  fullName           String         @map("full_name")
+  phone              String?
   /// MinIO object key under the shared documents bucket (`avatars/{userId}/...`)
   /// — never a public URL, since MinIO isn't internet-reachable (same
   /// reasoning as DocumentVersion.storageKey). Streamed through
   /// GET /identity/me/avatar, self-only in this pass.
-  avatarStorageKey  String?        @map("avatar_storage_key")
-  departmentId      String?        @map("department_id") @db.Uuid
-  department        Department?    @relation(fields: [departmentId], references: [id])
-  branchId          String?        @map("branch_id") @db.Uuid
-  branch            Branch?        @relation(fields: [branchId], references: [id])
+  avatarStorageKey   String?        @map("avatar_storage_key")
+  /// Ordered array of kpi-tile-catalog.ts keys (frontend/web) — which
+  /// tiles the main dashboard's top KPI strip shows, and in what order.
+  /// Null/empty means "use the default 6" (kpi-tile-catalog.ts's
+  /// DEFAULT_KPI_TILE_KEYS) — no backfill needed for existing users.
+  /// Self-only, read/written via GET|PATCH /identity/me alongside
+  /// fullName/phone, same as every other personal-preference field there.
+  kpiTilePreferences Json?          @map("kpi_tile_preferences")
+  departmentId       String?        @map("department_id") @db.Uuid
+  department         Department?    @relation(fields: [departmentId], references: [id])
+  branchId           String?        @map("branch_id") @db.Uuid
+  branch             Branch?        @relation(fields: [branchId], references: [id])
   /// Free text (e.g. "Team Lead", "Supervisor", "Senior Agent") — display/
   /// labeling only, deliberately not a closed enum. The functional
   /// reporting-line piece workflows actually route approvals through is
   /// managerId below, not this field.
-  positionTitle     String?        @map("position_title")
-  managerId         String?        @map("manager_id") @db.Uuid
-  manager           User?          @relation("UserManager", fields: [managerId], references: [id])
-  directReports     User[]         @relation("UserManager")
-  status            UserStatus     @default(ACTIVE)
-  presenceStatus    PresenceStatus @default(OFFLINE) @map("presence_status")
-  presenceUpdatedAt DateTime?      @map("presence_updated_at") @db.Timestamptz(6)
-  lastSyncedAt      DateTime?      @map("last_synced_at") @db.Timestamptz(6)
-  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  positionTitle      String?        @map("position_title")
+  managerId          String?        @map("manager_id") @db.Uuid
+  manager            User?          @relation("UserManager", fields: [managerId], references: [id])
+  directReports      User[]         @relation("UserManager")
+  status             UserStatus     @default(ACTIVE)
+  presenceStatus     PresenceStatus @default(OFFLINE) @map("presence_status")
+  presenceUpdatedAt  DateTime?      @map("presence_updated_at") @db.Timestamptz(6)
+  lastSyncedAt       DateTime?      @map("last_synced_at") @db.Timestamptz(6)
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   roles           UserRole[]
   teamMemberships TeamMember[]
@@ -493,6 +519,7 @@ model User {
   notifications               Notification[]       @relation("NotificationRecipient")
   createdAutomationRules      AutomationRule[]     @relation("AutomationRuleCreatedBy")
   aiUsage                     AiUsageLedger[]      @relation("AiUsageUser")
+  aiChatSessions              AiChatSession[]      @relation("AiChatSessionUser")
   ownedDashboards             SavedDashboard[]     @relation("DashboardOwner")
   updatedOrgSettings          OrgSetting[]         @relation("OrgSettingUpdatedBy")
   dsrRequested                DataSubjectRequest[] @relation("DsrRequestedBy")
@@ -542,7 +569,12 @@ model User {
 
   // --- Enterprise pass: identity ---
   pendingRoleGrants          PendingRoleGrant[]
-  requestedPendingRoleGrants PendingRoleGrant[] @relation("PendingRoleGrantRequestedBy")
+  requestedPendingRoleGrants PendingRoleGrant[]        @relation("PendingRoleGrantRequestedBy")
+  complianceObligationsOwned ComplianceObligation[]    @relation("ComplianceObligationOwner")
+  complianceFilingsSubmitted ComplianceFiling[]        @relation("ComplianceFilingSubmittedBy")
+  territoriesManaged         Territory[]               @relation("TerritoryManager")
+  territoryMemberships       TerritoryMember[]         @relation("TerritoryMemberUser")
+  graphConnection            MicrosoftGraphConnection? @relation("GraphConnectionUser")
 
   @@map("users")
 }
@@ -591,13 +623,13 @@ enum FieldPermissionVisibility {
 /// small fixed allowlist per resource, same "fixed keys, not an open query"
 /// convention as SavedView.filters / AutomationRule condition filters.
 model FieldPermission {
-  id         String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  roleId     String                     @map("role_id") @db.Uuid
-  role       Role                       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  id         String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roleId     String                    @map("role_id") @db.Uuid
+  role       Role                      @relation(fields: [roleId], references: [id], onDelete: Cascade)
   resource   String
-  fieldName  String                     @map("field_name")
+  fieldName  String                    @map("field_name")
   visibility FieldPermissionVisibility
-  createdAt  DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt  DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@unique([roleId, resource, fieldName])
   @@map("field_permissions")
@@ -715,49 +747,63 @@ model Industry {
 // =============================================================================
 
 model Account {
-  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name              String
-  accountType       AccountType   @map("account_type")
-  status            AccountStatus @default(PROSPECT)
-  industryId        String?       @map("industry_id") @db.Uuid
-  industry          Industry?     @relation(fields: [industryId], references: [id])
-  annualRevenueBand String?       @map("annual_revenue_band")
-  riskRating        RiskRating?   @map("risk_rating")
-  addressLine1      String?       @map("address_line1")
-  addressLine2      String?       @map("address_line2")
-  city              String?
-  state             String?
-  country           String?       @default("NG")
-  postalCode        String?       @map("postal_code")
+  id                    String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                  String
+  accountType           AccountType   @map("account_type")
+  status                AccountStatus @default(PROSPECT)
+  industryId            String?       @map("industry_id") @db.Uuid
+  industry              Industry?     @relation(fields: [industryId], references: [id])
+  annualRevenueBand     String?       @map("annual_revenue_band")
+  riskRating            RiskRating?   @map("risk_rating")
+  addressLine1          String?       @map("address_line1")
+  addressLine2          String?       @map("address_line2")
+  city                  String?
+  state                 String?
+  country               String?       @default("NG")
+  postalCode            String?       @map("postal_code")
   /// FSC's Account.KYC Status/KYC Expiry/NAICOM ID — compliance fields
   /// gating the "KYC Expiry Flow" automation (see
   /// policy-lifecycle.ts's assertKycValidForRenewal): a RENEWAL policy
   /// version can't be created against this account unless kycStatus is
   /// VERIFIED and kycExpiryDate is more than 30 days out.
-  kycStatus         KycStatus     @default(NOT_STARTED) @map("kyc_status")
-  kycExpiryDate     DateTime?     @map("kyc_expiry_date") @db.Date
-  naicomId          String?       @map("naicom_id")
-  parentAccountId   String?       @map("parent_account_id") @db.Uuid
-  parentAccount     Account?      @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
-  subAccounts       Account[]     @relation("AccountHierarchy")
-  ownerId           String        @map("owner_id") @db.Uuid
-  owner             User          @relation("AccountOwner", fields: [ownerId], references: [id])
-  source            String?
-  notes             String?
+  kycStatus             KycStatus     @default(NOT_STARTED) @map("kyc_status")
+  kycExpiryDate         DateTime?     @map("kyc_expiry_date") @db.Date
+  naicomId              String?       @map("naicom_id")
+  parentAccountId       String?       @map("parent_account_id") @db.Uuid
+  parentAccount         Account?      @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
+  subAccounts           Account[]     @relation("AccountHierarchy")
+  ownerId               String        @map("owner_id") @db.Uuid
+  owner                 User          @relation("AccountOwner", fields: [ownerId], references: [id])
+  source                String?
+  notes                 String?
   /// Arbitrary org-defined fields (see CustomFieldDefinition) — a jsonb
   /// column, not an EAV table, so it inherits this row's RLS policy for
   /// free and needs no join on list queries. Validated against active
   /// CustomFieldDefinition rows at the service layer before write.
-  customFields      Json          @default("{}") @map("custom_fields")
+  customFields          Json          @default("{}") @map("custom_fields")
   /// Composite 0-100 relationship-health signal — renewal status + open
   /// claims + payment aging, NOT underwriting risk (see riskRating, which
   /// stays 100% manual). Recomputed by refresh-health-score.job.ts; null
   /// until the first run, or if the account has no renewal/claims/premium
   /// data to score at all.
-  healthScore           Int?      @map("health_score")
-  healthScoreComputedAt DateTime? @map("health_score_computed_at") @db.Timestamptz(6)
-  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  healthScore           Int?          @map("health_score")
+  healthScoreComputedAt DateTime?     @map("health_score_computed_at") @db.Timestamptz(6)
+  /// Free-form org-defined labels (e.g. "high-value", "at-risk-renewal") —
+  /// a plain text array rather than a shared Tag registry table: simpler to
+  /// query (`hasSome`/`has` on the array column, no join) and this app has
+  /// no cross-entity tag reuse requirement yet. Filterable via
+  /// AccountQueryDto.tag; not RLS-relevant (visibility still keys off
+  /// owner_id only).
+  tags                  String[]      @default([])
+  /// Soft-delete flag — DELETE /crm/accounts/:id (and bulk/delete) archive
+  /// rather than hard-delete, matching Document.isArchived's pattern:
+  /// avoids the FK-RESTRICT-on-Policy crash a hard delete could hit, and
+  /// keeps the row (and its audit history) around instead of losing it
+  /// outright. Excluded from list() by default; included via
+  /// AccountQueryDto.includeArchived.
+  isArchived            Boolean       @default(false) @map("is_archived")
+  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   contacts         Contact[]
   relationshipsAsA AccountRelationship[] @relation("RelationshipAccountA")
@@ -772,8 +818,14 @@ model Account {
   loyaltyAccount   LoyaltyAccount?
   slaOverrides     AccountSlaOverride[]
   sites            Site[]
+  /// Which book of business this client sits in. Optional — a client can
+  /// exist before anyone decides whose book it belongs to, and forcing a
+  /// territory at creation would block that.
+  territoryId      String?               @map("territory_id") @db.Uuid
+  territory        Territory?            @relation(fields: [territoryId], references: [id], onDelete: SetNull)
 
   @@index([status])
+  @@index([ownerId])
   @@map("accounts")
 }
 
@@ -795,19 +847,19 @@ model AccountRelationship {
 /// CHECK constraint (prisma/rls/004_check_constraints.sql); Prisma's DSL
 /// cannot express cross-column checks.
 model Contact {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  accountId     String?  @map("account_id") @db.Uuid
-  account       Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  carrierId     String?  @map("carrier_id") @db.Uuid
-  carrier       Carrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId     String?   @map("account_id") @db.Uuid
+  account       Account?  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  carrierId     String?   @map("carrier_id") @db.Uuid
+  carrier       Carrier?  @relation(fields: [carrierId], references: [id], onDelete: Cascade)
   /// Optional — which of the account's Sites (branches) this contact
   /// belongs to, for a corporate client with multiple locations. Not
   /// required: most accounts have zero Sites and every Contact is simply
   /// account-wide.
-  siteId        String?  @map("site_id") @db.Uuid
-  site          Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
-  firstName     String   @map("first_name")
-  lastName      String   @map("last_name")
+  siteId        String?   @map("site_id") @db.Uuid
+  site          Site?     @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  firstName     String    @map("first_name")
+  lastName      String    @map("last_name")
   email         String?
   phone         String?
   title         String?
@@ -817,14 +869,14 @@ model Contact {
   /// can't express cleanly" call as elsewhere in this schema). `title`
   /// stays the job-title field for Business-account contacts; this is a
   /// distinct concept even though both are free strings.
-  householdRole String?  @map("household_role")
+  householdRole String?   @map("household_role")
   /// FSC's Contact.ID Type/ID Number — supporting identity-document detail
   /// for the parent Account's kycStatus, not a separate parallel KYC state
   /// on Contact itself (the FSC spec's own field list keeps KYC Status/
   /// Expiry on Account only).
-  idType        String?  @map("id_type")
-  idNumber      String?  @map("id_number")
-  isPrimary     Boolean  @default(false) @map("is_primary")
+  idType        String?   @map("id_type")
+  idNumber      String?   @map("id_number")
+  isPrimary     Boolean   @default(false) @map("is_primary")
   /// Set by DataSubjectRequestsController.process() on a DELETE request —
   /// see DataSubjectRequest's own schema comment for why this is anonymize-
   /// in-place, not a hard delete. Non-null is the durable "this contact was
@@ -833,9 +885,9 @@ model Contact {
   /// processed it, but this field is what every other reader — a contact
   /// list, a form pre-fill — needs to check first).
   anonymizedAt  DateTime? @map("anonymized_at") @db.Timestamptz(6)
-  customFields  Json     @default("{}") @map("custom_fields")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  customFields  Json      @default("{}") @map("custom_fields")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   cases                Case[]
   campaignRecipients   CampaignRecipient[]
@@ -911,21 +963,21 @@ enum DataSubjectRequestStatus {
 /// than routed through the Document/MinIO pipeline — a small point-in-time
 /// JSON snapshot, not a file worth its own storage lifecycle.
 model DataSubjectRequest {
-  id            String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  contactId     String                    @map("contact_id") @db.Uuid
-  contact       Contact                   @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  requestType   DataSubjectRequestType    @map("request_type")
-  status        DataSubjectRequestStatus  @default(PENDING)
+  id            String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contactId     String                   @map("contact_id") @db.Uuid
+  contact       Contact                  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  requestType   DataSubjectRequestType   @map("request_type")
+  status        DataSubjectRequestStatus @default(PENDING)
   notes         String?
-  requestedById String                    @map("requested_by_id") @db.Uuid
-  requestedBy   User                      @relation("DsrRequestedBy", fields: [requestedById], references: [id])
+  requestedById String                   @map("requested_by_id") @db.Uuid
+  requestedBy   User                     @relation("DsrRequestedBy", fields: [requestedById], references: [id])
   /// EXPORT only — a point-in-time JSON snapshot (contact fields + related
   /// activities + parent account name), written once by process().
-  exportData    Json?                     @map("export_data")
-  processedById String?                   @map("processed_by_id") @db.Uuid
-  processedBy   User?                     @relation("DsrProcessedBy", fields: [processedById], references: [id])
-  processedAt   DateTime?                 @map("processed_at") @db.Timestamptz(6)
-  createdAt     DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  exportData    Json?                    @map("export_data")
+  processedById String?                  @map("processed_by_id") @db.Uuid
+  processedBy   User?                    @relation("DsrProcessedBy", fields: [processedById], references: [id])
+  processedAt   DateTime?                @map("processed_at") @db.Timestamptz(6)
+  createdAt     DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("data_subject_requests")
 }
@@ -1078,38 +1130,38 @@ model Lead {
 }
 
 model Opportunity {
-  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  accountId         String        @map("account_id") @db.Uuid
-  account           Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  name              String
-  pipelineStageId   String        @map("pipeline_stage_id") @db.Uuid
-  pipelineStage     PipelineStage @relation(fields: [pipelineStageId], references: [id])
-  amount            Decimal       @db.Decimal(15, 2)
+  id                        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId                 String        @map("account_id") @db.Uuid
+  account                   Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  name                      String
+  pipelineStageId           String        @map("pipeline_stage_id") @db.Uuid
+  pipelineStage             PipelineStage @relation(fields: [pipelineStageId], references: [id])
+  amount                    Decimal       @db.Decimal(15, 2)
   /// ISO 4217 code — Opportunity has no FK path to anything else that
   /// carries currency (unlike Premium/Claim/etc., which inherit Policy.
   /// currency), so it gets its own column, same "NGN default" convention
   /// as Policy.currency. See ExchangeRate for how a non-NGN amount gets
   /// normalized into the org's base currency for dashboard/report totals.
-  currency          String        @default("NGN")
-  probability       Int
-  expectedCloseDate DateTime      @map("expected_close_date") @db.Date
-  actualCloseDate   DateTime?     @map("actual_close_date") @db.Date
-  wonReason         String?       @map("won_reason")
-  lostReason        String?       @map("lost_reason")
-  ownerId           String        @map("owner_id") @db.Uuid
-  owner             User          @relation("OpportunityOwner", fields: [ownerId], references: [id])
-  lineOfBusiness    String?       @map("line_of_business")
-  customFields      Json          @default("{}") @map("custom_fields")
+  currency                  String        @default("NGN")
+  probability               Int
+  expectedCloseDate         DateTime      @map("expected_close_date") @db.Date
+  actualCloseDate           DateTime?     @map("actual_close_date") @db.Date
+  wonReason                 String?       @map("won_reason")
+  lostReason                String?       @map("lost_reason")
+  ownerId                   String        @map("owner_id") @db.Uuid
+  owner                     User          @relation("OpportunityOwner", fields: [ownerId], references: [id])
+  lineOfBusiness            String?       @map("line_of_business")
+  customFields              Json          @default("{}") @map("custom_fields")
   /// Composite 0-100 "is this deal on track" signal — overdue-vs-
   /// expectedCloseDate + activity-engagement-staleness, averaged. Only
   /// computed for OPEN opportunities (pipelineStage.isWon=false AND
   /// isLost=false) — null once a deal is decided, and null until the first
   /// refresh-deal-health.job.ts run. Distinct from `probability` (a
   /// human-set/stage-default forecast weight, never touched by this job).
-  dealHealthScore           Int?      @map("deal_health_score")
-  dealHealthScoreComputedAt DateTime? @map("deal_health_score_computed_at") @db.Timestamptz(6)
-  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  dealHealthScore           Int?          @map("deal_health_score")
+  dealHealthScoreComputedAt DateTime?     @map("deal_health_score_computed_at") @db.Timestamptz(6)
+  createdAt                 DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   sourceLead        Lead?                         @relation("LeadConvertedOpportunity")
   marketSubmissions OpportunityMarketSubmission[]
@@ -1182,6 +1234,14 @@ model Activity {
   externalThreadId    String?                      @map("external_thread_id")
   externalMessageId   String?                      @unique @map("external_message_id")
   emailDeliveryStatus ActivityEmailDeliveryStatus? @map("email_delivery_status")
+  /// Actual recipients used for an OUTBOUND Case email — either the caller's
+  /// explicit choice (SendCaseEmailDialog's To/Cc fields) or, for the
+  /// legacy path (no explicit recipient given), whatever
+  /// resolveCaseEmail() auto-resolved, written back by the worker so the
+  /// timeline can always show who really got this. Empty for everything
+  /// that isn't an OUTBOUND Case email.
+  emailTo             String[]                     @default([]) @map("email_to")
+  emailCc             String[]                     @default([]) @map("email_cc")
   aiSentiment         String?                      @map("ai_sentiment")
   aiSentimentScore    Decimal?                     @map("ai_sentiment_score") @db.Decimal(4, 3)
   aiAnalyzedAt        DateTime?                    @map("ai_analyzed_at") @db.Timestamptz(6)
@@ -1573,7 +1633,7 @@ model Document {
   createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  versions          DocumentVersion[]    @relation("DocumentVersions")
+  versions          DocumentVersion[]  @relation("DocumentVersions")
   links             DocumentLink[]
   policyVersions    PolicyVersion[]
   signatureRequests SignatureRequest[]
@@ -1595,7 +1655,7 @@ model DocumentVersion {
   changeNote     String?  @map("change_note")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  currentForDocument Document? @relation("DocumentCurrentVersion")
+  currentForDocument Document?          @relation("DocumentCurrentVersion")
   signatureRequests  SignatureRequest[]
 
   @@unique([documentId, versionNumber])
@@ -1969,6 +2029,28 @@ model AutomationRule {
   /// simply have no `id`/goto and execute exactly as before (fall through
   /// to the next array index).
   steps       Json?
+  /// SCHEDULE trigger only. Standard 5-field cron, resolved in
+  /// `scheduleTimezone`. Null on ENTITY_EVENT rules, which are woken by the
+  /// event queue instead. Until this column existed, SCHEDULE was a trigger
+  /// type with no way to say WHEN and no job looking for it — rules created
+  /// on /admin/automations were stored and never ran (the page said so in
+  /// its own description). See packages/automation/src/schedule.ts.
+  scheduleCron     String?          @map("schedule_cron")
+  /// IANA zone the cron is resolved in — "weekdays at 8am" means 8am where
+  /// the firm is, and a Lagos broker running on UTC would fire an hour early.
+  scheduleTimezone String           @default("UTC") @map("schedule_timezone")
+  /// Next due instant, precomputed on save and after every run so the scan
+  /// job can find due rules with an indexed `nextRunAt <= now()` rather than
+  /// parsing every rule's cron on every wake-up.
+  nextRunAt        DateTime?        @map("next_run_at") @db.Timestamptz(6)
+  lastRunAt        DateTime?        @map("last_run_at") @db.Timestamptz(6)
+  /// 'OK' | 'FAILED' | 'SKIPPED' — surfaced on the rules list so a rule that
+  /// has quietly stopped working is visible without opening its log.
+  lastRunStatus    String?          @map("last_run_status")
+  lastRunError     String?          @map("last_run_error")
+  /// How many records the last scheduled run acted on. A rule matching zero
+  /// every time is usually mis-scoped, and that is only obvious as a number.
+  lastMatchCount   Int?             @map("last_match_count")
   isActive    Boolean               @default(true) @map("is_active")
   /// DRAFT rules are never matched by the engine (see the `status:
   /// 'PUBLISHED'` filter in automation-events.queue.ts and
@@ -1987,6 +2069,8 @@ model AutomationRule {
   executionLogs        AutomationExecutionLog[]
   defaultForCategories CaseCategory[]
 
+  /// Drives the scheduled scan's "which rules are due" query.
+  @@index([triggerType, isActive, status, nextRunAt])
   @@map("automation_rules")
 }
 
@@ -2014,24 +2098,24 @@ enum AutomationExecutionStatus {
 /// nullable + SetNull (not Cascade) so a log entry survives rule deletion
 /// — ruleName is denormalized alongside it for exactly that reason.
 model AutomationExecutionLog {
-  id            String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ruleId        String?                    @map("rule_id") @db.Uuid
-  rule          AutomationRule?            @relation(fields: [ruleId], references: [id], onDelete: SetNull)
-  ruleName      String                     @map("rule_name")
+  id            String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ruleId        String?                   @map("rule_id") @db.Uuid
+  rule          AutomationRule?           @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  ruleName      String                    @map("rule_name")
   /// 'CASE' | 'CLAIM' | 'POLICY' — POLICY covers renewal-playbook firings,
   /// which act on a Policy/RenewalSchedule, not a Case/Claim; kept a plain
   /// string (not CaseManagementEntityType) since it needs to represent that
   /// third case CaseManagementEntityType doesn't model.
-  entityType    String                     @map("entity_type")
-  entityId      String?                    @map("entity_id") @db.Uuid
+  entityType    String                    @map("entity_type")
+  entityId      String?                   @map("entity_id") @db.Uuid
   /// 'ENTITY_EVENT' | 'RENEWAL_PLAYBOOK' — which of the two flat-execution
   /// sites produced this row.
-  triggerSource String                     @map("trigger_source")
+  triggerSource String                    @map("trigger_source")
   status        AutomationExecutionStatus
   /// ActionExecutionResult[] — {actionType, ok, error?} per action, in
   /// order (see action-handler.ts).
-  actionResults Json                       @map("action_results")
-  createdAt     DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  actionResults Json                      @map("action_results")
+  createdAt     DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([ruleId, createdAt])
   @@index([entityType, entityId])
@@ -2107,28 +2191,76 @@ model AiUsageLedger {
   @@map("ai_usage_ledger")
 }
 
+enum AiChatRole {
+  USER
+  ASSISTANT
+}
+
+/// One conversation thread with the CRM AI copilot (ai-gateway.controller.ts's
+/// POST /ai-gateway/chat/sessions/:id/messages) — the copilot's own
+/// read-only tool-use loop lets Claude look up real account/case data
+/// mid-conversation instead of answering purely from the prompt (see
+/// chat-tools.ts). Personal to the user who started it — no ALL-scope
+/// oversight grant, unlike AiUsageLedger's own org-wide spend-tracking use
+/// case, since a conversation's CONTENT (not just its cost) is private to
+/// whoever asked. See this model's own RLS policy, ai_chat_sessions_rw.
+model AiChatSession {
+  id        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String          @map("user_id") @db.Uuid
+  user      User            @relation("AiChatSessionUser", fields: [userId], references: [id], onDelete: Cascade)
+  /// First user message, truncated — same "derive a title from the first
+  /// line" convention most chat UIs use, computed once at creation rather
+  /// than kept in sync with later messages.
+  title     String?
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  messages  AiChatMessage[]
+
+  @@index([userId, updatedAt])
+  @@map("ai_chat_sessions")
+}
+
+/// Append-only — a session's history is never edited/deleted in place,
+/// same convention as ConsentRecord/ClaimStatusHistory. Tool-use
+/// round-trips (the copilot calling search_accounts etc.) happen entirely
+/// within one ASSISTANT turn's own Anthropic API call and aren't persisted
+/// as separate rows — only the user's question and the model's final text
+/// reply are stored, keeping the conversation log readable as a normal
+/// back-and-forth rather than exposing tool-call plumbing.
+model AiChatMessage {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId String        @map("session_id") @db.Uuid
+  session   AiChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      AiChatRole
+  content   String
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([sessionId, createdAt])
+  @@map("ai_chat_messages")
+}
+
 /// Chunked embeddings for semantic search over notes/documents (first real
 /// consumer: backend/api/src/modules/ai-gateway/ POST /ai/index + /ai/search).
 /// `embedding` uses pgvector via Prisma's Unsupported type — vector
 /// similarity queries are raw SQL (Prisma has no typed query API for it).
-/// Dimension is 1024, not the 1536 this column originally shipped with
-/// (sized for OpenAI's ada-002/text-embedding-3-small default): Anthropic has
-/// no embeddings API, so Voyage AI (Anthropic's recommended embeddings
-/// partner — see voyage-client.ts) is the actual provider, and Voyage's
-/// `output_dimension` only offers 256/512/1024(default)/2048 — 1536 isn't one
-/// of them. Changed via a real migration (20260803_.../migration.sql) rather
+/// Dimension is 384 — the output size of the local, in-process embedding
+/// model (all-MiniLM-L6-v2, see local/local-embeddings.service.ts) that
+/// replaced the external Voyage AI API this column was previously sized for
+/// (1024). Changed via a real migration
+/// (20260812020000_semantic_embedding_local_dimension/migration.sql) rather
 /// than editing the original CREATE TABLE, but verified costless first: this
-/// table had zero production rows at the time (see that migration's header
-/// comment).
+/// table had zero rows at the time (Voyage never had a real API key
+/// configured in this environment, so nothing was ever successfully
+/// indexed — see that migration's header comment).
 model SemanticEmbedding {
-  id         String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  entityType String                      @map("entity_type")
-  entityId   String                      @map("entity_id") @db.Uuid
-  chunkIndex Int                         @default(0) @map("chunk_index")
+  id         String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType String                     @map("entity_type")
+  entityId   String                     @map("entity_id") @db.Uuid
+  chunkIndex Int                        @default(0) @map("chunk_index")
   content    String
-  embedding  Unsupported("vector(1024)")
+  embedding  Unsupported("vector(384)")
   model      String
-  createdAt  DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt  DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@unique([entityType, entityId, model, chunkIndex])
   @@map("semantic_embeddings")
@@ -2229,6 +2361,16 @@ enum CaseManagementEntityType {
   /// same "representable but no evaluating code path yet" precedent this
   /// enum's own CLAIM value already sets for BusinessRule.
   LEAD
+  /// Added so AutomationRunState can carry a multi-step workflow run against
+  /// any entity automation supports — an approval gate on an opportunity or
+  /// a policy is a far more common brokerage need than one on a ticket. Same
+  /// additive precedent as LEAD above: the other five models sharing this
+  /// enum gain members with no evaluating code path.
+  POLICY
+  OPPORTUNITY
+  TASK
+  ACCOUNT
+  CONTACT
 }
 
 enum SlaMetricType {
@@ -3510,4 +3652,325 @@ model LoyaltyTransaction {
 
   @@index([loyaltyAccountId, createdAt])
   @@map("loyalty_transactions")
+}
+
+// ---------------------------------------------------------------------------
+// Compliance obligations register + regulatory returns calendar
+// ---------------------------------------------------------------------------
+
+/// Who the obligation is owed to. Free-form OTHER exists because a broker
+/// also carries contractual obligations (carrier binder audits, PI insurer
+/// warranties) that aren't statutory but are tracked on the same calendar.
+enum ComplianceRegulator {
+  NAICOM
+  NDPC
+  SCUML_NFIU
+  FIRS
+  CBN
+  INTERNAL
+  OTHER
+}
+
+enum ComplianceFrequency {
+  ONE_OFF
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+}
+
+/// Lifecycle of a single filing occurrence. ACCEPTED is distinct from
+/// SUBMITTED on purpose: a return that was filed but bounced back is the
+/// exact situation a compliance team needs visible, and collapsing the two
+/// would hide it.
+enum ComplianceFilingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+}
+
+/// A recurring (or one-off) regulatory duty — "NAICOM quarterly return",
+/// "NDPC annual data-protection audit", "SCUML renewal", "PI cover renewal".
+///
+/// This is the RULE, not the event: each due occurrence is a ComplianceFiling
+/// below. Separating them is what makes the register auditable — a regulator
+/// asks "prove you filed Q1", and the answer is a row with a date, a
+/// submitter and an attached receipt, not a status flag that was overwritten
+/// the next quarter.
+model ComplianceObligation {
+  id           String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String
+  description  String?
+  regulator    ComplianceRegulator
+  /// The rule being satisfied, e.g. "Insurance Act 2003 s.40" or
+  /// "NDPA 2023 s.32". Free text — citations vary in form and a lookup table
+  /// would be stale the first time a regulation is amended.
+  reference    String?
+  frequency    ComplianceFrequency
+  /// Days before dueDate that work should start — drives the "due soon"
+  /// bucket. Per-obligation because a quarterly return needs a fortnight
+  /// while an annual audit needs a quarter.
+  leadTimeDays Int                 @default(14) @map("lead_time_days")
+  ownerId      String?             @map("owner_id") @db.Uuid
+  owner        User?               @relation("ComplianceObligationOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  /// Soft-disable rather than delete — a retired obligation's filing history
+  /// is still evidence and must survive.
+  isActive     Boolean             @default(true) @map("is_active")
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  filings ComplianceFiling[]
+
+  @@index([regulator])
+  @@index([ownerId])
+  @@map("compliance_obligations")
+}
+
+/// One due occurrence of an obligation — "Q1 2026", "FY2025".
+///
+/// `dueDate` is stored, never derived at read time: regulators move
+/// deadlines, and a recomputed date would silently rewrite history about
+/// whether a past filing was late.
+model ComplianceFiling {
+  id            String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  obligationId  String                 @map("obligation_id") @db.Uuid
+  obligation    ComplianceObligation   @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+  /// Human label for the period this filing covers, e.g. "Q1 2026".
+  periodLabel   String                 @map("period_label")
+  dueDate       DateTime               @map("due_date") @db.Date
+  status        ComplianceFilingStatus @default(NOT_STARTED)
+  submittedAt   DateTime?              @map("submitted_at") @db.Timestamptz(6)
+  submittedById String?                @map("submitted_by_id") @db.Uuid
+  submittedBy   User?                  @relation("ComplianceFilingSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  /// The regulator's own acknowledgement/receipt number — the single most
+  /// useful field when proving a filing landed.
+  reference     String?
+  notes         String?
+  createdAt     DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// One filing per obligation per period — makes generating the next
+  /// occurrence idempotent, so a scheduler can run twice without duplicating.
+  @@unique([obligationId, periodLabel])
+  @@index([dueDate])
+  @@index([status])
+  @@map("compliance_filings")
+}
+
+// ---------------------------------------------------------------------------
+// Territories / books of business
+// ---------------------------------------------------------------------------
+
+/// How a book is carved up. A brokerage rarely uses just one axis — Lagos
+/// corporate and Marine specialists can both be real books over the same
+/// clients — so this is a label on the territory, not a partition of the
+/// client base.
+enum TerritoryType {
+  GEOGRAPHIC
+  INDUSTRY
+  PRODUCT
+  NAMED_ACCOUNTS
+}
+
+/// A named book of business with people attached.
+///
+/// Ownership already exists per-account (Account.ownerId) and moving a whole
+/// book between people is handled by book-transfer.controller.ts. What this
+/// adds is the STRUCTURE around that: a durable name for a book, who leads
+/// it, who works it, and a hierarchy so "Lagos" can roll up into "South
+/// West". Without it, a book only exists as whichever accounts happen to
+/// share an owner today, which disappears the moment that person leaves.
+model Territory {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  description String?
+  type        TerritoryType @default(GEOGRAPHIC)
+  /// Self-referential hierarchy. Depth is not constrained in the schema —
+  /// the API guards against cycles, same approach as Account's own parent
+  /// relationship.
+  parentId    String?       @map("parent_id") @db.Uuid
+  parent      Territory?    @relation("TerritoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Territory[]   @relation("TerritoryHierarchy")
+  managerId   String?       @map("manager_id") @db.Uuid
+  manager     User?         @relation("TerritoryManager", fields: [managerId], references: [id], onDelete: SetNull)
+  /// Soft-disable rather than delete — a retired territory's accounts keep
+  /// pointing at it, and the reporting history stays meaningful.
+  isActive    Boolean       @default(true) @map("is_active")
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  members  TerritoryMember[]
+  accounts Account[]
+
+  @@unique([name])
+  @@index([parentId])
+  @@map("territories")
+}
+
+/// Who works a territory. Separate from Territory.managerId: the manager is
+/// accountable for the book, members are the producers in it, and the same
+/// person is often both.
+model TerritoryMember {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  territoryId String    @map("territory_id") @db.Uuid
+  territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id") @db.Uuid
+  user        User      @relation("TerritoryMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([territoryId, userId])
+  @@index([userId])
+  @@map("territory_members")
+}
+
+// ---------------------------------------------------------------------------
+// Microsoft 365 (Graph) calendar + mail sync
+// ---------------------------------------------------------------------------
+
+enum GraphSyncKind {
+  CALENDAR
+  MAIL
+}
+
+enum GraphConnectionStatus {
+  CONNECTED
+  /// The refresh token no longer works — the user must re-consent. Kept
+  /// distinct from DISABLED so the UI can tell "you turned this off" from
+  /// "this broke and needs you".
+  NEEDS_RECONSENT
+  DISABLED
+}
+
+/// One user's Microsoft 365 mailbox/calendar link.
+///
+/// Per-USER, not per-tenant: Graph tokens are delegated, so each producer
+/// consents for their own mailbox. Tokens are stored with the same
+/// AES-256-GCM helper the integration OAuth credentials already use
+/// (oauth-token-crypto.ts) rather than a second crypto path.
+model MicrosoftGraphConnection {
+  id                    String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String                @unique @map("user_id") @db.Uuid
+  user                  User                  @relation("GraphConnectionUser", fields: [userId], references: [id], onDelete: Cascade)
+  /// Graph's own object id for the signed-in user, so a mailbox can be
+  /// recognised even if the UPN is renamed.
+  microsoftUserId       String                @map("microsoft_user_id")
+  microsoftUpn          String                @map("microsoft_upn")
+  encryptedAccessToken  String                @map("encrypted_access_token")
+  encryptedRefreshToken String?               @map("encrypted_refresh_token")
+  expiresAt             DateTime?             @map("expires_at") @db.Timestamptz(6)
+  scopes                String[]
+  /// Independently toggleable: a producer may want meetings captured without
+  /// their entire inbox flowing into the CRM.
+  calendarSyncEnabled   Boolean               @default(true) @map("calendar_sync_enabled")
+  mailSyncEnabled       Boolean               @default(false) @map("mail_sync_enabled")
+  status                GraphConnectionStatus @default(CONNECTED)
+  lastSyncedAt          DateTime?             @map("last_synced_at") @db.Timestamptz(6)
+  lastSyncError         String?               @map("last_sync_error")
+  createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  syncStates    GraphSyncState[]
+  subscriptions GraphSubscription[]
+
+  @@map("microsoft_graph_connections")
+}
+
+/// Graph delta cursor per resource.
+///
+/// The deltaLink is what makes repeat syncs incremental instead of refetching
+/// a mailbox every run. It is stored rather than derived because Graph will
+/// not reissue it — losing it means a full resync.
+model GraphSyncState {
+  id           String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  connectionId String                   @map("connection_id") @db.Uuid
+  connection   MicrosoftGraphConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  kind         GraphSyncKind
+  deltaLink    String?                  @map("delta_link")
+  lastRunAt    DateTime?                @map("last_run_at") @db.Timestamptz(6)
+  createdAt    DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([connectionId, kind])
+  @@map("graph_sync_states")
+}
+
+/// A Graph change-notification subscription.
+///
+/// Graph subscriptions expire in about three days, so `expiresAt` is not
+/// bookkeeping — a renewal job reads it, and a missed renewal silently stops
+/// all push updates for that mailbox. `clientState` is the shared secret the
+/// webhook handler checks so a forged notification can't inject activities.
+model GraphSubscription {
+  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  connectionId   String                   @map("connection_id") @db.Uuid
+  connection     MicrosoftGraphConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  kind           GraphSyncKind
+  subscriptionId String                   @unique @map("subscription_id")
+  clientState    String                   @map("client_state")
+  expiresAt      DateTime                 @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([connectionId, kind])
+  @@map("graph_subscriptions")
+}
+
+// ---------------------------------------------------------------------------
+// Outbound mail settings (per tenant, admin-managed)
+// ---------------------------------------------------------------------------
+
+/// Which service is sending. Only a LABEL — it drives the setup hints and
+/// host/port presets in the UI, never the transport, which is plain SMTP for
+/// every option. Adding a provider therefore needs no backend change.
+enum MailProvider {
+  BREVO
+  SENDGRID
+  MAILJET
+  MICROSOFT365
+  GOOGLE_WORKSPACE
+  AMAZON_SES
+  CUSTOM
+}
+
+/// A tenant's own outbound mail transport.
+///
+/// Exists so switching provider is an admin action, not a redeploy: the
+/// SMTP_* env vars are process-wide and identical for every tenant, which is
+/// wrong the moment one firm wants Microsoft 365 and another wants Brevo.
+///
+/// One logical row per tenant, enforced in the controller rather than by a
+/// DB constraint — the same singleton-config convention MicrosoftSsoConfig
+/// uses.
+///
+/// When `isActive` is false (or no row exists) the mailer falls back to the
+/// SMTP_* environment variables, so a dev stack keeps working against
+/// MailDev with nothing configured.
+model MailSettings {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider          MailProvider @default(CUSTOM)
+  host              String
+  port              Int
+  /// true for implicit TLS (465), false for STARTTLS (587). Not derivable
+  /// from the port alone — some providers offer both.
+  secure            Boolean      @default(false)
+  username          String?
+  /// AES-256-GCM via packages/config's secret-crypto. NEVER returned by the
+  /// API — responses report only whether one is set.
+  encryptedPassword String?      @map("encrypted_password")
+  fromName          String       @map("from_name")
+  /// Must be an address on a domain verified with the provider, or real
+  /// providers reject the send outright.
+  fromEmail         String       @map("from_email")
+  replyToEmail      String?      @map("reply_to_email")
+  isActive          Boolean      @default(false) @map("is_active")
+  /// Set by the "send test email" action — an admin should never enable a
+  /// transport they have not proven works.
+  lastTestedAt      DateTime?    @map("last_tested_at") @db.Timestamptz(6)
+  lastTestError     String?      @map("last_test_error")
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("mail_settings")
 }

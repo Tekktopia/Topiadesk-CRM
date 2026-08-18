@@ -1,94 +1,126 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useMutation, useQueries, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import { toast } from '@topiadesk/ui';
+import { csrfHeaders } from '@/lib/csrf';
 import { apiFetch, ApiRequestError, buildQuery } from './api';
 import type {
   Account,
+  AccountClaimRow,
   AccountDetail,
   AccountGroupRollup,
+  AccountImportResult,
   AccountQuery,
   AccountRelationship,
   AccountRenewalRow,
   AccountSlaOverride,
+  AccountStats,
   Activity,
   ActivityQuery,
+  ActivityStats,
+  BranchRef,
   BulkActionResponse,
   BulkAssignInput,
   BulkDeleteInput,
+  BulkUpdateTasksInput,
   Carrier,
   CarrierMarketSubmissionRow,
   CarrierPolicyRow,
+  CarrierQuery,
   CarrierScorecard,
+  CarrierStats,
   CheckAccountDuplicatesQuery,
   CheckContactOrLeadDuplicatesQuery,
+  ConsentRecord,
   Contact,
   ContactQuery,
+  ContactStats,
   ConvertLeadInput,
   ConvertLeadResponse,
   CreateAccountInput,
   CreateAccountRelationshipInput,
   CreateActivityInput,
   CreateCarrierInput,
+  CreateConsentRecordInput,
   CreateContactInput,
   CreateCustomFieldDefinitionInput,
+  CreateDataSubjectRequestInput,
   CreateLeadInput,
+  CreateLeadSourceInput,
   CreateMarketSubmissionInput,
   CreateOpportunityInput,
+  CreatePipelineInput,
+  CreatePipelineStageInput,
   CreateSalesQuotaInput,
   CreateSavedViewInput,
   CreateSiteInput,
   CreateTaskInput,
-  ConsentRecord,
-  CreateConsentRecordInput,
-  CreateDataSubjectRequestInput,
+  CreateTerritoryInput,
+  CrossSellQuery,
+  CrossSellRow,
+  CrossSellStats,
   CurrentConsent,
   CustomFieldDefinition,
+  CustomFieldDefinitionQuery,
+  CustomFieldDefinitionStats,
   CustomFieldEntityType,
   DataSubjectRequest,
+  DataSubjectRequestQuery,
+  DataSubjectRequestStats,
+  DepartmentRef,
   DirectoryUser,
   DuplicateGroup,
+  Industry,
   Lead,
   LeadQuery,
   LeadSourceOption,
-  CreateLeadSourceInput,
-  UpdateLeadSourceInput,
+  LeadStats,
   LoyaltyAccount,
+  LoyaltyAccountQuery,
+  LoyaltyStats,
   LoyaltyTransaction,
   MarketSubmission,
-  BranchRef,
-  DepartmentRef,
   MergeResponse,
   Opportunity,
   OpportunityQuery,
-  StageHistoryEntry,
-  PipelineDetail,
+  OpportunityStats,
   Pipeline,
+  PipelineDetail,
   PipelineStage,
-  CreatePipelineInput,
-  UpdatePipelineInput,
-  CreatePipelineStageInput,
-  UpdatePipelineStageInput,
+  PipelineUsage,
   QuotaAttainment,
   RunSavedViewResult,
   SalesQuota,
+  SalesQuotaQuery,
+  SalesQuotaStats,
   SavedView,
   SavedViewEntityType,
   Site,
+  StageHistoryEntry,
   Task,
   TaskQuery,
+  TaskStats,
+  Territory,
+  TerritoryQuery,
+  TerritoryStats,
   UpdateAccountInput,
   UpdateAccountRelationshipInput,
+  UpdateActivityInput,
   UpdateCarrierInput,
   UpdateContactInput,
   UpdateCustomFieldDefinitionInput,
   UpdateLeadInput,
+  UpdateLeadSourceInput,
   UpdateOpportunityInput,
   UpdateOpportunityStageInput,
+  UpdatePipelineInput,
+  UpdatePipelineStageInput,
   UpdateSalesQuotaInput,
   UpdateSavedViewInput,
   UpdateSiteInput,
   UpdateTaskInput,
+  UpdateTerritoryInput
 } from './types';
 
 function errorMessage(err: unknown): string {
@@ -203,12 +235,187 @@ export function useDeleteAccount() {
   });
 }
 
-/** Small id->name lookup for cards/lists that only carry a raw accountId (e.g. the opportunity Kanban). */
+/**
+ * Small id->name lookup for cards/lists that only carry a raw accountId
+ * (e.g. the opportunity Kanban).
+ *
+ * Memoized on query.data for exactly the reason spelled out on
+ * useDirectoryUsers below: an unmemoized Map is a BRAND-NEW reference on
+ * every render, and `accountsById` is threaded into
+ * opportunities-table-view.tsx's `columns` useMemo deps. A new columns array
+ * every render hands TanStack Table a "changed" column set forever, which is
+ * a real render loop — the page pegs and stops responding to clicks. This
+ * hook was the last copy of the bug that useDirectoryUsers already fixed.
+ */
+/** Whitespace per client — which lines they hold and which they don't. */
+export function useTerritories(query: TerritoryQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'territories', query],
+    queryFn: () => apiFetch<Territory[]>(`/api/crm/territories${buildQuery(query)}`),
+  });
+}
+
+export function useTerritoryStats(query: TerritoryQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'territories', 'stats', query],
+    queryFn: () => apiFetch<TerritoryStats>(`/api/crm/territories/stats${buildQuery(query)}`),
+  });
+}
+
+export function useCreateTerritory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateTerritoryInput) =>
+      apiFetch<Territory>('/api/crm/territories', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'territories'] });
+      toast.success('Territory created');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useUpdateTerritory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...input }: UpdateTerritoryInput & { id: string }) =>
+      apiFetch<Territory>(`/api/crm/territories/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'territories'] });
+      toast.success('Territory updated');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+/** Soft-disable — the API never hard-deletes, so accounts keep their history. */
+export function useDeactivateTerritory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<{ deactivated: boolean }>(`/api/crm/territories/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'territories'] });
+      toast.success('Territory retired');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useCrossSell(query: CrossSellQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'cross-sell', query],
+    queryFn: () => apiFetch<CrossSellRow[]>(`/api/crm/cross-sell${buildQuery(query)}`),
+  });
+}
+
+export function useCrossSellStats(query: CrossSellQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'cross-sell', 'stats', query],
+    queryFn: () => apiFetch<CrossSellStats>(`/api/crm/cross-sell/stats${buildQuery(query)}`),
+  });
+}
+
 export function useAccountsLookup() {
   const query = useAccounts({ take: 250 });
-  const byId = new Map<string, Account>();
-  for (const account of query.data ?? []) byId.set(account.id, account);
-  return { accountsById: byId, isLoading: query.isLoading };
+  const accountsById = useMemo(() => {
+    const byId = new Map<string, Account>();
+    for (const account of query.data ?? []) byId.set(account.id, account);
+    return byId;
+  }, [query.data]);
+  return { accountsById, isLoading: query.isLoading };
+}
+
+/** Real total for the current filter set — list() caps `take` for payload size, so the list response alone can't tell the accounts list page how many rows exist past the fetched page. */
+/** Book-of-business aggregates over the same filter set as the accounts table. */
+export function useAccountStats(query: AccountQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'accounts', 'stats', query],
+    queryFn: () => apiFetch<AccountStats>(`/api/crm/accounts/stats${buildQuery(query)}`),
+  });
+}
+
+export function useAccountsCount(query: AccountQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'accounts', 'count', query],
+    queryFn: () => apiFetch<{ count: number }>(`/api/crm/accounts/count${buildQuery(query)}`),
+  });
+}
+
+export function useAccountClaims(accountId: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'accounts', accountId, 'claims'],
+    queryFn: () => apiFetch<AccountClaimRow[]>(`/api/crm/accounts/${accountId}/claims`),
+    enabled: Boolean(accountId),
+  });
+}
+
+export function useRestoreAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<Account>(`/api/crm/accounts/${id}/restore`, { method: 'POST' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts'] });
+      toast.success('Account restored');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+/** Distinct from useUpdateAccount — captures a reason and writes a dedicated OWNERSHIP_TRANSFERRED audit row instead of a plain field update. */
+export function useTransferAccountOwner(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { newOwnerId: string; reason?: string }) =>
+      apiFetch<Account>(`/api/crm/accounts/${accountId}/transfer-owner`, { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts'] });
+      toast.success('Ownership transferred');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useImportAccountsCsv() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/crm/accounts/import', { method: 'POST', headers: csrfHeaders('POST'), body: formData });
+      const body = (await res.json().catch(() => null)) as (AccountImportResult & { message?: string }) | null;
+      if (!res.ok) throw new Error(body?.message ?? 'Import failed');
+      return body as AccountImportResult;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts'] });
+      const parts = [`${result.created} created`, `${result.updated} updated`];
+      if (result.errors.length > 0) parts.push(`${result.errors.length} row error(s)`);
+      toast.success(`Import complete — ${parts.join(', ')}`);
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Import failed'),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Industries — open reference list, no dedicated permission resource (see
+// industries.controller.ts). Powers the Account form's searchable industry
+// picker, replacing what used to be a raw UUID text input.
+// ---------------------------------------------------------------------------
+
+export function useIndustries(search?: string) {
+  return useQuery({
+    queryKey: ['crm', 'industries', search ?? ''],
+    queryFn: () => apiFetch<Industry[]>(`/api/crm/industries${buildQuery({ search })}`),
+  });
+}
+
+/** Resolves one industry's name from just its id — used to show the currently-set value when editing an account (the account form only ever stores industryId, not a denormalized name). */
+export function useIndustry(id: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'industries', 'byId', id],
+    queryFn: () => apiFetch<Industry>(`/api/crm/industries/${id}`),
+    enabled: Boolean(id),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -270,6 +477,24 @@ export function useDeleteAccountRelationship(accountId: string) {
 // Contacts
 // ---------------------------------------------------------------------------
 
+/** Real total for the current contact filters — useContacts() caps `take`. */
+export function useContactsCount(query: ContactQuery) {
+  return useQuery({
+    queryKey: ['crm', 'contacts', 'count', query],
+    queryFn: () => apiFetch<{ count: number }>(`/api/crm/contacts/count${buildQuery(query)}`),
+    enabled: Boolean(query.accountId || query.carrierId || query.q),
+  });
+}
+
+/** Contact-book aggregates (reachability, primaries, anonymized). */
+export function useContactStats(query: ContactQuery) {
+  return useQuery({
+    queryKey: ['crm', 'contacts', 'stats', query],
+    queryFn: () => apiFetch<ContactStats>(`/api/crm/contacts/stats${buildQuery(query)}`),
+    enabled: Boolean(query.accountId || query.carrierId || query.q),
+  });
+}
+
 export function useContacts(query: ContactQuery) {
   return useQuery({
     queryKey: ['crm', 'contacts', query],
@@ -293,11 +518,20 @@ export function useContactsByIds(ids: string[]) {
       queryFn: () => apiFetch<Contact>(`/api/crm/contacts/${id}`),
     })),
   });
-  const byId = new Map<string, Contact>();
-  for (const q of queries) {
-    if (q.data) byId.set(q.data.id, q.data);
-  }
-  return { contactsById: byId, isLoading: queries.some((q) => q.isLoading) };
+  // Same memoization requirement as useAccountsLookup/useDirectoryUsers.
+  // useQueries returns a new results ARRAY each render, so the Map is keyed
+  // on the resolved data rather than on `queries` itself — depending on the
+  // array would defeat the memo entirely and reintroduce the render loop.
+  const dataKey = queries.map((q) => q.data?.id ?? '').join(',');
+  const contactsById = useMemo(() => {
+    const byId = new Map<string, Contact>();
+    for (const q of queries) {
+      if (q.data) byId.set(q.data.id, q.data);
+    }
+    return byId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see dataKey above
+  }, [dataKey]);
+  return { contactsById, isLoading: queries.some((q) => q.isLoading) };
 }
 
 export function useCreateContact() {
@@ -343,10 +577,18 @@ export function useDeleteContact(accountId?: string) {
 
 // -- Data Subject Requests (NDPR/GDPR) ---------------------------------------
 
-export function useDataSubjectRequests(query?: { contactId?: string; status?: string }) {
+export function useDataSubjectRequests(query?: DataSubjectRequestQuery) {
   return useQuery({
     queryKey: ['crm', 'data-subject-requests', query],
     queryFn: () => apiFetch<DataSubjectRequest[]>(`/api/crm/data-subject-requests${buildQuery(query ?? {})}`),
+  });
+}
+
+/** Compliance-queue KPIs over the same filter as the list. */
+export function useDataSubjectRequestStats(query?: DataSubjectRequestQuery) {
+  return useQuery({
+    queryKey: ['crm', 'data-subject-requests', 'stats', query],
+    queryFn: () => apiFetch<DataSubjectRequestStats>(`/api/crm/data-subject-requests/stats${buildQuery(query ?? {})}`),
   });
 }
 
@@ -474,10 +716,26 @@ export function useDeleteSite(accountId: string) {
 // Carriers
 // ---------------------------------------------------------------------------
 
-export function useCarriers() {
+export function useCarriers(query: CarrierQuery = {}) {
   return useQuery({
-    queryKey: ['crm', 'carriers'],
-    queryFn: () => apiFetch<Carrier[]>('/api/crm/carriers'),
+    queryKey: ['crm', 'carriers', query],
+    queryFn: () => apiFetch<Carrier[]>(`/api/crm/carriers${buildQuery(query)}`),
+  });
+}
+
+/** Real total for the current carrier filters — useCarriers() caps `take`. */
+export function useCarriersCount(query: CarrierQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'carriers', 'count', query],
+    queryFn: () => apiFetch<{ count: number }>(`/api/crm/carriers/count${buildQuery(query)}`),
+  });
+}
+
+/** Panel-level aggregates — distinct from the per-carrier scorecard on the detail page. */
+export function useCarrierStats(query: CarrierQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'carriers', 'stats', query],
+    queryFn: () => apiFetch<CarrierStats>(`/api/crm/carriers/stats${buildQuery(query)}`),
   });
 }
 
@@ -568,6 +826,46 @@ export function useLead(id: string | undefined) {
     queryFn: () => apiFetch<Lead>(`/api/crm/leads/${id}`),
     enabled: Boolean(id),
   });
+}
+
+/** Real total for the current filters — useLeads() caps `take`, so its array length is a page size, not a total. */
+export function useLeadsCount(query: LeadQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'leads', 'count', query],
+    queryFn: () => apiFetch<{ count: number }>(`/api/crm/leads/count${buildQuery(query)}`),
+  });
+}
+
+/** Header KPI aggregates, computed server-side over the same filter set as the table. */
+export function useLeadStats(query: LeadQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'leads', 'stats', query],
+    queryFn: () => apiFetch<LeadStats>(`/api/crm/leads/stats${buildQuery(query)}`),
+  });
+}
+
+/**
+ * Status-only update where the lead id is supplied per call, unlike
+ * useUpdateLead(id) which binds one id at hook-construction time. The board
+ * needs this shape: any card in any column can be the one that moves, and a
+ * hook cannot be created per card without breaking the rules of hooks.
+ */
+export function useMoveLeadStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      apiFetch<Lead>(`/api/crm/leads/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    onSuccess: (_lead, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'leads'] });
+      toast.success(`Lead moved to ${humanizeStatus(variables.status)}`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+/** Local to the toast above — constants.ts's humanize() lives in the UI layer, and hooks.ts deliberately imports no UI. */
+function humanizeStatus(status: string): string {
+  return status.charAt(0) + status.slice(1).toLowerCase();
 }
 
 export function useCreateLead() {
@@ -718,6 +1016,20 @@ export function useDeletePipelineStage(pipelineId: string) {
   });
 }
 
+/**
+ * Per-stage deal counts/value for one pipeline. Drives the Setup page's
+ * "what does this config change affect" display and the delete guardrails —
+ * deleting a stage that still holds deals is rejected by the database
+ * (ON DELETE RESTRICT), so the UI needs the counts up front.
+ */
+export function usePipelineUsage(pipelineId: string | undefined) {
+  return useQuery({
+    queryKey: ['crm', 'pipelines', pipelineId, 'usage'],
+    queryFn: () => apiFetch<PipelineUsage>(`/api/crm/pipelines/${pipelineId}/usage`),
+    enabled: Boolean(pipelineId),
+  });
+}
+
 export function useReorderPipelineStages(pipelineId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -750,31 +1062,46 @@ export function useAllPipelineStages() {
     })),
   });
 
-  const stagesById = new Map<string, { id: string; name: string; order: number; isWon: boolean; isLost: boolean; defaultProbability: number; pipelineId: string; pipelineName: string }>();
-  for (const detail of detailQueries) {
-    if (!detail.data) continue;
-    for (const stage of detail.data.stages) {
-      stagesById.set(stage.id, { ...stage, pipelineName: detail.data.name });
+  // Memoized for the same reason as useAccountsLookup: `stagesById` lands in
+  // opportunities-table-view.tsx's `columns` deps and in
+  // opportunity-form-dialog.tsx's `[pipelineId, stagesById]` effect deps —
+  // a fresh Map per render makes both fire forever.
+  const stagesKey = detailQueries.map((d) => d.data?.id ?? '').join(',');
+  const stagesById = useMemo(() => {
+    const byId = new Map<string, { id: string; name: string; order: number; isWon: boolean; isLost: boolean; defaultProbability: number; pipelineId: string; pipelineName: string }>();
+    for (const detail of detailQueries) {
+      if (!detail.data) continue;
+      for (const stage of detail.data.stages) {
+        byId.set(stage.id, { ...stage, pipelineName: detail.data.name });
+      }
     }
-  }
+    return byId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see stagesKey above
+  }, [stagesKey]);
+
+  // `data ?? []` is a fresh array on every render while the query is still
+  // loading — stable once resolved, but consumers put this in deps too, so
+  // pin the empty case rather than leaving a second copy of the same trap.
+  const pipelines = useMemo(() => pipelinesQuery.data ?? [], [pipelinesQuery.data]);
 
   return {
     stagesById,
-    pipelines: pipelinesQuery.data ?? [],
+    pipelines,
     isLoading: pipelinesQuery.isLoading || detailQueries.some((q) => q.isLoading),
   };
 }
 
 /**
- * backend/api's TasksController.list() only filters by assigneeId/status/
- * dueBefore/dueAfter/caseId (see backend/api/src/modules/crm/tasks.controller.ts)
- * — there is still no accountId/opportunityId/leadId/policyId query param
- * even though the Task model carries those FKs, so an account/lead/
- * opportunity detail page's "related tasks" still can't be filtered
- * server-side. Those four stay client-filtered over the full (RLS-scoped)
- * task list — fine at this module's seeded-demo scale. `caseId` closed
- * this gap for the ticket detail page specifically (a real backend param
- * now exists), so it's passed straight through to useTasks() instead.
+ * backend/api's TasksController.list() filters by assigneeId/status/
+ * dueBefore/dueAfter/caseId/accountId (see
+ * backend/api/src/modules/crm/tasks.controller.ts) — there is still no
+ * opportunityId/leadId/policyId query param even though the Task model
+ * carries those FKs, so an opportunity/lead/policy detail page's "related
+ * tasks" still can't be filtered server-side. Those three stay
+ * client-filtered over the full (RLS-scoped) task list — fine at this
+ * module's seeded-demo scale. `caseId`/`accountId` closed this gap for the
+ * ticket and account detail pages specifically (real backend params now
+ * exist), so both are passed straight through to useTasks() instead.
  */
 export function useTasksForEntity(filter: {
   accountId?: string;
@@ -783,14 +1110,12 @@ export function useTasksForEntity(filter: {
   policyId?: string;
   caseId?: string;
 }) {
-  const query = useTasks(filter.caseId ? { caseId: filter.caseId } : {});
+  const query = useTasks(filter.caseId || filter.accountId ? { caseId: filter.caseId, accountId: filter.accountId } : {});
   const data = (query.data ?? []).filter(
     (task) =>
-      (!filter.accountId || task.accountId === filter.accountId) &&
       (!filter.opportunityId || task.opportunityId === filter.opportunityId) &&
       (!filter.leadId || task.leadId === filter.leadId) &&
-      (!filter.policyId || task.policyId === filter.policyId) &&
-      (!filter.caseId || task.caseId === filter.caseId),
+      (!filter.policyId || task.policyId === filter.policyId),
   );
   return { data, isLoading: query.isLoading };
 }
@@ -803,6 +1128,22 @@ export function useOpportunities(query: OpportunityQuery = {}) {
   return useQuery({
     queryKey: ['crm', 'opportunities', query],
     queryFn: () => apiFetch<Opportunity[]>(`/api/crm/opportunities${buildQuery(query)}`),
+  });
+}
+
+/** Real total for the current filters — useOpportunities() caps `take`, so its array length is a page size. */
+export function useOpportunitiesCount(query: OpportunityQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'opportunities', 'count', query],
+    queryFn: () => apiFetch<{ count: number }>(`/api/crm/opportunities/count${buildQuery(query)}`),
+  });
+}
+
+/** Currency-normalized pipeline aggregates over the same filter set as the board/table. */
+export function useOpportunityStats(query: OpportunityQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'opportunities', 'stats', query],
+    queryFn: () => apiFetch<OpportunityStats>(`/api/crm/opportunities/stats${buildQuery(query)}`),
   });
 }
 
@@ -911,6 +1252,51 @@ export function useActivities(query: ActivityQuery) {
   });
 }
 
+/** Real total past the page cap, for the team-activity view. */
+export function useActivitiesCount(query: ActivityQuery) {
+  return useQuery({
+    queryKey: ['crm', 'activities', 'count', query],
+    queryFn: () => apiFetch<{ count: number }>(`/api/crm/activities/count${buildQuery(query as Record<string, string | number | boolean | undefined>)}`),
+  });
+}
+
+export function useActivityStats(query: ActivityQuery) {
+  return useQuery({
+    queryKey: ['crm', 'activities', 'stats', query],
+    queryFn: () => apiFetch<ActivityStats>(`/api/crm/activities/stats${buildQuery(query as Record<string, string | number | boolean | undefined>)}`),
+  });
+}
+
+/**
+ * Correct a mis-logged activity. The API refuses this for transmitted
+ * messages (anything with an externalMessageId) — the error surfaces as a
+ * toast rather than being pre-empted here, so the rule lives in one place.
+ */
+export function useUpdateActivity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...input }: UpdateActivityInput & { id: string }) =>
+      apiFetch<Activity>(`/api/crm/activities/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'activities'] });
+      toast.success('Activity corrected');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useDeleteActivity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<{ deleted: boolean }>(`/api/crm/activities/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'activities'] });
+      toast.success('Activity removed');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
 export function useCreateActivity(invalidateKey: unknown[]) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -932,6 +1318,22 @@ export function useTasks(query: TaskQuery = {}) {
   return useQuery({
     queryKey: ['crm', 'tasks', query],
     queryFn: () => apiFetch<Task[]>(`/api/crm/tasks${buildQuery(query)}`),
+  });
+}
+
+/** Real total for the current task filters — useTasks() caps `take`. */
+export function useTasksCount(query: TaskQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'tasks', 'count', query],
+    queryFn: () => apiFetch<{ count: number }>(`/api/crm/tasks/count${buildQuery(query)}`),
+  });
+}
+
+/** Task aggregates — open/overdue/due-today, computed server-side over the whole filtered set. */
+export function useTaskStats(query: TaskQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'tasks', 'stats', query],
+    queryFn: () => apiFetch<TaskStats>(`/api/crm/tasks/stats${buildQuery(query)}`),
   });
 }
 
@@ -999,9 +1401,20 @@ export function useDirectoryUsers() {
     staleTime: 5 * 60_000,
     throwOnError: false,
   });
-  const byId = new Map<string, DirectoryUser>();
-  for (const user of query.data ?? []) byId.set(user.id, user);
-  return { usersById: byId, isLoading: query.isLoading };
+  // Memoized on query.data itself (React Query keeps that reference stable
+  // across renders when the underlying cache entry hasn't changed) — a
+  // consumer that puts `usersById` in its own useMemo/useEffect deps (e.g.
+  // a DataTable columns definition) would otherwise see a brand-new Map on
+  // every single render regardless of whether the directory actually
+  // changed, breaking that consumer's memoization. Found live: this fed an
+  // accounts-list-view.tsx columns useMemo, which fed TanStack Table a
+  // constantly-"changing" columns array and produced a real render loop.
+  const usersById = useMemo(() => {
+    const byId = new Map<string, DirectoryUser>();
+    for (const user of query.data ?? []) byId.set(user.id, user);
+    return byId;
+  }, [query.data]);
+  return { usersById, isLoading: query.isLoading };
 }
 
 // ---------------------------------------------------------------------------
@@ -1056,11 +1469,26 @@ export function useDeleteLeadSource() {
 // Phase 2: Custom field definitions
 // ---------------------------------------------------------------------------
 
-export function useCustomFieldDefinitions(entityType?: CustomFieldEntityType) {
+/**
+ * Overloaded shape kept deliberately: form dialogs across the app call this
+ * with a bare entityType to populate their custom-field inputs, while the
+ * admin page passes a full filter object. Accepting both avoids touching
+ * every one of those call sites for one new filter.
+ */
+export function useCustomFieldDefinitions(query?: CustomFieldEntityType | CustomFieldDefinitionQuery) {
+  const params: CustomFieldDefinitionQuery = typeof query === 'string' ? { entityType: query } : (query ?? {});
   return useQuery({
-    queryKey: ['crm', 'custom-field-definitions', entityType],
-    queryFn: () => apiFetch<CustomFieldDefinition[]>(`/api/crm/custom-field-definitions${buildQuery({ entityType })}`),
+    queryKey: ['crm', 'custom-field-definitions', params],
+    queryFn: () => apiFetch<CustomFieldDefinition[]>(`/api/crm/custom-field-definitions${buildQuery(params)}`),
     staleTime: 60_000,
+  });
+}
+
+/** Custom-schema KPIs over the same filter as the list. */
+export function useCustomFieldDefinitionStats(query: CustomFieldDefinitionQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'custom-field-definitions', 'stats', query],
+    queryFn: () => apiFetch<CustomFieldDefinitionStats>(`/api/crm/custom-field-definitions/stats${buildQuery(query)}`),
   });
 }
 
@@ -1165,10 +1593,18 @@ export function useRunSavedView<T>() {
 // Phase 2: Sales quotas
 // ---------------------------------------------------------------------------
 
-export function useSalesQuotas(query: { scopeType?: SalesQuota['scopeType']; userId?: string } = {}) {
+export function useSalesQuotas(query: SalesQuotaQuery = {}) {
   return useQuery({
     queryKey: ['crm', 'sales-quotas', query],
     queryFn: () => apiFetch<SalesQuota[]>(`/api/crm/sales-quotas${buildQuery(query)}`),
+  });
+}
+
+/** Quota-coverage KPIs over the same filter as the list. */
+export function useSalesQuotaStats(query: SalesQuotaQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'sales-quotas', 'stats', query],
+    queryFn: () => apiFetch<SalesQuotaStats>(`/api/crm/sales-quotas/stats${buildQuery(query)}`),
   });
 }
 
@@ -1311,6 +1747,58 @@ export function useMergeLeads() {
 // Phase 2: Bulk actions
 // ---------------------------------------------------------------------------
 
+/**
+ * Contact bulk actions. The endpoints existed upstream from the start but
+ * had no BFF route and no hook, so none of them were reachable from the
+ * browser — found while building the Contacts screen.
+ *
+ * "Assign" here means re-parenting a contact to a different ACCOUNT, not
+ * changing an owner: contacts carry no ownerId. Carrier-linked contacts come
+ * back in `skipped` because a contact has exactly one parent.
+ */
+export function useBulkAssignContacts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { ids: string[]; accountId: string }) =>
+      apiFetch<BulkActionResponse>('/api/crm/contacts/bulk/assign', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts'] });
+      toast.success(
+        `Moved ${res.updated.length} contact(s)${res.skipped.length ? `, ${res.skipped.length} skipped (carrier-linked or out of scope)` : ''}`,
+      );
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useBulkUpdateContacts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { ids: string[]; title?: string; isPrimary?: boolean }) =>
+      apiFetch<BulkActionResponse>('/api/crm/contacts/bulk/update', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'contacts'] });
+      toast.success(`Updated ${res.updated.length} contact(s)${res.skipped.length ? `, ${res.skipped.length} skipped` : ''}`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useBulkDeleteContacts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BulkDeleteInput) =>
+      apiFetch<BulkActionResponse>('/api/crm/contacts/bulk/delete', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['crm', 'accounts'] });
+      toast.success(`Deleted ${res.updated.length} contact(s)${res.skipped.length ? `, ${res.skipped.length} skipped` : ''}`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
 export function useBulkAssignAccounts() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -1363,6 +1851,51 @@ export function useBulkDeleteLeads() {
   });
 }
 
+/**
+ * Task bulk actions. The backend has exposed bulk assign/update/delete since
+ * the module was built, but no UI ever called them — the Tasks page had no
+ * selection column at all, so reassigning a queue meant editing rows one at
+ * a time.
+ */
+export function useBulkAssignTasks() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BulkAssignInput) =>
+      apiFetch<BulkActionResponse>('/api/crm/tasks/bulk/assign', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'tasks'] });
+      toast.success(`Reassigned ${res.updated.length} task(s)${res.skipped.length ? `, ${res.skipped.length} skipped` : ''}`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useBulkUpdateTasks() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BulkUpdateTasksInput) =>
+      apiFetch<BulkActionResponse>('/api/crm/tasks/bulk/update', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'tasks'] });
+      toast.success(`Updated ${res.updated.length} task(s)${res.skipped.length ? `, ${res.skipped.length} skipped` : ''}`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
+export function useBulkDeleteTasks() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BulkDeleteInput) =>
+      apiFetch<BulkActionResponse>('/api/crm/tasks/bulk/delete', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['crm', 'tasks'] });
+      toast.success(`Deleted ${res.updated.length} task(s)${res.skipped.length ? `, ${res.skipped.length} skipped` : ''}`);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+}
+
 export function useBulkAssignOpportunities() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -1400,10 +1933,20 @@ export function useLoyaltyAccountByAccountId(accountId: string) {
   });
 }
 
-export function useLoyaltyAccounts(search?: string) {
+export function useLoyaltyAccounts(query: LoyaltyAccountQuery = {}) {
   return useQuery({
-    queryKey: ['crm', 'loyalty-accounts', search ?? ''],
-    queryFn: () => apiFetch<LoyaltyAccount[]>(`/api/loyalty-accounts${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+    queryKey: ['crm', 'loyalty-accounts', query],
+    queryFn: () => apiFetch<LoyaltyAccount[]>(`/api/loyalty-accounts${buildQuery(query)}`),
+  });
+}
+
+/** Programme KPIs over the same filter as the list. */
+export function useLoyaltyStats(query: LoyaltyAccountQuery = {}) {
+  return useQuery({
+    queryKey: ['crm', 'loyalty-accounts', 'stats', query],
+    // `take` only bounds the table page; it must never change what the
+    // header reports, so it is stripped before the stats call.
+    queryFn: () => apiFetch<LoyaltyStats>(`/api/loyalty-accounts/stats${buildQuery({ search: query.search, tier: query.tier })}`),
   });
 }
 

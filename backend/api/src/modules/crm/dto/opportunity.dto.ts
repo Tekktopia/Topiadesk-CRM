@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { ArrayMinSize, IsArray, IsBoolean, IsDateString, IsInt, IsObject, IsOptional, IsString, IsUUID, Max, Min, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ArrayMinSize, IsArray, IsBoolean, IsBooleanString, IsDateString, IsInt, IsNumber, IsObject, IsOptional, IsString, IsUUID, Max, Min, MinLength } from 'class-validator';
 
 export class CreateOpportunityDto {
   @ApiProperty() @IsUUID() accountId!: string;
@@ -34,11 +35,84 @@ export class OpportunityQueryDto {
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() pipelineId?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() pipelineStageId?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() ownerId?: string;
-  @ApiProperty({ required: false, description: 'true = stage.isWon=false AND isLost=false' })
+  // String, not boolean: the global pipe's enableImplicitConversion casts a
+  // boolean-typed query param with Boolean(), turning the string "false"
+  // into `true` and pinning the flag permanently ON. See
+  // AccountQueryDto.includeArchived for the full explanation.
+  @ApiProperty({ required: false, description: "'true' = stage.isWon=false AND isLost=false" })
   @IsOptional()
-  @IsBoolean()
-  isOpen?: boolean;
+  @IsBooleanString()
+  isOpen?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() lineOfBusiness?: string;
+  @ApiPropertyOptional({ description: 'Free-text search across the opportunity name.' })
+  @IsOptional()
+  @IsString()
+  q?: string;
+  // Amount is Decimal(15,2) in the DB and a string on the wire, but these
+  // bounds are plain numbers: they are only ever compared, never persisted,
+  // and a JS number covers the realistic deal-size range without the
+  // ceremony of parsing a Decimal on a query param.
+  @ApiPropertyOptional({ description: 'Lower bound on deal amount, in the deal\'s own currency.' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minAmount?: number;
+  @ApiPropertyOptional({ description: 'Upper bound on deal amount, in the deal\'s own currency.' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxAmount?: number;
+  @ApiPropertyOptional({ description: 'Only deals expected to close on/after this date (ISO 8601).' })
+  @IsOptional()
+  @IsDateString()
+  closeFrom?: string;
+  @ApiPropertyOptional({ description: 'Only deals expected to close on/before this date (ISO 8601).' })
+  @IsOptional()
+  @IsDateString()
+  closeTo?: string;
+  @ApiPropertyOptional({ description: 'Max rows to return (default 200).' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  take?: number;
+  @ApiPropertyOptional({ description: 'Rows to skip, for pagination.' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  skip?: number;
+}
+
+/**
+ * Pipeline header aggregates.
+ *
+ * Every money figure is normalized into the org's BASE_CURRENCY via
+ * ExchangeRate (dashboards/currency.util.ts) before being summed —
+ * Opportunity.currency is per-row, so a raw SUM(amount) across a mixed
+ * NGN/USD pipeline is a meaningless number. `baseCurrency` is returned
+ * alongside the totals so the UI can label them honestly rather than
+ * guessing.
+ */
+export class OpportunityStatsResponseDto {
+  @ApiProperty({ description: 'ISO 4217 code every *Value field below is expressed in.' })
+  baseCurrency!: string;
+  @ApiProperty() totalCount!: number;
+  @ApiProperty({ description: 'Deals in a stage that is neither won nor lost.' }) openCount!: number;
+  @ApiProperty() wonCount!: number;
+  @ApiProperty() lostCount!: number;
+  @ApiProperty({ description: 'Sum of open deal amounts, base currency.' }) openValue!: number;
+  @ApiProperty({ description: 'Sum of open amount x probability/100 — the forecastable figure.' })
+  weightedValue!: number;
+  @ApiProperty({ description: 'Sum of won deal amounts, base currency.' }) wonValue!: number;
+  @ApiProperty({ description: 'won / (won + lost), as a 0-100 percentage rounded to one decimal.' })
+  winRate!: number;
+  @ApiProperty({ description: 'Mean open deal size, base currency.' }) averageDealSize!: number;
+  @ApiProperty({ description: 'Open deals whose expectedCloseDate has already passed.' })
+  overdueCount!: number;
 }
 
 export class UpdateOpportunityStageDto {

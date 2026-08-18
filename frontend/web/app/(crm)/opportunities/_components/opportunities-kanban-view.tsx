@@ -3,10 +3,13 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Plus, X } from 'lucide-react';
+import { Download, Plus, Search, X } from 'lucide-react';
 import {
   Badge,
   Button,
+  Card,
+  CardContent,
+  Input,
   Select,
   SelectContent,
   SelectItem,
@@ -27,12 +30,32 @@ import {
   usePipeline,
   usePipelines,
   useOpportunities,
+  useOpportunitiesCount,
+  useOpportunityStats,
   useUpdateOpportunityStage,
 } from '../../_lib/hooks';
-import type { FilterTree, Opportunity } from '../../_lib/types';
+import { useDebouncedValue } from '../../_lib/use-debounced-value';
+import type { FilterTree, Opportunity, OpportunityQuery } from '../../_lib/types';
 import { OpportunityCard } from './opportunity-card';
 import { OpportunityFormDialog } from './opportunity-form-dialog';
 import { OpportunitiesTableView } from './opportunities-table-view';
+import { PipelineStatsStrip } from './pipeline-stats-strip';
+
+const UNSET = '__any';
+const FETCH_CAP = 200;
+
+/**
+ * Coarse size bands rather than two free-text amount inputs — one control,
+ * and it sidesteps asking the user to type an unformatted figure. Bounds are
+ * compared against the deal's OWN currency (the filter is a plain WHERE on
+ * Opportunity.amount, no conversion), which is why the labels stay
+ * currency-agnostic instead of implying a specific symbol.
+ */
+const DEAL_SIZE_BANDS = [
+  { value: 'small', label: 'Under 1M', minAmount: undefined, maxAmount: 1_000_000 },
+  { value: 'mid', label: '1M – 10M', minAmount: 1_000_000, maxAmount: 10_000_000 },
+  { value: 'large', label: 'Over 10M', minAmount: 10_000_000, maxAmount: undefined },
+] as const;
 
 export function OpportunitiesKanbanView() {
   const searchParams = useSearchParams();
@@ -42,7 +65,12 @@ export function OpportunitiesKanbanView() {
   // isOpen=true (open-opportunities/pipeline-value tiles). Read once as
   // initial values, same pattern as accountIdFilter above.
   const stageIdFilter = searchParams.get('stageId') ?? undefined;
-  const isOpenFilter = searchParams.get('isOpen') === 'true' ? true : undefined;
+  // Kept as the literal string 'true' (or omitted) rather than a boolean:
+  // the API models boolean query flags as strings because the global
+  // ValidationPipe's enableImplicitConversion casts a boolean-typed param
+  // with Boolean(), which turns the string "false" into `true`. See
+  // AccountQueryDto.includeArchived for the full explanation.
+  const isOpenFilter = searchParams.get('isOpen') === 'true' ? 'true' : undefined;
   const urlPipelineId = searchParams.get('pipelineId') ?? undefined;
   const ownerIdFilter = searchParams.get('ownerId') ?? undefined;
 
@@ -55,6 +83,9 @@ export function OpportunitiesKanbanView() {
   // on the board (still bucketed by stage). See accounts-list-view.tsx.
   const [savedViewRows, setSavedViewRows] = React.useState<Opportunity[] | null>(null);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [search, setSearch] = React.useState('');
+  const [owner, setOwner] = React.useState<string>(UNSET);
+  const [sizeBand, setSizeBand] = React.useState<string>(UNSET);
 
   React.useEffect(() => {
     if (!pipelineId && pipelines && pipelines.length > 0) {
@@ -63,12 +94,27 @@ export function OpportunitiesKanbanView() {
   }, [pipelines, pipelineId]);
 
   const { data: pipelineDetail, isLoading: stagesLoading } = usePipeline(pipelineId);
-  const { data: liveOpportunities, isLoading: oppsLoading } = useOpportunities({
+
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const selectedSizeBand = DEAL_SIZE_BANDS.find((b) => b.value === sizeBand);
+
+  // One query object drives the board, the count and the stats strip, so the
+  // tiles always describe exactly the rows shown beneath them.
+  const query: OpportunityQuery = {
     pipelineId,
     accountId: accountIdFilter,
     isOpen: isOpenFilter,
-    ownerId: ownerIdFilter,
-  });
+    // The URL's ownerId is the initial value; the in-page picker overrides it.
+    ownerId: owner !== UNSET ? owner : ownerIdFilter,
+    q: debouncedSearch || undefined,
+    minAmount: selectedSizeBand?.minAmount,
+    maxAmount: selectedSizeBand?.maxAmount,
+    take: FETCH_CAP,
+  };
+
+  const { data: liveOpportunities, isLoading: oppsLoading } = useOpportunities(query);
+  const { data: countData } = useOpportunitiesCount(query);
+  const { data: stats, isLoading: statsLoading } = useOpportunityStats(query);
   const opportunities = savedViewRows ?? liveOpportunities;
   const { accountsById } = useAccountsLookup();
   const { usersById } = useDirectoryUsers();
@@ -91,6 +137,10 @@ export function OpportunitiesKanbanView() {
   const pipelineVisibleOpportunities = allOpportunities.filter((o) => stageIds.has(o.pipelineStageId));
   const visibleOpportunities = stageIdFilter ? pipelineVisibleOpportunities.filter((o) => o.pipelineStageId === stageIdFilter) : pipelineVisibleOpportunities;
   const excludedFromOtherPipelinesCount = allOpportunities.length - pipelineVisibleOpportunities.length;
+  const realTotal = savedViewRows ? savedViewRows.length : (countData?.count ?? allOpportunities.length);
+  const isTruncated = !savedViewRows && realTotal > allOpportunities.length;
+  const hasActiveFilters = Boolean(debouncedSearch) || owner !== UNSET || sizeBand !== UNSET;
+  const directoryUsers = React.useMemo(() => [...usersById.values()], [usersById]);
   const stageFilterName = stageIdFilter ? stages.find((s) => s.id === stageIdFilter)?.name : undefined;
   const byStage = new Map<string, Opportunity[]>();
   for (const stage of stages) byStage.set(stage.id, []);
@@ -114,6 +164,25 @@ export function OpportunitiesKanbanView() {
       { id: opportunityId, input: { pipelineStageId: targetStageId } },
       { onSettled: () => setMovingId(null) },
     );
+  }
+
+  function clearFilters() {
+    setSavedViewRows(null);
+    setSearch('');
+    setOwner(UNSET);
+    setSizeBand(UNSET);
+  }
+
+  function handleExport() {
+    const qs = new URLSearchParams();
+    if (query.pipelineId) qs.set('pipelineId', query.pipelineId);
+    if (query.accountId) qs.set('accountId', query.accountId);
+    if (query.ownerId) qs.set('ownerId', query.ownerId);
+    if (query.isOpen) qs.set('isOpen', 'true');
+    if (query.q) qs.set('q', query.q);
+    if (query.minAmount !== undefined) qs.set('minAmount', String(query.minAmount));
+    if (query.maxAmount !== undefined) qs.set('maxAmount', String(query.maxAmount));
+    window.location.href = `/api/crm/opportunities/export?${qs.toString()}`;
   }
 
   function toggleSelected(id: string, checked: boolean) {
@@ -153,6 +222,9 @@ export function OpportunitiesKanbanView() {
                 <SelectItem value="table">Table</SelectItem>
               </SelectContent>
             </Select>
+            <Button variant="outline" onClick={handleExport} disabled={realTotal === 0}>
+              <Download aria-hidden /> Export
+            </Button>
             <Button onClick={() => setCreateOpen(true)}>
               <Plus aria-hidden /> New opportunity
             </Button>
@@ -160,7 +232,88 @@ export function OpportunitiesKanbanView() {
         }
       />
 
+      <PipelineStatsStrip stats={stats} isLoading={statsLoading} />
+
       <SavedViewBar<Opportunity> entityType="OPPORTUNITY" buildFilters={buildFilters} onApply={setSavedViewRows} />
+
+      <Card>
+        <CardContent className="flex flex-col gap-3 pt-6 lg:flex-row lg:items-end">
+          <div className="w-full space-y-1.5 lg:max-w-xs">
+            <label htmlFor="opportunity-search" className="text-xs font-medium text-muted-foreground">
+              Search
+            </label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <Input
+                id="opportunity-search"
+                value={search}
+                onChange={(e) => {
+                  setSavedViewRows(null);
+                  setSearch(e.target.value);
+                }}
+                placeholder="Opportunity name"
+                className="pl-8"
+              />
+            </div>
+          </div>
+          <div className="w-full space-y-1.5 sm:w-48">
+            <label className="text-xs font-medium text-muted-foreground">Owner</label>
+            <Select
+              value={owner}
+              onValueChange={(v) => {
+                setSavedViewRows(null);
+                setOwner(v);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNSET}>Anyone</SelectItem>
+                {directoryUsers.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.fullName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full space-y-1.5 sm:w-44">
+            <label className="text-xs font-medium text-muted-foreground">Deal size</label>
+            <Select
+              value={sizeBand}
+              onValueChange={(v) => {
+                setSavedViewRows(null);
+                setSizeBand(v);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNSET}>Any size</SelectItem>
+                {DEAL_SIZE_BANDS.map((b) => (
+                  <SelectItem key={b.value} value={b.value}>
+                    {b.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {hasActiveFilters ? (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1.5 sm:mb-0.5">
+              <X className="h-3.5 w-3.5" aria-hidden /> Clear filters
+            </Button>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {isTruncated ? (
+        <p className="text-sm text-muted-foreground">
+          Showing the first {allOpportunities.length.toLocaleString()} of {realTotal.toLocaleString()} matching deals — narrow
+          the filters, or use Export for the full set.
+        </p>
+      ) : null}
 
       {accountIdFilter ? (
         <div className="flex items-center gap-2 text-sm">

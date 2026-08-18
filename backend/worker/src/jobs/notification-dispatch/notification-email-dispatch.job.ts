@@ -23,6 +23,7 @@
 import { Queue, Worker, type Job } from 'bullmq';
 import type Redis from 'ioredis';
 import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT } from '@topiadesk/db';
+import { getPlatformPrismaClient } from '@topiadesk/db-platform';
 import { sendMail } from '../scheduled-reports/mailer';
 
 export const NOTIFICATION_EMAIL_DISPATCH_QUEUE_NAME = 'notification-email-dispatch';
@@ -36,8 +37,44 @@ export interface NotificationEmailDispatchResult {
   skippedAlreadyClaimed: number;
 }
 
+/**
+ * Every ACTIVE tenant's schema, plus the seed tenant.
+ *
+ * Read from the platform registry rather than scraping pg_namespace — see
+ * graph-sync.job.ts for why that shortcut is unsafe. `null` is the seed
+ * tenant (public), which is a real schema with real notifications and would
+ * otherwise be skipped.
+ */
+async function dispatchScopes(): Promise<(string | null)[]> {
+  const tenants = await runWithRlsContext(SYSTEM_JOB_CONTEXT, () =>
+    getPlatformPrismaClient().tenant.findMany({ where: { status: 'ACTIVE' }, select: { schemaName: true } }),
+  );
+  return [null, ...tenants.map((t) => t.schemaName)];
+}
+
+/**
+ * Sweeps EVERY tenant, not just `public`.
+ *
+ * This previously ran under bare SYSTEM_JOB_CONTEXT, whose tenantSchema is
+ * null — i.e. the `public` schema — so pending EMAIL notifications belonging
+ * to any real tenant were never picked up and never sent. Nothing failed
+ * loudly: the rows simply sat at PENDING forever while the job reported
+ * "0 sent, 0 failed" every three minutes. Same defect class already fixed in
+ * the outbound-case-email, team-assignment and graph-sync jobs.
+ */
 export async function runNotificationEmailDispatch(): Promise<NotificationEmailDispatchResult> {
-  return runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+  const total: NotificationEmailDispatchResult = { sent: 0, failed: 0, skippedAlreadyClaimed: 0 };
+  for (const tenantSchema of await dispatchScopes()) {
+    const part = await dispatchForScope(tenantSchema);
+    total.sent += part.sent;
+    total.failed += part.failed;
+    total.skippedAlreadyClaimed += part.skippedAlreadyClaimed;
+  }
+  return total;
+}
+
+async function dispatchForScope(tenantSchema: string | null): Promise<NotificationEmailDispatchResult> {
+  return runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema }, async () => {
     const prisma = getPrismaClient();
     const result: NotificationEmailDispatchResult = { sent: 0, failed: 0, skippedAlreadyClaimed: 0 };
 
@@ -62,7 +99,10 @@ export async function runNotificationEmailDispatch(): Promise<NotificationEmailD
         await sendMail({ to: notification.recipient.email, subject: notification.title, text: notification.body });
         result.sent++;
       } catch (err) {
-        console.error(`[notification-email-dispatch] failed to send notification ${notification.id}`, err);
+        console.error(
+          `[notification-email-dispatch] failed to send notification ${notification.id} in schema "${tenantSchema ?? 'public'}"`,
+          err,
+        );
         await prisma.notification.update({ where: { id: notification.id }, data: { status: 'FAILED' } });
         result.failed++;
       }

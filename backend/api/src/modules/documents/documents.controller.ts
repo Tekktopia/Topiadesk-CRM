@@ -15,11 +15,12 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { getPrismaClient } from '@topiadesk/db';
+import { getPrismaClient, type DocumentEntityType } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
+import { assertFileNotMalicious } from '../../common/uploads/malware-scan.util';
 // NOT a type-only import: DocumentsService is constructor-injected below —
 // Nest's DI resolves constructor parameter types via emitDecoratorMetadata's
 // design:paramtypes, which needs the real class reference at runtime (same
@@ -73,8 +74,13 @@ export class DocumentsController {
 
   @Get()
   @ApiOkResponse({ type: [DocumentResponseDto] })
-  async list(@Query('categoryId') categoryId?: string, @Query('search') search?: string): Promise<DocumentResponseDto[]> {
-    const documents = await this.documents.list(categoryId, search);
+  async list(
+    @Query('categoryId') categoryId?: string,
+    @Query('search') search?: string,
+    @Query('entityType') entityType?: DocumentEntityType,
+    @Query('entityId') entityId?: string,
+  ): Promise<DocumentResponseDto[]> {
+    const documents = await this.documents.list(categoryId, search, entityType, entityId);
     return documents.map(toDocumentResponseDto);
   }
 
@@ -119,6 +125,7 @@ export class DocumentsController {
     @Body() dto: UploadDocumentDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<DocumentResponseDto> {
+    await assertFileNotMalicious(file.buffer, 'Document');
     const document = await this.documents.upload(file, dto.categoryId, user.id);
     return toDocumentResponseDto(document);
   }
@@ -134,6 +141,7 @@ export class DocumentsController {
     @Body() dto: UploadDocumentVersionDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<DocumentResponseDto> {
+    await assertFileNotMalicious(file.buffer, 'Document');
     const document = await this.documents.addVersion(id, file, dto.changeNote, user.id);
     return toDocumentResponseDto(document);
   }
@@ -208,5 +216,7 @@ function toDocumentResponseDto(document: DocumentWithCurrentVersion): DocumentRe
     isArchived: document.isArchived,
     createdAt: document.createdAt,
     updatedAt: document.updatedAt,
+    linkId: document.links?.[0]?.id,
+    linkedAt: document.links?.[0]?.linkedAt,
   };
 }

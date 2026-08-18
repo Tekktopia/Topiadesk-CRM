@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Download, ScrollText, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, History, ScrollText, ShieldCheck, ShieldEllipsis } from 'lucide-react';
 import {
   Button,
   Input,
@@ -25,9 +25,10 @@ import { EmptyState, ErrorState } from '../_components/query-states';
 import { AuditActionBadge } from '../_components/status-badge';
 import { apiFetch } from '../_lib/api';
 import { useUsers } from '../_lib/queries';
-import type { AuditLogDto, AuditVerifyResponseDto } from '../_lib/types';
+import type { AuditCheckpointDto, AuditLogDto, AuditVerifyResponseDto } from '../_lib/types';
 import { AuditLogDetailDialog } from './audit-log-detail-dialog';
 import { AuditVerifyResultDialog } from './audit-verify-result-dialog';
+import { AuditCheckpointHistoryDialog } from './audit-checkpoint-history-dialog';
 
 const UNSET = '__any';
 const TAKE = 50;
@@ -55,6 +56,7 @@ export default function AuditLogPage() {
   const [skip, setSkip] = useState(0);
   const [selected, setSelected] = useState<AuditLogDto | null>(null);
   const [verifyResult, setVerifyResult] = useState<AuditVerifyResponseDto | null>(null);
+  const [checkpointHistoryOpen, setCheckpointHistoryOpen] = useState(false);
 
   const debouncedEntityType = useDebounced(entityType, 300);
   const debouncedEntityId = useDebounced(entityId, 300);
@@ -85,8 +87,22 @@ export default function AuditLogPage() {
   const rows = auditLogQuery.data ?? [];
   const hasNextPage = rows.length === TAKE;
 
+  // Checkpoints are written every ~5 min by backend/worker's
+  // audit-checkpoint/create-checkpoint.job.ts (one per active tenant) —
+  // the most recent one lets "Verify since last checkpoint" recompute
+  // hashes over only the last few minutes of rows instead of the whole
+  // table, same incremental design 003_audit_checkpoint.sql documents.
+  const checkpointsQuery = useQuery({
+    queryKey: ['admin', 'audit-log', 'checkpoints'],
+    queryFn: () => apiFetch<AuditCheckpointDto[]>('/api/admin/audit-log/checkpoints'),
+  });
+  const latestCheckpoint = checkpointsQuery.data?.[0];
+
   const verifyMutation = useMutation({
-    mutationFn: () => apiFetch<AuditVerifyResponseDto>('/api/admin/audit-log/verify'),
+    mutationFn: (fromCheckpointId?: string) =>
+      apiFetch<AuditVerifyResponseDto>(
+        `/api/admin/audit-log/verify${fromCheckpointId ? `?fromCheckpointId=${fromCheckpointId}` : ''}`,
+      ),
     onSuccess: setVerifyResult,
     onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed to verify the audit chain'),
   });
@@ -105,9 +121,21 @@ export default function AuditLogPage() {
         title="Audit Log"
         description="Every compliance-relevant mutation, hash-chained and structurally append-only. Visible here only to ADMIN and COMPLIANCE_OFFICER — the API enforces this independently of what this page shows."
         actions={
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => verifyMutation.mutate()} disabled={verifyMutation.isPending}>
-              <ShieldCheck className="h-4 w-4" aria-hidden /> {verifyMutation.isPending ? 'Verifying…' : 'Verify chain'}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => setCheckpointHistoryOpen(true)}>
+              <History className="h-4 w-4" aria-hidden /> Checkpoints
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => verifyMutation.mutate(latestCheckpoint?.id)}
+              disabled={verifyMutation.isPending || checkpointsQuery.isLoading}
+              title={latestCheckpoint ? `Since ${new Date(latestCheckpoint.checkpointAt).toLocaleString()}` : 'No checkpoint yet — verifies from genesis'}
+            >
+              <ShieldCheck className="h-4 w-4" aria-hidden /> {verifyMutation.isPending ? 'Verifying…' : 'Verify since checkpoint'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => verifyMutation.mutate(undefined)} disabled={verifyMutation.isPending}>
+              <ShieldEllipsis className="h-4 w-4" aria-hidden /> Verify full history
             </Button>
             <Button variant="outline" size="sm" onClick={() => handleExport('csv')}>
               <Download className="h-4 w-4" aria-hidden /> Export CSV
@@ -256,6 +284,13 @@ export default function AuditLogPage() {
       <AuditLogDetailDialog entry={selected} open={!!selected} onOpenChange={(open) => !open && setSelected(null)} />
 
       <AuditVerifyResultDialog result={verifyResult} open={!!verifyResult} onOpenChange={(open) => !open && setVerifyResult(null)} />
+
+      <AuditCheckpointHistoryDialog
+        checkpoints={checkpointsQuery.data ?? []}
+        isLoading={checkpointsQuery.isLoading}
+        open={checkpointHistoryOpen}
+        onOpenChange={setCheckpointHistoryOpen}
+      />
     </div>
   );
 }

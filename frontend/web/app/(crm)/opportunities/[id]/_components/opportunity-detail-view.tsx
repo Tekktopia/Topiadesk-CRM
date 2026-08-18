@@ -388,7 +388,7 @@ function ActivityLog({ opportunityId }: { opportunityId: string }) {
     occurredAt: a.occurredAt,
     durationMinutes: a.durationMinutes,
     outcome: a.outcome,
-    authorName: usersById.get(a.createdById)?.fullName ?? null,
+    authorName: a.createdById ? (usersById.get(a.createdById)?.fullName ?? null) : null,
   }));
 
   async function handleLogActivity(values: LogActivityFormValues) {

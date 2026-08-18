@@ -154,6 +154,10 @@
     <canvas id="topiadesk-wave-canvas"></canvas>
     <div class="td-hero-inner">
       <div class="td-hero-brand">
+        <#-- Always the TopiaDesk mark, never per-tenant — the hero panel is
+             TopiaDesk's own product chrome, not the tenant's. Per-tenant
+             branding (Org Settings -> Sign-in page logo) belongs only on the
+             card below, right next to the tenant's own realm name. -->
         <img src="${url.resourcesPath}/img/logo-mark.png" alt="" class="td-hero-brand-mark" />
         <div class="td-hero-brand-text">
           <span class="td-hero-brand-name">TopiaDesk CRM</span>
@@ -219,8 +223,21 @@
 <div class="${properties.kcLogin!}">
   <div class="${properties.kcLoginContainer!}">
     <header id="kc-header" class="pf-v5-c-login__header">
-      <div id="kc-header-wrapper"
-              class="pf-v5-c-brand">${kcSanitize(msg("loginTitleHtml",(realm.displayNameHtml!'')))?no_esc}</div>
+      <div id="kc-header-wrapper" class="pf-v5-c-brand">
+        <#-- Per-tenant logo (Org Settings -> Sign-in page logo) — this circle,
+             next to the tenant's own realm name, is the ONLY place a tenant's
+             branding appears on the login page; the hero panel above always
+             stays TopiaDesk's own. Falls back to the default TopiaDesk mark on
+             any failure (no logo uploaded, network error, etc.) — the login
+             page has no session yet, so there's no way to know server-side
+             whether this realm has a custom logo without an extra round-trip;
+             onerror keeps this a single request in the common case and
+             degrades to the default image otherwise. -->
+        <img src="${properties.tenantBrandingBaseUrl}/api/public/tenant-branding/${realm.name}/logo"
+             onerror="this.onerror=null;this.src='${url.resourcesPath}/img/logo-mark.png';"
+             alt="" class="td-card-brand-mark" />
+        ${kcSanitize(msg("loginTitleHtml",(realm.displayNameHtml!'')))?no_esc}
+      </div>
     </header>
     <main class="${properties.kcLoginMain!}">
       <div class="${properties.kcLoginMainHeader!}">

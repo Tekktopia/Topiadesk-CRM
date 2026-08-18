@@ -30,6 +30,7 @@ import { randomUUID } from 'node:crypto';
 import { Queue, Worker, type Job } from 'bullmq';
 import type Redis from 'ioredis';
 import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, type Prisma } from '@topiadesk/db';
+import { getPlatformPrismaClient } from '@topiadesk/db-platform';
 import { mapAuditRowToWebhookEventType } from './audit-event-map';
 import { signWebhookPayload } from './webhook-signing.util';
 
@@ -52,7 +53,34 @@ export interface WebhookPollResult {
 
 /** `dispatchQueue` is threaded in explicitly (not a module-level singleton) — see createWebhookPollWorker(), which closes over it. */
 export async function runWebhookPoll(dispatchQueue: Queue, now: Date = new Date()): Promise<WebhookPollResult> {
-  return runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+  // Multi-tenant iteration — same pattern as detect-anomalies.job.ts.
+  // Each tenant's webhooks are stored in their own schema, so we must iterate
+  // and run the poll within each tenant's RLS context, not globally in 'public'.
+  const tenants = await runWithRlsContext(SYSTEM_JOB_CONTEXT, () =>
+    getPlatformPrismaClient().tenant.findMany({ where: { status: 'ACTIVE' }, select: { schemaName: true } }),
+  );
+
+  let totalAuditRowsScanned = 0;
+  let totalDeliveriesCreated = 0;
+  let totalDeliveriesEnqueued = 0;
+
+  for (const tenant of tenants) {
+    const result = await runWebhookPollForTenant(tenant.schemaName, dispatchQueue, now);
+    totalAuditRowsScanned += result.auditRowsScanned;
+    totalDeliveriesCreated += result.deliveriesCreated;
+    totalDeliveriesEnqueued += result.deliveriesEnqueued;
+  }
+
+  return {
+    auditRowsScanned: totalAuditRowsScanned,
+    deliveriesCreated: totalDeliveriesCreated,
+    deliveriesEnqueued: totalDeliveriesEnqueued,
+  };
+}
+
+/** Run webhook poll for a single tenant in its own RLS context. */
+async function runWebhookPollForTenant(tenantSchema: string, dispatchQueue: Queue, now: Date): Promise<WebhookPollResult> {
+  return runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema }, async () => {
     const prisma = getPrismaClient();
     const { auditRowsScanned, deliveriesCreated } = await scanNewAuditRows(prisma, now);
     const deliveriesEnqueued = await sweepDueDeliveries(prisma, dispatchQueue, now);

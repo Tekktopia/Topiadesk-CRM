@@ -1,0 +1,113 @@
+# =============================================================================
+# TopiaDesk CRM — real production TLS (Let's Encrypt via Traefik's DNS-01
+# challenge, Cloudflare provider). NOT auto-merged like
+# docker-compose.override.yml — apply explicitly:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod-tls.yml up -d
+#
+# Note the deliberate absence of `-f docker-compose.override.yml`: that file
+# IS auto-merged by a bare `docker compose up`, and it publishes Postgres,
+# Redis, MinIO, Keycloak and the API straight onto the host. Naming both
+# files explicitly, as above, is what keeps them off a public interface —
+# see that file's own header.
+#
+# ---------------------------------------------------------------------------
+# Why DNS-01 and not HTTP-01
+# ---------------------------------------------------------------------------
+# This deployment is subdomain-per-tenant: every tenant is served by the
+# `web-tenant` router's `Host(*.${APP_BASE_DOMAIN})` rule (see
+# docker-compose.yml). HTTP-01 cannot issue a wildcard certificate, so under
+# the previous HTTP-01 setup `web-tenant` had no resolver at all and every
+# tenant subdomain fell back to the only certificate Traefik had loaded —
+# infra/traefik/certs/topiadesk-localhost.pem, the self-signed *dev* cert.
+# In production that is a full-page browser interstitial on every tenant's
+# first request, and (because an untrusted cert means no secure context) it
+# also silently disables the PWA service worker.
+#
+# DNS-01 fixes that: it proves domain control by writing a TXT record via
+# the Cloudflare API instead of serving a file over port 80, which is the
+# only ACME challenge type Let's Encrypt permits for wildcards.
+#
+# Two prerequisites change versus HTTP-01, both in your favour:
+#   - Port 80 no longer has to be publicly reachable for *issuance*. It is
+#     still published, because traefik.yml redirects :80 -> :443.
+#   - Cloudflare's orange-cloud proxy may stay ON. Set the zone's SSL/TLS
+#     mode to "Full (strict)"; the certificate issued here is then the
+#     origin cert behind Cloudflare's edge.
+#
+# ---------------------------------------------------------------------------
+# Prerequisites
+# ---------------------------------------------------------------------------
+#   1. APP_BASE_DOMAIN in .env set to the real registered domain (it still
+#      ships as `topiadesk.localhost` in .env.example — that default will
+#      not issue). Same for APP_URL / KEYCLOAK_HOSTNAME / the *_URL vars.
+#   2. DNS records in the Cloudflare zone:
+#        A/AAAA   ${APP_BASE_DOMAIN}      -> this server's public IP
+#        A/AAAA   *.${APP_BASE_DOMAIN}    -> this server's public IP
+#      The wildcard record is what makes a brand-new tenant subdomain
+#      resolve with no per-tenant DNS work at provisioning time.
+#   3. CLOUDFLARE_DNS_API_TOKEN in .env — a *scoped* API token, not the
+#      global API key. Create at Cloudflare → My Profile → API Tokens with
+#      exactly:  Permissions: Zone / DNS / Edit
+#                Zone Resources: Include / Specific zone / <your zone>
+#      That token can edit DNS in one zone and nothing else, so a leak from
+#      this host cannot touch billing, other zones, or account settings.
+#   4. TRAEFIK_ACME_EMAIL set to a real, monitored address — Let's Encrypt
+#      sends expiry and revocation notices there.
+#
+# Certificates are persisted in the `traefik_acme` volume (mounted at
+# /letsencrypt by the base compose file). Back that volume up, or at minimum
+# be aware that destroying it forces a full re-issue and burns Let's
+# Encrypt rate limit.
+# =============================================================================
+services:
+  traefik:
+    environment:
+      TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_EMAIL: '${TRAEFIK_ACME_EMAIL}'
+      TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_STORAGE: /letsencrypt/acme.json
+      TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_DNSCHALLENGE_PROVIDER: cloudflare
+      # Resolve the challenge TXT record against public resolvers rather
+      # than whatever this host's /etc/resolv.conf points at. Without this,
+      # a server using an internal/split-horizon resolver can fail its own
+      # propagation pre-check indefinitely even though the record is live
+      # on Cloudflare's authoritative nameservers.
+      TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_DNSCHALLENGE_RESOLVERS: 1.1.1.1:53,8.8.8.8:53
+      # Consumed by lego's Cloudflare provider (the ACME library Traefik
+      # embeds). CF_DNS_API_TOKEN is the scoped-token variable; the
+      # global-key pair (CF_API_EMAIL/CF_API_KEY) is deliberately not used.
+      CF_DNS_API_TOKEN: '${CLOUDFLARE_DNS_API_TOKEN}'
+
+  keycloak:
+    labels:
+      - traefik.http.routers.keycloak.tls.certresolver=le
+
+  api:
+    labels:
+      - traefik.http.routers.api.tls.certresolver=le
+
+  web:
+    labels:
+      - traefik.http.routers.web.tls.certresolver=le
+      # The tenant wildcard. `main` is the apex because a `*.example.com`
+      # SAN does not itself cover `example.com`, and one certificate
+      # carrying both is cheaper to renew than two.
+      #
+      # Only THIS router carries a `domains` block: it is the one router
+      # whose Host rule Traefik cannot enumerate into concrete names on its
+      # own (a wildcard rule matches hostnames that do not exist yet, which
+      # is the entire point of subdomain-per-tenant provisioning). The four
+      # exact-host routers above need no such hint — Traefik derives the
+      # name to request directly from each one's Host() rule.
+      #
+      # Note `*.${APP_BASE_DOMAIN}` matches exactly one label, so
+      # `scib-nigeria.${APP_BASE_DOMAIN}` is covered but
+      # `a.b.${APP_BASE_DOMAIN}` is not — the same single-level constraint
+      # the web-tenant Host() rule already documents in docker-compose.yml.
+      - traefik.http.routers.web-tenant.tls=true
+      - traefik.http.routers.web-tenant.tls.certresolver=le
+      - traefik.http.routers.web-tenant.tls.domains[0].main=${APP_BASE_DOMAIN}
+      - traefik.http.routers.web-tenant.tls.domains[0].sans=*.${APP_BASE_DOMAIN}
+
+  global-admin:
+    labels:
+      - traefik.http.routers.global-admin.tls.certresolver=le

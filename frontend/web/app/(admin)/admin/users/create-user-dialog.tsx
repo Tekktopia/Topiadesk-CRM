@@ -49,6 +49,7 @@ export function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpen
   const [branchId, setBranchId] = useState(UNASSIGNED);
   const [managerId, setManagerId] = useState<string | undefined>(undefined);
   const [positionTitle, setPositionTitle] = useState('');
+  const [password, setPassword] = useState('');
   const [created, setCreated] = useState<CreateUserResponse | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -71,6 +72,7 @@ export function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpen
       branchId: branchId === UNASSIGNED ? undefined : branchId,
       managerId,
       positionTitle: positionTitle.trim() || undefined,
+      password: password || undefined,
     });
   }
 
@@ -90,6 +92,7 @@ export function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpen
       setBranchId(UNASSIGNED);
       setManagerId(undefined);
       setPositionTitle('');
+      setPassword('');
       setCreated(null);
       setCopied(false);
     }
@@ -104,12 +107,13 @@ export function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpen
             <DialogHeader>
               <DialogTitle>{created.user.fullName} was created</DialogTitle>
               <DialogDescription>
-                Copy this temporary password now — it won&apos;t be shown again here (it&apos;s also been emailed to{' '}
-                {created.user.email}). They&apos;ll be asked to set a new password on first sign-in.
+                {password
+                  ? `They can sign in with the password you set — it's also been emailed to ${created.user.email}. They'll only be asked to configure two-factor authentication on first sign-in.`
+                  : `Copy this temporary password now — it won't be shown again here (it's also been emailed to ${created.user.email}). They'll be asked to set a new password on first sign-in.`}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-1.5">
-              <Label htmlFor="new-user-password">Temporary password</Label>
+              <Label htmlFor="new-user-password">{password ? 'Password' : 'Temporary password'}</Label>
               <div className="flex gap-2">
                 <Input id="new-user-password" readOnly value={created.temporaryPassword} className="font-mono text-xs" />
                 <Button type="button" variant="outline" size="icon" aria-label="Copy password" onClick={handleCopy}>
@@ -191,6 +195,20 @@ export function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpen
                   value={positionTitle}
                   onChange={(e) => setPositionTitle(e.target.value)}
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="new-user-password">Password (optional)</Label>
+                <Input
+                  id="new-user-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Leave blank to auto-generate"
+                />
+                <p className="text-xs text-muted-foreground">
+                  If set, must be 12+ characters with upper/lowercase, a digit, and a special character. Skips the forced
+                  password-change on next sign-in.
+                </p>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => handleClose(false)}>

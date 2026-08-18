@@ -2,10 +2,12 @@ import { BadRequestException } from '@nestjs/common';
 import { getPrismaClient, type BusinessRule, type CaseManagementEntityType } from '@topiadesk/db';
 
 /**
- * Condition fields mirror backend/worker/src/automation/run-engine.ts's own
- * CONDITION_FIELDS allow-list exactly — same fixed set an AutomationRule
- * CONDITION step can branch on, so a BusinessRule and an AutomationRule
- * never disagree about what "the case's status" means. Action fields are a
+ * Condition fields are the case/claim subset a BusinessRule may branch on.
+ * (These used to mirror run-engine.ts's own hardcoded CONDITION_FIELDS map;
+ * that map is now derived from the shared @topiadesk/automation entity
+ * registry, which is a superset — an AutomationRule can branch on more
+ * fields than a BusinessRule. The overlap still agrees on meaning, which is
+ * what mattered; a BusinessRule is simply the narrower surface.) Action fields are a
  * different domain: every field frontend/web/app/(cases)/cases/_components/
  * case-form-dialog.tsx actually renders, since REQUIRE/HIDE/READONLY only
  * make sense on a field the form shows. CLAIM's action list is empty on
@@ -22,12 +24,27 @@ export const CONDITION_FIELDS: Record<CaseManagementEntityType, readonly string[
   // present so this stays a total Record over the shared enum, same "empty
   // but representable" precedent as CLAIM's own ACTION_FIELDS below.
   LEAD: [],
+  // Added to CaseManagementEntityType so AutomationRunState can carry a
+  // multi-step workflow on any entity type. BusinessRule is a form-behaviour
+  // engine over the case/claim forms and models none of them, so they are
+  // empty here for exactly the reason LEAD is — an admin cannot author a
+  // business rule against them, and this map stays total over the enum.
+  POLICY: [],
+  OPPORTUNITY: [],
+  TASK: [],
+  ACCOUNT: [],
+  CONTACT: [],
 };
 
 export const ACTION_FIELDS: Record<CaseManagementEntityType, readonly string[]> = {
   CASE: ['caseType', 'subject', 'description', 'priority', 'categoryId', 'accountId', 'policyId', 'assignedToId'],
   CLAIM: [],
   LEAD: [],
+  POLICY: [],
+  OPPORTUNITY: [],
+  TASK: [],
+  ACCOUNT: [],
+  CONTACT: [],
 };
 
 export type BusinessRuleActionEffect = 'REQUIRE' | 'HIDE' | 'READONLY' | 'SET_VALUE';

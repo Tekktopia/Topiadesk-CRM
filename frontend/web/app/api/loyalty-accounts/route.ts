@@ -4,11 +4,19 @@ import { proxyJson } from '../_lib/proxy';
 
 export const runtime = 'nodejs';
 
-/** GET /api/loyalty-accounts -> GET /loyalty-accounts (LoyaltyAccountsController.list) — optional ?search= by account name. */
+/**
+ * GET /api/loyalty-accounts -> GET /loyalty-accounts
+ * (LoyaltyAccountsController.list) — filters: search/tier/take.
+ *
+ * Forwards the whole query string. This route previously hand-picked only
+ * `search`, so `tier` and `take` were dropped SILENTLY — the request still
+ * succeeded and returned the unfiltered list. That is the same failure mode
+ * that hid broken filters on carriers, users, notifications and claims;
+ * hand-picked params are only worth the risk when there is an actual reason
+ * to withhold one, and there is none here.
+ */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const { searchParams } = new URL(request.url);
-  const search = searchParams.get('search');
-  return proxyJson(`/loyalty-accounts${search ? `?search=${encodeURIComponent(search)}` : ''}`);
+  return proxyJson(`/loyalty-accounts${request.nextUrl.search}`);
 }
 
 /** POST /api/loyalty-accounts -> POST /loyalty-accounts (LoyaltyAccountsController.enroll, EnrollLoyaltyAccountDto). */

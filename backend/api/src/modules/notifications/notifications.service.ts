@@ -72,4 +72,24 @@ export class NotificationsService {
       data: { status: 'READ', readAt: new Date() },
     });
   }
+
+  /** RLS (notifications_rw) already scopes this updateMany to the caller's own rows — no explicit recipientUserId filter needed, same as listMine(). */
+  async markAllRead(): Promise<number> {
+    const result = await getPrismaClient().notification.updateMany({
+      where: { readAt: null },
+      data: { status: 'READ', readAt: new Date() },
+    });
+    return result.count;
+  }
+
+  /** Returns which of the requested ids were actually deleted — RLS can silently narrow a deleteMany the same way it narrows any other bulk op (see crm/bulk-actions.ts's diffBulkIds, same reasoning applied here without importing across modules). */
+  async deleteMany(ids: string[]): Promise<string[]> {
+    const prisma = getPrismaClient();
+    const visible = await prisma.notification.findMany({ where: { id: { in: ids } }, select: { id: true } });
+    const visibleIds = visible.map((n) => n.id);
+    if (visibleIds.length > 0) {
+      await prisma.notification.deleteMany({ where: { id: { in: visibleIds } } });
+    }
+    return visibleIds;
+  }
 }

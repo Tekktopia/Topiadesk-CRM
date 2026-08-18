@@ -74,6 +74,13 @@ COPY backend/worker/package.json backend/worker/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/db-platform/package.json packages/db-platform/package.json
 COPY packages/config/package.json packages/config/package.json
+# packages/automation — the shared automation core (entity registry,
+# condition engine, action catalog, cron helpers). backend/api and
+# backend/worker both depend on it and have no import path between their
+# own src/ trees, which is why it is a workspace package rather than
+# duplicated code; it must be listed here like every other manifest or
+# pnpm install cannot resolve the workspace dependency.
+COPY packages/automation/package.json packages/automation/package.json
 COPY packages/shared-types/package.json packages/shared-types/package.json
 COPY packages/reports/package.json packages/reports/package.json
 # frontend/web and packages/ui are intentionally omitted here — backend/api
@@ -88,6 +95,31 @@ COPY packages/reports/package.json packages/reports/package.json
 # below fails with "Cannot find module" from inside packages/reports/src,
 # not from anything backend/api itself changed.
 RUN pnpm install --frozen-lockfile
+
+# Vendor the local embedding model's weights into the image at build time —
+# see local-embeddings.service.ts's header comment. Runs BEFORE `COPY . .`
+# below so it's cached by Docker layer caching independent of unrelated
+# source changes (same caching philosophy `pnpm install` above already
+# uses), and downloads once here rather than on every container start or
+# first request. /app/.model-cache is a literal path that MUST match
+# MODEL_CACHE_DIR in local-embeddings.service.ts exactly — there is no
+# shared constant between this Dockerfile and that TypeScript file, so if
+# one changes, the other must too.
+RUN cd backend/api && node -e "\
+  const { pipeline } = require('@huggingface/transformers'); \
+  pipeline('feature-extraction', 'onnx-community/all-MiniLM-L6-v2-ONNX', { dtype: 'fp32', cache_dir: '/app/.model-cache' }) \
+    .then(() => { console.log('embedding model cached'); process.exit(0); }) \
+    .catch((err) => { console.error('Failed to cache embedding model:', err); process.exit(1); });"
+
+# A second model-vendoring step for the local conversational fallback's
+# generative model (local-llm.service.ts) used to live here
+# (onnx-community/Qwen2.5-1.5B-Instruct, q8) — removed: that generic
+# pretrained model was reported live as making the system slow, and
+# LocalLlmService is no longer registered in AiGatewayModule (see that
+# module's own comment). See the approved plan
+# (distributed-kindling-cupcake.md, Track 2) for the parallel effort to
+# train a smaller, domain-fine-tuned replacement — if/when that ships, a
+# similar RUN step vendoring the NEW model belongs back here.
 
 # --- build: full source, generate Prisma client, compile backend/api ----------
 FROM deps AS build
@@ -114,7 +146,18 @@ WORKDIR /app
 # See the `base` stage's comment above — required again here, this is a
 # fresh FROM. The query engine runs on every request api serves, not just
 # at migration time.
-RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+#
+# fontconfig + fonts-dejavu-core: `canvas` (chartjs-node-canvas's rendering
+# backend, used by to-chart-image.ts) fetches a prebuilt native binary via
+# prebuild-install at `pnpm install` time — confirmed empirically it needs
+# NO apt packages at all to install or render. Without a font package,
+# though, it renders with a "Fontconfig error: Cannot load default config
+# file" warning and falls back to some default — verified live this still
+# produces a valid PNG, but with no confirmed-decent text rendering for
+# chart titles/labels/legends, which matters here since every generated
+# chart has visible text. Installing these two removes the warning and
+# gives Chart.js a real font to render with.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl fontconfig fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --system --gid 1001 topiadesk \
@@ -139,7 +182,15 @@ RUN chmod 0755 /usr/local/bin/topiadesk-api-entrypoint.sh
 USER topiadesk
 EXPOSE 4000
 
-HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
+# Right-sized back down now that only one model (the embedding model)
+# loads at boot — the generative LLM's own load no longer happens at all
+# (see the removed vendoring step above). Measured ~1.7s cold for the
+# embedding model alone once local_files_only actually applies correctly
+# (see local-embeddings.service.ts's header comment on the NODE_ENV bug
+# that used to make this silently attempt a network fetch instead) —
+# 60s/6 retries leaves generous margin over that without reintroducing the
+# multi-minute grace period two models used to need.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=6 \
   CMD node -e "require('http').get({host:'127.0.0.1',port:process.env.API_PORT||4000,path:'/ready'},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
 CMD ["/usr/local/bin/topiadesk-api-entrypoint.sh"]

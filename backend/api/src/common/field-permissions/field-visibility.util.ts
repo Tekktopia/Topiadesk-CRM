@@ -69,6 +69,24 @@ export function redactHiddenFieldsMany<T extends object>(rows: T[], visibilities
   return rows.map((row) => redactHiddenFields(row, visibilities));
 }
 
+/**
+ * Which of this resource's catalog fields are genuinely visible (not
+ * HIDDEN) to this caller — the trigger condition for a VIEW_SENSITIVE audit
+ * event. Fires whenever any catalog field is exposed at all, not only when
+ * a FieldPermission row happens to restrict it for someone else: these
+ * fields (NAICOM ID, national ID number, commission figures) are
+ * inherently sensitive by category, so "who viewed this" is the
+ * compliance-relevant question regardless of whether access is currently
+ * locked down — same reasoning as this codebase's KYC/consent-record audit
+ * coverage. Call this on single-record reads only (not list endpoints),
+ * to keep audit_log volume proportional to genuine "someone opened this
+ * specific sensitive record" events rather than routine list-browsing.
+ */
+export function sensitiveFieldsExposed(resource: string, visibilities: Record<string, FieldVisibility>): string[] {
+  const fields = FIELD_PERMISSION_CATALOG[resource] ?? [];
+  return fields.filter((field) => visibilities[field] !== 'HIDDEN');
+}
+
 /** Throws if the caller's DTO body touches any field that isn't EDITABLE for them — call before the write, with the raw request body (not the persisted row) so an omitted field never trips this. */
 export function assertFieldsWritable(body: object, visibilities: Record<string, FieldVisibility>): void {
   const blocked = Object.keys(body).filter((field) => field in visibilities && visibilities[field] !== 'EDITABLE');

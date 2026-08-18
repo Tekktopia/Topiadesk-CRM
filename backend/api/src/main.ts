@@ -11,7 +11,12 @@ import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 async function bootstrap() {
   const env = loadEnv();
 
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // rawBody: needed by webhook-receiver.controller.ts to verify a real
+  // vendor HMAC signature (Paystack's x-paystack-signature, DocuSign
+  // Connect's HMAC header) against the EXACT bytes sent — re-serializing
+  // the already-JSON-parsed body first can differ byte-for-byte (key
+  // order, whitespace) and silently break verification.
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
   app.useLogger(app.get(Logger));
 
   app.use(

@@ -1,5 +1,5 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { IsDateString, IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { IsBooleanString, IsDateString, IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 import { QuotaPeriodType, QuotaScopeType } from '@topiadesk/db';
 
 export class CreateSalesQuotaDto {
@@ -24,6 +24,28 @@ export class UpdateSalesQuotaDto extends PartialType(CreateSalesQuotaDto) {}
 export class SalesQuotaQueryDto {
   @ApiProperty({ enum: QuotaScopeType, required: false }) @IsOptional() @IsEnum(QuotaScopeType) scopeType?: QuotaScopeType;
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() userId?: string;
+  @ApiProperty({ enum: QuotaPeriodType, required: false }) @IsOptional() @IsEnum(QuotaPeriodType) periodType?: QuotaPeriodType;
+  @ApiPropertyOptional({ description: 'Only quotas whose period covers today — the ones actually being measured right now.' })
+  @IsOptional()
+  @IsBooleanString()
+  currentOnly?: string;
+}
+
+/**
+ * Quota-page aggregates.
+ *
+ * Deliberately does NOT compute org-wide attainment: that would mean running
+ * the per-quota won-opportunity scan (see getAttainment) once per quota on
+ * every page load, and each scan is its own filtered Opportunity query. The
+ * header reports coverage and committed target instead; attainment stays a
+ * per-quota, on-demand figure.
+ */
+export class SalesQuotaStatsResponseDto {
+  @ApiProperty() total!: number;
+  @ApiProperty({ description: 'Quotas whose periodStart..periodEnd covers today.' }) current!: number;
+  @ApiProperty({ description: 'Quotas assigned to an individual rep (scopeType = USER).' }) individual!: number;
+  @ApiProperty({ description: 'Sum of targetAmount across CURRENT quotas only — the number being carried this period.' })
+  currentTargetTotal!: string;
 }
 
 export class SalesQuotaResponseDto {

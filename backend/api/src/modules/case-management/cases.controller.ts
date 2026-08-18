@@ -1,9 +1,11 @@
 import { randomBytes } from 'node:crypto';
-import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Query, Res, StreamableFile, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, Prisma, type Case } from '@topiadesk/db';
+import type { Response } from 'express';
+import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, Prisma, type Case, type CaseStatus } from '@topiadesk/db';
 import { AuditLogResponseDto } from '../audit/dto/audit-log-response.dto';
 import { loadEntityHistory } from '../audit/entity-history';
+import { casesToCsv } from './case-csv';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -19,6 +21,7 @@ import {
   BulkAssignCasesDto,
   BulkUpdateCasesDto,
   CaseQueryDto,
+  CaseStatsResponseDto,
   CaseQueueQueryDto,
   CaseResponseDto,
   ChangeCaseStatusDto,
@@ -37,6 +40,7 @@ import { assertValidCaseTransition } from './case-lifecycle';
 import { ensureCaseSlaClocks } from './sla-clock.util';
 import { enqueueEntityEvent } from './automation-events.util';
 import { enqueueTeamAssignmentNotification } from './notify-team-assignment-queue';
+import { enqueueCaseAssignmentNotification } from './notify-case-assignment-queue';
 import { findMatchingAssignmentRule, resolveNextAssignee } from './assignment-resolver.util';
 import { buildCaseOrderBy, buildCaseWhere } from './case-query.util';
 import { diffBulkIds } from './bulk-actions';
@@ -96,6 +100,64 @@ export class CasesController {
   }
 
   /**
+   * Ticket-desk aggregates over the SAME filter set as list()/count(), so
+   * the header always describes the rows beneath it.
+   *
+   * `unassigned` and `breaching` are the two numbers a support lead is
+   * actually chasing: work nobody owns, and work about to miss its SLA.
+   * Neither is derivable from the ticket rows themselves — breach lives on
+   * SlaClock — so both are computed here rather than in the browser.
+   */
+  @Get('stats')
+  @RequirePermission('case', 'read')
+  @ApiOkResponse({ type: CaseStatsResponseDto })
+  async stats(@Query() query: CaseQueryDto, @CurrentUser() user: AuthenticatedUser): Promise<CaseStatsResponseDto> {
+    const prisma = getPrismaClient();
+    const where = await buildCaseWhere(query, user.id);
+    const OPEN_STATUSES: CaseStatus[] = ['NEW', 'OPEN', 'PENDING_CUSTOMER', 'PENDING_CARRIER', 'REOPENED'];
+
+    // Every sub-count ANDs onto `where` instead of spreading-and-overriding
+    // it. `{ ...where, status: 'X' }` REPLACES a status the caller already
+    // filtered on, so a filtered view reported counts drawn from rows the
+    // table wasn't showing. Intersecting makes an impossible combination
+    // return 0, which is the truth for that view.
+    const [total, newCount, open, resolved, closed, unassigned, breaching] = await Promise.all([
+      prisma.case.count({ where }),
+      prisma.case.count({ where: { AND: [where, { status: 'NEW' }] } }),
+      prisma.case.count({ where: { AND: [where, { status: { in: OPEN_STATUSES } }] } }),
+      prisma.case.count({ where: { AND: [where, { status: 'RESOLVED' }] } }),
+      prisma.case.count({ where: { AND: [where, { status: 'CLOSED' }] } }),
+      prisma.case.count({ where: { AND: [where, { assignedToId: null, status: { in: OPEN_STATUSES } }] } }),
+      // A RUNNING clock already past its dueAt. Counting clocks whose case
+      // matches the filter, not clocks in general — a breach on a ticket the
+      // user cannot see must not inflate their header.
+      prisma.case.count({
+        where: { AND: [where, { slaClocks: { some: { status: 'RUNNING', dueAt: { lt: new Date() } } } }] },
+      }),
+    ]);
+
+    return { total, newCount, open, resolved, closed, unassigned, breaching };
+  }
+
+  @Get('export')
+  @RequirePermission('case', 'read')
+  async export(
+    @Query() query: CaseQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const where = await buildCaseWhere(query, user.id);
+    const cases = await getPrismaClient().case.findMany({
+      where,
+      orderBy: buildCaseOrderBy(query),
+      take: 10_000,
+    });
+    const csv = casesToCsv(cases);
+    res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="tickets.csv"' });
+    return new StreamableFile(Buffer.from(csv, 'utf-8'));
+  }
+
+  /**
    * Real bulk endpoints — previously the ticket workspace fanned out one
    * PATCH/POST per selected row client-side (see (cases)/_lib/hooks.ts's
    * settleAndReport, kept as the pattern's own header comment explained:
@@ -106,16 +168,24 @@ export class CasesController {
   @Post('bulk/assign')
   @RequirePermission('case', 'write')
   @ApiOkResponse({ type: BulkActionResponseDto })
-  async bulkAssign(@Body() dto: BulkAssignCasesDto): Promise<BulkActionResponseDto> {
+  async bulkAssign(@Body() dto: BulkAssignCasesDto, @CurrentUser() user: AuthenticatedUser): Promise<BulkActionResponseDto> {
     const prisma = getPrismaClient();
     const visible = await prisma.case.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
     const { matched, skipped } = diffBulkIds(dto.ids, visible.map((c) => c.id));
     if (matched.length > 0) {
       await prisma.case.updateMany({ where: { id: { in: matched } }, data: { assignedToId: dto.assignedToId } });
+      const assignedAt = new Date().toISOString();
       await Promise.all(
-        matched.map((id) =>
-          enqueueEntityEvent({ entityType: 'CASE', entityId: id, eventType: 'ASSIGNED', occurredAt: new Date().toISOString() }).catch(() => undefined),
-        ),
+        matched.flatMap((id) => [
+          enqueueEntityEvent({ entityType: 'CASE', entityId: id, eventType: 'ASSIGNED', occurredAt: assignedAt }).catch(() => undefined),
+          // Tell the assignee. Bulk-assigning 50 tickets to one person
+          // produces 50 notifications by design — each is a distinct piece
+          // of work they now own, and collapsing them would hide the
+          // individual tickets behind a count.
+          dto.assignedToId
+            ? enqueueCaseAssignmentNotification({ caseId: id, assigneeId: dto.assignedToId, assignedById: user.id, assignedAt }).catch(() => undefined)
+            : Promise.resolve(),
+        ]),
       );
     }
     return { requested: dto.ids, updated: matched, skipped };
@@ -280,7 +350,12 @@ export class CasesController {
             where: { id: kase.id },
             data: { assignedToId: resolution.userId, assignedTeamId: rule.candidatePoolTeamId },
           });
-          await enqueueEntityEvent({ entityType: 'CASE', entityId: kase.id, eventType: 'ASSIGNED', occurredAt: new Date().toISOString() }).catch(() => undefined);
+          const autoAssignedAt = new Date().toISOString();
+          await enqueueEntityEvent({ entityType: 'CASE', entityId: kase.id, eventType: 'ASSIGNED', occurredAt: autoAssignedAt }).catch(() => undefined);
+          // No assignedById: an auto-assignment isn't "someone assigned it
+          // to you", so it always notifies even if the rule happens to pick
+          // the person who filed the ticket.
+          await enqueueCaseAssignmentNotification({ caseId: kase.id, assigneeId: resolution.userId, assignedAt: autoAssignedAt }).catch(() => undefined);
           if (rule.candidatePoolTeamId) {
             await enqueueTeamAssignmentNotification({ caseId: kase.id, teamId: rule.candidatePoolTeamId }).catch(() => undefined);
           }
@@ -297,7 +372,7 @@ export class CasesController {
   @Patch(':id')
   @RequirePermission('case', 'write')
   @ApiOkResponse({ type: CaseResponseDto })
-  async update(@Param('id') id: string, @Body() dto: UpdateCaseDto): Promise<CaseResponseDto> {
+  async update(@Param('id') id: string, @Body() dto: UpdateCaseDto, @CurrentUser() user: AuthenticatedUser): Promise<CaseResponseDto> {
     const prisma = getPrismaClient();
     const existing = await prisma.case.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Case not found');
@@ -322,6 +397,16 @@ export class CasesController {
     await enqueueEntityEvent({ entityType: 'CASE', entityId: id, eventType: 'UPDATED', occurredAt: updated.updatedAt.toISOString() }).catch(() => undefined);
     if (dto.assignedTeamId && dto.assignedTeamId !== existing.assignedTeamId) {
       await enqueueTeamAssignmentNotification({ caseId: id, teamId: dto.assignedTeamId }).catch(() => undefined);
+    }
+    // Only on a real CHANGE of assignee — re-saving a ticket without
+    // touching the assignee must not re-ping them.
+    if (dto.assignedToId && dto.assignedToId !== existing.assignedToId) {
+      await enqueueCaseAssignmentNotification({
+        caseId: id,
+        assigneeId: dto.assignedToId,
+        assignedById: user.id,
+        assignedAt: updated.updatedAt.toISOString(),
+      }).catch(() => undefined);
     }
     return updated;
   }

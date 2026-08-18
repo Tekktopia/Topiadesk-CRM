@@ -25,7 +25,8 @@ import { AdminBulkActionToolbar } from './admin-bulk-action-toolbar';
 import { apiFetch } from '../_lib/api';
 import { canWriteAdmin } from '../_lib/permissions';
 import type { AutomationRuleDto, AutomationTriggerType } from '../_lib/types';
-import { AutomationRuleFormDialog } from './automation-rule-form-dialog';
+import { AutomationRuleBuilder } from './automation-rule-builder';
+import { describeRuleConditions, describeRuleActions, describeRuleSchedule } from '../_lib/automation-describe';
 
 /**
  * Shared list view reused by /admin/triggers (ENTITY_EVENT) and
@@ -100,23 +101,47 @@ export function AutomationRulesListView({
       },
       {
         id: 'conditions',
-        header: 'Conditions',
+        header: 'Applies to',
         enableSorting: false,
+        // Was a raw JSON.stringify of the conditions blob. Nobody can scan a
+        // list of those to find the rule they mean.
         cell: ({ row }) => (
-          <span className="block max-w-xs truncate font-mono text-xs text-muted-foreground">
-            {JSON.stringify(row.original.conditions)}
-          </span>
+          <span className="block max-w-xs truncate text-xs text-muted-foreground">{describeRuleConditions(row.original)}</span>
         ),
       },
       {
         id: 'actionsSpec',
-        header: 'Actions',
+        header: 'Does',
         enableSorting: false,
         cell: ({ row }) => (
-          <span className="block max-w-xs truncate font-mono text-xs text-muted-foreground">
-            {JSON.stringify(row.original.actions)}
-          </span>
+          <span className="block max-w-xs truncate text-xs text-muted-foreground">{describeRuleActions(row.original)}</span>
         ),
+      },
+      {
+        id: 'schedule',
+        header: 'When',
+        enableSorting: false,
+        cell: ({ row }) => <span className="text-xs text-muted-foreground">{describeRuleSchedule(row.original)}</span>,
+      },
+      {
+        id: 'lastRun',
+        header: 'Last run',
+        enableSorting: false,
+        // The observability that did not exist: a rule silently failing every
+        // night looked identical to one working perfectly.
+        cell: ({ row }) => {
+          const { lastRunAt, lastRunStatus, lastMatchCount, lastRunError } = row.original;
+          if (!lastRunAt) return <span className="text-xs text-muted-foreground">Not yet run</span>;
+          return (
+            <div className="flex flex-col gap-0.5">
+              <Badge variant={lastRunStatus === 'OK' ? 'success' : lastRunStatus === 'FAILED' ? 'destructive' : 'secondary'}>
+                {lastRunStatus === 'OK' ? `${lastMatchCount ?? 0} matched` : (lastRunStatus ?? 'Unknown')}
+              </Badge>
+              <span className="text-[11px] text-muted-foreground">{new Date(lastRunAt).toLocaleString()}</span>
+              {lastRunError ? <span className="max-w-xs truncate text-[11px] text-destructive">{lastRunError}</span> : null}
+            </div>
+          );
+        },
       },
       {
         accessorKey: 'isActive',
@@ -216,7 +241,7 @@ export function AutomationRulesListView({
       )}
 
       {dialogTarget ? (
-        <AutomationRuleFormDialog
+        <AutomationRuleBuilder
           target={dialogTarget}
           triggerType={triggerType}
           open={!!dialogTarget}

@@ -1,4 +1,4 @@
-import { Briefcase, BookOpen, FileClock, LayoutDashboard, LifeBuoy, Megaphone, ShieldCheck } from 'lucide-react';
+import { Briefcase, BookOpen, FileClock, LayoutDashboard, LifeBuoy, Megaphone, ShieldCheck, ShieldQuestion } from 'lucide-react';
 import { dashboardNav } from './(dashboard)/nav';
 import { crmNav } from './(crm)/nav';
 import { policyNav } from './(policy)/nav';
@@ -7,6 +7,7 @@ import { casesNav } from './(cases)/nav';
 import { knowledgeNav } from './(knowledge)/nav';
 import { reportsNav } from './(reports)/nav';
 import { campaignsNav } from './(campaigns)/nav';
+import { complianceNav } from './(compliance)/nav';
 import type { NavItem } from '@/lib/nav-types';
 
 /**
@@ -34,6 +35,7 @@ export const NAV_MODULES: NavModule[] = [
   { key: 'knowledge', label: 'Knowledge', icon: BookOpen, indexHref: '/knowledge', items: knowledgeNav },
   { key: 'reports', label: 'Reports', icon: LayoutDashboard, indexHref: '/reports', items: reportsNav },
   { key: 'campaigns', label: 'Campaigns', icon: Megaphone, indexHref: '/campaigns', items: campaignsNav },
+  { key: 'compliance', label: 'Compliance', icon: ShieldQuestion, indexHref: '/compliance', items: complianceNav, adminOnly: true },
   { key: 'admin', label: 'Admin', icon: ShieldCheck, indexHref: '/admin/users', items: adminNav, adminOnly: true },
 ];
 

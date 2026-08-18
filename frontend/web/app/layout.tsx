@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { AppShell } from './app-shell';
 import { Providers } from './providers';
+import { InstallPrompt } from './install-prompt';
+import { OfflineStatus } from './offline-status';
 import { ServiceWorkerRegistration } from './service-worker-registration';
 import './globals.css';
 
@@ -15,6 +17,16 @@ export const metadata: Metadata = {
   icons: {
     icon: '/icons/icon-192.png',
     apple: '/icons/apple-touch-icon.png',
+  },
+  // iOS ignores the web manifest's `display` field entirely — without these
+  // apple-specific tags, "Add to Home Screen" on iPhone produces a bookmark
+  // that opens in a Safari tab with browser chrome, not a standalone app.
+  // `statusBarStyle: 'default'` keeps the status bar legible against the
+  // light background; 'black-translucent' would let content slide under it.
+  appleWebApp: {
+    capable: true,
+    title: 'TopiaDesk',
+    statusBarStyle: 'default',
   },
 };
 
@@ -37,6 +49,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <AppShell>{children}</AppShell>
         </Providers>
         <ServiceWorkerRegistration />
+        {/* One positioned stack rather than two independently-fixed cards —
+            both are bottom-anchored and would otherwise sit on top of each
+            other, hiding whichever lost the z-index. `pointer-events-none`
+            on the container keeps the empty gutter from swallowing clicks
+            on the page beneath; each card re-enables them for itself. */}
+        <div className="pointer-events-none fixed inset-x-3 bottom-3 z-50 flex flex-col gap-2 sm:left-auto sm:right-4 sm:w-96">
+          <OfflineStatus />
+          <InstallPrompt />
+        </div>
       </body>
     </html>
   );

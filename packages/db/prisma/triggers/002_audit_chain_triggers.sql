@@ -108,7 +108,16 @@ BEGIN
     -- Phase 3 — workflow engine. A run's status/step progression is a real
     -- compliance-relevant record once it can pause on an approval gate,
     -- same tier as approvals itself.
-    'automation_run_states'
+    'automation_run_states',
+    -- Compliance module (NDPR/GDPR). These two were a real gap, found live:
+    -- every other compliance-relevant table above already had coverage,
+    -- but the actual consent ledger and data-subject-request queue —
+    -- arguably the most audit-critical tables in the schema — silently
+    -- didn't. data_subject_requests.export_data (a point-in-time PII
+    -- snapshot written by DsrController.process()) being captured in the
+    -- diff is a feature here, not noise: knowing exactly what was
+    -- exported and when is itself an NDPR/GDPR requirement.
+    'consent_records', 'data_subject_requests'
   ]
   LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS %I_audit_trigger ON %I', t, t);

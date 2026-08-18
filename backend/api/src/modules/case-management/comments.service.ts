@@ -51,6 +51,11 @@ export class CommentsService {
         occurredAt,
         createdById,
         emailDeliveryStatus: isOutboundCaseEmail ? 'PENDING' : undefined,
+        // Explicit choice only — the legacy auto-resolved-contact path
+        // leaves these empty until the worker writes back what it actually
+        // used (see send-case-comment-email.job.ts).
+        emailTo: isOutboundCaseEmail ? (dto.emailTo ?? []) : undefined,
+        emailCc: isOutboundCaseEmail ? (dto.emailCc ?? []) : undefined,
       },
     });
 
@@ -63,7 +68,12 @@ export class CommentsService {
     }
 
     if (isOutboundCaseEmail) {
-      await enqueueCaseCommentEmail({ activityId: created.id, caseId: entity.caseId! }).catch(() => undefined);
+      await enqueueCaseCommentEmail({
+        activityId: created.id,
+        caseId: entity.caseId!,
+        to: dto.emailTo,
+        cc: dto.emailCc,
+      }).catch(() => undefined);
     }
 
     return created;

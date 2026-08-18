@@ -19,7 +19,7 @@ export interface ScheduledReportGenerateJobData {
  */
 const registry = buildDefaultRegistry();
 
-function toExportFormat(format: ScheduledReportFormat): ReportExportFormat {
+function toExportFormat(format: ScheduledReportFormat): Exclude<ReportExportFormat, 'png'> {
   switch (format) {
     case 'PDF':
       return 'pdf';
@@ -145,7 +145,7 @@ export async function runGenerateAndDeliver(runId: string): Promise<void> {
       const result = await definition.execute(prisma, filters, run.dimension ?? undefined);
 
       const exportFormat = toExportFormat(run.format);
-      const buffer = await renderReportExport(result, exportFormat, definition.name);
+      const buffer = await renderReportExport(result, exportFormat, definition.name, definition.defaultChartType);
       const uploaded = await uploadReportFile(run.id, run.reportKey, exportFormat, buffer);
 
       await prisma.scheduledReportRun.update({

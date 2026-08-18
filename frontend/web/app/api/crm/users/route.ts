@@ -1,3 +1,4 @@
+import type { NextRequest } from 'next/server';
 import { proxyJson } from '../_shared';
 
 export const runtime = 'nodejs';
@@ -15,7 +16,13 @@ export const runtime = 'nodejs';
  * COMPLIANCE_OFFICER hold per packages/db/prisma/seed.ts, so a MANAGER or
  * ACCOUNT_HANDLER caller will get a 403 here and the UI falls back to
  * showing a short id instead of a name.
+ *
+ * Forwards the query string: GET /identity/users accepts ListUsersQueryDto
+ * (q / departmentId / branchId / status / pagination). This route used to
+ * call proxyJson('/identity/users') with no params, so any caller passing a
+ * filter got the whole unfiltered directory back and had to narrow it
+ * client-side — silently, with no error to notice.
  */
-export async function GET() {
-  return proxyJson('/identity/users');
+export async function GET(request: NextRequest) {
+  return proxyJson(`/identity/users${request.nextUrl.search}`);
 }

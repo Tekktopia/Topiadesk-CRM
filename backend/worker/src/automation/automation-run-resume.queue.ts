@@ -9,12 +9,15 @@
  */
 import { Queue, Worker, type Job } from 'bullmq';
 import type Redis from 'ioredis';
+import { runWithRlsContext, SYSTEM_JOB_CONTEXT } from '@topiadesk/db';
 import { advanceRun } from './run-engine';
 
 export const AUTOMATION_RUN_RESUME_QUEUE_NAME = 'automation-run-resume';
 
 export interface AutomationRunResumeJobData {
   runStateId: string;
+  /** Which tenant's schema the run lives in — see the producer's comment. */
+  tenantSchema?: string | null;
 }
 
 export function createAutomationRunResumeQueue(connection: Redis): Queue {
@@ -25,7 +28,9 @@ export function createAutomationRunResumeWorker(connection: Redis): Worker {
   return new Worker(
     AUTOMATION_RUN_RESUME_QUEUE_NAME,
     async (job: Job<AutomationRunResumeJobData>) => {
-      await advanceRun(job.data.runStateId);
+      await runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema: job.data.tenantSchema ?? null }, () =>
+        advanceRun(job.data.runStateId),
+      );
       console.log(`[automation-run-resume] advanced run ${job.data.runStateId}`);
     },
     { connection },

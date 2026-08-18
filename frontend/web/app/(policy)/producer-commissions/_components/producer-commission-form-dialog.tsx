@@ -21,6 +21,7 @@ import {
   toast,
 } from '@topiadesk/ui';
 import type { PolicyDto, PremiumDto, ProducerDto } from '@/app/(policy)/lib/types';
+import { csrfHeaders } from '@/lib/csrf';
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: 'same-origin' });
@@ -108,7 +109,7 @@ export function ProducerCommissionFormDialog({
       };
       const res = await fetch('/api/producer-commissions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeaders('POST') },
         credentials: 'same-origin',
         body: JSON.stringify(payload),
       });

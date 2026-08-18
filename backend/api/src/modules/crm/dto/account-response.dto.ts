@@ -17,6 +17,11 @@ export class AccountResponseDto {
   /** Composite relationship-health signal (renewal + claims + payment aging) — see refresh-health-score.job.ts. Not underwriting risk (see riskRating). */
   @ApiProperty({ nullable: true }) healthScore!: number | null;
   @ApiProperty({ nullable: true }) healthScoreComputedAt!: Date | null;
+  @ApiProperty({ nullable: true }) source!: string | null;
+  @ApiProperty({ nullable: true }) notes!: string | null;
+  @ApiProperty({ nullable: true }) state!: string | null;
+  @ApiProperty({ type: [String] }) tags!: string[];
+  @ApiProperty() isArchived!: boolean;
   @ApiProperty({ type: 'object', additionalProperties: true }) customFields!: unknown;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
@@ -106,4 +111,30 @@ export class AccountRenewalRowDto {
   @ApiProperty({ nullable: true }) renewalDueDate!: Date | null;
   @ApiProperty({ nullable: true }) nextAlertDueAt!: Date | null;
   @ApiProperty({ nullable: true }) assignedToId!: string | null;
+}
+
+/** GET /crm/accounts/:id/claims — Claim has no direct accountId FK (Claim -> Policy -> Account); this stitches that join server-side. */
+export class AccountClaimRowDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() claimNumber!: string;
+  @ApiProperty() status!: string;
+  @ApiProperty() priority!: string;
+  @ApiProperty() dateOfLoss!: Date;
+  @ApiProperty() dateReported!: Date;
+  @ApiProperty({ nullable: true }) reserveAmount!: string | null;
+  @ApiProperty({ nullable: true }) settledAmount!: string | null;
+  @ApiProperty() policyId!: string;
+  @ApiProperty() policyNumber!: string;
+}
+
+class AccountImportRowErrorDto {
+  @ApiProperty() row!: number;
+  @ApiProperty() message!: string;
+}
+
+/** POST /crm/accounts/import — CSV bulk import summary. Matched by exact name (case-insensitive) against existing accounts: a match updates, otherwise a new account is created. */
+export class AccountImportResultDto {
+  @ApiProperty() created!: number;
+  @ApiProperty() updated!: number;
+  @ApiProperty({ type: [AccountImportRowErrorDto] }) errors!: { row: number; message: string }[];
 }

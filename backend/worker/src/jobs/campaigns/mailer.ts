@@ -15,10 +15,14 @@ let transporter: Transporter | undefined;
 function getTransporter(): Transporter {
   if (!transporter) {
     const env = loadEnv();
+    // SMTP_USER/PASSWORD are optional — maildev accepts unauthenticated
+    // SMTP, but a real provider (SES/SendGrid/Postmark) needs auth. Same
+    // fix as ../scheduled-reports/mailer.ts's identical transporter.
     transporter = nodemailer.createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
       secure: env.SMTP_SECURE,
+      auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASSWORD } : undefined,
     });
   }
   return transporter;

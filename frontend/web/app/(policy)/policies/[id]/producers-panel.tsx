@@ -30,6 +30,7 @@ import {
 } from '@topiadesk/ui';
 import { PRODUCER_ASSIGNMENT_ROLES, type ProducerAssignmentRole, type ProducerDto, type ProducerPolicyAssignmentDto } from '@/app/(policy)/lib/types';
 import { ConfirmDialog } from '../../_components/confirm-dialog';
+import { csrfHeaders } from '@/lib/csrf';
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: 'same-origin' });
@@ -54,7 +55,7 @@ export function ProducersPanel({ policyId }: { policyId: string }) {
 
   const removeAssignment = useMutation({
     mutationFn: (assignmentId: string) =>
-      fetch(`/api/policies/${policyId}/producers/${assignmentId}`, { method: 'DELETE', credentials: 'same-origin' }),
+      fetch(`/api/policies/${policyId}/producers/${assignmentId}`, { method: 'DELETE', credentials: 'same-origin', headers: csrfHeaders('DELETE') }),
     onSuccess: () => {
       toast.success('Producer removed from this policy');
       invalidate();
@@ -166,7 +167,7 @@ function AssignProducerDialog({
     mutationFn: async () => {
       const res = await fetch(`/api/policies/${policyId}/producers`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeaders('POST') },
         credentials: 'same-origin',
         body: JSON.stringify({ producerId, role, commissionSplitPercent: split }),
       });

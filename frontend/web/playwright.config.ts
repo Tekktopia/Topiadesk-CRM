@@ -51,5 +51,30 @@ export default defineConfig({
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/admin.json' },
     },
+    // Opt-in render check for the rebuilt automation surfaces:
+    //   AUTOMATION_VERIFY=1 pnpm exec playwright test --project=automation-verify
+    //
+    // Gated behind an env var rather than listed unconditionally because CI
+    // invokes a bare `playwright test` (see .github/workflows/ci.yml), which
+    // runs every project — and this one deliberately has no
+    // `dependencies: ['setup']`, so in CI it would start with no
+    // storageState and fail.
+    //
+    // That missing dependency is the whole point locally. The setup project
+    // answers whatever Keycloak asks, including UPDATE_PASSWORD and
+    // CONFIGURE_TOTP, which is how this suite once took over a real
+    // account's password and authenticator (see auth.setup.ts's own
+    // comment). Every account on this stack belongs to a person, so this
+    // project reuses an already-persisted session and reports an expired one
+    // rather than signing in and mutating the account.
+    ...(process.env.AUTOMATION_VERIFY
+      ? [
+          {
+            name: 'automation-verify',
+            testMatch: /automation-builder-verify\.spec\.ts/u,
+            use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/admin.json' },
+          },
+        ]
+      : []),
   ],
 });

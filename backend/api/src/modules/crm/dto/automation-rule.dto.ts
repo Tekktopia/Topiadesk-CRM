@@ -49,6 +49,22 @@ export class CreateAutomationRuleDto {
   @IsArray()
   @Type(() => Object)
   steps?: unknown[];
+  /**
+   * SCHEDULE rules only. Required for them: a scheduled rule with no cadence
+   * is exactly the rule that used to be saved, badged Active, and never run.
+   * The controller enforces that rather than leaving it optional here,
+   * because ENTITY_EVENT rules must keep omitting it.
+   */
+  @ApiPropertyOptional({ description: 'Standard 5-field cron, e.g. "0 8 * * 1-5" for weekdays at 8am. SCHEDULE rules only.' })
+  @IsOptional()
+  @IsString()
+  scheduleCron?: string;
+
+  @ApiPropertyOptional({ description: 'IANA timezone the cron is resolved in, e.g. "Africa/Lagos". Defaults to UTC.' })
+  @IsOptional()
+  @IsString()
+  scheduleTimezone?: string;
+
   @ApiProperty({ required: false, default: true }) @IsOptional() @IsBoolean() isActive?: boolean;
   @ApiPropertyOptional({
     enum: AutomationRuleStatus,
@@ -75,9 +91,43 @@ export class AutomationRuleResponseDto {
   @ApiPropertyOptional({ type: 'array', items: { type: 'object', additionalProperties: true }, nullable: true }) steps?: unknown;
   @ApiProperty() isActive!: boolean;
   @ApiProperty({ enum: AutomationRuleStatus }) status!: string;
+  @ApiPropertyOptional({ nullable: true }) scheduleCron?: string | null;
+  @ApiPropertyOptional() scheduleTimezone?: string;
+  @ApiPropertyOptional({ nullable: true, description: 'When this rule is next due to run. Null for ENTITY_EVENT rules.' })
+  nextRunAt?: Date | null;
+  @ApiPropertyOptional({ nullable: true }) lastRunAt?: Date | null;
+  @ApiPropertyOptional({ nullable: true, description: "'OK' | 'FAILED' | 'SKIPPED' — surfaced so a rule that has quietly stopped working is visible on the list." })
+  lastRunStatus?: string | null;
+  @ApiPropertyOptional({ nullable: true }) lastRunError?: string | null;
+  @ApiPropertyOptional({ nullable: true, description: 'How many records the last scheduled run acted on.' })
+  lastMatchCount?: number | null;
   @ApiProperty() createdById!: string;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
+}
+
+/** What the rule builder needs to render itself — entity types, their fields, and the actions available for each. */
+export class AutomationCatalogResponseDto {
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true } }) entityTypes!: unknown;
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true } }) actions!: unknown;
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true } }) operators!: unknown;
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true } }) schedulePresets!: unknown;
+}
+
+/** Result of a dry run — what the rule WOULD do, without doing any of it. */
+export class AutomationSimulationResponseDto {
+  @ApiProperty({ description: 'False when the rule is invalid; `issues` says why.' }) valid!: boolean;
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true } }) issues!: unknown;
+  @ApiProperty({ description: 'How many records match right now.' }) matchCount!: number;
+  @ApiProperty({ description: 'True when the match exceeds the rule’s per-run cap, so a real run would refuse.' })
+  exceedsCap!: boolean;
+  @ApiProperty({ description: 'Records already acted on, which a real run would skip.' }) alreadyHandledCount!: number;
+  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true }, description: 'A sample of the matching records.' })
+  sample!: unknown;
+  @ApiProperty({ type: 'array', items: { type: 'string' }, description: 'Plain-English description of what would happen to each.' })
+  plannedActions!: string[];
+  @ApiPropertyOptional({ nullable: true, description: 'Next few firing times, for SCHEDULE rules.' })
+  schedulePreview?: string[] | null;
 }
 
 /** One firing of a rule's flat `actions` list — see AutomationExecutionLog's schema comment. Branching (`steps`) runs have their own history via GET /automation-run-states, not this. */

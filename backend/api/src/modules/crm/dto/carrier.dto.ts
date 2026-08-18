@@ -1,5 +1,6 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { IsArray, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsArray, IsEnum, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 import { CarrierPanelStatus, CarrierType } from '@topiadesk/db';
 
 export class CreateCarrierDto {
@@ -13,6 +14,58 @@ export class CreateCarrierDto {
 }
 
 export class UpdateCarrierDto extends PartialType(CreateCarrierDto) {}
+
+export class CarrierQueryDto {
+  @ApiPropertyOptional({ description: 'Free-text search across carrier name, A.M. Best rating and treaty type.' })
+  @IsOptional()
+  @IsString()
+  q?: string;
+  @ApiPropertyOptional({ enum: CarrierType }) @IsOptional() @IsEnum(CarrierType) carrierType?: CarrierType;
+  @ApiPropertyOptional({ enum: CarrierPanelStatus })
+  @IsOptional()
+  @IsEnum(CarrierPanelStatus)
+  panelStatus?: CarrierPanelStatus;
+  @ApiPropertyOptional({ description: 'Matches carriers writing this line of business (exact tag match on linesOfBusiness).' })
+  @IsOptional()
+  @IsString()
+  lineOfBusiness?: string;
+  @ApiPropertyOptional({ description: 'Max rows to return (default 100).' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  take?: number;
+  @ApiPropertyOptional({ description: 'Rows to skip, for pagination.' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  skip?: number;
+}
+
+/**
+ * Panel-level aggregates for the Carriers page header.
+ *
+ * Distinct from GET /crm/carriers/:id/scorecard, which rates ONE carrier's
+ * performance (bind ratio, response time, loss ratio). This answers "what
+ * does our panel look like overall" instead, and is the figure a broker
+ * reports upward.
+ *
+ * `totalGrossPremium` is normalized into the org's base currency: Premium
+ * carries no currency of its own and inherits Policy.currency, so premium
+ * placed across a mixed-currency book cannot be raw-summed.
+ */
+export class CarrierStatsResponseDto {
+  @ApiProperty() total!: number;
+  @ApiProperty({ description: 'Carriers with panelStatus = ACTIVE.' }) activeOnPanel!: number;
+  @ApiProperty({ description: 'Carriers still being evaluated (PROSPECTIVE).' }) prospective!: number;
+  @ApiProperty({ description: 'SUSPENDED or TERMINATED — cannot take new business.' }) offPanel!: number;
+  @ApiProperty({ description: 'Policies placed with the matching carriers.' }) policiesPlaced!: number;
+  @ApiProperty({ description: 'ISO 4217 code totalGrossPremium is expressed in.' }) baseCurrency!: string;
+  @ApiProperty({ description: 'Gross premium placed with the matching carriers, in baseCurrency.' })
+  totalGrossPremium!: number;
+}
 
 export class CarrierResponseDto {
   @ApiProperty() id!: string;

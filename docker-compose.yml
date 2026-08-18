@@ -60,11 +60,7 @@ x-common-app-env: &common-app-env
   KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
   CAMPAIGN_WEBHOOK_SECRET: ${CAMPAIGN_WEBHOOK_SECRET}
   OMNICHANNEL_WEBHOOK_SECRET: ${OMNICHANNEL_WEBHOOK_SECRET}
-  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-  AI_GATEWAY_MODEL: ${AI_GATEWAY_MODEL}
-  AI_ORG_MONTHLY_SPEND_CAP_USD: ${AI_ORG_MONTHLY_SPEND_CAP_USD}
   AI_PER_USER_DAILY_REQUEST_CAP: ${AI_PER_USER_DAILY_REQUEST_CAP}
-  VOYAGE_API_KEY: ${VOYAGE_API_KEY}
   SMTP_HOST: ${SMTP_HOST}
   SMTP_PORT: ${SMTP_PORT}
   SMTP_SECURE: ${SMTP_SECURE}
@@ -77,6 +73,8 @@ x-common-app-env: &common-app-env
   KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID}
   KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
   INTEGRATION_TOKEN_ENCRYPTION_KEY: ${INTEGRATION_TOKEN_ENCRYPTION_KEY}
+  CLAMAV_HOST: ${CLAMAV_HOST}
+  CLAMAV_PORT: ${CLAMAV_PORT}
 
 x-logging: &default-logging
   driver: json-file
@@ -245,6 +243,28 @@ services:
     networks:
       - topiadesk_data
 
+  # Malware scanning for document uploads (documents.controller.ts's
+  # upload/addVersion) — a security-audit finding: KYC/ID scans and other
+  # customer documents were accepted with no content scanning at all,
+  # beyond a size cap. clamd's virus-definition database (~200-500MB) is
+  # downloaded by the image's own startup freshclam run, so first boot can
+  # take a few minutes before the healthcheck (and anything depending on
+  # it) goes healthy — this is normal, not a hang.
+  clamav:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - clamav_data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 5m
+    networks:
+      - topiadesk_data
+
   # ---------------------------------------------------------------------------
   # Identity
   # ---------------------------------------------------------------------------
@@ -310,9 +330,18 @@ services:
       - traefik.http.routers.keycloak.rule=Host(`${KEYCLOAK_HOSTNAME}`)
       - traefik.http.routers.keycloak.entrypoints=websecure
       - traefik.http.routers.keycloak.tls=true
-      - traefik.http.routers.keycloak.middlewares=secure-headers@file
+      - traefik.http.routers.keycloak.middlewares=secure-headers@file,rate-limit@file
       - traefik.http.routers.keycloak.priority=10
       - traefik.http.services.keycloak.loadbalancer.server.port=8080
+      # Pins which of this container's two networks Traefik routes to.
+      # Without this, Traefik's Docker provider picks non-deterministically
+      # between topiadesk_data and topiadesk_public when a container is on
+      # both — and since Traefik itself only sits on topiadesk_public, a
+      # wrong pick means every request hangs until Traefik's own timeout,
+      # then 504s. Observed for real: reconnecting a service to
+      # topiadesk_public after it was already on topiadesk_data flipped
+      # Traefik's selection to the unreachable network.
+      - traefik.docker.network=topiadesk_public
     networks:
       - topiadesk_data
       - topiadesk_public
@@ -397,9 +426,11 @@ services:
       - traefik.http.routers.api.rule=Host(`api.${APP_BASE_DOMAIN}`)
       - traefik.http.routers.api.entrypoints=websecure
       - traefik.http.routers.api.tls=true
-      - traefik.http.routers.api.middlewares=secure-headers@file
+      - traefik.http.routers.api.middlewares=secure-headers@file,rate-limit@file
       - traefik.http.routers.api.priority=10
       - traefik.http.services.api.loadbalancer.server.port=${API_PORT}
+      # See keycloak's identical label above for why this is required.
+      - traefik.docker.network=topiadesk_public
     networks:
       - topiadesk_data
       - topiadesk_public
@@ -456,7 +487,7 @@ services:
       - traefik.http.routers.web.rule=Host(`app.${APP_BASE_DOMAIN}`)
       - traefik.http.routers.web.entrypoints=websecure
       - traefik.http.routers.web.tls=true
-      - traefik.http.routers.web.middlewares=secure-headers@file
+      - traefik.http.routers.web.middlewares=secure-headers@file,rate-limit@file
       - traefik.http.routers.web.priority=10
       - traefik.http.services.web.loadbalancer.server.port=${WEB_PORT}
       # Tenant subdomains (e.g. <slug>.topiadesk.localhost) — same `web`
@@ -469,9 +500,11 @@ services:
       - traefik.http.routers.web-tenant.rule=Host(`*.${APP_BASE_DOMAIN}`)
       - traefik.http.routers.web-tenant.entrypoints=websecure
       - traefik.http.routers.web-tenant.tls=true
-      - traefik.http.routers.web-tenant.middlewares=secure-headers@file
+      - traefik.http.routers.web-tenant.middlewares=secure-headers@file,rate-limit@file
       - traefik.http.routers.web-tenant.priority=1
       - traefik.http.routers.web-tenant.service=web
+      # See keycloak's identical label above for why this is required.
+      - traefik.docker.network=topiadesk_public
     networks:
       - topiadesk_data
       - topiadesk_public
@@ -512,9 +545,11 @@ services:
       - traefik.http.routers.global-admin.rule=Host(`platform.${APP_BASE_DOMAIN}`)
       - traefik.http.routers.global-admin.entrypoints=websecure
       - traefik.http.routers.global-admin.tls=true
-      - traefik.http.routers.global-admin.middlewares=secure-headers@file
+      - traefik.http.routers.global-admin.middlewares=secure-headers@file,rate-limit@file
       - traefik.http.routers.global-admin.priority=10
       - traefik.http.services.global-admin.loadbalancer.server.port=${GLOBAL_ADMIN_PORT}
+      # See keycloak's identical label above for why this is required.
+      - traefik.docker.network=topiadesk_public
     networks:
       - topiadesk_data
       - topiadesk_public
@@ -674,6 +709,16 @@ services:
       MINIO_BACKUPS_BUCKET: ${MINIO_BACKUPS_BUCKET}
       BACKUP_CRON_SCHEDULE: ${BACKUP_CRON_SCHEDULE}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS}
+      # Offsite replication target (see infra/backup/backup.sh). All
+      # optional with :- defaults so an unconfigured local stack keeps
+      # working — an unset BACKUP_OFFSITE_ENDPOINT means "local copy only",
+      # which the script logs explicitly rather than passing over silently.
+      BACKUP_OFFSITE_ENDPOINT: ${BACKUP_OFFSITE_ENDPOINT:-}
+      BACKUP_OFFSITE_BUCKET: ${BACKUP_OFFSITE_BUCKET:-}
+      BACKUP_OFFSITE_ACCESS_KEY: ${BACKUP_OFFSITE_ACCESS_KEY:-}
+      BACKUP_OFFSITE_SECRET_KEY: ${BACKUP_OFFSITE_SECRET_KEY:-}
+      BACKUP_OFFSITE_USE_SSL: ${BACKUP_OFFSITE_USE_SSL:-true}
+      BACKUP_OFFSITE_RETENTION_DAYS: ${BACKUP_OFFSITE_RETENTION_DAYS:-90}
     depends_on:
       postgres:
         condition: service_healthy
@@ -696,3 +741,4 @@ volumes:
   grafana_data:
   loki_data:
   traefik_acme:
+  clamav_data:

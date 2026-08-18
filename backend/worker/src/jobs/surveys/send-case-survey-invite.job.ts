@@ -26,21 +26,31 @@
 import { randomBytes } from 'node:crypto';
 import { Queue, Worker, type Job } from 'bullmq';
 import type Redis from 'ioredis';
-import { loadEnv } from '@topiadesk/config';
 import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT } from '@topiadesk/db';
 import { sendMail } from '../scheduled-reports/mailer';
+import { tenantBaseUrl } from '../tenant-url.util';
 
 export const SURVEY_DISPATCH_QUEUE_NAME = 'survey-dispatch';
 
-export interface SendCaseSurveyInviteJobData {
+/**
+ * Every payload here carries its tenant. The job reads survey/case/contact
+ * rows and builds a client-facing link — both of which are wrong without it:
+ * the lookups would run against `public` and find nothing, and the link would
+ * point at the app host, which returns 403 for every real tenant.
+ */
+interface TenantScoped {
+  tenantSchema?: string | null;
+}
+
+export interface SendCaseSurveyInviteJobData extends TenantScoped {
   surveyId: string;
   caseId: string;
 }
-export interface SendClaimSurveyInviteJobData {
+export interface SendClaimSurveyInviteJobData extends TenantScoped {
   surveyId: string;
   claimId: string;
 }
-export interface SendPolicySurveyInviteJobData {
+export interface SendPolicySurveyInviteJobData extends TenantScoped {
   surveyId: string;
   policyVersionId: string;
   triggerEvent: 'POLICY_ISSUED' | 'POLICY_RENEWED';
@@ -59,6 +69,8 @@ async function createResponseAndSend(params: {
   email: string | null;
   subject: string;
   bodyIntro: string;
+  /** Needed to build a link on the tenant's own origin. */
+  tenantSchema: string | null;
 }): Promise<SendResult> {
   const prisma = getPrismaClient();
   const survey = await prisma.survey.findUnique({ where: { id: params.surveyId } });
@@ -85,8 +97,9 @@ async function createResponseAndSend(params: {
     },
   });
 
-  const env = loadEnv();
-  const link = `${env.APP_URL}/survey-respond/${response.id}.${response.respondToken}`;
+  // The tenant's own origin, never APP_URL — a survey invite goes to a
+  // CLIENT, and the app host returns 403 for every real tenant.
+  const link = `${await tenantBaseUrl(params.tenantSchema)}/survey-respond/${response.id}.${response.respondToken}`;
   await sendMail({
     to: params.email,
     subject: params.subject,
@@ -111,7 +124,7 @@ async function resolveCaseRespondentEmail(caseId: string): Promise<string | null
 }
 
 export async function sendCaseSurveyInvite(data: SendCaseSurveyInviteJobData): Promise<SendResult> {
-  return runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+  return runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema: data.tenantSchema ?? null }, async () => {
     const prisma = getPrismaClient();
     const kase = await prisma.case.findUnique({ where: { id: data.caseId } });
     // The case may have been reopened between enqueue and this (possibly
@@ -122,6 +135,7 @@ export async function sendCaseSurveyInvite(data: SendCaseSurveyInviteJobData): P
     const account = kase.accountId ? await prisma.account.findUnique({ where: { id: kase.accountId } }) : null;
     return createResponseAndSend({
       surveyId: data.surveyId,
+      tenantSchema: data.tenantSchema ?? null,
       triggerEntityType: 'CASE',
       triggerEntityId: data.caseId,
       dedupeKey: `${data.surveyId}:CASE:${data.caseId}`,
@@ -137,7 +151,7 @@ export async function sendCaseSurveyInvite(data: SendCaseSurveyInviteJobData): P
 
 /** Claims have no direct Contact FK (unlike Case) — respondent is always resolved via the Claim's Policy's Account's primary Contact. */
 export async function sendClaimSurveyInvite(data: SendClaimSurveyInviteJobData): Promise<SendResult> {
-  return runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+  return runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema: data.tenantSchema ?? null }, async () => {
     const prisma = getPrismaClient();
     const claim = await prisma.claim.findUnique({
       where: { id: data.claimId },
@@ -151,6 +165,7 @@ export async function sendClaimSurveyInvite(data: SendClaimSurveyInviteJobData):
     const primaryContact = claim.policy.account.contacts[0] ?? null;
     return createResponseAndSend({
       surveyId: data.surveyId,
+      tenantSchema: data.tenantSchema ?? null,
       triggerEntityType: 'CLAIM',
       triggerEntityId: data.claimId,
       dedupeKey: `${data.surveyId}:CLAIM:${data.claimId}`,
@@ -166,7 +181,7 @@ export async function sendClaimSurveyInvite(data: SendClaimSurveyInviteJobData):
 
 /** Policies have no direct Contact FK either — respondent is the Policy's Account's primary Contact, same shape as Claim. */
 export async function sendPolicySurveyInvite(data: SendPolicySurveyInviteJobData): Promise<SendResult> {
-  return runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+  return runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema: data.tenantSchema ?? null }, async () => {
     const prisma = getPrismaClient();
     const version = await prisma.policyVersion.findUnique({
       where: { id: data.policyVersionId },
@@ -183,6 +198,7 @@ export async function sendPolicySurveyInvite(data: SendPolicySurveyInviteJobData
     const eventLabel = data.triggerEvent === 'POLICY_ISSUED' ? 'issued' : 'renewed';
     return createResponseAndSend({
       surveyId: data.surveyId,
+      tenantSchema: data.tenantSchema ?? null,
       triggerEntityType: 'POLICY_VERSION',
       triggerEntityId: data.policyVersionId,
       dedupeKey: `${data.surveyId}:POLICY_VERSION:${data.policyVersionId}`,

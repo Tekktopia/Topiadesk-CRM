@@ -1,21 +1,51 @@
-import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Res,
+  StreamableFile,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { getPrismaClient, type Prisma } from '@topiadesk/db';
 import { AuditLogResponseDto } from '../audit/dto/audit-log-response.dto';
 import { loadEntityHistory } from '../audit/entity-history';
+import { AuditService } from '../../common/audit/audit.service';
 import { PermissionGuard } from '../../common/auth/permission.guard';
 import { RequirePermission } from '../../common/auth/require-permission.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/authenticated-user';
 import {
   AccountQueryDto,
+  AccountStatsResponseDto,
   BulkAssignAccountsDto,
   BulkDeleteAccountsDto,
   BulkUpdateAccountsDto,
   CreateAccountDto,
+  TransferAccountOwnerDto,
   UpdateAccountDto,
 } from './dto/account.dto';
-import { AccountDetailResponseDto, AccountGroupRollupDto, AccountRenewalRowDto, AccountResponseDto } from './dto/account-response.dto';
+import {
+  AccountClaimRowDto,
+  AccountDetailResponseDto,
+  AccountGroupRollupDto,
+  AccountImportResultDto,
+  AccountRenewalRowDto,
+  AccountResponseDto,
+} from './dto/account-response.dto';
+import { accountsToCsv, importAccountsCsv } from './account-csv';
 import { AccountSlaOverrideResponseDto, UpsertAccountSlaOverrideDto } from './dto/account-sla-override.dto';
 import {
   AccountRelationshipResponseDto,
@@ -29,24 +59,33 @@ import { validateCustomFields } from './custom-fields.validator';
 import { diffBulkIds } from './bulk-actions';
 import { checkAccountDuplicates } from './duplicate-detection';
 import { mergeAccounts } from './merge';
-import { assertFieldsWritable, redactHiddenFields, redactHiddenFieldsMany, resolveFieldVisibilities } from '../../common/field-permissions/field-visibility.util';
+import {
+  assertFieldsWritable,
+  redactHiddenFields,
+  redactHiddenFieldsMany,
+  resolveFieldVisibilities,
+  sensitiveFieldsExposed,
+} from '../../common/field-permissions/field-visibility.util';
 import { decimalToString } from '../policy/decimal.util';
 // NOT a type-only import: constructor-injected below — see the same
 // footgun documented on Reflector in permission.guard.ts.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { DojahService } from '../integrations/dojah.service';
+import { enqueueEntityEvent } from '../case-management/automation-events.util';
 
 /**
- * Account/Contact/AccountRelationship all key off 'account' — the only
- * seeded permission resource in this family (no dedicated 'contact' grant
- * exists; Contacts are always reached through an Account or Carrier).
+ * Account/AccountRelationship key off 'account' — Contact has its own
+ * dedicated 'contact' resource now (see contacts.controller.ts).
  */
 @ApiTags('crm')
 @ApiBearerAuth()
 @UseGuards(PermissionGuard)
 @Controller('crm/accounts')
 export class AccountsController {
-  constructor(private readonly dojah: DojahService) {}
+  constructor(
+    private readonly dojah: DojahService,
+    private readonly auditService: AuditService,
+  ) {}
 
   @Get()
   @RequirePermission('account', 'read')
@@ -55,13 +94,7 @@ export class AccountsController {
     // RLS (accounts_rw) restricts rows to the caller's granted scope — no
     // manual owner/department WHERE clause needed here.
     const accounts = await getPrismaClient().account.findMany({
-      where: {
-        status: query.status,
-        industryId: query.industryId,
-        riskRating: query.riskRating,
-        ownerId: query.ownerId,
-        name: query.q ? { contains: query.q, mode: 'insensitive' } : undefined,
-      },
+      where: accountListWhere(query),
       orderBy: { createdAt: 'desc' },
       take: query.take ?? 50,
       skip: query.skip ?? 0,
@@ -70,9 +103,71 @@ export class AccountsController {
     return redactHiddenFieldsMany(accounts, visibilities);
   }
 
+  // Mirrors list()'s filters but returns just the count — the list endpoint
+  // caps `take` for payload size, so the frontend can't derive a real total
+  // from the page it fetched (previously showed the fetched-page size as
+  // "N total", which was wrong past the first `take` rows).
+  @Get('count')
+  @RequirePermission('account', 'read')
+  @ApiOkResponse({ type: Number })
+  async count(@Query() query: AccountQueryDto): Promise<{ count: number }> {
+    const count = await getPrismaClient().account.count({ where: accountListWhere(query) });
+    return { count };
+  }
+
+  @Get('stats')
+  @RequirePermission('account', 'read')
+  @ApiOkResponse({ type: AccountStatsResponseDto })
+  async stats(@Query() query: AccountQueryDto): Promise<AccountStatsResponseDto> {
+    const prisma = getPrismaClient();
+    const where = accountListWhere(query);
+    // 40 mirrors MID_SCORE_THRESHOLD in the frontend's shared ScoreMeter, so
+    // "at risk" here means exactly what the per-row meter shows as its low
+    // band. Scored-only: `healthScore: { not: null }` keeps unscored
+    // accounts out of both the at-risk count and the average.
+    const [total, clients, prospects, atRisk, healthAgg, kycExpired] = await Promise.all([
+      prisma.account.count({ where }),
+      prisma.account.count({ where: { AND: [where, { status: 'CLIENT' }] } }),
+      prisma.account.count({ where: { AND: [where, { status: 'PROSPECT' }] } }),
+      prisma.account.count({ where: { AND: [where, { healthScore: { not: null, lt: 40 } }] } }),
+      prisma.account.aggregate({ where: { AND: [where, { healthScore: { not: null } }] }, _avg: { healthScore: true } }),
+      prisma.account.count({ where: { AND: [where, { kycStatus: 'EXPIRED' }] } }),
+    ]);
+    return {
+      total,
+      clients,
+      prospects,
+      atRisk,
+      averageHealthScore: Math.round(healthAgg._avg.healthScore ?? 0),
+      kycExpired,
+    };
+  }
+
   // Must precede ':id' — Nest matches literal segments in declaration order
   // ahead of a dynamic param competing for the same position (see
   // tasks.controller.ts's 'mine' route for the same precedent).
+  @Get('export')
+  @RequirePermission('account', 'read')
+  async export(@Query() query: AccountQueryDto, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
+    const accounts = await getPrismaClient().account.findMany({
+      where: accountListWhere(query),
+      orderBy: { createdAt: 'desc' },
+      take: 10_000,
+    });
+    const csv = await accountsToCsv(accounts);
+    res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="accounts.csv"' });
+    return new StreamableFile(Buffer.from(csv, 'utf-8'));
+  }
+
+  @Post('import')
+  @RequirePermission('account', 'write')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  @ApiOkResponse({ type: AccountImportResultDto })
+  async import(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: AuthenticatedUser): Promise<AccountImportResultDto> {
+    return importAccountsCsv(file.buffer, user.id);
+  }
+
   @Get('check-duplicates')
   @RequirePermission('account', 'read')
   @ApiOkResponse({ type: [DuplicateGroupDto] })
@@ -112,6 +207,15 @@ export class AccountsController {
 
     const { contacts, _count, ...rest } = account;
     const visibilities = await resolveFieldVisibilities(user, 'account');
+    const exposedSensitiveFields = sensitiveFieldsExposed('account', visibilities);
+    if (exposedSensitiveFields.length > 0) {
+      await this.auditService.recordEvent({
+        action: 'VIEW_SENSITIVE',
+        entityType: 'account',
+        entityId: id,
+        changedFields: { fields: exposedSensitiveFields },
+      });
+    }
     return {
       ...redactHiddenFields(rest, visibilities),
       contacts,
@@ -169,6 +273,44 @@ export class AccountsController {
       renewalDueDate: p.renewalSchedule?.renewalDueDate ?? null,
       nextAlertDueAt: p.renewalSchedule?.nextAlertDueAt ?? null,
       assignedToId: p.renewalSchedule?.assignedToId ?? null,
+    }));
+  }
+
+  // Same non-collision reasoning as :id/renewals above. Claims have no
+  // direct accountId FK (Claim -> Policy -> Account) — this stitches that
+  // join server-side instead of leaving it to the frontend, matching how
+  // listRenewals() above already joins Policy -> RenewalSchedule for this
+  // account.
+  @Get(':id/claims')
+  @RequirePermission('account', 'read')
+  @ApiOkResponse({ type: [AccountClaimRowDto] })
+  async listClaims(@Param('id') id: string): Promise<AccountClaimRowDto[]> {
+    const claims = await getPrismaClient().claim.findMany({
+      where: { policy: { accountId: id } },
+      select: {
+        id: true,
+        claimNumber: true,
+        status: true,
+        priority: true,
+        dateOfLoss: true,
+        dateReported: true,
+        reserveAmount: true,
+        settledAmount: true,
+        policy: { select: { id: true, policyNumber: true } },
+      },
+      orderBy: { dateReported: 'desc' },
+    });
+    return claims.map((c) => ({
+      id: c.id,
+      claimNumber: c.claimNumber,
+      status: c.status,
+      priority: c.priority,
+      dateOfLoss: c.dateOfLoss,
+      dateReported: c.dateReported,
+      reserveAmount: decimalToString(c.reserveAmount),
+      settledAmount: decimalToString(c.settledAmount),
+      policyId: c.policy.id,
+      policyNumber: c.policy.policyNumber,
     }));
   }
 
@@ -286,7 +428,7 @@ export class AccountsController {
   async create(@Body() dto: CreateAccountDto, @CurrentUser() user: AuthenticatedUser): Promise<AccountResponseDto> {
     await validateCustomFields('ACCOUNT', dto.customFields, { isCreate: true });
     assertFieldsWritable(dto, await resolveFieldVisibilities(user, 'account'));
-    return getPrismaClient().account.create({
+    const account = await getPrismaClient().account.create({
       data: {
         ...dto,
         ownerId: dto.ownerId ?? user.id,
@@ -298,6 +440,13 @@ export class AccountsController {
         customFields: dto.customFields as Prisma.InputJsonValue | undefined,
       },
     });
+    await enqueueEntityEvent({
+      entityType: 'ACCOUNT',
+      entityId: account.id,
+      eventType: 'CREATED',
+      occurredAt: account.createdAt.toISOString(),
+    }).catch(() => undefined);
+    return account;
   }
 
   @Patch(':id')
@@ -308,7 +457,17 @@ export class AccountsController {
     if (!existing) throw new NotFoundException('Account not found');
     await validateCustomFields('ACCOUNT', dto.customFields, { isCreate: false });
     assertFieldsWritable(dto, await resolveFieldVisibilities(user, 'account'));
-    return getPrismaClient().account.update({
+
+    // Validate KYC status transitions if kycStatus is being changed
+    if (dto.kycStatus && dto.kycStatus !== existing.kycStatus) {
+      assertValidKycStatusTransition(existing.kycStatus, dto.kycStatus);
+      // When transitioning to VERIFIED, kycExpiryDate must be provided
+      if (dto.kycStatus === 'VERIFIED' && !dto.kycExpiryDate) {
+        throw new BadRequestException('kycExpiryDate is required when setting kycStatus to VERIFIED');
+      }
+    }
+
+    const account = await getPrismaClient().account.update({
       where: { id },
       data: {
         ...dto,
@@ -316,15 +475,63 @@ export class AccountsController {
         customFields: dto.customFields as Prisma.InputJsonValue | undefined,
       },
     });
+    // KYC is called out separately from a general edit because it is the
+    // account change with real consequences — it blocks renewals — and a rule
+    // wanting to react to it should not have to fire on every field edit.
+    await enqueueEntityEvent({
+      entityType: 'ACCOUNT',
+      entityId: account.id,
+      eventType: dto.kycStatus && dto.kycStatus !== existing.kycStatus ? 'KYC_STATUS_CHANGED' : 'UPDATED',
+      occurredAt: account.updatedAt.toISOString(),
+    }).catch(() => undefined);
+    return account;
   }
 
+  // Soft-archive, not a hard delete — matches Document.isArchived's
+  // pattern. A hard delete here previously risked an unhandled
+  // FK-RESTRICT crash the moment the account had any Policy (policies.
+  // account_id has no onDelete override), and threw away the row's own
+  // audit history in the process. See restore() below for the inverse.
   @Delete(':id')
   @RequirePermission('account', 'write')
   async remove(@Param('id') id: string): Promise<{ deleted: boolean }> {
     const existing = await getPrismaClient().account.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Account not found');
-    await getPrismaClient().account.delete({ where: { id } });
+    await getPrismaClient().account.update({ where: { id }, data: { isArchived: true } });
     return { deleted: true };
+  }
+
+  @Post(':id/restore')
+  @RequirePermission('account', 'write')
+  @ApiOkResponse({ type: AccountResponseDto })
+  async restore(@Param('id') id: string): Promise<AccountResponseDto> {
+    const existing = await getPrismaClient().account.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Account not found');
+    return getPrismaClient().account.update({ where: { id }, data: { isArchived: false } });
+  }
+
+  // Distinct from PATCH :id's generic ownerId update — captures a reason
+  // and writes a dedicated OWNERSHIP_TRANSFERRED audit action instead of a
+  // plain field-diff UPDATE row, so ownership moves are individually
+  // queryable (see schema.prisma's AuditAction.OWNERSHIP_TRANSFERRED
+  // comment).
+  @Post(':id/transfer-owner')
+  @RequirePermission('account', 'write')
+  @ApiOkResponse({ type: AccountResponseDto })
+  async transferOwner(@Param('id') id: string, @Body() dto: TransferAccountOwnerDto): Promise<AccountResponseDto> {
+    const prisma = getPrismaClient();
+    const existing = await prisma.account.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Account not found');
+    const newOwner = await prisma.user.findUnique({ where: { id: dto.newOwnerId }, select: { id: true } });
+    if (!newOwner) throw new NotFoundException('New owner not found');
+    const updated = await prisma.account.update({ where: { id }, data: { ownerId: dto.newOwnerId } });
+    await this.auditService.recordEvent({
+      action: 'OWNERSHIP_TRANSFERRED',
+      entityType: 'account',
+      entityId: id,
+      changedFields: { fromOwnerId: existing.ownerId, toOwnerId: dto.newOwnerId, reason: dto.reason ?? null },
+    });
+    return updated;
   }
 
   // Bulk endpoints — updateMany/deleteMany fire the audit trigger once per
@@ -362,6 +569,7 @@ export class AccountsController {
     return { requested: dto.ids, updated: matched, skipped };
   }
 
+  // Soft-archives, same reasoning as the single remove() above.
   @Post('bulk/delete')
   @RequirePermission('account', 'write')
   @ApiOkResponse({ type: BulkActionResponseDto })
@@ -370,7 +578,7 @@ export class AccountsController {
     const visible = await prisma.account.findMany({ where: { id: { in: dto.ids } }, select: { id: true } });
     const { matched, skipped } = diffBulkIds(dto.ids, visible.map((a) => a.id));
     if (matched.length > 0) {
-      await prisma.account.deleteMany({ where: { id: { in: matched } } });
+      await prisma.account.updateMany({ where: { id: { in: matched } }, data: { isArchived: true } });
     }
     return { requested: dto.ids, updated: matched, skipped };
   }
@@ -451,4 +659,47 @@ export class AccountRelationshipsController {
     await prisma.accountRelationship.delete({ where: { id } });
     return { deleted: true };
   }
+}
+
+/**
+ * Enforce valid KYC status transitions. KYC lifecycle:
+ * - NOT_STARTED: initial state (can transition to VERIFIED, PENDING, REJECTED via admin/DojahService)
+ * - PENDING: awaiting verification result (can transition to VERIFIED, REJECTED, or NOT_STARTED)
+ * - VERIFIED: passed verification (can only transition to EXPIRED or NOT_STARTED via admin reset)
+ * - EXPIRED: automatically set when kycExpiryDate passes (can transition back to NOT_STARTED or VERIFIED via admin reset)
+ * - REJECTED: failed verification (can only be reset to NOT_STARTED, requires manual re-verification)
+ */
+function assertValidKycStatusTransition(currentStatus: string, newStatus: string): void {
+  // Manual resets to NOT_STARTED are always allowed (admin override)
+  if (newStatus === 'NOT_STARTED') return;
+
+  // Prevent circular/invalid transitions
+  const validTransitions: Record<string, string[]> = {
+    NOT_STARTED: ['PENDING', 'VERIFIED', 'REJECTED'],
+    PENDING: ['VERIFIED', 'REJECTED', 'NOT_STARTED'],
+    VERIFIED: ['EXPIRED', 'NOT_STARTED'],
+    EXPIRED: ['VERIFIED', 'NOT_STARTED'],
+    REJECTED: ['NOT_STARTED'], // Rejected requires full reset, not direct re-verification
+  };
+
+  const allowed = validTransitions[currentStatus] ?? [];
+  if (!allowed.includes(newStatus)) {
+    throw new BadRequestException(
+      `Invalid KYC status transition: ${currentStatus} → ${newStatus}. Valid transitions: ${allowed.join(', ')}`,
+    );
+  }
+}
+
+/** Shared between list(), count(), and export() so the three stay filter-consistent. */
+function accountListWhere(query: AccountQueryDto): Prisma.AccountWhereInput {
+  return {
+    status: query.status,
+    industryId: query.industryId,
+    riskRating: query.riskRating,
+    ownerId: query.ownerId,
+    name: query.q ? { contains: query.q, mode: 'insensitive' } : undefined,
+    tags: query.tag ? { has: query.tag } : undefined,
+    // Explicit string comparison — see AccountQueryDto.includeArchived.
+    isArchived: query.includeArchived === 'true' ? undefined : false,
+  };
 }

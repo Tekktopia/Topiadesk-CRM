@@ -37,6 +37,9 @@ BEGIN
     'producer_policy_assignments', 'producer_commissions',
     'documents', 'document_versions', 'document_links',
     'approvals', 'notifications', 'ai_usage_ledger',
+    -- CRM AI copilot conversation history — self-only, see
+    -- ai_chat_sessions_rw/ai_chat_messages_rw (002_policies.sql).
+    'ai_chat_sessions', 'ai_chat_messages',
     'audit_log', 'integration_connectors', 'sync_jobs', 'integration_logs',
     -- Phase 1 gap, found via research: semantic_embeddings had zero RLS
     -- protection despite holding potentially OWN-scoped content chunks —

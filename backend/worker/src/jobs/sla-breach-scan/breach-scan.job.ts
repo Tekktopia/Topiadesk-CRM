@@ -125,7 +125,13 @@ export async function runSlaBreachScan(now: Date = new Date()): Promise<SlaBreac
 
       const configuredActions = parseActionSpecs(clock.slaTarget.onBreachActions);
       if (configuredActions) {
-        const outcomes = await executeActions(configuredActions, { entity: toEntityRef(clock), actingUserId: null, systemJobName: 'sla-breach-scan' });
+        const outcomes = await executeActions(configuredActions, {
+          entity: toEntityRef(clock),
+          target: { entityType, id: entityId },
+          targetData: null,
+          actingUserId: null,
+          systemJobName: 'sla-breach-scan',
+        });
         for (const outcome of outcomes) {
           if (outcome.ok) result.breachNotificationsCreated++;
           else console.error(`[sla-breach-scan] configured onBreachActions "${outcome.actionType}" failed for SlaClock ${clock.id}: ${outcome.error}`);
@@ -173,7 +179,13 @@ export async function runSlaBreachScan(now: Date = new Date()): Promise<SlaBreac
       const entityId = (clock.claimId ?? clock.caseId)!;
 
       if (configuredActions) {
-        const outcomes = await executeActions(configuredActions, { entity: toEntityRef(clock), actingUserId: null, systemJobName: 'sla-breach-scan' });
+        const outcomes = await executeActions(configuredActions, {
+          entity: toEntityRef(clock),
+          target: { entityType, id: entityId },
+          targetData: null,
+          actingUserId: null,
+          systemJobName: 'sla-breach-scan',
+        });
         for (const outcome of outcomes) {
           if (outcome.ok) result.escalationNotificationsCreated++;
           else console.error(`[sla-breach-scan] configured onEscalateActions "${outcome.actionType}" failed for SlaClock ${clock.id}: ${outcome.error}`);

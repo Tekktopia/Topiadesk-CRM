@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, Matches, MinLength } from 'class-validator';
+import { IsArray, IsBoolean, IsBooleanString, IsEnum, IsInt, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 import { CustomFieldEntityType, CustomFieldType } from '@topiadesk/db';
 
 export class CreateCustomFieldDefinitionDto {
@@ -41,6 +41,45 @@ export class UpdateCustomFieldDefinitionDto {
 
 export class CustomFieldDefinitionQueryDto {
   @ApiProperty({ enum: CustomFieldEntityType, required: false }) @IsOptional() @IsEnum(CustomFieldEntityType) entityType?: CustomFieldEntityType;
+  @ApiProperty({ enum: CustomFieldType, required: false }) @IsOptional() @IsEnum(CustomFieldType) fieldType?: CustomFieldType;
+  /**
+   * `@IsBooleanString` + explicit 'true' comparison, never a bare
+   * `@IsBoolean()`: a query string arrives as text, and class-transformer
+   * turns the string "false" into boolean `true` — which would silently
+   * invert this filter.
+   */
+  @ApiProperty({ required: false, description: 'Filter by soft-delete state. Omit to see both.' })
+  @IsOptional()
+  @IsBooleanString()
+  isActive?: string;
+  @ApiProperty({ required: false, description: 'Matches label or jsonb key (case-insensitive, substring).' })
+  @IsOptional()
+  @IsString()
+  q?: string;
+}
+
+/** One entity's share of the schema — the shape the admin page charts. */
+export class CustomFieldEntityCountDto {
+  @ApiProperty({ enum: CustomFieldEntityType }) entityType!: string;
+  @ApiProperty() total!: number;
+  @ApiProperty() active!: number;
+}
+
+/**
+ * Custom-schema aggregates.
+ *
+ * `required` is the number worth surfacing: every active required field is a
+ * field a user must fill before they can save that entity, so it is the one
+ * stat here with a direct cost to everyday data entry. It counts only ACTIVE
+ * definitions — a deactivated required field is not enforced anywhere.
+ */
+export class CustomFieldDefinitionStatsResponseDto {
+  @ApiProperty({ description: 'Definitions matching the current filter.' }) total!: number;
+  @ApiProperty() active!: number;
+  @ApiProperty({ description: 'Soft-deleted — retained so existing jsonb values are never orphaned.' })
+  inactive!: number;
+  @ApiProperty({ description: 'Active definitions users are forced to fill in.' }) required!: number;
+  @ApiProperty({ type: [CustomFieldEntityCountDto] }) byEntityType!: CustomFieldEntityCountDto[];
 }
 
 export class CustomFieldDefinitionResponseDto {

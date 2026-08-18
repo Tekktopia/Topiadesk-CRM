@@ -23,4 +23,7 @@ export class DocumentResponseDto {
   @ApiProperty() isArchived!: boolean;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
+  /** Only present when list() was called with entityType+entityId — the matching DocumentLink's own id/linkedAt, so a caller (e.g. an Account's Documents tab) can unlink without a follow-up GET .../links call. */
+  @ApiProperty({ nullable: true, required: false }) linkId?: string;
+  @ApiProperty({ nullable: true, required: false }) linkedAt?: Date;
 }

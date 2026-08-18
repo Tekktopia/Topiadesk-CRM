@@ -1,8 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
 import { PaginationQueryDto } from './pagination-query.dto';
 
 const USER_STATUSES = ['ACTIVE', 'SUSPENDED', 'DEACTIVATED'] as const;
+
+/** Mirrors createTenantRealm()'s own realm passwordPolicy string exactly
+ * (backend/worker/src/jobs/platform/keycloak-realm-provisioning.ts:
+ * "length(12) and upperCase(1) and lowerCase(1) and digits(1) and
+ * specialChars(1)") — same constant platform/dto/tenant-user.dto.ts's
+ * ResetTenantUserPasswordDto uses, duplicated rather than shared across
+ * the identity/platform module boundary. */
+const TENANT_PASSWORD_POLICY = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$/;
+const PASSWORD_POLICY_MESSAGE = 'Password must be at least 12 characters and include an uppercase letter, a lowercase letter, a digit, and a special character.';
 
 export class UserRoleSummaryDto {
   @ApiProperty() id!: string;
@@ -93,6 +102,11 @@ export class CreateUserDto {
   @ApiPropertyOptional() @IsOptional() @IsUUID() branchId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() managerId?: string;
   @ApiPropertyOptional({ description: 'Free text — e.g. "Team Lead", "Supervisor"' }) @IsOptional() @IsString() @MaxLength(100) positionTitle?: string;
+  @ApiPropertyOptional({ description: 'Set a specific sign-in password instead of auto-generating one. Skips the forced password-change on next sign-in (MFA setup is still required).' })
+  @IsOptional()
+  @IsString()
+  @Matches(TENANT_PASSWORD_POLICY, { message: PASSWORD_POLICY_MESSAGE })
+  password?: string;
 }
 
 export class CreateUserResponseDto {

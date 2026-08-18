@@ -36,5 +36,40 @@ export async function proxyJson(path: string, init?: RequestInit): Promise<NextR
 /** For POST/PATCH bodies: pass the request's raw text straight through to fetchApi — no re-serialization needed. */
 export async function forwardBody(request: Request, path: string, method: 'POST' | 'PATCH'): Promise<NextResponse> {
   const body = await request.text();
-  return proxyJson(path, { method, body, headers: { 'Content-Type': 'application/json' } });
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  // The browser talks to this BFF, never to the API origin, so a header the
+  // client sets is dropped here unless it's explicitly relayed. The offline
+  // outbox's replay safety depends end-to-end on this one reaching the API's
+  // IdempotencyInterceptor — without the relay the key is silently lost and
+  // every replayed create duplicates.
+  const idempotencyKey = request.headers.get('Idempotency-Key');
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
+  return proxyJson(path, { method, body, headers });
+}
+
+/** Multipart forwarding (e.g. accounts/import's CSV upload) — same shape as app/api/_lib/proxy.ts's proxyMultipart, kept local to this namespace rather than a cross-namespace import. */
+export async function forwardMultipart(request: Request, path: string): Promise<NextResponse> {
+  const formData = await request.formData();
+  return proxyJson(path, { method: 'POST', body: formData });
+}
+
+/** For a non-JSON response (e.g. accounts/export's text/csv download) — streams the backend's raw body + relevant headers through instead of assuming JSON. */
+export async function proxyFile(path: string, init?: RequestInit): Promise<NextResponse> {
+  try {
+    const res = await fetchApi(path, init);
+    const buffer = await res.arrayBuffer();
+    return new NextResponse(buffer, {
+      status: res.status,
+      headers: {
+        'Content-Type': res.headers.get('Content-Type') ?? 'application/octet-stream',
+        'Content-Disposition': res.headers.get('Content-Disposition') ?? 'attachment',
+      },
+    });
+  } catch (err) {
+    if (err instanceof ApiUnauthenticatedError) {
+      return NextResponse.json({ statusCode: 401, message: 'Not authenticated' }, { status: 401 });
+    }
+    console.error(`[crm proxy] GET ${path} (file) failed`, err);
+    return NextResponse.json({ statusCode: 502, message: 'Upstream API request failed' }, { status: 502 });
+  }
 }

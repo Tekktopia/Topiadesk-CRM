@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient, Prisma } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
@@ -7,7 +7,12 @@ import { RequirePermission } from '../../common/auth/require-permission.decorato
 // below — see the same footgun documented on Reflector in permission.guard.ts.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { NotificationsService } from './notifications.service';
-import { NotificationResponseDto } from './dto/notification-response.dto';
+import {
+  BulkNotificationIdsDto,
+  ListMyNotificationsQueryDto,
+  NotificationBulkActionResponseDto,
+  NotificationResponseDto,
+} from './dto/notification-response.dto';
 import { AdminNotificationQueryDto, AdminNotificationResponseDto } from './dto/admin-notification.dto';
 
 /**
@@ -24,10 +29,18 @@ export class NotificationsController {
 
   @Get()
   @ApiOkResponse({ type: [NotificationResponseDto] })
-  async listMine(): Promise<NotificationResponseDto[]> {
+  async listMine(@Query() query: ListMyNotificationsQueryDto): Promise<NotificationResponseDto[]> {
     // recipient_user_id-scoped by RLS (prisma/rls/002_policies.sql:
     // notifications_rw) — no manual filter needed.
-    return getPrismaClient().notification.findMany({ orderBy: { createdAt: 'desc' }, take: 50 });
+    return getPrismaClient().notification.findMany({
+      where: {
+        type: query.type,
+        readAt: query.isRead === undefined ? undefined : query.isRead === 'true' ? { not: null } : null,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: query.take ?? 50,
+      skip: query.skip ?? 0,
+    });
   }
 
   @Patch(':id/read')
@@ -44,6 +57,31 @@ export class NotificationsController {
       }
       throw err;
     }
+  }
+
+  /** Marks every one of the caller's own unread notifications as read in a single round trip — the "Mark all as read" button. */
+  @Patch('read-all')
+  @ApiOkResponse({ schema: { type: 'object', properties: { count: { type: 'number' } } } })
+  async markAllRead(): Promise<{ count: number }> {
+    const count = await this.notifications.markAllRead();
+    return { count };
+  }
+
+  /** Notifications can only ever be marked read before this, never removed — this is the single-item delete/dismiss action. RLS-scoped like everything else here; a P2025 (someone else's notification, or a bad id) reads as "not found", not a 500. */
+  @Delete(':id')
+  async remove(@Param('id') id: string): Promise<{ deleted: boolean }> {
+    const deleted = await this.notifications.deleteMany([id]);
+    if (deleted.length === 0) throw new NotFoundException(`Notification ${id} not found`);
+    return { deleted: true };
+  }
+
+  /** Bulk-select delete from the inbox table — same requested/affected/skipped shape as crm/dto/bulk-action.dto.ts's BulkActionResponseDto, kept as a local copy rather than a cross-module import (see notification-response.dto.ts). */
+  @Post('bulk-delete')
+  @ApiOkResponse({ type: NotificationBulkActionResponseDto })
+  async bulkDelete(@Body() dto: BulkNotificationIdsDto): Promise<NotificationBulkActionResponseDto> {
+    const affected = await this.notifications.deleteMany(dto.ids);
+    const affectedSet = new Set(affected);
+    return { requested: dto.ids, affected, skipped: dto.ids.filter((id) => !affectedSet.has(id)) };
   }
 
   /**

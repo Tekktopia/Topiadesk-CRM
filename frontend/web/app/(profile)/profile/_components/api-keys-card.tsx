@@ -28,6 +28,7 @@ import {
   TableRow,
   toast,
 } from '@topiadesk/ui';
+import { csrfHeaders } from '@/lib/csrf';
 
 interface ApiKey {
   id: string;
@@ -73,7 +74,7 @@ export function ApiKeysCard() {
     mutationFn: async (input: { name: string }) => {
       const res = await fetch('/api/auth/api-keys', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeaders('POST') },
         body: JSON.stringify(input),
       });
       if (!res.ok) throw new Error('Failed to create API key');
@@ -89,7 +90,7 @@ export function ApiKeysCard() {
 
   const revokeMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/auth/api-keys/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/auth/api-keys/${id}`, { method: 'DELETE', headers: csrfHeaders('DELETE') });
       if (!res.ok) throw new Error('Failed to revoke API key');
     },
     onSuccess: () => {

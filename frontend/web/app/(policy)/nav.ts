@@ -1,4 +1,4 @@
-import { FileClock, Receipt, FolderOpen, ShieldCheck, Users, Percent } from 'lucide-react';
+import { FileClock, Receipt, FolderOpen, ShieldCheck, Users, Percent, CalendarClock } from 'lucide-react';
 import type { NavItem } from '@/lib/nav-types';
 
 /** Policy Lifecycle feature area: policy list/detail (lifecycle state
@@ -8,6 +8,7 @@ import type { NavItem } from '@/lib/nav-types';
  * app/(policy)/producer-commissions, app/(policy)/documents. */
 export const policyNav: NavItem[] = [
   { label: 'Policies', href: '/policies', icon: FileClock, section: 'Policy' },
+  { label: 'Renewals', href: '/renewals', icon: CalendarClock, section: 'Policy' },
   { label: 'Premiums', href: '/premiums', icon: Receipt, section: 'Policy' },
   { label: 'Producers', href: '/producers', icon: Users, section: 'Policy' },
   { label: 'Commissions', href: '/producer-commissions', icon: Percent, section: 'Policy' },

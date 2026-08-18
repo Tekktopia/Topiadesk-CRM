@@ -103,7 +103,10 @@ export function ApprovalThresholdRulesView() {
     [canWrite],
   );
 
-  const rules = rulesQuery.data ?? [];
+  // Stable reference: `x ?? []` mints a new array on every render while the
+  // query has no data (i.e. right after a filter change), which is what drove
+  // DataTable's pagination into a render loop. See data-table.tsx.
+  const rules = React.useMemo(() => rulesQuery.data ?? [], [rulesQuery.data]);
 
   return (
     <div className="space-y-6">

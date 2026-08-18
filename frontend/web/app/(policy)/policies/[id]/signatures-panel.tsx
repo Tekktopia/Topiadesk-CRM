@@ -28,6 +28,7 @@ import {
   toast,
 } from '@topiadesk/ui';
 import { formatDate } from '@/app/(policy)/lib/format';
+import { csrfHeaders } from '@/lib/csrf';
 import type { PolicyDocumentRow } from '@/app/api/policies/[id]/documents/route';
 
 interface SignatureRequest {
@@ -86,7 +87,7 @@ export function SignaturesPanel({ policyId }: { policyId: string }) {
     mutationFn: () =>
       fetch(`/api/policies/${policyId}/signature-requests`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeaders('POST') },
         body: JSON.stringify({ documentId, signerName, signerEmail }),
       }).then((res) => {
         if (!res.ok) throw new Error('Failed to send for signature');
@@ -105,7 +106,7 @@ export function SignaturesPanel({ policyId }: { policyId: string }) {
 
   const voidMutation = useMutation({
     mutationFn: (requestId: string) =>
-      fetch(`/api/policies/${policyId}/signature-requests/${requestId}/void`, { method: 'POST' }).then((res) => {
+      fetch(`/api/policies/${policyId}/signature-requests/${requestId}/void`, { method: 'POST', headers: csrfHeaders('POST') }).then((res) => {
         if (!res.ok) throw new Error('Failed to void request');
       }),
     onSuccess: () => {

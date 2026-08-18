@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AuditService } from '../../common/audit/audit.service';
 import { IdentityController } from './identity.controller';
 import { UsersController } from './users.controller';
 import { RoleGrantsController } from './role-grants.controller';
@@ -18,15 +17,11 @@ import { ScimController } from './scim.controller';
 import { ScimTokensController } from './scim-tokens.controller';
 import { AuditExportController } from './audit-export.controller';
 import { MicrosoftSsoController } from './microsoft-sso.controller';
+import { TenantBrandingController } from './tenant-branding.controller';
+import { PublicTenantBrandingController } from './public-tenant-branding.controller';
 import { UserProvisioningService } from './user-provisioning.service';
 import { KeycloakAdminService } from './keycloak-admin.service';
 
-// AuditService is registered directly on AppModule's own providers (see
-// app.module.ts) rather than via its own exported module — since AppModule
-// is the root, that registration isn't visible to imported feature modules
-// through Nest's DI scoping, so it's re-provided here too. It's stateless
-// (reads getPrismaClient()/getRlsContext() singletons internally), so a
-// second instance in this module's injector is harmless.
 @Module({
   controllers: [
     IdentityController,
@@ -47,7 +42,9 @@ import { KeycloakAdminService } from './keycloak-admin.service';
     ScimTokensController,
     AuditExportController,
     MicrosoftSsoController,
+    TenantBrandingController,
+    PublicTenantBrandingController,
   ],
-  providers: [AuditService, UserProvisioningService, KeycloakAdminService],
+  providers: [UserProvisioningService, KeycloakAdminService],
 })
 export class IdentityModule {}

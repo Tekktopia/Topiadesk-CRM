@@ -126,8 +126,32 @@ export function DataTable<TData, TValue>({
   // page that doesn't need row selection (i.e. most list pages) hit this.
   const [internalRowSelection, setInternalRowSelection] = React.useState<RowSelectionState>({});
 
+  /**
+   * `data` is stabilised HERE rather than trusting every caller to memoize.
+   *
+   * TanStack's `autoResetPageIndex` (on by default when pagination isn't
+   * manual) resets the page whenever `data` changes IDENTITY. Most list
+   * pages in this app compute their rows as `query.data ?? []`, which mints
+   * a brand-new array on every render for as long as the query has no data
+   * — exactly the state a page is in right after a filter changes, since a
+   * new query key starts out undefined. That produced:
+   *
+   *     new [] -> autoReset fires -> onPaginationChange -> setState with a
+   *     new object -> re-render -> new [] -> ...
+   *
+   * an unbreakable render loop that pegged the tab the instant a filter was
+   * selected, with NO error and NO request storm to point at (the API had
+   * already answered 200 in ~100ms). Holding the previous array whenever the
+   * incoming one is empty AND the outgoing one was too keeps the reference
+   * stable across those renders and breaks the cycle at the single point
+   * every list page shares, instead of in thirteen call sites that would
+   * drift apart again.
+   */
+  const emptyRef = React.useRef<TData[]>([]);
+  const stableData = data.length === 0 ? emptyRef.current : data;
+
   const table = useReactTable({
-    data,
+    data: stableData,
     columns,
     getRowId: getRowId ? (row) => getRowId(row) : undefined,
     state: {
@@ -143,6 +167,16 @@ export function DataTable<TData, TValue>({
     manualSorting,
     manualPagination,
     pageCount: manualPagination ? pageCount : undefined,
+    // Off deliberately. Left on, TanStack calls onPaginationChange every
+    // time `data` changes identity — and a caller that rebuilds its rows
+    // inline (`items.filter(...)`, `(data ?? []).slice().sort(...)`) does
+    // that on EVERY render, non-empty included, which the stableData guard
+    // above cannot catch. Each call sets a fresh pagination object, which
+    // re-renders, which rebuilds the array: the same unbreakable loop.
+    // Resetting on filter change is the caller's job (every list page here
+    // already does it explicitly), and the clamp below covers the one case
+    // auto-reset genuinely protected against.
+    autoResetPageIndex: false,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: manualSorting ? undefined : getSortedRowModel(),
     getPaginationRowModel: pagination && !manualPagination ? getPaginationRowModel() : undefined,
@@ -150,6 +184,24 @@ export function DataTable<TData, TValue>({
 
   const showPager = !!pagination;
   const rows = table.getRowModel().rows;
+
+  // Replaces what autoResetPageIndex was for: if filtering leaves the user
+  // stranded past the last page, step back to the first one. Guarded on
+  // being genuinely out of range, so it fires at most once per filter change
+  // and can never become a render loop of its own.
+  // getPageCount() reads state.pagination.pageSize, so it THROWS on the
+  // pager-less variant (callers that omit all three pagination props to
+  // render every row — see the prop docs above). Guard the computation
+  // itself, not just the effect: this runs during render, before the
+  // effect's own early return could help. Caught by the production build
+  // prerendering /macros, which is one of those callers.
+  const resolvedPageCount = !pagination ? 0 : manualPagination ? (pageCount ?? 0) : table.getPageCount();
+  React.useEffect(() => {
+    if (!pagination || !onPaginationChange) return;
+    if (pagination.pageIndex > 0 && pagination.pageIndex >= resolvedPageCount) {
+      onPaginationChange((prev) => ({ ...prev, pageIndex: 0 }));
+    }
+  }, [pagination, onPaginationChange, resolvedPageCount]);
 
   return (
     <div className={cn('space-y-3', className)}>

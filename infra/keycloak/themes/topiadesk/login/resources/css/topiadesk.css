@@ -275,7 +275,7 @@ body#keycloak-bg {
    duplication — it's the same pattern the reference image itself uses:
    one brand mark on the hero side, one directly on the card). */
 #kc-header {
-  margin: 0 0 1.1rem;
+  margin: 0 0 0.8rem;
   border: none !important;
   box-shadow: none !important;
   background: transparent !important;
@@ -293,25 +293,28 @@ body#keycloak-bg {
   text-transform: uppercase;
   text-align: center;
 }
-/* Soft concentric-ring halo behind the mark, in place of the flat logo
-   image — matches the reference card's glowing circular badge. Three
-   box-shadow rings (cheaper than a second element) fade the accent color
-   outward; the white plate underneath keeps the mark itself crisp. */
-#kc-header-wrapper::before {
-  content: "";
+/* Soft concentric-ring halo behind the mark — matches the reference card's
+   glowing circular badge. A real <img> now (template.ftl), not a CSS
+   ::before background-image, because this is the one spot on the page a
+   tenant's own uploaded logo renders (see template.ftl's comment) — a
+   background-image can't be made dynamic/per-tenant from a FreeMarker
+   template, only a real <img src> can. `object-fit: contain` + padding
+   insets the logo within the white circle the same way the old
+   `background-size: 62%` did; the white plate underneath keeps whatever
+   logo lands here crisp regardless of its own background. */
+.td-card-brand-mark {
   display: block;
-  width: 40px;
-  height: 40px;
-  margin-bottom: 0.15rem;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 0.2rem;
+  padding: 9px;
+  box-sizing: border-box;
   border-radius: 50%;
   background-color: #ffffff;
-  background-image: url("../img/logo-mark.png");
-  background-size: 62%;
-  background-repeat: no-repeat;
-  background-position: center;
+  object-fit: contain;
   box-shadow:
-    0 0 0 9px var(--td-accent-soft),
-    0 0 0 18px rgba(79, 140, 255, 0.07),
+    0 0 0 10px var(--td-accent-soft),
+    0 0 0 20px rgba(79, 140, 255, 0.07),
     0 6px 18px -6px rgba(47, 111, 238, 0.4);
 }
 
@@ -325,7 +328,7 @@ body#keycloak-bg {
   background: var(--td-card-bg);
   border: 1px solid var(--td-card-border);
   border-radius: 20px;
-  padding: 2.35rem 2.25rem 1.9rem;
+  padding: 1.9rem 2rem 1.6rem;
   box-shadow: 0 2px 5px rgba(16, 24, 40, 0.05), 0 26px 52px -16px rgba(16, 24, 40, 0.18);
   position: relative;
   overflow: hidden;
@@ -340,11 +343,18 @@ body#keycloak-bg {
   background: linear-gradient(90deg, var(--td-accent-strong), var(--td-accent) 70%, #bcd2ff);
 }
 
+/* padding-bottom is zeroed too, not just padding-top: PatternFly's native
+   1rem padding-block-end on this element was stacking underneath our own
+   margin-bottom below, doubling the gap between the subtitle and the
+   first input (confirmed against the real patternfly.min.css bundled in
+   the Keycloak image — --pf-v5-c-login__main-header--PaddingBottom
+   resolves to --pf-v5-global--spacer--md, 1rem). */
 .pf-v5-c-login__main-header {
   text-align: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.85rem;
   border-top: none !important;
   padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 .pf-v5-c-title,
@@ -375,7 +385,7 @@ body#keycloak-bg {
 }
 
 .pf-v5-c-form__group {
-  margin-bottom: 1.15rem;
+  margin-bottom: 0.85rem;
 }
 
 /* The real root cause of "fields render narrower than the card": PatternFly's
@@ -389,9 +399,30 @@ body#keycloak-bg {
    was long enough to visibly truncate. The card's own padding is enough
    on its own, so main-body's copy is zeroed out here rather than kept and
    compensated for elsewhere. */
+/* padding-block-end (bottom) is zeroed for the same reason as inline-
+   start/end above: PatternFly's native 2rem bottom padding on this class
+   was landing twice — once on this element itself, and a second time on
+   the "Sign in with Microsoft" `<ul>` (keycloak.v2's own login.ftl
+   deliberately reuses this exact class on that `<ul>` for its list-style
+   reset, so it inherits every other rule scoped to the class too). That's
+   64px of dead space stacked right after the Microsoft button, the main
+   reason the card was reading taller than its actual content. */
 .pf-v5-c-login__main-body {
   padding-inline-start: 0 !important;
   padding-inline-end: 0 !important;
+  padding-block-end: 0 !important;
+}
+
+/* The "Or sign in with" divider band carries its own native 1.5rem
+   top + 1.5rem bottom padding (--pf-v5-c-login__main-footer-band--PaddingTop/
+   Bottom, both --pf-v5-global--spacer--lg) that was never touched here —
+   on top of .pf-v5-c-login__main-footer's own margin-top just below, that
+   put ~44px of empty space between the Sign In button and this label, and
+   another 24px before the Microsoft button. Tightened, border (the actual
+   divider line) kept. */
+.pf-v5-c-login__main-footer-band {
+  padding-block-start: 0.5rem !important;
+  padding-block-end: 0.45rem !important;
 }
 
 /* ---------- Remember-me + Forgot-password row ----------
@@ -400,7 +431,7 @@ body#keycloak-bg {
    wrapping .pf-v5-c-helper-text) — this just restyles the checkbox itself
    to match the card's visual language instead of PatternFly's defaults. */
 .pf-v5-c-form__helper-text {
-  margin-top: 0.7rem;
+  margin-top: 0.5rem;
 }
 .pf-v5-c-helper-text {
   align-items: center;
@@ -447,7 +478,7 @@ body#keycloak-bg {
 }
 
 .pf-v5-c-form__actions {
-  padding-top: 0.9rem !important;
+  padding-top: 0.6rem !important;
   padding-bottom: 0 !important;
   margin: 0 !important;
 }
@@ -486,19 +517,69 @@ label {
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   padding-left: 2.85rem !important;
 }
-/* The input immediately followed by the password-visibility toggle button
-   (see the seam fix below) — flatten the shared edge so the two read as
-   one continuous control instead of two adjacent boxes with a visible
-   double-border bump where they meet. */
-.pf-v5-c-form-control:has(+ .pf-v5-c-button.pf-m-control) {
-  border-top-right-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
-  border-right: none !important;
+/* Password field: the input and the show/hide button are each in their
+   OWN .pf-v5-c-input-group__item wrapper div (see field.ftl's `password`
+   macro) — they are not direct DOM siblings of each other, only their
+   wrapper divs are. A `:has(+ .pf-v5-c-button.pf-m-control)` sibling
+   selector here therefore never matches, so this rule used to silently
+   do nothing: the input kept its own full rounded border AND the toggle
+   button kept its own full rounded border right next to it, rendering as
+   two visibly separate boxes instead of one field. Fixed at the real
+   shared ancestor instead: the border/background/radius now lives on
+   `.pf-v5-c-input-group` itself (one box), and both the input span and
+   the toggle button below are stripped down to transparent, borderless
+   panes inside it. */
+.pf-v5-c-input-group {
+  display: flex;
+  align-items: stretch;
+  position: relative;
+  background: var(--td-input-bg) !important;
+  border: 1px solid var(--td-input-border) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.pf-v5-c-input-group:hover {
+  background: #f0f1f4 !important;
+}
+.pf-v5-c-input-group:focus-within {
+  background: #ffffff !important;
+  border-color: var(--td-accent) !important;
+  box-shadow: 0 0 0 3px var(--td-accent-soft) !important;
+}
+.pf-v5-c-input-group .pf-v5-c-form-control,
+.pf-v5-c-input-group .pf-v5-c-form-control:hover,
+.pf-v5-c-input-group .pf-v5-c-form-control:focus-within {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control:hover {
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+/* The actual visible seam turned out to be neither of the two elements
+   above — it's PatternFly's own dark-theme stylesheet, active whenever
+   the OS/browser prefers-color-scheme is dark (template.ftl's own script
+   adds .pf-v5-theme-dark to <html> for that; confirmed live via
+   CSS.getMatchedStylesForNode). Its rule
+   `:where(.pf-v5-theme-dark) .pf-v5-c-input-group > * + *` puts a real
+   1px solid dark border on the wrapper <div> around the toggle button,
+   completely independent of every color this file controls — so it kept
+   rendering a hard line there even though the rest of the card correctly
+   stayed light. Killed directly on the wrapper. */
+.pf-v5-c-input-group__item {
+  border: none !important;
 }
 .pf-v5-c-form-control input,
 .pf-v5-c-form-control textarea {
   outline: none !important;
-  height: 3.35rem;
+  height: 2.9rem;
   padding: 0 1rem 0 0 !important;
   font-size: 0.95rem !important;
   font-family: var(--td-font);
@@ -575,7 +656,7 @@ label {
 .pf-v5-c-button.pf-m-primary,
 .pf-v5-c-button.pf-m-secondary {
   font-family: var(--td-font);
-  height: 3.35rem;
+  height: 2.9rem;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
   font-size: 0.95rem !important;
@@ -634,21 +715,21 @@ label {
 .pf-v5-c-button.pf-m-secondary:hover {
   background: var(--td-input-bg) !important;
 }
+/* Base look for the toggle button outside a unified input-group (shouldn't
+   occur in practice — every use of kcFormPasswordVisibilityButtonClass in
+   field.ftl is inside .pf-v5-c-input-group) kept only as a fallback; the
+   `.pf-v5-c-input-group .pf-v5-c-button.pf-m-control` rule above (higher
+   specificity) is what actually renders in the password field, stripping
+   this background/border back to transparent so it reads as one box with
+   the input rather than a separate pill next to it. */
 .pf-v5-c-button.pf-m-control {
   background: var(--td-input-bg) !important;
   border: 1px solid var(--td-input-border) !important;
   border-left: none !important;
   color: var(--td-ink-muted) !important;
   border-radius: 0 12px 12px 0 !important;
-  height: 3.35rem;
+  height: 2.9rem;
   transition: background 0.15s ease, color 0.15s ease;
-}
-/* Mirrors .pf-v5-c-form-control:focus-within just above — the toggle
-   button is the input's visual other half now (see the seam fix), so
-   focusing/filling either side should read as one control lighting up. */
-.pf-v5-c-form-control:focus-within + .pf-v5-c-button.pf-m-control {
-  background: #ffffff !important;
-  border-color: var(--td-accent) !important;
 }
 .pf-v5-c-button.pf-m-control:hover {
   color: var(--td-ink) !important;

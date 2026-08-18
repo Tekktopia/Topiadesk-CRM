@@ -1,4 +1,20 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+  StreamableFile,
+  UseGuards,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient, type Prisma } from '@topiadesk/db';
 import { PermissionGuard } from '../../common/auth/permission.guard';
@@ -7,10 +23,12 @@ import {
   CreateSalesQuotaDto,
   QuotaAttainmentResponseDto,
   SalesQuotaQueryDto,
+  SalesQuotaStatsResponseDto,
   SalesQuotaResponseDto,
   UpdateSalesQuotaDto,
 } from './dto/sales-quota.dto';
 import { toSalesQuotaDto } from './mapping';
+import { salesQuotasToCsv } from './sales-quota-csv';
 
 /**
  * sales_quotas_rw's WITH CHECK (prisma/rls/002_policies.sql) requires
@@ -35,10 +53,62 @@ export class SalesQuotasController {
   @ApiOkResponse({ type: [SalesQuotaResponseDto] })
   async list(@Query() query: SalesQuotaQueryDto): Promise<SalesQuotaResponseDto[]> {
     const quotas = await getPrismaClient().salesQuota.findMany({
-      where: { scopeType: query.scopeType, userId: query.userId },
+      where: quotaListWhere(query),
       orderBy: { periodStart: 'desc' },
     });
     return quotas.map(toSalesQuotaDto);
+  }
+
+  /** Must precede ':id' — Nest matches literal segments in declaration order. */
+  @Get('stats')
+  @RequirePermission('opportunity', 'read')
+  @ApiOkResponse({ type: SalesQuotaStatsResponseDto })
+  async stats(@Query() query: SalesQuotaQueryDto): Promise<SalesQuotaStatsResponseDto> {
+    const prisma = getPrismaClient();
+    const where = quotaListWhere(query);
+    const today = new Date();
+    const currentWindow = { periodStart: { lte: today }, periodEnd: { gte: today } };
+
+    // AND, never a spread-and-override: `{ ...where, scopeType: 'USER' }`
+    // REPLACES a scopeType the caller already filtered on, so filtering the
+    // page to ORG would report an "individual" count drawn from outside the
+    // filter — a header describing rows the table isn't showing. Intersecting
+    // instead makes the impossible combination return 0, which is the truth.
+    const withCurrent = { AND: [where, currentWindow] };
+    const [total, current, individual, currentAgg] = await Promise.all([
+      prisma.salesQuota.count({ where }),
+      prisma.salesQuota.count({ where: withCurrent }),
+      prisma.salesQuota.count({ where: { AND: [where, { scopeType: 'USER' as const }] } }),
+      prisma.salesQuota.aggregate({ where: withCurrent, _sum: { targetAmount: true } }),
+    ]);
+
+    return {
+      total,
+      current,
+      individual,
+      // Decimal -> string, never Number(): targets are money at 15,2 and can
+      // exceed IEEE-754 integer precision once summed across a large team.
+      currentTargetTotal: (currentAgg._sum.targetAmount ?? 0).toString(),
+    };
+  }
+
+  /**
+   * CSV over the current filter. Includes the quota owner's name rather than
+   * only their id — a target list reviewed by a sales manager in a
+   * spreadsheet is unusable as UUIDs. Must precede ':id'.
+   */
+  @Get('export')
+  @RequirePermission('opportunity', 'read')
+  async export(@Query() query: SalesQuotaQueryDto, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
+    const quotas = await getPrismaClient().salesQuota.findMany({
+      where: quotaListWhere(query),
+      include: { user: { select: { fullName: true } } },
+      orderBy: { periodStart: 'desc' },
+      take: 10_000,
+    });
+    const csv = salesQuotasToCsv(quotas);
+    res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="sales-quotas.csv"' });
+    return new StreamableFile(Buffer.from(csv, 'utf-8'));
   }
 
   @Get(':id')
@@ -166,4 +236,18 @@ function assertScopeTargetConsistent(
   if (scopeType === 'ORG' && setCount !== 0) {
     throw new BadRequestException('scopeType=ORG requires userId/departmentId/branchId to all be unset');
   }
+}
+
+/** Shared by list() and stats() so the page header always matches the rows. */
+function quotaListWhere(query: SalesQuotaQueryDto): Prisma.SalesQuotaWhereInput {
+  const today = new Date();
+  return {
+    scopeType: query.scopeType,
+    userId: query.userId,
+    periodType: query.periodType,
+    // 'true'|'false' as a query string — a bare @IsBoolean() never coerces,
+    // and NestJS's implicit cast turns the string "false" into true (the
+    // footgun already documented on AccountQueryDto.includeArchived).
+    ...(query.currentOnly === 'true' ? { periodStart: { lte: today }, periodEnd: { gte: today } } : {}),
+  };
 }

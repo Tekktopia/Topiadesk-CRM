@@ -13,6 +13,8 @@
  * and params shapes in sync.
  */
 
+import type { AutomationEntityType } from '@topiadesk/automation';
+
 export interface ActionSpec {
   actionType: string;
   params: Record<string, unknown>;
@@ -21,11 +23,49 @@ export interface ActionSpec {
 export type CaseManagementEntityRef = { entityType: 'CLAIM'; claimId: string } | { entityType: 'CASE'; caseId: string };
 
 export interface AutomationActionContext {
-  entity: CaseManagementEntityRef;
+  /**
+   * The record the rule fired on, for every entity type automation now
+   * supports. `entity` below stays the narrow CASE/CLAIM union the six
+   * original ticket actions were written against; this is the general form
+   * the newer actions (email, task, field update, webhook) use so they can
+   * run against a policy or an opportunity too.
+   */
+  target: { entityType: AutomationEntityType; id: string };
+  /**
+   * The already-loaded row. Passed through rather than re-queried because
+   * every caller has just fetched it to evaluate the rule's conditions, and
+   * because template placeholders must render from the SAME snapshot the
+   * conditions matched — re-reading invites a rule that says "premium is
+   * overdue" sending a message quoting a premium that was paid in between.
+   */
+  targetData: Record<string, unknown> | null;
+  /**
+   * Narrow ticket ref. Undefined when the rule fired on something that is
+   * not a case or a claim — the ticket-only actions call `requireTicketRef`
+   * and fail cleanly rather than silently no-op'ing.
+   */
+  entity?: CaseManagementEntityRef;
   /** Always null here — every action run through this registry is fired by a background AutomationRule, never a human request. */
   actingUserId: string | null;
   /** Flows into Activity.createdBySystemJob for ADD_INTERNAL_NOTE — identifies which automation rule/job produced the note. */
   systemJobName: string | null;
+}
+
+/**
+ * Ticket-only actions call this instead of reaching for `ctx.entity`.
+ *
+ * Automation can now fire on policies, opportunities, leads and clients, none
+ * of which have a status or an assignee in the ticket sense. The action
+ * catalog already stops the builder offering "set status" on a policy, but
+ * that is a UI guard — a rule stored before the entity type was changed, or
+ * posted directly to the API, must still fail with something an admin can
+ * read rather than throwing on an undefined property.
+ */
+export function requireTicketRef(ctx: AutomationActionContext): CaseManagementEntityRef {
+  if (!ctx.entity) {
+    throw new Error(`This action only works on tickets and claims — it cannot run on a ${ctx.target.entityType.toLowerCase()}.`);
+  }
+  return ctx.entity;
 }
 
 export interface AutomationActionHandler {

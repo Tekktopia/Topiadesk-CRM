@@ -1,6 +1,7 @@
 import { Queue } from 'bullmq';
 import Redis from 'ioredis';
 import { loadEnv } from '@topiadesk/config';
+import { getRlsContext } from '@topiadesk/db';
 
 /**
  * Producer side of the portal magic-link email — same producer/consumer
@@ -28,6 +29,7 @@ function getQueue(): Queue {
 export interface SendPortalLoginLinkJobData {
   email: string;
   token: string;
+  tenantSchema: string | null;
 }
 
 /**
@@ -41,7 +43,10 @@ export async function enqueuePortalLoginEmail(email: string, token: string): Pro
     const q = getQueue();
     await q.add(
       'send-portal-login-link',
-      { email, token } satisfies SendPortalLoginLinkJobData,
+      // Capture the tenant at enqueue time — the worker cannot infer it, and
+      // without it the token lookup runs against `public` and the email is
+      // silently never sent.
+      { email, token, tenantSchema: getRlsContext()?.tenantSchema ?? null } satisfies SendPortalLoginLinkJobData,
       { removeOnComplete: true, removeOnFail: 100 },
     );
   } catch (err) {

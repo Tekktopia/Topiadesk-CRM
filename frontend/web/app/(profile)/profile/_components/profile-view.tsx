@@ -21,8 +21,10 @@ import {
   toast,
 } from '@topiadesk/ui';
 import { useCurrentUser } from '@/lib/auth/use-current-user';
+import { csrfHeaders } from '@/lib/csrf';
 import { bumpAvatarCacheBust, getAvatarCacheBust } from '@/app/account-menu';
 import { ApiKeysCard } from './api-keys-card';
+import { MicrosoftMailboxCard } from './microsoft-mailbox-card';
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 
@@ -78,7 +80,7 @@ export function ProfileView() {
     mutationFn: (input: { fullName: string; phone: string | null }) =>
       fetch('/api/auth/profile', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeaders('PATCH') },
         body: JSON.stringify(input),
       }).then((res) => {
         if (!res.ok) throw new Error('Failed to update profile');
@@ -95,7 +97,7 @@ export function ProfileView() {
     mutationFn: (file: File) => {
       const formData = new FormData();
       formData.append('file', file);
-      return fetch('/api/auth/avatar', { method: 'POST', body: formData }).then((res) => {
+      return fetch('/api/auth/avatar', { method: 'POST', headers: csrfHeaders('POST'), body: formData }).then((res) => {
         if (!res.ok) throw new Error('Failed to upload photo');
         return res.json();
       });
@@ -109,7 +111,7 @@ export function ProfileView() {
   });
 
   const removeAvatar = useMutation({
-    mutationFn: () => fetch('/api/auth/avatar', { method: 'DELETE' }).then((res) => {
+    mutationFn: () => fetch('/api/auth/avatar', { method: 'DELETE', headers: csrfHeaders('DELETE') }).then((res) => {
       if (!res.ok) throw new Error('Failed to remove photo');
       return res.json();
     }),
@@ -140,7 +142,7 @@ export function ProfileView() {
     mutationFn: (value: 'ONLINE' | 'AWAY' | 'OFFLINE') =>
       fetch('/api/auth/presence', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeaders('PATCH') },
         body: JSON.stringify({ presenceStatus: value }),
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['auth', 'current-user'] }),
@@ -308,6 +310,8 @@ export function ProfileView() {
           </Button>
         </CardContent>
       </Card>
+
+      <MicrosoftMailboxCard />
 
       <ApiKeysCard />
     </div>

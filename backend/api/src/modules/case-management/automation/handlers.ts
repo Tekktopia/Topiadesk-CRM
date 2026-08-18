@@ -1,7 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT, type CasePriority, type CaseStatus, type ClaimStatus } from '@topiadesk/db';
-import { registerActionHandler } from './action-handler';
+import { registerActionHandler, requireTicketRef } from './action-handler';
 import { applyCaseStatusTransition, applyClaimStatusTransition } from '../status-transition.util';
+// Registers CREATE_TASK / UPDATE_FIELD as a side effect of the import, so a
+// macro gets them too — importing this module has always been what populates
+// the registry.
+import './generic-handlers';
 
 function requireString(params: Record<string, unknown>, key: string): string {
   const value = params[key];
@@ -15,11 +19,12 @@ function requireString(params: Record<string, unknown>, key: string): string {
 registerActionHandler({
   actionType: 'SET_STATUS',
   async execute(params, ctx) {
+    const entity = requireTicketRef(ctx);
     const status = requireString(params, 'status');
-    if (ctx.entity.entityType === 'CLAIM') {
-      await applyClaimStatusTransition(ctx.entity.claimId, status as ClaimStatus, ctx.actingUserId, 'Applied via macro/automation');
+    if (entity.entityType === 'CLAIM') {
+      await applyClaimStatusTransition(entity.claimId, status as ClaimStatus, ctx.actingUserId, 'Applied via macro/automation');
     } else {
-      await applyCaseStatusTransition(ctx.entity.caseId, status as CaseStatus, 'Applied via macro/automation');
+      await applyCaseStatusTransition(entity.caseId, status as CaseStatus, 'Applied via macro/automation');
     }
   },
 });
@@ -28,12 +33,13 @@ registerActionHandler({
 registerActionHandler({
   actionType: 'ASSIGN_TO_USER',
   async execute(params, ctx) {
+    const entity = requireTicketRef(ctx);
     const userId = requireString(params, 'userId');
     const prisma = getPrismaClient();
-    if (ctx.entity.entityType === 'CLAIM') {
-      await prisma.claim.update({ where: { id: ctx.entity.claimId }, data: { adjusterId: userId } });
+    if (entity.entityType === 'CLAIM') {
+      await prisma.claim.update({ where: { id: entity.claimId }, data: { adjusterId: userId } });
     } else {
-      await prisma.case.update({ where: { id: ctx.entity.caseId }, data: { assignedToId: userId } });
+      await prisma.case.update({ where: { id: entity.caseId }, data: { assignedToId: userId } });
     }
   },
 });
@@ -42,12 +48,13 @@ registerActionHandler({
 registerActionHandler({
   actionType: 'ASSIGN_TO_TEAM',
   async execute(params, ctx) {
+    const entity = requireTicketRef(ctx);
     const teamId = requireString(params, 'teamId');
     const prisma = getPrismaClient();
-    if (ctx.entity.entityType === 'CLAIM') {
-      await prisma.claim.update({ where: { id: ctx.entity.claimId }, data: { assignedTeamId: teamId } });
+    if (entity.entityType === 'CLAIM') {
+      await prisma.claim.update({ where: { id: entity.claimId }, data: { assignedTeamId: teamId } });
     } else {
-      await prisma.case.update({ where: { id: ctx.entity.caseId }, data: { assignedTeamId: teamId } });
+      await prisma.case.update({ where: { id: entity.caseId }, data: { assignedTeamId: teamId } });
     }
   },
 });
@@ -56,12 +63,13 @@ registerActionHandler({
 registerActionHandler({
   actionType: 'SET_PRIORITY',
   async execute(params, ctx) {
+    const entity = requireTicketRef(ctx);
     const priority = requireString(params, 'priority') as CasePriority;
     const prisma = getPrismaClient();
-    if (ctx.entity.entityType === 'CLAIM') {
-      await prisma.claim.update({ where: { id: ctx.entity.claimId }, data: { priority } });
+    if (entity.entityType === 'CLAIM') {
+      await prisma.claim.update({ where: { id: entity.claimId }, data: { priority } });
     } else {
-      await prisma.case.update({ where: { id: ctx.entity.caseId }, data: { priority } });
+      await prisma.case.update({ where: { id: entity.caseId }, data: { priority } });
     }
   },
 });
@@ -70,13 +78,14 @@ registerActionHandler({
 registerActionHandler({
   actionType: 'ADD_INTERNAL_NOTE',
   async execute(params, ctx) {
+    const entity = requireTicketRef(ctx);
     const body = requireString(params, 'body');
     const subject = typeof params.subject === 'string' && params.subject.length > 0 ? params.subject : 'Automated note';
     const prisma = getPrismaClient();
     await prisma.activity.create({
       data: {
-        claimId: ctx.entity.entityType === 'CLAIM' ? ctx.entity.claimId : undefined,
-        caseId: ctx.entity.entityType === 'CASE' ? ctx.entity.caseId : undefined,
+        claimId: entity.entityType === 'CLAIM' ? entity.claimId : undefined,
+        caseId: entity.entityType === 'CASE' ? entity.caseId : undefined,
         type: 'NOTE',
         direction: 'INTERNAL',
         subject,
@@ -116,12 +125,13 @@ registerActionHandler({
 registerActionHandler({
   actionType: 'SEND_NOTIFICATION',
   async execute(params, ctx) {
+    const entity = requireTicketRef(ctx);
     const title = requireString(params, 'title');
     const body = requireString(params, 'body');
     const channel = params.channel === 'EMAIL' ? 'EMAIL' : 'IN_APP';
     const prisma = getPrismaClient();
-    const relatedEntityType = ctx.entity.entityType;
-    const relatedEntityId = ctx.entity.entityType === 'CLAIM' ? ctx.entity.claimId : ctx.entity.caseId;
+    const relatedEntityType = entity.entityType;
+    const relatedEntityId = entity.entityType === 'CLAIM' ? entity.claimId : entity.caseId;
 
     const recipientTeamId = typeof params.recipientTeamId === 'string' ? params.recipientTeamId : undefined;
     let recipientUserIds: string[];
@@ -131,11 +141,11 @@ registerActionHandler({
     } else {
       let recipientUserId = typeof params.recipientUserId === 'string' ? params.recipientUserId : undefined;
       if (!recipientUserId) {
-        if (ctx.entity.entityType === 'CLAIM') {
-          const claim = await prisma.claim.findUnique({ where: { id: ctx.entity.claimId } });
+        if (entity.entityType === 'CLAIM') {
+          const claim = await prisma.claim.findUnique({ where: { id: entity.claimId } });
           recipientUserId = claim?.adjusterId ?? undefined;
         } else {
-          const kase = await prisma.case.findUnique({ where: { id: ctx.entity.caseId } });
+          const kase = await prisma.case.findUnique({ where: { id: entity.caseId } });
           recipientUserId = kase?.assignedToId ?? undefined;
         }
       }

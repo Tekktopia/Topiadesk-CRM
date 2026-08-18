@@ -81,7 +81,7 @@ export class ReportsController {
     // paginated slice like POST .../run supports for the interactive
     // pivot-table view.
     const result = await definition.execute(getPrismaClient(), filters, query.dimension);
-    const buffer = await renderReportExport(result, query.format, definition.name);
+    const buffer = await renderReportExport(result, query.format, definition.name, definition.defaultChartType);
 
     // Not tied to a ScheduledReportRun — this is an ad-hoc, on-demand
     // export, so it gets its own storage-key namespace (a fresh uuid)

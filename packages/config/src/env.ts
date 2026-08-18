@@ -29,11 +29,11 @@ const zBooleanFromEnvString = (defaultValue: boolean) =>
  * defined-but-empty value. That distinction is not academic: Docker Compose's
  * `${VAR}` interpolation substitutes an unset .env var with an empty string,
  * not "key absent" — so any optional secret left blank in .env would boot the
- * container with e.g. `VOYAGE_API_KEY=""` and fail `loadEnv()` outright,
+ * container with e.g. `KEYCLOAK_ADMIN=""` and fail `loadEnv()` outright,
  * turning "not configured yet" into a boot crash. Normalizing '' to
  * `undefined` here keeps the two cases (truly unset vs. blank-interpolated)
- * behaving identically, matching what every lazy-client caller (e.g.
- * `getAnthropicClient()`) already assumes: "falsy means not configured."
+ * behaving identically, matching what every lazy-client caller assumes:
+ * "falsy means not configured."
  */
 const zOptionalEnvString = () =>
   z
@@ -73,6 +73,9 @@ const envSchema = z.object({
   MINIO_BACKUPS_BUCKET: z.string().min(1),
   MINIO_APP_ACCESS_KEY: z.string().min(1),
   MINIO_APP_SECRET_KEY: z.string().min(1),
+
+  CLAMAV_HOST: z.string().min(1),
+  CLAMAV_PORT: z.coerce.number().int().positive(),
 
   KEYCLOAK_URL: z.string().url(),
   KEYCLOAK_REALM: z.string().min(1),
@@ -128,18 +131,16 @@ const envSchema = z.object({
   // CAMPAIGN_WEBHOOK_SECRET, see
   // backend/api/src/modules/omnichannel/omnichannel-webhook.guard.ts.
   OMNICHANNEL_WEBHOOK_SECRET: z.string().min(1),
+  /** Optional — enables real Twilio X-Twilio-Signature verification (HMAC-SHA1) in omnichannel-webhook.guard.ts alongside the shared-secret check above. Unset in dev (no real Twilio account to sign against); set to the account's real Auth Token in production. */
+  TWILIO_AUTH_TOKEN: z.string().optional(),
 
-  ANTHROPIC_API_KEY: z.string().min(1).optional(),
-  AI_GATEWAY_MODEL: z.string().default('claude-sonnet-5'),
-  AI_ORG_MONTHLY_SPEND_CAP_USD: z.coerce.number().positive().default(500),
+  // The AI Gateway (backend/api/src/modules/ai-gateway/) runs fully
+  // locally now — no external API/key of any kind (no ANTHROPIC_API_KEY,
+  // no VOYAGE_API_KEY, no AI_GATEWAY_MODEL to select a hosted model with).
+  // AI_ORG_MONTHLY_SPEND_CAP_USD was dropped too: local compute has no
+  // dollar cost to cap. Only the per-user rate-limit remains, repurposed
+  // from a cost guard to an abuse/runaway-usage guard.
   AI_PER_USER_DAILY_REQUEST_CAP: z.coerce.number().int().positive().default(100),
-  // Anthropic has no embeddings API — Voyage AI is Anthropic's recommended
-  // embeddings partner (see ai-gateway/voyage-client.ts). Optional, same
-  // lazy-client reasoning as ANTHROPIC_API_KEY: semantic search must not
-  // block API boot in an environment that hasn't provisioned it yet. Uses
-  // zOptionalEnvString (not `.optional()` alone) — see that helper's
-  // comment for a real docker-compose footgun this avoids.
-  VOYAGE_API_KEY: zOptionalEnvString(),
 
   // AES-256-GCM key (32 bytes, hex-encoded = 64 chars) for app-layer
   // encryption of IntegrationOAuthCredential's stored access/refresh tokens
@@ -156,6 +157,23 @@ const envSchema = z.object({
   SMTP_PORT: z.coerce.number().int().positive(),
   SMTP_SECURE: zBooleanFromEnvString(false),
   SMTP_FROM: z.string().min(1),
+  /** Optional — maildev (this dev stack) accepts unauthenticated SMTP; a real provider (SES/SendGrid/Postmark/Gmail) needs these. See mailer.ts's getTransporter(). */
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+
+  /**
+   * Microsoft 365 / Entra app registration.
+   *
+   * These already existed in .env but had never been declared here — they
+   * were read only by infra/keycloak/enable-microsoft-sso.sh, a shell script,
+   * so the application had no validated access to them. Optional because a
+   * deployment without Microsoft integration is perfectly valid; the Graph
+   * sync service checks for them and reports a clear connection error rather
+   * than failing at boot.
+   */
+  MICROSOFT_IDP_TENANT_ID: z.string().optional(),
+  MICROSOFT_IDP_CLIENT_ID: z.string().optional(),
+  MICROSOFT_IDP_CLIENT_SECRET: z.string().optional(),
 
   BACKUP_CRON_SCHEDULE: z.string().default('0 */6 * * *'),
   BACKUP_RETENTION_DAYS: z.coerce.number().int().positive().default(30),

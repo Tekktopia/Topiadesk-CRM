@@ -1,9 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsDateString, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
-const APPROVAL_QUERY_STATUSES = ['PENDING', 'APPROVED', 'REJECTED'] as const;
+const APPROVAL_QUERY_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'DECIDED'] as const;
 
 export class ApprovalQueryDto {
+  /** 'DECIDED' is a query-only shorthand for "APPROVED or REJECTED" (a History view) — never a real Approval.status value, translated in the controller. */
   @ApiProperty({ required: false, enum: APPROVAL_QUERY_STATUSES, default: 'PENDING' })
   @IsOptional()
   @IsIn(APPROVAL_QUERY_STATUSES)
@@ -32,6 +33,10 @@ export class PendingApprovalDto {
   @ApiProperty() label!: string;
   @ApiProperty({ nullable: true }) linkPath!: string | null;
   @ApiProperty() isMine!: boolean;
+  /** Null while status is PENDING. */
+  @ApiProperty({ nullable: true }) decidedAt!: Date | null;
+  @ApiProperty({ nullable: true }) decisionNote!: string | null;
+  @ApiProperty({ nullable: true }) approvedByName!: string | null;
 }
 
 export class CreateApprovalDelegationDto {

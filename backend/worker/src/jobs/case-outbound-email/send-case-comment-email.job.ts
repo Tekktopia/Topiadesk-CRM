@@ -30,6 +30,18 @@ export const CASE_OUTBOUND_EMAIL_QUEUE_NAME = 'case-outbound-email';
 export interface SendCaseCommentEmailJobData {
   activityId: string;
   caseId: string;
+  /** Explicit recipient override (SendCaseEmailDialog's To/Cc) — omitted/empty falls back to resolveCaseEmail() below, same as before this existed. */
+  to?: string[];
+  cc?: string[];
+  /**
+   * The tenant schema the Activity/Case live in, captured by the producer
+   * from the originating request's RLS context. See the matching comment on
+   * CaseCommentEmailPayload in the api — omitting this bound every lookup
+   * below to `public` and silently dropped every real tenant's outbound
+   * email. Optional only so jobs enqueued before this field existed still
+   * parse; they fall back to the old (public) behaviour.
+   */
+  tenantSchema?: string | null;
 }
 
 async function resolveCaseEmail(caseId: string): Promise<string | null> {
@@ -48,20 +60,44 @@ async function resolveCaseEmail(caseId: string): Promise<string | null> {
 export async function sendCaseCommentEmail(
   data: SendCaseCommentEmailJobData,
 ): Promise<{ status: 'sent' | 'skipped-no-email' | 'skipped-not-found' | 'failed' }> {
-  return runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+  // `{ ...SYSTEM_JOB_CONTEXT, tenantSchema }` — the same pattern every other
+  // tenant-aware job here uses (see kyc-expiry-check.job.ts). Bare
+  // SYSTEM_JOB_CONTEXT pins tenantSchema to null, i.e. the `public` schema,
+  // which is why this job kept reporting 'skipped-not-found' for tickets
+  // that plainly existed.
+  return runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema: data.tenantSchema ?? null }, async () => {
     const prisma = getPrismaClient();
 
     const [activity, kase] = await Promise.all([
       prisma.activity.findUnique({ where: { id: data.activityId } }),
       prisma.case.findUnique({ where: { id: data.caseId } }),
     ]);
-    if (!activity || !kase) return { status: 'skipped-not-found' };
+    if (!activity || !kase) {
+      // Loud on purpose: this is indistinguishable from success in BullMQ
+      // (the job still "completes"), and it silently swallowed every
+      // outbound email for months. If it fires now it means a genuinely
+      // missing row, not a schema mix-up.
+      console.error(
+        `[case-outbound-email] NOT SENT — activity ${data.activityId} / case ${data.caseId} not found in schema ` +
+          `"${data.tenantSchema ?? 'public'}" (activity=${Boolean(activity)}, case=${Boolean(kase)})`,
+      );
+      return { status: 'skipped-not-found' };
+    }
 
-    const email = await resolveCaseEmail(data.caseId);
-    if (!email) {
+    let to = data.to?.filter(Boolean) ?? [];
+    if (to.length === 0) {
+      const resolved = await resolveCaseEmail(data.caseId);
+      if (resolved) to = [resolved];
+    }
+    if (to.length === 0) {
+      console.warn(
+        `[case-outbound-email] NOT SENT — no recipient resolved for activity ${data.activityId} / case ${data.caseId}; ` +
+          'the case has no contact email and its account has no primary contact email.',
+      );
       await prisma.activity.update({ where: { id: data.activityId }, data: { emailDeliveryStatus: 'SKIPPED_NO_EMAIL' } });
       return { status: 'skipped-no-email' };
     }
+    const cc = data.cc?.filter(Boolean) ?? [];
 
     // Reply parent: the case's most recent OTHER activity that's already
     // part of an email thread (inbound or a prior outbound reply) —
@@ -76,7 +112,8 @@ export async function sendCaseCommentEmail(
 
     try {
       await sendMail({
-        to: email,
+        to,
+        cc: cc.length > 0 ? cc : undefined,
         subject: activity.subject || `Re: ${kase.subject} [${kase.caseNumber}]`,
         text: activity.body ?? '',
         messageId,
@@ -85,7 +122,7 @@ export async function sendCaseCommentEmail(
       });
     } catch (err) {
       console.error(`[case-outbound-email] failed to send comment ${data.activityId} for case ${data.caseId}`, err);
-      await prisma.activity.update({ where: { id: data.activityId }, data: { emailDeliveryStatus: 'FAILED' } });
+      await prisma.activity.update({ where: { id: data.activityId }, data: { emailDeliveryStatus: 'FAILED', emailTo: to, emailCc: cc } });
       return { status: 'failed' };
     }
 
@@ -95,6 +132,8 @@ export async function sendCaseCommentEmail(
         emailDeliveryStatus: 'SENT',
         externalMessageId: messageId,
         externalThreadId: threadId ?? messageId,
+        emailTo: to,
+        emailCc: cc,
       },
     });
     return { status: 'sent' };

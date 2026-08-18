@@ -47,6 +47,23 @@ class CaseMutableFieldsDto {
 /** status/caseType/caseNumber deliberately absent — caseType and caseNumber are immutable post-creation, status changes exclusively through POST :id/status (see case-lifecycle.ts). */
 export class UpdateCaseDto extends PartialType(CaseMutableFieldsDto) {}
 
+/**
+ * Ticket-desk aggregates for the workspace header.
+ *
+ * `open` spans every non-terminal status (NEW / OPEN / PENDING_* / REOPENED)
+ * rather than just OPEN — a ticket waiting on the customer is still the
+ * desk's problem, and counting only status=OPEN understates every queue.
+ */
+export class CaseStatsResponseDto {
+  @ApiProperty() total!: number;
+  @ApiProperty({ description: 'status = NEW — untriaged.' }) newCount!: number;
+  @ApiProperty({ description: 'Any non-terminal status, including PENDING_* and REOPENED.' }) open!: number;
+  @ApiProperty() resolved!: number;
+  @ApiProperty() closed!: number;
+  @ApiProperty({ description: 'Open tickets with no assignee — nobody owns them.' }) unassigned!: number;
+  @ApiProperty({ description: 'Tickets with a RUNNING SLA clock already past its dueAt.' }) breaching!: number;
+}
+
 export class CaseQueryDto {
   @ApiPropertyOptional({ enum: CaseStatus }) @IsOptional() @IsEnum(CaseStatus) status?: CaseStatus;
   @ApiPropertyOptional({ enum: CasePriority }) @IsOptional() @IsEnum(CasePriority) priority?: CasePriority;

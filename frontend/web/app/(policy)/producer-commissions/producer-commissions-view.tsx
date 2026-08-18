@@ -52,6 +52,11 @@ export function ProducerCommissionsView() {
     },
   });
 
+  // Stable reference: `x ?? []` mints a new array on every render while the
+  // query has no data (i.e. right after a filter change), which is what drove
+  // DataTable's pagination into a render loop. See data-table.tsx.
+  const commissions = React.useMemo(() => commissionsQuery.data ?? [], [commissionsQuery.data]);
+
   const updateStatus = useMutation({
     mutationFn: async ({ id, status, paymentDate }: { id: string; status: string; paymentDate?: string }) => {
       const res = await fetch(`/api/producer-commissions/${id}`, {
@@ -209,7 +214,7 @@ export function ProducerCommissionsView() {
 
       <DataTable<ProducerCommissionDto, unknown>
         columns={columns}
-        data={commissionsQuery.data ?? []}
+        data={commissions}
         getRowId={(c) => c.id}
         isLoading={commissionsQuery.isLoading}
         isError={commissionsQuery.isError}

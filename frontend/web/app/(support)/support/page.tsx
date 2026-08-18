@@ -87,7 +87,7 @@ export default function SupportPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Submit a support ticket</DialogTitle>
-              <DialogDescription>Sent to the TopiaDesk team, not your own organization's admins.</DialogDescription>
+              <DialogDescription>Sent to the TopiaDesk team, not your own organization&apos;s admins.</DialogDescription>
             </DialogHeader>
             <form
               className="flex flex-col gap-4"
@@ -145,7 +145,7 @@ export default function SupportPage() {
               ))}
             </ul>
           ) : (
-            <p className="p-6 text-sm text-muted-foreground">You haven't submitted any support tickets yet.</p>
+            <p className="p-6 text-sm text-muted-foreground">You haven&apos;t submitted any support tickets yet.</p>
           )}
         </CardContent>
       </Card>

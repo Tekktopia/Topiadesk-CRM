@@ -1,8 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { getPrismaClient } from '@topiadesk/db';
-import { registerActionHandler } from './action-handler';
+import { registerActionHandler, requireTicketRef } from './action-handler';
 import { isValidCaseTransition, isValidClaimTransition } from './lifecycle-transitions';
 import { sendMail } from '../jobs/scheduled-reports/mailer';
+// Registers CREATE_TASK / UPDATE_FIELD / CALL_WEBHOOK as a side effect of the
+// import, alongside the shared helpers SEND_EMAIL below now uses.
+import { loadTarget, notificationDedupeKey, renderTemplate, resolveEmailRecipients } from './generic-handlers';
 
 function requireString(params: Record<string, unknown>, key: string): string {
   const value = params[key];
@@ -27,32 +30,33 @@ function requireString(params: Record<string, unknown>, key: string): string {
 registerActionHandler({
   actionType: 'SET_STATUS',
   async execute(params, ctx) {
+    const entity = requireTicketRef(ctx);
     const status = requireString(params, 'status');
     const prisma = getPrismaClient();
-    if (ctx.entity.entityType === 'CLAIM') {
-      const claim = await prisma.claim.findUnique({ where: { id: ctx.entity.claimId } });
-      if (!claim) throw new Error(`Claim ${ctx.entity.claimId} not found`);
+    if (entity.entityType === 'CLAIM') {
+      const claim = await prisma.claim.findUnique({ where: { id: entity.claimId } });
+      if (!claim) throw new Error(`Claim ${entity.claimId} not found`);
       if (!isValidClaimTransition(claim.status, status)) {
         throw new Error(`Cannot transition claim status from ${claim.status} to ${status}`);
       }
       if (claim.status === status) return;
       await prisma.claim.update({
-        where: { id: ctx.entity.claimId },
+        where: { id: entity.claimId },
         data: { status: status as never, settledAt: status === 'SETTLED' ? new Date() : undefined },
       });
       await prisma.claimStatusHistory.create({
-        data: { claimId: ctx.entity.claimId, fromStatus: claim.status, toStatus: status as never, reason: `Applied via automation rule${ctx.systemJobName ? ` (${ctx.systemJobName})` : ''}` },
+        data: { claimId: entity.claimId, fromStatus: claim.status, toStatus: status as never, reason: `Applied via automation rule${ctx.systemJobName ? ` (${ctx.systemJobName})` : ''}` },
       });
     } else {
-      const kase = await prisma.case.findUnique({ where: { id: ctx.entity.caseId } });
-      if (!kase) throw new Error(`Case ${ctx.entity.caseId} not found`);
+      const kase = await prisma.case.findUnique({ where: { id: entity.caseId } });
+      if (!kase) throw new Error(`Case ${entity.caseId} not found`);
       if (!isValidCaseTransition(kase.status, status)) {
         throw new Error(`Cannot transition case status from ${kase.status} to ${status}`);
       }
       if (kase.status === status) return;
       const now = new Date();
       await prisma.case.update({
-        where: { id: ctx.entity.caseId },
+        where: { id: entity.caseId },
         data: {
           status: status as never,
           resolvedAt: status === 'RESOLVED' ? now : undefined,
@@ -67,12 +71,13 @@ registerActionHandler({
 registerActionHandler({
   actionType: 'ASSIGN_TO_USER',
   async execute(params, ctx) {
+    const entity = requireTicketRef(ctx);
     const userId = requireString(params, 'userId');
     const prisma = getPrismaClient();
-    if (ctx.entity.entityType === 'CLAIM') {
-      await prisma.claim.update({ where: { id: ctx.entity.claimId }, data: { adjusterId: userId } });
+    if (entity.entityType === 'CLAIM') {
+      await prisma.claim.update({ where: { id: entity.claimId }, data: { adjusterId: userId } });
     } else {
-      await prisma.case.update({ where: { id: ctx.entity.caseId }, data: { assignedToId: userId } });
+      await prisma.case.update({ where: { id: entity.caseId }, data: { assignedToId: userId } });
     }
   },
 });
@@ -81,12 +86,13 @@ registerActionHandler({
 registerActionHandler({
   actionType: 'ASSIGN_TO_TEAM',
   async execute(params, ctx) {
+    const entity = requireTicketRef(ctx);
     const teamId = requireString(params, 'teamId');
     const prisma = getPrismaClient();
-    if (ctx.entity.entityType === 'CLAIM') {
-      await prisma.claim.update({ where: { id: ctx.entity.claimId }, data: { assignedTeamId: teamId } });
+    if (entity.entityType === 'CLAIM') {
+      await prisma.claim.update({ where: { id: entity.claimId }, data: { assignedTeamId: teamId } });
     } else {
-      await prisma.case.update({ where: { id: ctx.entity.caseId }, data: { assignedTeamId: teamId } });
+      await prisma.case.update({ where: { id: entity.caseId }, data: { assignedTeamId: teamId } });
     }
   },
 });
@@ -95,12 +101,13 @@ registerActionHandler({
 registerActionHandler({
   actionType: 'SET_PRIORITY',
   async execute(params, ctx) {
+    const entity = requireTicketRef(ctx);
     const priority = requireString(params, 'priority');
     const prisma = getPrismaClient();
-    if (ctx.entity.entityType === 'CLAIM') {
-      await prisma.claim.update({ where: { id: ctx.entity.claimId }, data: { priority: priority as never } });
+    if (entity.entityType === 'CLAIM') {
+      await prisma.claim.update({ where: { id: entity.claimId }, data: { priority: priority as never } });
     } else {
-      await prisma.case.update({ where: { id: ctx.entity.caseId }, data: { priority: priority as never } });
+      await prisma.case.update({ where: { id: entity.caseId }, data: { priority: priority as never } });
     }
   },
 });
@@ -109,13 +116,14 @@ registerActionHandler({
 registerActionHandler({
   actionType: 'ADD_INTERNAL_NOTE',
   async execute(params, ctx) {
+    const entity = requireTicketRef(ctx);
     const body = requireString(params, 'body');
     const subject = typeof params.subject === 'string' && params.subject.length > 0 ? params.subject : 'Automated note';
     const prisma = getPrismaClient();
     await prisma.activity.create({
       data: {
-        claimId: ctx.entity.entityType === 'CLAIM' ? ctx.entity.claimId : undefined,
-        caseId: ctx.entity.entityType === 'CASE' ? ctx.entity.caseId : undefined,
+        claimId: entity.entityType === 'CLAIM' ? entity.claimId : undefined,
+        caseId: entity.entityType === 'CASE' ? entity.caseId : undefined,
         type: 'NOTE',
         direction: 'INTERNAL',
         subject,
@@ -145,12 +153,13 @@ registerActionHandler({
 registerActionHandler({
   actionType: 'SEND_NOTIFICATION',
   async execute(params, ctx) {
+    const entity = requireTicketRef(ctx);
     const title = requireString(params, 'title');
     const body = requireString(params, 'body');
     const channel = params.channel === 'EMAIL' ? 'EMAIL' : 'IN_APP';
     const prisma = getPrismaClient();
-    const relatedEntityType = ctx.entity.entityType;
-    const relatedEntityId = ctx.entity.entityType === 'CLAIM' ? ctx.entity.claimId : ctx.entity.caseId;
+    const relatedEntityType = entity.entityType;
+    const relatedEntityId = entity.entityType === 'CLAIM' ? entity.claimId : entity.caseId;
 
     const recipientTeamId = typeof params.recipientTeamId === 'string' ? params.recipientTeamId : undefined;
     let recipientUserIds: string[];
@@ -160,11 +169,11 @@ registerActionHandler({
     } else {
       let recipientUserId = typeof params.recipientUserId === 'string' ? params.recipientUserId : undefined;
       if (!recipientUserId) {
-        if (ctx.entity.entityType === 'CLAIM') {
-          const claim = await prisma.claim.findUnique({ where: { id: ctx.entity.claimId } });
+        if (entity.entityType === 'CLAIM') {
+          const claim = await prisma.claim.findUnique({ where: { id: entity.claimId } });
           recipientUserId = claim?.adjusterId ?? undefined;
         } else {
-          const kase = await prisma.case.findUnique({ where: { id: ctx.entity.caseId } });
+          const kase = await prisma.case.findUnique({ where: { id: entity.caseId } });
           recipientUserId = kase?.assignedToId ?? undefined;
         }
       }
@@ -188,28 +197,6 @@ registerActionHandler({
   },
 });
 
-/** Mirrors send-case-survey-invite.job.ts's exact contact-resolution chain
- * (Case's own linked Contact first, else its Account's primary Contact) —
- * deliberately duplicated rather than imported, same api/worker deployable
- * boundary every other worker job in this directory respects. Claims have
- * no direct Contact FK, so they resolve via their Policy's Account's
- * primary Contact instead. */
-async function resolveCaseManagementCustomerEmail(entity: { entityType: 'CASE' | 'CLAIM'; caseId?: string; claimId?: string }): Promise<string | null> {
-  const prisma = getPrismaClient();
-  if (entity.entityType === 'CLAIM') {
-    const claim = await prisma.claim.findUnique({
-      where: { id: entity.claimId! },
-      include: { policy: { include: { account: { include: { contacts: { where: { isPrimary: true }, take: 1 } } } } } },
-    });
-    return claim?.policy.account.contacts[0]?.email ?? null;
-  }
-  const kase = await prisma.case.findUnique({
-    where: { id: entity.caseId! },
-    include: { contact: true, account: { include: { contacts: { where: { isPrimary: true }, take: 1 } } } },
-  });
-  return kase?.contact?.email ?? kase?.account?.contacts[0]?.email ?? null;
-}
-
 /**
  * SEND_EMAIL — params: { recipientMode: 'USER'|'TEAM'|'CASE_CUSTOMER',
  * recipientUserId?, recipientTeamId?, subject: string, body: string }. A
@@ -231,39 +218,38 @@ async function resolveCaseManagementCustomerEmail(entity: { entityType: 'CASE' |
 registerActionHandler({
   actionType: 'SEND_EMAIL',
   async execute(params, ctx) {
-    const recipientMode = params.recipientMode === 'TEAM' || params.recipientMode === 'CASE_CUSTOMER' ? params.recipientMode : 'USER';
-    const subject = requireString(params, 'subject');
-    const body = requireString(params, 'body');
+    // No requireTicketRef: this used to narrow to a Case/Claim, which is why
+    // a rule could not email the client on a policy or a lead. Recipient
+    // resolution now goes through the shared entity registry, so the same
+    // action works on all eight entity types while CASE_CUSTOMER keeps
+    // meaning exactly what it meant for tickets.
+    const row = await loadTarget(ctx);
+    const subject = renderTemplate(requireString(params, 'subject'), row);
+    const body = renderTemplate(requireString(params, 'body'), row);
     const prisma = getPrismaClient();
 
-    if (recipientMode === 'CASE_CUSTOMER') {
-      const email = await resolveCaseManagementCustomerEmail(
-        ctx.entity.entityType === 'CLAIM' ? { entityType: 'CLAIM', claimId: ctx.entity.claimId } : { entityType: 'CASE', caseId: ctx.entity.caseId },
-      );
-      if (!email) throw new Error('No email on file for this ticket/claim’s customer');
-      await sendMail({ to: email, subject, text: body });
-      return;
+    const { addresses, userIds } = await resolveEmailRecipients(params, ctx, row);
+
+    for (const to of addresses) {
+      await sendMail({ to, subject, text: body });
     }
+    if (userIds.length === 0) return;
 
-    const relatedEntityType = ctx.entity.entityType;
-    const relatedEntityId = ctx.entity.entityType === 'CLAIM' ? ctx.entity.claimId : ctx.entity.caseId;
-    const recipientUserIds =
-      recipientMode === 'TEAM'
-        ? (await prisma.teamMember.findMany({ where: { teamId: requireString(params, 'recipientTeamId') }, select: { userId: true } })).map((m) => m.userId)
-        : [requireString(params, 'recipientUserId')];
-    if (recipientUserIds.length === 0) return;
-
+    // Internal recipients go through the Notification table rather than
+    // straight to SMTP, so they obey each person's own delivery preferences
+    // and appear in-app as well — the same route every other internal
+    // notification takes.
     await prisma.notification.createMany({
-      data: recipientUserIds.map((recipientUserId) => ({
+      data: userIds.map((recipientUserId) => ({
         recipientUserId,
         type: 'CASE_MANAGEMENT_AUTOMATION',
         title: subject,
         body,
-        relatedEntityType,
-        relatedEntityId,
+        relatedEntityType: ctx.target.entityType,
+        relatedEntityId: ctx.target.id,
         channel: 'EMAIL',
         status: 'PENDING',
-        dedupeKey: `case-mgmt-automation-email:${relatedEntityType}:${relatedEntityId}:${recipientUserId}:${randomUUID()}`,
+        dedupeKey: notificationDedupeKey(ctx.target.entityType, ctx.target.id, recipientUserId),
       })),
     });
   },

@@ -21,6 +21,7 @@ import {
   toast,
 } from '@topiadesk/ui';
 import { Plus } from 'lucide-react';
+import { csrfHeaders } from '@/lib/csrf';
 import type { LookupOption, UserOption } from '@/app/(policy)/lib/types';
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -98,7 +99,7 @@ export function CreatePolicyDialog({ onCreated }: { onCreated: () => void }) {
     try {
       const res = await fetch('/api/policies', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeaders('POST') },
         body: JSON.stringify({
           policyNumber,
           accountId,
