@@ -52,3 +52,8 @@ frontend/web/e2e/.auth/
 # Docker volumes mounted locally (dev only)
 infra/postgres/data/
 infra/minio/data/
+
+# Generated deliverables (BRD/TRD/API PDFs) and CONFIDENTIAL security
+# reports (pentest + remediation). Kept out of version control — the pentest
+# documents describe a live weakness and must not land in the repo history.
+docs/deliverables/

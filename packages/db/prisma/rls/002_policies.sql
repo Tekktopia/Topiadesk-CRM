@@ -43,8 +43,22 @@ $$ LANGUAGE sql STABLE;
  */
 CREATE OR REPLACE FUNCTION app_max_scope(p_resource text, p_action text) RETURNS text AS $$
   SELECT CASE
+    -- SYSTEM_JOB is set ONLY by trusted server-side code for background jobs
+    -- (SYSTEM_JOB_CONTEXT), which legitimately have no user to verify against
+    -- and is never derivable from a token or user input. It remains a bypass
+    -- by necessity.
     WHEN app_current_role() = 'SYSTEM_JOB' THEN 'ALL'
-    WHEN app_current_role() = 'ADMIN' THEN 'ALL'
+    -- ADMIN previously trusted the role STRING alone: a session that merely
+    -- set app.current_role='ADMIN' (e.g. a compromised runtime DB connection)
+    -- received full cross-tenant access. Pentest finding PT-H1. The string
+    -- must now be backed by the user ACTUALLY holding the ADMIN role in this
+    -- schema; a spoofed string with a non-admin user_id fails this check and
+    -- falls through to the scoped permission lookup below, where it is denied.
+    WHEN app_current_role() = 'ADMIN' AND EXISTS (
+      SELECT 1 FROM user_roles ur
+      JOIN roles r ON r.id = ur.role_id
+      WHERE ur.user_id = app_current_user_id() AND r.name = 'ADMIN'
+    ) THEN 'ALL'
     ELSE (
       SELECT p.scope::text
       FROM user_roles ur

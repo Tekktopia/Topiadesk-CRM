@@ -6,6 +6,7 @@ import { sendMail } from '../jobs/scheduled-reports/mailer';
 // Registers CREATE_TASK / UPDATE_FIELD / CALL_WEBHOOK as a side effect of the
 // import, alongside the shared helpers SEND_EMAIL below now uses.
 import { loadTarget, notificationDedupeKey, renderTemplate, resolveEmailRecipients } from './generic-handlers';
+import { assertPublicHttpsUrl, isRedirect } from './ssrf-guard';
 
 function requireString(params: Record<string, unknown>, key: string): string {
   const value = params[key];
@@ -283,6 +284,9 @@ registerActionHandler({
 
     const config = connector.config as { webhookUrl?: string } | null;
     if (!config?.webhookUrl) throw new Error(`Connector "${connector.name}" has no webhookUrl configured`);
+    // Same SSRF class as CALL_WEBHOOK: an admin-configured URL fetched from
+    // the internal network (pentest PT-M1).
+    await assertPublicHttpsUrl(config.webhookUrl);
 
     const res = await fetch(config.webhookUrl, {
       method: 'POST',
@@ -294,7 +298,11 @@ registerActionHandler({
         title,
         text: body,
       }),
+      redirect: 'manual',
     });
+    if (isRedirect(res.status)) {
+      throw new Error(`Teams webhook URL returned a redirect (${res.status}); redirects are not followed.`);
+    }
     if (!res.ok) {
       throw new Error(`Teams webhook POST failed: ${res.status} ${await res.text().catch(() => res.statusText)}`);
     }

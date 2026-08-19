@@ -45,6 +45,63 @@ http:
         referrerPolicy: "strict-origin-when-cross-origin"
         customResponseHeaders:
           X-Robots-Tag: "noindex, nofollow"
+    # Content-Security-Policy + Permissions-Policy for the WEB app only
+    # (pentest PT-M3). Deliberately a SEPARATE middleware, attached to the
+    # web routers alone and NOT to api/keycloak/global-admin: Keycloak serves
+    # its own login theme and its own CSP, and a shared policy would risk
+    # breaking that page.
+    #
+    # script-src/style-src carry 'unsafe-inline' (and 'unsafe-eval') because
+    # Next.js emits inline hydration scripts and has no nonce without
+    # per-request generation, which this static file provider cannot do. That
+    # weakens the anti-XSS value of script-src specifically — but the rest is
+    # strict and genuinely protective: object-src 'none' (no plugins),
+    # base-uri 'self' (no base-tag hijack), frame-ancestors 'none' (no
+    # clickjacking), form-action 'self' (no credential-post redirection).
+    # worker-src/manifest-src accommodate the offline PWA. Tightening
+    # script-src to a nonce is the recommended follow-up. connect-src carries
+    # https: (not just 'self') because the browser must reach the Keycloak
+    # auth origin, a different subdomain, during login — verified by a
+    # browser load that flagged the 'self'-only violation before this shipped.
+    web-csp:
+      headers:
+        contentSecurityPolicy: >-
+          default-src 'self';
+          script-src 'self' 'unsafe-inline' 'unsafe-eval';
+          style-src 'self' 'unsafe-inline';
+          img-src 'self' data: blob:;
+          font-src 'self' data:;
+          connect-src 'self' https:;
+          worker-src 'self' blob:;
+          manifest-src 'self';
+          frame-ancestors 'none';
+          object-src 'none';
+          base-uri 'self';
+          form-action 'self'
+        customResponseHeaders:
+          Permissions-Policy: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+    # Restricts the Keycloak ADMIN surface (/admin console + admin REST API)
+    # to internal networks (pentest PT-M2). The identity provider's admin
+    # console has no business being internet-reachable; the application itself
+    # reaches Keycloak's admin API over the INTERNAL url (KEYCLOAK_INTERNAL_
+    # URL → keycloak:8080), never through this public edge, so restricting the
+    # public /admin path does not affect the app — only human/direct access.
+    # The OIDC login/token endpoints live under /realms, not /admin, and are
+    # deliberately left open.
+    #
+    # sourceRange is RFC1918 + loopback: internal and VPN clients keep access,
+    # public internet is refused. REVIEW these ranges against the real
+    # operations/VPN network before production, and verify the block from an
+    # external IP after cutover — it cannot be exercised from a local-only
+    # (RFC1918) environment, where every source already falls in the allow list.
+    internal-only:
+      ipAllowList:
+        sourceRange:
+          - 127.0.0.1/32
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+          - "::1/128"
     # Edge-level flood protection, per source IP — coarser and deliberately
     # more generous than backend/api's own ThrottlerGuard (300 req/60s,
     # per-authenticated-caller; see rate-limit-related security-audit

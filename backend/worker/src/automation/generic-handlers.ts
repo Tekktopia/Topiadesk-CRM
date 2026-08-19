@@ -18,6 +18,7 @@ import { createHmac, randomUUID } from 'node:crypto';
 import { getPrismaClient } from '@topiadesk/db';
 import { getEntityMeta, renderTemplate, type AutomationEntityType } from '@topiadesk/automation';
 import { registerActionHandler, type AutomationActionContext } from './action-handler';
+import { assertPublicHttpsUrl, isRedirect } from './ssrf-guard';
 import { sendMail } from '../jobs/scheduled-reports/mailer';
 
 function requireString(params: Record<string, unknown>, key: string): string {
@@ -227,7 +228,10 @@ registerActionHandler({
   actionType: 'CALL_WEBHOOK',
   async execute(params, ctx) {
     const url = requireString(params, 'url');
-    if (!url.startsWith('https://')) throw new Error('Webhook URLs must use https.');
+    // Rejects https URLs whose host resolves to an internal/link-local/
+    // metadata address — the SSRF guard (pentest PT-M1). Was a bare
+    // startsWith('https://'), which stopped nothing but plain http.
+    await assertPublicHttpsUrl(url);
     const row = await loadTarget(ctx);
 
     const payload = JSON.stringify({
@@ -248,8 +252,14 @@ registerActionHandler({
       method: 'POST',
       headers,
       body: payload,
+      // manual: a public URL must not be allowed to 30x onward to an internal
+      // one AFTER the guard has cleared it. A redirect is treated as failure.
+      redirect: 'manual',
       signal: AbortSignal.timeout(15_000),
     });
+    if (isRedirect(res.status)) {
+      throw new Error(`Webhook URL returned a redirect (${res.status}); redirects are not followed.`);
+    }
     if (!res.ok) {
       throw new Error(`Webhook POST failed: ${res.status} ${await res.text().catch(() => res.statusText)}`);
     }

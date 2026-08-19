@@ -37,6 +37,7 @@ import {
   conditionsToPrismaWhere,
   getEntityMeta,
   normalizeConditions,
+  validateConditions,
   type AutomationEntityType,
 } from '@topiadesk/automation';
 import '../../automation/handlers';
@@ -145,6 +146,18 @@ async function runOneScheduledRule(rule: ScheduledRule, tenantSchema: string, no
   const meta = getEntityMeta(entityType);
   if (!meta) {
     await finish(rule, now, 'FAILED', `Unknown record type "${entityType}".`, 0);
+    return 0;
+  }
+
+  // Re-validate the STORED conditions before turning them into a database
+  // query (pentest PT-L1). The API validates at save time, but the worker
+  // must not trust that a row reached it through that path — a rule written
+  // directly to the table, or a future save path that skips validation,
+  // would otherwise build a query from unchecked field names. A rule that
+  // fails here stops with a readable reason rather than running.
+  const issues = validateConditions(conditions, true);
+  if (issues.length > 0) {
+    await finish(rule, now, 'FAILED', `Rule conditions are invalid: ${issues.map((i) => i.message).join(' ')}`, 0);
     return 0;
   }
 
