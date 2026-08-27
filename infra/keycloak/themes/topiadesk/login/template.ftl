@@ -42,7 +42,8 @@
     <#if themeResources?? && themeResources.favicons?has_content>
         <@themeResourceTags.renderFavicons themeResources.favicons url.resourcesPath />
     <#else>
-        <link rel="icon" href="${url.resourcesPath}/img/favicon.ico" />
+        <link rel="icon" type="image/png" href="${url.resourcesPath}/img/logo-mark.png" />
+        <link rel="apple-touch-icon" href="${url.resourcesPath}/img/logo-mark.png" />
     </#if>
     <#if themeResources?? && themeResources.stylesCommon?has_content>
         <@themeResourceTags.renderStyles themeResources.stylesCommon url.resourcesCommonPath />
@@ -233,9 +234,7 @@
              whether this realm has a custom logo without an extra round-trip;
              onerror keeps this a single request in the common case and
              degrades to the default image otherwise. -->
-        <img src="${properties.tenantBrandingBaseUrl}/api/public/tenant-branding/${realm.name}/logo"
-             onerror="this.onerror=null;this.src='${url.resourcesPath}/img/logo-mark.png';"
-             alt="" class="td-card-brand-mark" />
+
         ${kcSanitize(msg("loginTitleHtml",(realm.displayNameHtml!'')))?no_esc}
       </div>
     </header>
