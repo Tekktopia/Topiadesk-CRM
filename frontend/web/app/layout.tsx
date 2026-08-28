@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     default: 'TopiaDesk CRM',
     template: '%s · TopiaDesk CRM',
   },
-  description: 'TopiaDesk CRM — the engagement layer for Scib Nigeria insurance brokerage operations.',
+  description: 'Topiadesk CRM -  the super-fast customer support platform built for the way your business actually works',
   manifest: '/manifest.webmanifest',
   icons: {
     icon: '/icons/icon-192.png',
