@@ -236,13 +236,15 @@ export class GraphConnectionController {
  * to the subdomain they started from.
  *
  * The tenant's schema name is on the RLS context, so the subdomain is looked
- * up from the platform registry and the root domain derived by stripping the
- * `app.` prefix — the same derivation tenants.controller.ts and
- * keycloak-realm-provisioning.ts already use.
+ * up from the platform registry and the root domain derived by stripping
+ * env.APP_URL's own leftmost label — the same derivation tenants.controller.ts
+ * and keycloak-realm-provisioning.ts already use (see the latter's comment
+ * for why this must NOT be a hardcoded `/^app\./` strip).
  */
 async function tenantProfileUrl(tenantSchema: string | null, suffix: string): Promise<string> {
   const env = loadEnv();
-  const root = new URL(env.APP_URL).host.replace(/^app\./, '');
+  const appHost = new URL(env.APP_URL).host;
+  const root = appHost.split('.').slice(1).join('.') || appHost;
   if (!tenantSchema) return `${env.APP_URL}/profile${suffix}`;
   const tenant = await runWithRlsContext(SYSTEM_JOB_CONTEXT, () =>
     getPlatformPrismaClient().tenant.findFirst({ where: { schemaName: tenantSchema }, select: { subdomain: true } }),

@@ -128,14 +128,17 @@ export class TenantsController {
     private readonly auditService: PlatformAuditService,
   ) {}
 
-  /** `env.APP_URL` is `https://app.<root domain>` — stripping the `app.`
-   * prefix gives the root domain every tenant subdomain hangs off of. Same
-   * derivation as keycloak-realm-provisioning.ts's tenantRootDomain(),
+  /** Strips only env.APP_URL's OWN leftmost label (whatever it's actually
+   * named — this deployment's is "tekktopia-app", not literally "app") to
+   * get the root domain every tenant subdomain hangs off of. Same
+   * derivation as keycloak-realm-provisioning.ts's tenantRootDomain() (see
+   * its comment for the bug a hardcoded `/^app\./` strip caused live),
    * computed here instead of imported for the same api/worker
    * deployable-boundary reason as slugToSubdomain() above. */
   private tenantUrl(subdomain: string | null): string | null {
     if (!subdomain) return null;
-    const root = new URL(this.env.APP_URL).host.replace(/^app\./, '');
+    const appHost = new URL(this.env.APP_URL).host;
+    const root = appHost.split('.').slice(1).join('.') || appHost;
     return `https://${subdomain}.${root}`;
   }
 

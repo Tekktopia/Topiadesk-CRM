@@ -23,10 +23,20 @@ import { getWebEnv } from '../env';
  */
 export async function realmForHost(host: string): Promise<string> {
   const env = getWebEnv();
-  const root = new URL(env.APP_URL).host.replace(/^app\./, '');
+  // Strip only the app's OWN leftmost label, whatever it actually is — NOT
+  // a hardcoded "app." prefix. Real deployments don't all name it "app.":
+  // this one's APP_URL is https://tekktopia-app.topiadesk.com, so a literal
+  // /^app\./ strip never matched, root stayed "tekktopia-app.topiadesk.com",
+  // and every real tenant subdomain (cribxpert., boltspeed-broadband-
+  // networks., ...) failed the endsWith(root) check below and silently
+  // fell back to the default realm — confirmed live: a real tenant hit
+  // Keycloak's "Invalid parameter: redirect_uri" because the DEFAULT
+  // realm's client has no reason to know that tenant's redirect URI.
+  const appHost = new URL(env.APP_URL).host;
+  const root = appHost.split('.').slice(1).join('.') || appHost;
   const bareHost = host.split(':')[0] ?? '';
 
-  if (bareHost === `app.${root}` || bareHost === root || !bareHost.endsWith(`.${root}`)) {
+  if (bareHost === appHost || bareHost === root || !bareHost.endsWith(`.${root}`)) {
     return env.KEYCLOAK_REALM;
   }
 

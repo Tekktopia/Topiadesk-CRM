@@ -51,7 +51,17 @@ const TENANT_REALM_ROLES = [
  */
 function tenantRootDomain(): string {
   const env = loadEnv();
-  return new URL(env.APP_URL).host.replace(/^app\./, '');
+  // Strip only the app's OWN leftmost label, not a hardcoded "app." prefix
+  // — this deployment's real APP_URL is https://tekktopia-app.topiadesk.com,
+  // so /^app\./ never matched and every tenant provisioned since Phase 2's
+  // wildcard subdomain routing went live got the WRONG root domain baked
+  // into their Keycloak client's redirect URI
+  // (<slug>.tekktopia-app.topiadesk.com instead of <slug>.topiadesk.com) —
+  // confirmed live, a real tenant hit Keycloak's "Invalid parameter:
+  // redirect_uri" as a direct result. See frontend/web/lib/auth/
+  // tenant-realm.ts's identical fix for the full explanation.
+  const appHost = new URL(env.APP_URL).host;
+  return appHost.split('.').slice(1).join('.') || appHost;
 }
 
 /**

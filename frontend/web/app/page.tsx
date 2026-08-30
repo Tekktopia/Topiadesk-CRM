@@ -33,7 +33,14 @@ interface Destination {
  */
 export default async function EntryChooserPage() {
   const host = (await headers()).get('host') ?? '';
-  const globalAdminHref = `https://${host.replace(/^app\./, 'platform.')}`;
+  // Swap the current request's OWN leftmost label for "platform" — not a
+  // hardcoded `/^app\./` replace, which silently no-ops on a deployment
+  // whose app label isn't literally "app" (this one's is "tekktopia-app"),
+  // leaving the Global Admin card pointed right back at the Staff CRM
+  // itself. Same root-domain derivation bug as lib/auth/tenant-realm.ts —
+  // see its comment for the full story.
+  const root = host.split('.').slice(1).join('.') || host;
+  const globalAdminHref = `https://platform.${root}`;
 
   const destinations: Destination[] = [
     {
