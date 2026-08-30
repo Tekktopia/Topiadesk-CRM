@@ -49,7 +49,7 @@ export const adminNav: NavItem[] = [
   { label: 'Automations', href: '/admin/automations', icon: Clock, section: 'Workflow', adminOnly: true },
 
   { label: 'Org Settings', href: '/admin/settings', icon: Settings, section: 'System', adminOnly: true },
-  { label: 'Outbound Email', href: '/admin/mail', icon: Mail, adminOnly: true },
+  { label: 'Mail', href: '/admin/mail', icon: Mail, section: 'System', adminOnly: true },
   { label: 'Integrations', href: '/admin/integrations', icon: Network, section: 'System', adminOnly: true },
   { label: 'Webhooks', href: '/admin/webhooks', icon: Webhook, section: 'System', adminOnly: true },
   { label: 'Notifications', href: '/admin/notifications', icon: Bell, section: 'System', adminOnly: true },
