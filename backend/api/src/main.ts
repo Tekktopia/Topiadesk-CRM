@@ -24,8 +24,12 @@ async function bootstrap() {
       contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false,
     }),
   );
+  const corsOrigins = [
+    env.APP_URL,
+    ...(env.CORS_ADDITIONAL_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean) ?? []),
+  ];
   app.enableCors({
-    origin: [env.APP_URL],
+    origin: corsOrigins,
     credentials: true,
   });
 

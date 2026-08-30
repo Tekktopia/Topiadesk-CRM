@@ -48,6 +48,10 @@ const envSchema = z.object({
   APP_URL: z.string().url(),
   API_URL: z.string().url(),
   API_PORT: z.coerce.number().int().positive().default(4000),
+  // Comma-separated extra CORS origins on top of APP_URL — for a local dev
+  // frontend (e.g. http://localhost:3000) talking to a remote/shared API.
+  // Leave unset in normal deployments; APP_URL alone still governs CORS.
+  CORS_ADDITIONAL_ORIGINS: zOptionalEnvString(),
   WORKER_METRICS_PORT: z.coerce.number().int().positive().default(9100),
 
   // Postgres — runtime role only. Migrations use DIRECT_URL with the migrator role.
