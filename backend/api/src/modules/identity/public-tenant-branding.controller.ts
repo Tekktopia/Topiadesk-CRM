@@ -46,6 +46,17 @@ export class PublicTenantBrandingController {
       // declared Content-Type, for any row written before that check
       // existed.
       'X-Content-Type-Options': 'nosniff',
+      // main.ts's global helmet() defaults every response to
+      // Cross-Origin-Resource-Policy: same-origin — correct for the JSON
+      // API, wrong here: this endpoint's ENTIRE purpose is being embedded
+      // as an <img> on the Keycloak login page, a different origin
+      // (auth.<domain> vs api.<domain>). With the default in place the
+      // browser silently blocks the image load even on a real 200 with
+      // real bytes, which template.ftl's onerror handler then reads as
+      // "no logo" and hides — confirmed live: two tenants with a real
+      // uploaded logo (verified 200 + real PNG bytes at this exact URL)
+      // still showed no logo at all on their login page.
+      'Cross-Origin-Resource-Policy': 'cross-origin',
     });
     return new StreamableFile(result.Body as Readable);
   }
