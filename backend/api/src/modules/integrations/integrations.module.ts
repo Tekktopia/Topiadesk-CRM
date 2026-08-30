@@ -6,6 +6,7 @@ import { WebhookReceiverController } from './webhook-receiver.controller';
 import { TeamsActionsController } from './teams-actions.controller';
 import { GraphConnectionController } from './graph/graph-connection.controller';
 import { MailSettingsController } from './mail-settings.controller';
+import { InboundEmailSettingsController } from './inbound-email-settings.controller';
 import { GraphSyncService } from './graph/graph-sync.service';
 import { OAuthController } from './oauth.controller';
 import { OAuthConnectorService } from './oauth-connector.service';
@@ -24,7 +25,7 @@ import { KeycloakAdminService } from '../identity/keycloak-admin.service';
 @Module({
   controllers: [
     GraphConnectionController,
-    MailSettingsController,IntegrationsController, WebhookSubscriptionsController, WebhookReceiverController, OAuthController, TeamsActionsController],
+    MailSettingsController,InboundEmailSettingsController,IntegrationsController, WebhookSubscriptionsController, WebhookReceiverController, OAuthController, TeamsActionsController],
   providers: [
     GraphSyncService,IntegrationsService, OAuthConnectorService, KeycloakAdminService, PaystackService, DojahService, WhatsAppCloudService, ESignatureService],
   exports: [PaystackService, DojahService, WhatsAppCloudService, ESignatureService],

@@ -100,6 +100,18 @@ model Tenant {
   /// login page itself has no session yet and can't know in advance
   /// whether a given realm has a logo to show.
   logoStorageKey      String?      @map("logo_storage_key")
+  /// The tenant's own choice of "email a ticket into TopiaDesk" address
+  /// (e.g. support@theirdomain.com) — set from Admin -> Integrations ->
+  /// Inbound Email (inbound-email-settings.controller.ts). Lives here,
+  /// not on the tenant-schema MailSettings row, because the inbound
+  /// webhook (omnichannel/inbound-email.controller.ts) receives mail
+  /// before any tenant context exists at all: this is the ONE globally
+  /// unique lookup that turns "an email arrived addressed to X" into
+  /// "which tenant's schema does this belong to" — see that
+  /// controller's own header comment. Globally unique (Postgres allows
+  /// unlimited NULLs under a plain UNIQUE constraint, so tenants that
+  /// haven't configured one yet don't conflict with each other).
+  inboundEmailAddress String?      @unique @map("inbound_email_address")
   status              TenantStatus @default(PROVISIONING)
   primaryContactEmail String       @map("primary_contact_email")
   createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)

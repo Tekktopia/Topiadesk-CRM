@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Mail, Send } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Inbox, Mail, Send } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -26,7 +26,7 @@ import { PageHeader } from '../_components/page-header';
 import { ErrorState } from '../_components/query-states';
 import { apiFetch } from '../_lib/api';
 import { canWriteAdmin } from '../_lib/permissions';
-import type { MailProvider, MailSettings, UpsertMailSettingsInput } from '../_lib/types';
+import type { InboundEmailAddress, MailProvider, MailSettings, UpsertMailSettingsInput } from '../_lib/types';
 
 /**
  * Host/port presets.
@@ -90,6 +90,24 @@ export default function MailSettingsPage() {
   const query = useQuery({
     queryKey: ['admin', 'mail-settings'],
     queryFn: () => apiFetch<MailSettings>('/api/admin/mail-settings'),
+  });
+
+  const inboundQuery = useQuery({
+    queryKey: ['admin', 'inbound-email'],
+    queryFn: () => apiFetch<InboundEmailAddress>('/api/admin/inbound-email'),
+  });
+  const [inboundAddress, setInboundAddress] = useState('');
+  useEffect(() => {
+    setInboundAddress(inboundQuery.data?.address ?? '');
+  }, [inboundQuery.data]);
+  const saveInbound = useMutation({
+    mutationFn: (address: string) =>
+      apiFetch<InboundEmailAddress>('/api/admin/inbound-email', { method: 'PUT', body: JSON.stringify({ address }) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'inbound-email'] });
+      toast.success('Inbound email address saved');
+    },
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Could not save the inbound address'),
   });
 
   const [provider, setProvider] = useState<MailProvider>('BREVO');
@@ -178,9 +196,55 @@ export default function MailSettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Outbound Email"
-        description="Where this organisation's email is sent from. Changing provider here takes effect immediately — no redeploy."
+        title="Email"
+        description="Where this organisation's email is sent from, and where a customer's email turns into a ticket."
       />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Inbox className="h-4 w-4 text-muted-foreground" aria-hidden /> Inbound Email
+          </CardTitle>
+          <CardDescription>
+            Any email sent to this address becomes a ticket here automatically, the same way it would land in Freshdesk's
+            inbox — replies thread onto the same ticket instead of creating a new one each time.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {inboundQuery.isLoading ? (
+            <Skeleton className="h-10 w-full sm:w-96" />
+          ) : (
+            <>
+              <div className="w-full space-y-1.5 sm:w-96">
+                <Label htmlFor="inbound-email">Ticket email address</Label>
+                <Input
+                  id="inbound-email"
+                  value={inboundAddress}
+                  onChange={(e) => setInboundAddress(e.target.value)}
+                  placeholder="support@yourdomain.com"
+                  disabled={!canWrite}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Point this address's mail routing (MX record, or a forwarding rule from your existing mailbox) at
+                  TopiaDesk. Clearing this field turns email-to-ticket off.
+                </p>
+              </div>
+              {canWrite ? (
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() => saveInbound.mutate(inboundAddress.trim())}
+                    disabled={saveInbound.isPending || inboundAddress.trim() === (inboundQuery.data?.address ?? '')}
+                  >
+                    {saveInbound.isPending ? 'Saving…' : 'Save inbound address'}
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <h2 className="pt-2 text-sm font-semibold text-foreground">Outbound Email</h2>
 
       {query.isLoading ? (
         <Skeleton className="h-64 w-full" />

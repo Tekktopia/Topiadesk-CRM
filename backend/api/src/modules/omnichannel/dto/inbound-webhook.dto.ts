@@ -23,6 +23,6 @@ export class InboundMessagingWebhookDto {
 }
 
 export class InboundWebhookResponseDto {
-  @ApiProperty() status!: 'created' | 'appended' | 'duplicate';
+  @ApiProperty() status!: 'created' | 'appended' | 'duplicate' | 'ignored';
   @ApiProperty() caseId!: string | null;
 }

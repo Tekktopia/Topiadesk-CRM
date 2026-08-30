@@ -1,6 +1,7 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { getPrismaClient, runWithRlsContext, SYSTEM_JOB_CONTEXT } from '@topiadesk/db';
+import { getPlatformPrismaClient } from '@topiadesk/db-platform';
 import { ensureCaseSlaClocks } from '../case-management/sla-clock.util';
 import { enqueueEntityEvent } from '../case-management/automation-events.util';
 import { OmnichannelWebhookGuard } from './omnichannel-webhook.guard';
@@ -8,12 +9,36 @@ import { InboundEmailWebhookDto, InboundWebhookResponseDto } from './dto/inbound
 import { findParentActivityForThreading, generateCaseNumber } from './omnichannel.util';
 
 /**
+ * Pulls the bare address out of a header-style sender/recipient string
+ * ("Support Team <support@acme.com>") — providers vary on whether `to`
+ * arrives bare or wrapped, and platform.tenants.inboundEmailAddress is
+ * stored bare + lowercased (inbound-email-settings.controller.ts), so the
+ * lookup key has to be normalized the same way regardless of which shape
+ * showed up on the wire.
+ */
+function normalizeEmailAddress(raw: string): string {
+  const match = /<([^>]+)>/.exec(raw);
+  return (match?.[1] ?? raw).trim().toLowerCase();
+}
+
+/**
  * Email-to-case: a provider (SendGrid/Postmark/Mailgun-shaped inbound
  * parse webhook, or a manual curl simulating one — no live provider
  * account is wired up in this environment) posts here on every inbound
  * email. See omnichannel-webhook.guard.ts for the auth model and
  * app.module.ts's RlsContextMiddleware exclusion list for why this route
- * needs one and runs under SYSTEM_JOB_CONTEXT.
+ * needs one.
+ *
+ * Multi-tenant routing: this endpoint is PUBLIC and unauthenticated (mail
+ * providers can't present a tenant's own bearer token), so which tenant's
+ * Postgres schema an arriving message belongs to has to be resolved from
+ * the message itself — `dto.to` against platform.tenants.inboundEmailAddress
+ * (set via Admin -> Integrations -> Inbound Email). Everything below this
+ * lookup runs under THAT tenant's schema, never a bare SYSTEM_JOB_CONTEXT
+ * (which resolves to the original pre-multi-tenant 'public' schema) — a
+ * previous version of this handler did exactly that, which would have
+ * collided every tenant's inbound mail into one shared schema the moment a
+ * second tenant configured this feature.
  */
 @ApiTags('omnichannel')
 @UseGuards(OmnichannelWebhookGuard)
@@ -22,7 +47,24 @@ export class InboundEmailController {
   @Post()
   @ApiOkResponse({ type: InboundWebhookResponseDto })
   async receive(@Body() dto: InboundEmailWebhookDto): Promise<InboundWebhookResponseDto> {
-    return runWithRlsContext(SYSTEM_JOB_CONTEXT, async () => {
+    const toAddress = normalizeEmailAddress(dto.to);
+    const tenant = await runWithRlsContext(SYSTEM_JOB_CONTEXT, () =>
+      getPlatformPrismaClient().tenant.findUnique({
+        where: { inboundEmailAddress: toAddress },
+        select: { schemaName: true, keycloakRealm: true, status: true },
+      }),
+    );
+    // No tenant has claimed this address (never configured, mistyped
+    // provider setup, or a stale/removed one) — never a real Case, an
+    // unauthenticated sender can't be allowed to create work in an
+    // arbitrary tenant's queue just by guessing at an address. Reported as
+    // "ignored" rather than a 404/500 so the provider doesn't endlessly
+    // retry a message that was never going to match.
+    if (!tenant || tenant.status !== 'ACTIVE') {
+      return { status: 'ignored', caseId: null };
+    }
+
+    return runWithRlsContext({ ...SYSTEM_JOB_CONTEXT, tenantSchema: tenant.schemaName, keycloakRealm: tenant.keycloakRealm }, async () => {
       const prisma = getPrismaClient();
 
       // Idempotency: webhook retries are normal — a provider redelivering
