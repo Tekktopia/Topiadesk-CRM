@@ -283,9 +283,9 @@ export default function MailSettingsPage() {
               <Inbox className="h-4 w-4 text-muted-foreground" aria-hidden /> Inbound Email
             </CardTitle>
             <CardDescription className="mt-1">
-              Connect a mailbox and any email sent to it becomes a ticket here automatically, the same way it would land
-              in Freshdesk's inbox — replies thread onto the same ticket instead of creating a new one each time. No DNS
-              changes, no separate provider account — just the mailbox's own login.
+              Connect a mailbox and any email sent to it becomes a ticket here automatically — replies thread onto the
+              same ticket instead of creating a new one each time. No DNS changes, no separate provider account — just
+              the mailbox's own login.
             </CardDescription>
           </div>
           {inboundSettings?.isActive ? (

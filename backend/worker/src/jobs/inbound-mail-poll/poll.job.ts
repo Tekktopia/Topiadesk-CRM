@@ -25,7 +25,7 @@ import { getPlatformPrismaClient } from '@topiadesk/db-platform';
 
 export const INBOUND_MAIL_POLL_QUEUE_NAME = 'inbound-mail-poll';
 const INBOUND_MAIL_POLL_SCHEDULER_ID = 'inbound-mail-poll-sweep';
-/** Freshdesk-adjacent responsiveness without hammering a real mailbox provider's IMAP rate limits. */
+/** Feels responsive without hammering a real mailbox provider's IMAP rate limits. */
 const POLL_INTERVAL_MS = 3 * 60_000;
 /** A stuck IMAP server must not hang the whole sweep for every other tenant behind it. */
 const CONNECT_TIMEOUT_MS = 20_000;
