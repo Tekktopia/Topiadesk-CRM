@@ -21,6 +21,7 @@
     "@nestjs/swagger": "^8.1.0",
     "@nestjs/terminus": "^10.2.3",
     "@nestjs/throttler": "^6.3.0",
+    "@topiadesk/automation": "workspace:*",
     "@topiadesk/config": "workspace:*",
     "@topiadesk/db": "workspace:*",
     "@topiadesk/db-platform": "workspace:*",
@@ -33,6 +34,7 @@
     "csv-parse": "^5.6.0",
     "csv-stringify": "^6.5.2",
     "helmet": "^8.0.0",
+    "imapflow": "^1.7.6",
     "ioredis": "^5.11.1",
     "ipaddr.js": "^1.9.1",
     "jsonwebtoken": "^9.0.2",
@@ -44,8 +46,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^3.24.1",
-    "zod-to-json-schema": "^3.24.1",
-    "@topiadesk/automation": "workspace:*"
+    "zod-to-json-schema": "^3.24.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.9",

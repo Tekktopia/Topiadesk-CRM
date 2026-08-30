@@ -3969,6 +3969,39 @@ model MailSettings {
   /// transport they have not proven works.
   lastTestedAt      DateTime?    @map("last_tested_at") @db.Timestamptz(6)
   lastTestError     String?      @map("last_test_error")
+
+  /// Inbound (IMAP polling) side — entirely independent of the outbound
+  /// fields above, so a tenant can configure either without the other.
+  /// This is the "enter your mailbox login, save, it just works" path:
+  /// backend/worker/src/jobs/inbound-mail-poll/poll.job.ts logs into
+  /// inboundUsername's mailbox every few minutes and turns unseen mail
+  /// into a Case, same domain model as the push-webhook path in
+  /// omnichannel/inbound-email.controller.ts (which stays available for a
+  /// future real push-provider integration - this is not a replacement
+  /// for it, just the simpler no-DNS onboarding path).
+  inboundHost             String?   @map("inbound_host")
+  inboundPort             Int?      @map("inbound_port")
+  /// true for implicit TLS (993, the IMAP norm) - unlike SMTP, plaintext
+  /// IMAP is rare enough that this defaults true rather than false.
+  inboundSecure           Boolean   @default(true) @map("inbound_secure")
+  /// The mailbox to log into - also the address customers should be told
+  /// to email, and what MailSettingsResponseDto exposes as the tenant's
+  /// current "ticket email address" (no separate address field: for IMAP
+  /// login, the username already IS the email address).
+  inboundUsername         String?   @map("inbound_username")
+  inboundEncryptedPassword String?  @map("inbound_encrypted_password")
+  /// Which mailbox folder to poll. INBOX by default; a tenant who already
+  /// files support mail into a specific folder via their own mail rules
+  /// can point here instead of INBOX.
+  inboundFolder           String    @default("INBOX") @map("inbound_folder")
+  inboundIsActive         Boolean   @default(false) @map("inbound_is_active")
+  inboundLastPolledAt     DateTime? @map("inbound_last_polled_at") @db.Timestamptz(6)
+  inboundLastPollError    String?   @map("inbound_last_poll_error")
+  /// Set by the "test connection" action, same "never enable a transport
+  /// unproven" reasoning as lastTestedAt/lastTestError above.
+  inboundLastTestedAt     DateTime? @map("inbound_last_tested_at") @db.Timestamptz(6)
+  inboundLastTestError    String?   @map("inbound_last_test_error")
+
   createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 

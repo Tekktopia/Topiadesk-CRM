@@ -631,10 +631,31 @@ export interface UpsertMailSettingsInput {
   isActive?: boolean;
 }
 
-/** Backed by integrations/inbound-email-settings.controller.ts, a separate
- * endpoint from MailSettings above — this address lives on platform.tenants,
- * not the tenant-schema mail_settings row (see that controller's own
- * comment for why). */
-export interface InboundEmailAddress {
-  address: string | null;
+/** Backed by integrations/inbound-email-settings.controller.ts — IMAP
+ * polling settings for "email becomes a ticket", independent of the
+ * outbound SMTP settings above. */
+export interface InboundMailboxSettings {
+  configured: boolean;
+  host: string | null;
+  port: number | null;
+  secure: boolean;
+  username: string | null;
+  hasPassword: boolean;
+  folder: string;
+  isActive: boolean;
+  lastPolledAt: string | null;
+  lastPollError: string | null;
+  lastTestedAt: string | null;
+  lastTestError: string | null;
+}
+
+export interface UpsertInboundMailboxSettingsInput {
+  host: string;
+  port: number;
+  secure: boolean;
+  username: string;
+  /** Omit to KEEP the stored password; empty string clears it. */
+  password?: string;
+  folder?: string;
+  isActive?: boolean;
 }

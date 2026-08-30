@@ -11,18 +11,21 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@topiadesk/automation": "workspace:*",
     "@topiadesk/config": "workspace:*",
     "@topiadesk/db": "workspace:*",
     "@topiadesk/db-platform": "workspace:*",
     "@topiadesk/reports": "workspace:*",
     "bullmq": "^6.0.5",
+    "imapflow": "^1.7.6",
     "ioredis": "^5.4.1",
     "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^9.0.5",
-    "@topiadesk/automation": "workspace:*"
+    "mailparser": "^3.9.17",
+    "nodemailer": "^9.0.5"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.7",
+    "@types/mailparser": "^3.4.6",
     "@types/node": "^22.10.2",
     "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.11.10",

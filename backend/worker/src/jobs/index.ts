@@ -48,6 +48,7 @@ import {
 } from './automation-schedule/schedule-scan.job';
 import { createAuditCheckpointQueue, createAuditCheckpointWorker, scheduleAuditCheckpoint } from './audit-checkpoint/create-checkpoint.job';
 import { createDetectAnomaliesQueue, createDetectAnomaliesWorker, scheduleDetectAnomalies } from './security-monitoring/detect-anomalies.job';
+import { createInboundMailPollQueue, createInboundMailPollWorker, scheduleInboundMailPoll } from './inbound-mail-poll/poll.job';
 
 export interface RegisteredJobs {
   queues: Queue[];
@@ -226,6 +227,13 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
   const detectAnomaliesWorker = createDetectAnomaliesWorker(connection);
   await scheduleDetectAnomalies(detectAnomaliesQueue);
 
+  // "Enter your mailbox login, save, it just works" ticket-email path — see
+  // inbound-mail-poll/poll.job.ts's header comment for how this relates to
+  // the DNS/push-webhook path (omnichannel/inbound-email.controller.ts).
+  const inboundMailPollQueue = createInboundMailPollQueue(connection);
+  const inboundMailPollWorker = createInboundMailPollWorker(connection);
+  await scheduleInboundMailPoll(inboundMailPollQueue);
+
   return {
     queues: [
       renewalScanQueue,
@@ -259,6 +267,7 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       automationAsyncActionQueue,
       auditCheckpointQueue,
       detectAnomaliesQueue,
+      inboundMailPollQueue,
     ],
     workers: [
       renewalScanWorker,
@@ -292,6 +301,7 @@ export async function registerJobs(connection: Redis): Promise<RegisteredJobs> {
       automationAsyncActionWorker,
       auditCheckpointWorker,
       detectAnomaliesWorker,
+      inboundMailPollWorker,
     ],
   };
 }

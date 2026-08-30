@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Inbox, Mail, Send } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Inbox, Mail, Plug, Send } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -26,7 +26,36 @@ import { PageHeader } from '../_components/page-header';
 import { ErrorState } from '../_components/query-states';
 import { apiFetch } from '../_lib/api';
 import { canWriteAdmin } from '../_lib/permissions';
-import type { InboundEmailAddress, MailProvider, MailSettings, UpsertMailSettingsInput } from '../_lib/types';
+import type {
+  InboundMailboxSettings,
+  MailProvider,
+  MailSettings,
+  UpsertInboundMailboxSettingsInput,
+  UpsertMailSettingsInput,
+} from '../_lib/types';
+
+/**
+ * IMAP host/port presets — same "label to save a lookup" purpose as the
+ * outbound PRESETS table below, for the three mailbox providers a tenant is
+ * overwhelmingly likely to already have.
+ */
+const IMAP_PRESETS: Record<'GMAIL' | 'MICROSOFT365' | 'CUSTOM', { label: string; host: string; port: number; secure: boolean; hint: string }> = {
+  GMAIL: {
+    label: 'Gmail / Google Workspace',
+    host: 'imap.gmail.com',
+    port: 993,
+    secure: true,
+    hint: 'Needs an App Password (2-Step Verification must be on) — your normal Google password will not work here.',
+  },
+  MICROSOFT365: {
+    label: 'Microsoft 365 / Outlook',
+    host: 'outlook.office365.com',
+    port: 993,
+    secure: true,
+    hint: 'Requires IMAP enabled on the mailbox and, if MFA is on, an app password.',
+  },
+  CUSTOM: { label: 'Custom IMAP', host: '', port: 993, secure: true, hint: 'Any IMAP server.' },
+};
 
 /**
  * Host/port presets.
@@ -94,21 +123,68 @@ export default function MailSettingsPage() {
 
   const inboundQuery = useQuery({
     queryKey: ['admin', 'inbound-email'],
-    queryFn: () => apiFetch<InboundEmailAddress>('/api/admin/inbound-email'),
+    queryFn: () => apiFetch<InboundMailboxSettings>('/api/admin/inbound-email'),
   });
-  const [inboundAddress, setInboundAddress] = useState('');
+  const inboundSettings = inboundQuery.data;
+
+  const [inboundPreset, setInboundPreset] = useState<'GMAIL' | 'MICROSOFT365' | 'CUSTOM'>('GMAIL');
+  const [inboundHost, setInboundHost] = useState('');
+  const [inboundPort, setInboundPort] = useState('993');
+  const [inboundSecure, setInboundSecure] = useState(true);
+  const [inboundUsername, setInboundUsername] = useState('');
+  const [inboundPassword, setInboundPassword] = useState('');
+  const [inboundActive, setInboundActive] = useState(false);
+
   useEffect(() => {
-    setInboundAddress(inboundQuery.data?.address ?? '');
-  }, [inboundQuery.data]);
+    if (!inboundSettings?.configured) return;
+    setInboundHost(inboundSettings.host ?? '');
+    setInboundPort(String(inboundSettings.port ?? 993));
+    setInboundSecure(inboundSettings.secure);
+    setInboundUsername(inboundSettings.username ?? '');
+    setInboundActive(inboundSettings.isActive);
+    setInboundPassword('');
+  }, [inboundSettings]);
+
+  function applyInboundPreset(next: 'GMAIL' | 'MICROSOFT365' | 'CUSTOM') {
+    setInboundPreset(next);
+    const preset = IMAP_PRESETS[next];
+    if (preset.host) {
+      setInboundHost(preset.host);
+      setInboundPort(String(preset.port));
+      setInboundSecure(preset.secure);
+    }
+  }
+
   const saveInbound = useMutation({
-    mutationFn: (address: string) =>
-      apiFetch<InboundEmailAddress>('/api/admin/inbound-email', { method: 'PUT', body: JSON.stringify({ address }) }),
+    mutationFn: (input: UpsertInboundMailboxSettingsInput) =>
+      apiFetch<InboundMailboxSettings>('/api/admin/inbound-email', { method: 'PUT', body: JSON.stringify(input) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'inbound-email'] });
-      toast.success('Inbound email address saved');
+      toast.success('Inbound mailbox settings saved');
     },
-    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Could not save the inbound address'),
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Could not save the inbound mailbox settings'),
   });
+
+  const testInbound = useMutation({
+    mutationFn: () => apiFetch<{ connected: boolean; error: string | null }>('/api/admin/inbound-email/test', { method: 'POST' }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'inbound-email'] });
+      if (res.connected) toast.success('Connected — the mailbox is reachable');
+      else toast.error(`Connection failed: ${res.error ?? 'unknown error'}`);
+    },
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Test failed'),
+  });
+
+  function submitInbound() {
+    saveInbound.mutate({
+      host: inboundHost,
+      port: Number(inboundPort),
+      secure: inboundSecure,
+      username: inboundUsername,
+      ...(inboundPassword ? { password: inboundPassword } : {}),
+      isActive: inboundActive,
+    });
+  }
 
   const [provider, setProvider] = useState<MailProvider>('BREVO');
   const [host, setHost] = useState('');
@@ -201,41 +277,128 @@ export default function MailSettingsPage() {
       />
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Inbox className="h-4 w-4 text-muted-foreground" aria-hidden /> Inbound Email
-          </CardTitle>
-          <CardDescription>
-            Any email sent to this address becomes a ticket here automatically, the same way it would land in Freshdesk's
-            inbox — replies thread onto the same ticket instead of creating a new one each time.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Inbox className="h-4 w-4 text-muted-foreground" aria-hidden /> Inbound Email
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Connect a mailbox and any email sent to it becomes a ticket here automatically, the same way it would land
+              in Freshdesk's inbox — replies thread onto the same ticket instead of creating a new one each time. No DNS
+              changes, no separate provider account — just the mailbox's own login.
+            </CardDescription>
+          </div>
+          {inboundSettings?.isActive ? (
+            <Badge variant="success">Active</Badge>
+          ) : (
+            <Badge variant="outline">Off</Badge>
+          )}
         </CardHeader>
+        {inboundSettings?.lastPolledAt ? (
+          <CardContent className="pt-0">
+            {inboundSettings.lastPollError ? (
+              <p className="flex items-start gap-2 text-sm text-destructive">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                <span>Last poll failed: {inboundSettings.lastPollError}</span>
+              </p>
+            ) : (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 text-success" aria-hidden />
+                Last checked {new Date(inboundSettings.lastPolledAt).toLocaleString()}
+              </p>
+            )}
+          </CardContent>
+        ) : null}
         <CardContent className="space-y-4">
           {inboundQuery.isLoading ? (
-            <Skeleton className="h-10 w-full sm:w-96" />
+            <Skeleton className="h-64 w-full" />
           ) : (
             <>
-              <div className="w-full space-y-1.5 sm:w-96">
-                <Label htmlFor="inbound-email">Ticket email address</Label>
-                <Input
-                  id="inbound-email"
-                  value={inboundAddress}
-                  onChange={(e) => setInboundAddress(e.target.value)}
-                  placeholder="support@yourdomain.com"
-                  disabled={!canWrite}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Point this address's mail routing (MX record, or a forwarding rule from your existing mailbox) at
-                  TopiaDesk. Clearing this field turns email-to-ticket off.
-                </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Mailbox provider</Label>
+                  <Select value={inboundPreset} onValueChange={(v) => applyInboundPreset(v as typeof inboundPreset)} disabled={!canWrite}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(IMAP_PRESETS) as (keyof typeof IMAP_PRESETS)[]).map((p) => (
+                        <SelectItem key={p} value={p}>{IMAP_PRESETS[p].label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">{IMAP_PRESETS[inboundPreset].hint}</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="inbound-username">Email address</Label>
+                  <Input
+                    id="inbound-username"
+                    value={inboundUsername}
+                    onChange={(e) => setInboundUsername(e.target.value)}
+                    placeholder="support@yourdomain.com"
+                    disabled={!canWrite}
+                  />
+                  <p className="text-xs text-muted-foreground">Also what customers should be told to email.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="inbound-host">IMAP host</Label>
+                  <Input id="inbound-host" value={inboundHost} onChange={(e) => setInboundHost(e.target.value)} disabled={!canWrite} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="inbound-port">Port</Label>
+                  <Input
+                    id="inbound-port"
+                    inputMode="numeric"
+                    value={inboundPort}
+                    onChange={(e) => setInboundPort(e.target.value)}
+                    disabled={!canWrite}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Encryption</Label>
+                  <Select value={inboundSecure ? 'ssl' : 'starttls'} onValueChange={(v) => setInboundSecure(v === 'ssl')} disabled={!canWrite}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ssl">SSL/TLS (usually port 993)</SelectItem>
+                      <SelectItem value="starttls">STARTTLS (usually port 143)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="inbound-pass">Password / app password</Label>
+                  <Input
+                    id="inbound-pass"
+                    type="password"
+                    value={inboundPassword}
+                    onChange={(e) => setInboundPassword(e.target.value)}
+                    placeholder={inboundSettings?.hasPassword ? '•••••••• (leave blank to keep)' : ''}
+                    disabled={!canWrite}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Stored encrypted and never shown again. Leave blank to keep the current one.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Status</Label>
+                  <Select value={inboundActive ? 'on' : 'off'} onValueChange={(v) => setInboundActive(v === 'on')} disabled={!canWrite}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="on">Active — check this mailbox for new tickets</SelectItem>
+                      <SelectItem value="off">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+
               {canWrite ? (
-                <div className="flex justify-end">
+                <div className="flex flex-wrap justify-end gap-3">
                   <Button
-                    onClick={() => saveInbound.mutate(inboundAddress.trim())}
-                    disabled={saveInbound.isPending || inboundAddress.trim() === (inboundQuery.data?.address ?? '')}
+                    variant="outline"
+                    onClick={() => testInbound.mutate()}
+                    disabled={testInbound.isPending || !inboundSettings?.configured}
                   >
-                    {saveInbound.isPending ? 'Saving…' : 'Save inbound address'}
+                    <Plug aria-hidden /> {testInbound.isPending ? 'Testing…' : 'Test connection'}
+                  </Button>
+                  <Button onClick={submitInbound} disabled={saveInbound.isPending || !inboundHost || !inboundUsername}>
+                    {saveInbound.isPending ? 'Saving…' : 'Save inbound settings'}
                   </Button>
                 </div>
               ) : null}

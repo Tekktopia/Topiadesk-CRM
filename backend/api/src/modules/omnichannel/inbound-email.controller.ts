@@ -5,6 +5,9 @@ import { getPlatformPrismaClient } from '@topiadesk/db-platform';
 import { ensureCaseSlaClocks } from '../case-management/sla-clock.util';
 import { enqueueEntityEvent } from '../case-management/automation-events.util';
 import { OmnichannelWebhookGuard } from './omnichannel-webhook.guard';
+// NOT type-only: @Body() parameter types need a runtime value for
+// ValidationPipe to resolve the metatype.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { InboundEmailWebhookDto, InboundWebhookResponseDto } from './dto/inbound-webhook.dto';
 import { findParentActivityForThreading, generateCaseNumber } from './omnichannel.util';
 
