@@ -772,6 +772,18 @@ a:hover {
   border-radius: 10px;
   font-family: var(--td-font);
 }
+/* keycloak.v2's base theme assumes a dark/saturated alert background and
+   sets light (near-white) text on top of it — the light tint above alone
+   leaves that same light text sitting on a near-white background,
+   invisible. Confirmed live: a real "Invalid redirect_uri" error was
+   completely unreadable on a tenant's login page. */
+.pf-v5-c-alert.pf-m-danger .pf-v5-c-alert__title,
+.pf-v5-c-alert.pf-m-danger .kc-feedback-text {
+  color: #8a2622 !important;
+}
+.pf-v5-c-alert.pf-m-danger .pf-v5-c-alert__icon {
+  color: #d9534f !important;
+}
 
 /* ---------- Trust badges + footer, below the card ---------- */
 .td-trust-badges {

@@ -161,8 +161,8 @@
              card below, right next to the tenant's own realm name. -->
         <img src="${url.resourcesPath}/img/logo-mark.png" alt="" class="td-hero-brand-mark" />
         <div class="td-hero-brand-text">
-          <span class="td-hero-brand-name">TopiaDesk CRM</span>
-          <span class="td-hero-brand-tag">Insurance Brokerage Platform</span>
+          <span class="td-hero-brand-name">Topiadesk CRM</span>
+          <span class="td-hero-brand-tag">Customer Support Platform</span>
         </div>
       </div>
 
