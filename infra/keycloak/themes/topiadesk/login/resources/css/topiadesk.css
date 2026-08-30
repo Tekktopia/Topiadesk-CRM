@@ -267,6 +267,15 @@ body#keycloak-bg {
 
 .pf-v5-c-login__container {
   grid-template-columns: 23.5rem !important;
+  /* keycloak.v2's base theme (loaded before ours) puts its own
+     white-card-with-shadow styling directly on this wrapper - flattening
+     only .pf-v5-c-login__main below left this outer default exposed,
+     reproducing the exact boxed/shadowed look this theme is meant to
+     remove. Neutralize it here too so nothing card-like survives. */
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
 }
 
 /* The original single-page brand header — kept as a small mark+label
