@@ -11,6 +11,7 @@
     "generate": "prisma generate",
     "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
     "migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy && dotenv -e ../../.env -- tsx src/apply-sql.ts",
+    "migrate:tenants": "dotenv -e ../../.env -- tsx src/sync-tenant-migrations.ts",
     "apply-sql": "dotenv -e ../../.env -- tsx src/apply-sql.ts",
     "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
     "studio": "dotenv -e ../../.env -- prisma studio",
