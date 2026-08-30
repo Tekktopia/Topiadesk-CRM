@@ -318,29 +318,19 @@ body#keycloak-bg {
     0 6px 18px -6px rgba(47, 111, 238, 0.4);
 }
 
-/* ---------- Card: clean, light, a thin single-hue accent bar ----------
-   Slightly more generous padding/radius/shadow than a default PatternFly
-   card — the goal is "considered product surface", not "unstyled form in
-   a box". Sizing/position of the card itself (.pf-v5-c-login__container's
-   width) is left alone so it keeps lining up with the trust-badge row
-   below, which lives outside this component. */
+/* ---------- Flat, borderless form surface ----------
+   No card/box/shadow — the form sits directly on .td-form-panel's own
+   background, same flat treatment as AssessIQ/ScibAccess/Onboarding's
+   sign-in screens. Sizing/position (.pf-v5-c-login__container's width) is
+   left alone so it keeps lining up with the trust-badge row below, which
+   lives outside this component. */
 .pf-v5-c-login__main {
-  background: var(--td-card-bg);
-  border: 1px solid var(--td-card-border);
-  border-radius: 20px;
-  padding: 1.9rem 2rem 1.6rem;
-  box-shadow: 0 2px 5px rgba(16, 24, 40, 0.05), 0 26px 52px -16px rgba(16, 24, 40, 0.18);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
   position: relative;
-  overflow: hidden;
-}
-.pf-v5-c-login__main::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--td-accent-strong), var(--td-accent) 70%, #bcd2ff);
 }
 
 /* padding-bottom is zeroed too, not just padding-top: PatternFly's native
